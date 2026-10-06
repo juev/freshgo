@@ -1,0 +1,77 @@
+package config
+
+import (
+	"flag"
+	"io"
+	"testing"
+)
+
+func parse(t *testing.T, env map[string]string, args ...string) *Config {
+	t.Helper()
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	c := Bind(fs, func(k string) string { return env[k] })
+	if err := fs.Parse(args); err != nil {
+		t.Fatalf("parse %v: %v", args, err)
+	}
+	return c
+}
+
+func TestPrecedence(t *testing.T) {
+	env := map[string]string{EnvListen: "0.0.0.0:9000"}
+
+	if got := parse(t, nil).Listen; got != defaultListen {
+		t.Errorf("no env, no flag: Listen = %q, want default %q", got, defaultListen)
+	}
+	if got := parse(t, env).Listen; got != "0.0.0.0:9000" {
+		t.Errorf("env only: Listen = %q, want value from environment", got)
+	}
+	if got := parse(t, env, "-listen", ":1234").Listen; got != ":1234" {
+		t.Errorf("env and flag: Listen = %q, want value from flag", got)
+	}
+}
+
+func TestDatabase(t *testing.T) {
+	tests := []struct {
+		url     string
+		driver  Driver
+		dsn     string
+		wantErr bool
+	}{
+		{url: "sqlite://data/freshgo.sqlite", driver: DriverSQLite, dsn: "data/freshgo.sqlite"},
+		{url: "sqlite:///var/lib/freshgo/db.sqlite", driver: DriverSQLite, dsn: "/var/lib/freshgo/db.sqlite"},
+		{url: "postgres://u:p@localhost:5432/freshgo", driver: DriverPostgres, dsn: "postgres://u:p@localhost:5432/freshgo"},
+		{url: "postgresql://localhost/freshgo", driver: DriverPostgres, dsn: "postgresql://localhost/freshgo"},
+		{url: "sqlite://", wantErr: true},
+		{url: "mysql://localhost/freshgo", wantErr: true},
+		{url: "freshgo.sqlite", wantErr: true},
+	}
+	for _, tt := range tests {
+		c := &Config{DatabaseURL: tt.url}
+		driver, dsn, err := c.Database()
+		if (err != nil) != tt.wantErr {
+			t.Errorf("Database(%q) error = %v, wantErr %v", tt.url, err, tt.wantErr)
+			continue
+		}
+		if driver != tt.driver || dsn != tt.dsn {
+			t.Errorf("Database(%q) = %q, %q; want %q, %q", tt.url, driver, dsn, tt.driver, tt.dsn)
+		}
+	}
+}
+
+func TestValidateBaseURL(t *testing.T) {
+	c := &Config{DatabaseURL: defaultDatabaseURL, BaseURL: "https://rss.example.org/reader/"}
+	if err := c.Validate(); err != nil {
+		t.Fatalf("Validate: %v", err)
+	}
+	if c.BaseURL != "https://rss.example.org/reader" {
+		t.Errorf("BaseURL = %q, want trailing slash removed", c.BaseURL)
+	}
+
+	for _, bad := range []string{"rss.example.org", "ftp://rss.example.org", "https://"} {
+		c := &Config{DatabaseURL: defaultDatabaseURL, BaseURL: bad}
+		if err := c.Validate(); err == nil {
+			t.Errorf("Validate with BaseURL %q: no error", bad)
+		}
+	}
+}

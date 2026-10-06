@@ -1,0 +1,5 @@
+/bin/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+!/testdata/reference/**/db.sqlite
