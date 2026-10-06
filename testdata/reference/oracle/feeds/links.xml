@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>t</title><link>http://base.test/dir/page</link>
+<item><title>l0</title><link>http://e.test/a b</link><pubDate>Tue, 06 Oct 2026 10:00:00 GMT</pubDate><description>k0</description></item>
+<item><title>l1</title><link>http://e.test/é</link><pubDate>Tue, 06 Oct 2026 10:00:01 GMT</pubDate><description>k1</description></item>
+<item><title>l2</title><link>http://e.test/%c3%a9</link><pubDate>Tue, 06 Oct 2026 10:00:02 GMT</pubDate><description>k2</description></item>
+<item><title>l3</title><link>http://e.test/a?b=c|d</link><pubDate>Tue, 06 Oct 2026 10:00:03 GMT</pubDate><description>k3</description></item>
+<item><title>l4</title><link>http://e.test/a?x=[1]</link><pubDate>Tue, 06 Oct 2026 10:00:04 GMT</pubDate><description>k4</description></item>
+<item><title>l5</title><link>http://e.test/a#</link><pubDate>Tue, 06 Oct 2026 10:00:05 GMT</pubDate><description>k5</description></item>
+<item><title>l6</title><link>http://e.test/a?</link><pubDate>Tue, 06 Oct 2026 10:00:06 GMT</pubDate><description>k6</description></item>
+<item><title>l7</title><link>HTTP://E.TEST/A</link><pubDate>Tue, 06 Oct 2026 10:00:07 GMT</pubDate><description>k7</description></item>
+<item><title>l8</title><link>http://e.test</link><pubDate>Tue, 06 Oct 2026 10:00:08 GMT</pubDate><description>k8</description></item>
+<item><title>l9</title><link>http://e.test:80/x</link><pubDate>Tue, 06 Oct 2026 10:00:09 GMT</pubDate><description>k9</description></item>
+<item><title>l10</title><link>http://e.test/a/../b</link><pubDate>Tue, 06 Oct 2026 10:00:00 GMT</pubDate><description>k10</description></item>
+<item><title>l11</title><link>http://e.test/a?q=a+b&amp;c='d'</link><pubDate>Tue, 06 Oct 2026 10:00:01 GMT</pubDate><description>k11</description></item>
+<item><title>l12</title><link>http://e.test/a?q=%7e%2f</link><pubDate>Tue, 06 Oct 2026 10:00:02 GMT</pubDate><description>k12</description></item>
+<item><title>l13</title><link>http://münchen.test/a</link><pubDate>Tue, 06 Oct 2026 10:00:03 GMT</pubDate><description>k13</description></item>
+<item><title>l14</title><link>http://e.test/a\b</link><pubDate>Tue, 06 Oct 2026 10:00:04 GMT</pubDate><description>k14</description></item>
+<item><title>l15</title><link>//e.test/proto-relative</link><pubDate>Tue, 06 Oct 2026 10:00:05 GMT</pubDate><description>k15</description></item>
+<item><title>l16</title><link>/relative/path</link><pubDate>Tue, 06 Oct 2026 10:00:06 GMT</pubDate><description>k16</description></item>
+<item><title>l17</title><link>relative</link><pubDate>Tue, 06 Oct 2026 10:00:07 GMT</pubDate><description>k17</description></item>
+<item><title>l18</title><link>http://e.test/a{b}</link><pubDate>Tue, 06 Oct 2026 10:00:08 GMT</pubDate><description>k18</description></item>
+<item><title>l19</title><link>mailto:x@y.z</link><pubDate>Tue, 06 Oct 2026 10:00:09 GMT</pubDate><description>k19</description></item>
+<item><title>l20</title><link>http://user:p@e.test/</link><pubDate>Tue, 06 Oct 2026 10:00:00 GMT</pubDate><description>k20</description></item>
+<item><title>l21</title><link>http://e.test/a;b=c</link><pubDate>Tue, 06 Oct 2026 10:00:01 GMT</pubDate><description>k21</description></item>
+<item><title>l22</title><link>http://e.test/a%zz</link><pubDate>Tue, 06 Oct 2026 10:00:02 GMT</pubDate><description>k22</description></item>
+<item><title>l23</title><link>http://e.test/a"b</link><pubDate>Tue, 06 Oct 2026 10:00:03 GMT</pubDate><description>k23</description></item>
+<item><title>l24</title><link>http://e.test/a&lt;b</link><pubDate>Tue, 06 Oct 2026 10:00:04 GMT</pubDate><description>k24</description></item>
+<item><title>l25</title><link>https://e.test/%41%2d</link><pubDate>Tue, 06 Oct 2026 10:00:05 GMT</pubDate><description>k25</description></item>
+<item><title>l26</title><link>http://e.test/a?q=é</link><pubDate>Tue, 06 Oct 2026 10:00:06 GMT</pubDate><description>k26</description></item>
+<item><title>l27</title><link>http://e.test/a#é</link><pubDate>Tue, 06 Oct 2026 10:00:07 GMT</pubDate><description>k27</description></item>
+<item><title>l28</title><link>javascript:alert(1)</link><pubDate>Tue, 06 Oct 2026 10:00:08 GMT</pubDate><description>k28</description></item>
+<item><title>l29</title><link>http://e.test/a
+/b</link><pubDate>Tue, 06 Oct 2026 10:00:09 GMT</pubDate><description>k29</description></item>
+<item><title>l30</title><link>http://[::1]/x</link><pubDate>Tue, 06 Oct 2026 10:00:00 GMT</pubDate><description>k30</description></item>
+<item><title>l31</title><link>http://e.test./x</link><pubDate>Tue, 06 Oct 2026 10:00:01 GMT</pubDate><description>k31</description></item>
+<item><title>l32</title><link>http://e.test/%</link><pubDate>Tue, 06 Oct 2026 10:00:02 GMT</pubDate><description>k32</description></item>
+<item><title>l33</title><link>ftp://e.test/x</link><pubDate>Tue, 06 Oct 2026 10:00:03 GMT</pubDate><description>k33</description></item>
+<item><title>l34</title><link>http://e.test/?</link><pubDate>Tue, 06 Oct 2026 10:00:04 GMT</pubDate><description>k34</description></item>
+<item><title>l35</title><link>http://e.test/..//x</link><pubDate>Tue, 06 Oct 2026 10:00:05 GMT</pubDate><description>k35</description></item>
+<item><title>l36</title><link>http://e.test//double//slash</link><pubDate>Tue, 06 Oct 2026 10:00:06 GMT</pubDate><description>k36</description></item>
+<item><title>l37</title><link>http://e.test/a?b#c#d</link><pubDate>Tue, 06 Oct 2026 10:00:07 GMT</pubDate><description>k37</description></item>
+<item><title>l38</title><link>http://e.test/a^b`c</link><pubDate>Tue, 06 Oct 2026 10:00:08 GMT</pubDate><description>k38</description></item>
+<item><title>l39</title><link>http://e.test/a?q=%20+%2B</link><pubDate>Tue, 06 Oct 2026 10:00:09 GMT</pubDate><description>k39</description></item>
+<item><title>l40</title><link>http://e.test:8080</link><pubDate>Tue, 06 Oct 2026 10:00:00 GMT</pubDate><description>k40</description></item>
+<item><title>l41</title><link>http://e.test/a?b=http://x/y?z</link><pubDate>Tue, 06 Oct 2026 10:00:01 GMT</pubDate><description>k41</description></item>
+<item><title>l42</title><link>http://e.test/~u/!$&amp;'()*+,;=:@</link><pubDate>Tue, 06 Oct 2026 10:00:02 GMT</pubDate><description>k42</description></item>
+<item><title>l43</title><link>http://e.test/%E4%B8%AD</link><pubDate>Tue, 06 Oct 2026 10:00:03 GMT</pubDate><description>k43</description></item>
+<item><title>l44</title><link>http://e.test/中文?к=в</link><pubDate>Tue, 06 Oct 2026 10:00:04 GMT</pubDate><description>k44</description></item>
+<item><title>l45</title><link>http://github.com/x</link><pubDate>Tue, 06 Oct 2026 10:00:05 GMT</pubDate><description>k45</description></item>
+<item><title>l46</title><link>http://e.test/a%2Fb/%2e%2e/c</link><pubDate>Tue, 06 Oct 2026 10:00:06 GMT</pubDate><description>k46</description></item>
+<item><title>l47</title><link>http://e.test/a/./b/</link><pubDate>Tue, 06 Oct 2026 10:00:07 GMT</pubDate><description>k47</description></item>
+<item><title>l48</title><link>?only=query</link><pubDate>Tue, 06 Oct 2026 10:00:08 GMT</pubDate><description>k48</description></item>
+<item><title>l49</title><link>#frag</link><pubDate>Tue, 06 Oct 2026 10:00:09 GMT</pubDate><description>k49</description></item>
+<item><title>l50</title><link>http://e.test/a b?c d#e f</link><pubDate>Tue, 06 Oct 2026 10:00:00 GMT</pubDate><description>k50</description></item>
+<item><title>l51</title><link>http://e.test/a	b</link><pubDate>Tue, 06 Oct 2026 10:00:01 GMT</pubDate><description>k51</description></item>
+<item><title>l52</title><link>https://e.test:443/</link><pubDate>Tue, 06 Oct 2026 10:00:02 GMT</pubDate><description>k52</description></item>
+<item><title>l53</title><link>http://E.test/%7Euser</link><pubDate>Tue, 06 Oct 2026 10:00:03 GMT</pubDate><description>k53</description></item>
+<item><title>l54</title><link>http://e.test/a?%</link><pubDate>Tue, 06 Oct 2026 10:00:04 GMT</pubDate><description>k54</description></item>
+<item><title>l55</title><link>http://e.test/[x]</link><pubDate>Tue, 06 Oct 2026 10:00:05 GMT</pubDate><description>k55</description></item>
+<item><title>l56</title><link>http://e.test/a#b%</link><pubDate>Tue, 06 Oct 2026 10:00:06 GMT</pubDate><description>k56</description></item>
+<item><title>l57</title><link>http://e.test/a?b=&lt;c&gt;</link><pubDate>Tue, 06 Oct 2026 10:00:07 GMT</pubDate><description>k57</description></item>
+<item><title>l58</title><link>http://xn--mnchen-3ya.test/a</link><pubDate>Tue, 06 Oct 2026 10:00:08 GMT</pubDate><description>k58</description></item>
+<item><title>l59</title><link>http://e.test/a?b=c&amp;d</link><pubDate>Tue, 06 Oct 2026 10:00:09 GMT</pubDate><description>k59</description></item>
+<item><title>l60</title><link>http://e.test/&#x41;</link><pubDate>Tue, 06 Oct 2026 10:00:00 GMT</pubDate><description>k60</description></item>
+<item><title>l61</title><link> http://e.test/sp </link><pubDate>Tue, 06 Oct 2026 10:00:01 GMT</pubDate><description>k61</description></item>
+<item><title>l62</title><link>http://e.test/a%20b%C3%A9%e2%82%ac</link><pubDate>Tue, 06 Oct 2026 10:00:02 GMT</pubDate><description>k62</description></item>
+</channel></rss>

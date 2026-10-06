@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel rdf:about="http://rdf.example.org/">
+    <title>RDF &amp; RSS 1.0</title>
+    <link>http://rdf.example.org/</link>
+    <description>An RSS 1.0 feed</description>
+    <dc:creator>Channel Creator</dc:creator>
+  </channel>
+  <item rdf:about="http://rdf.example.org/one?a=1&amp;b=2">
+    <title>First &lt;b&gt;RDF&lt;/b&gt; item</title>
+    <link>http://rdf.example.org/one</link>
+    <description>Plain description with &lt;em&gt;escaped markup&lt;/em&gt;.</description>
+    <dc:creator>Dana</dc:creator>
+    <dc:creator>Eli</dc:creator>
+    <dc:date>2024-03-01T10:00:00+01:00</dc:date>
+    <dc:subject>one, two</dc:subject>
+    <dc:subject>three</dc:subject>
+  </item>
+  <item rdf:about="http://github.com/about/two">
+    <title>Second item</title>
+    <link>http://rdf.example.org/two</link>
+    <description>Short</description>
+    <content:encoded><![CDATA[<p>Encoded <a href="rel">content</a></p>]]></content:encoded>
+    <dc:identifier>urn:dc:two</dc:identifier>
+    <dc:date>2024-03-02</dc:date>
+  </item>
+  <item>
+    <title>No about attribute</title>
+    <link>http://rdf.example.org/three</link>
+    <dc:date>2024-03-03T00:00:00Z</dc:date>
+  </item>
+</rdf:RDF>

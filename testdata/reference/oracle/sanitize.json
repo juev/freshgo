@@ -1,0 +1,232 @@
+[
+    {
+        "html": "<font color=red>Tom & Jerry &lt;b&gt; <b class=\"x\" id=i onclick=a()>bold</b></font><!-- c --><script>alert(1)</script>",
+        "base": "http://example.org/dir/page",
+        "out": "Tom &amp;amp; Jerry &amp;lt;b&amp;gt; <b data-sanitized-id=\"i\" data-sanitized-class=\"x\">bold</b>"
+    },
+    {
+        "html": "a &amp; b &lt; c &nbsp; &copy; é &#39; &quot;q&quot;",
+        "base": "http://example.org/dir/page",
+        "out": "a &amp; b &lt; c   © é ' \"q\""
+    },
+    {
+        "html": "<custom><p>x</p> tail</custom>",
+        "base": "http://example.org/dir/page",
+        "out": "<p>x</p> tail"
+    },
+    {
+        "html": "<p class=\"a b\" id=\"x\" style=\"color:red\" title=\"t\" lang=\"en\" data-foo=\"1\" aria-label=\"l\" onclick=\"x()\">t</p>",
+        "base": "http://example.org/dir/page",
+        "out": "<p title=\"t\" lang=\"en\" data-foo=\"1\" aria-label=\"l\" data-sanitized-id=\"x\" data-sanitized-class=\"a b\">t</p>"
+    },
+    {
+        "html": "<p id=\"x\" class=\"a\">id first</p><p class=\"a\" id=\"x\">class first</p>",
+        "base": "http://example.org/dir/page",
+        "out": "<p data-sanitized-id=\"x\" data-sanitized-class=\"a\">id first</p><p data-sanitized-id=\"x\" data-sanitized-class=\"a\">class first</p>"
+    },
+    {
+        "html": "<a href=\"relative/page?a=1&amp;b=2#f\" target=\"_blank\" rel=\"nofollow\" hreflang=\"en\" type=\"text/html\">l</a>",
+        "base": "http://example.org/dir/page",
+        "out": "<a href=\"http://example.org/dir/relative/page?a=1&amp;b=2#f\" hreflang=\"en\" type=\"text/html\">l</a>"
+    },
+    {
+        "html": "<img src=\"//cdn.example.com/a.png\" alt=\"\" width=\"10\" height=\"20\" loading=\"lazy\" srcset=\"a 1x\">",
+        "base": "http://example.org/dir/page",
+        "out": "<img src=\"http://cdn.example.com/a.png\" alt=\"\" width=\"10\" height=\"20\">"
+    },
+    {
+        "html": "<br><hr><p>unclosed<p>next",
+        "base": "http://example.org/dir/page",
+        "out": "<br><hr><p>unclosed</p><p>next</p>"
+    },
+    {
+        "html": "<table border=\"1\"><tr><td colspan=\"2\">c</td><th scope=\"col\">h</th></tr></table>",
+        "base": "http://example.org/dir/page",
+        "out": "<table border=\"1\"><tr><td colspan=\"2\">c</td><th scope=\"col\">h</th></tr></table>"
+    },
+    {
+        "html": "before<svg width=\"1\"><circle r=\"1\"/><text>svg text</text></svg>after<math display=\"block\"><mi>x</mi><mo>+</mo><mn>1</mn></math>",
+        "base": "http://example.org/dir/page",
+        "out": "beforeafter<math display=\"block\"><mi>x</mi><mo>+</mo><mn>1</mn></math>"
+    },
+    {
+        "html": "<audio src=\"a.mp3\"></audio><video poster=\"p.jpg\"><source src=\"v.webm\" type=\"video/webm\"><track src=\"s.vtt\" kind=\"subtitles\"></video>",
+        "base": "http://example.org/dir/page",
+        "out": "<audio src=\"http://example.org/dir/a.mp3\" controls=\"controls\" preload=\"none\"></audio><video poster=\"http://example.org/dir/p.jpg\" controls=\"controls\" preload=\"none\"><source src=\"http://example.org/dir/v.webm\" type=\"video/webm\"><track src=\"http://example.org/dir/s.vtt\" kind=\"subtitles\"></track></video>"
+    },
+    {
+        "html": "<object data=\"x\"><embed src=\"y\">fallback</object>",
+        "base": "http://example.org/dir/page",
+        "out": "fallback"
+    },
+    {
+        "html": "<form action=\"/post\"><input name=\"q\"><button disabled>b</button><textarea rows=\"2\">t</textarea><select><option value=\"1\" selected>o</option></select></form>",
+        "base": "http://example.org/dir/page",
+        "out": "<button disabled>b</button><textarea rows=\"2\">t</textarea><select><option value=\"1\" selected>o</option></select>"
+    },
+    {
+        "html": "<a href=\"JAVASCRIPT:alert(1)\">x</a><a href=\"data:text/html,x\">d</a><a href=\"mailto:a@b.c\">m</a><a href=\"  /sp \">s</a><a href=\"#frag\">f</a><a href=\"?q=1\">q</a><a href=\"\">e</a>",
+        "base": "http://example.org/dir/page",
+        "out": "<a href=\"unsafe:javascript:alert(1)\">x</a><a href=\"data:text/html,x\">d</a><a href=\"mailto:a@b.c\">m</a><a href=\"http://example.org/sp\">s</a><a href=\"http://example.org/dir/page#frag\">f</a><a href=\"http://example.org/dir/page?q=1\">q</a><a href=\"http://example.org/dir/page\">e</a>"
+    },
+    {
+        "html": "<div><div>inner</div></div>",
+        "base": "http://example.org/dir/page",
+        "out": "<div><div>inner</div></div>"
+    },
+    {
+        "html": "<div class=\"w\">wrapped</div><p>sibling</p>",
+        "base": "http://example.org/dir/page",
+        "out": "<div data-sanitized-class=\"w\">wrapped</div><p>sibling</p>"
+    },
+    {
+        "html": "text only",
+        "base": "http://example.org/dir/page",
+        "out": "text only"
+    },
+    {
+        "html": "<p>Русский текст &mdash; «кавычки»</p>",
+        "base": "http://example.org/dir/page",
+        "out": "<p>Русский текст — «кавычки»</p>"
+    },
+    {
+        "html": "<noscript><img src=\"n.png\"></noscript>",
+        "base": "http://example.org/dir/page",
+        "out": "<img src=\"http://example.org/dir/n.png\">"
+    },
+    {
+        "html": "<pre>  spaces\n  kept </pre><code>&lt;b&gt;</code>",
+        "base": "http://example.org/dir/page",
+        "out": "<pre>  spaces\n  kept </pre><code>&lt;b&gt;</code>"
+    },
+    {
+        "html": "<blockquote cite=\"/c\">q</blockquote><q cite=\"c2\">q</q><del cite=\"d\" datetime=\"2026\">d</del><ins cite=\"i\">i</ins>",
+        "base": "http://example.org/dir/page",
+        "out": "<blockquote cite=\"http://example.org/c\">q</blockquote><q cite=\"http://example.org/dir/c2\">q</q><del cite=\"http://example.org/dir/d\" datetime=\"2026\">d</del><ins cite=\"http://example.org/dir/i\">i</ins>"
+    },
+    {
+        "html": "<style>p{}</style><p>after style</p><template><p>t</p></template>",
+        "base": "http://example.org/dir/page",
+        "out": "<p>after style</p>"
+    },
+    {
+        "html": "<h1>H</h1><ul type=\"disc\"><li value=\"3\">i</li></ul><ol start=\"2\" reversed><li>o</li></ol>",
+        "base": "http://example.org/dir/page",
+        "out": "<h1>H</h1><ul type=\"disc\"><li value=\"3\">i</li></ul><ol start=\"2\" reversed><li>o</li></ol>"
+    },
+    {
+        "html": "<img src=\"a b.png\" title='q\"uote' alt=\"<tag> & amp\">",
+        "base": "http://example.org/dir/page",
+        "out": "<img src=\"http://example.org/dir/a%20b.png\" title='q\"uote' alt=\"&lt;tag&gt; &amp; amp\">"
+    },
+    {
+        "html": "</div><p>after stray close</p>",
+        "base": "http://example.org/dir/page",
+        "out": ""
+    },
+    {
+        "html": "<html><body class=\"x\"><p>doc</p></body></html>",
+        "base": "http://example.org/dir/page",
+        "out": "<p>doc</p>"
+    },
+    {
+        "html": "<p data-original=\"x\" data-leave-validation=\"1\" data-keep=\"k\">d</p>",
+        "base": "http://example.org/dir/page",
+        "out": "<p data-keep=\"k\">d</p>"
+    },
+    {
+        "html": "<details open><summary>s</summary>d</details><time datetime=\"2026-01-01\">t</time>",
+        "base": "http://example.org/dir/page",
+        "out": "<details open><summary>s</summary>d</details><time datetime=\"2026-01-01\">t</time>"
+    },
+    {
+        "html": "<iframe src=\"https://www.youtube.com/embed/x\" width=\"560\" height=\"315\" frameborder=\"0\" allowfullscreen></iframe>",
+        "base": "http://example.org/dir/page",
+        "out": "<iframe src=\"https://www.youtube.com/embed/x\" frameborder=\"0\" allowfullscreen=\"allowfullscreen\" allow=\"accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share\" sandbox=\"allow-scripts allow-same-origin\"></iframe>"
+    },
+    {
+        "html": "<a href=\"http://youtube.com/watch?v=1\">yt</a><a href=\"HTTP://GitHub.com/x\">gh</a><a href=\"http://sub.example.net/x\">custom</a><a href=\"http://example.org/x\">no</a>",
+        "base": "http://example.org/dir/page",
+        "out": "<a href=\"https://youtube.com/watch?v=1\">yt</a><a href=\"https://github.com/x\">gh</a><a href=\"https://sub.example.net/x\">custom</a><a href=\"http://example.org/x\">no</a>"
+    },
+    {
+        "html": "<a href=\"rel\">x</a><img src=\"/abs.png\">",
+        "base": "",
+        "out": "<a href=\"rel\">x</a><img src=\"/abs.png\">"
+    },
+    {
+        "html": "<p>a<br/>b</p><img src=\"x.png\"/>",
+        "base": "http://example.org/dir/page",
+        "out": "<p>a<br>b</p><img src=\"http://example.org/dir/x.png\">"
+    },
+    {
+        "html": "<a href=\"../up/./x/../y\">dots</a><a href=\"http://example.org:80/p\">port</a><a href=\"http://EXAMPLE.org/%7euser/é\">case</a>",
+        "base": "http://example.org/dir/page",
+        "out": "<a href=\"http://example.org/up/y\">dots</a><a href=\"http://example.org/p\">port</a><a href=\"http://example.org/~user/%C3%A9\">case</a>"
+    },
+    {
+        "html": "<span>s</span><em>e</em><strong>st</strong><u>u</u><s>s</s><sub>1</sub><sup>2</sup><small>sm</small><mark>m</mark><kbd>k</kbd><abbr title=\"a\">ab</abbr>",
+        "base": "http://example.org/dir/page",
+        "out": "<span>s</span><em>e</em><strong>st</strong><u>u</u><s>s</s><sub>1</sub><sup>2</sup><small>sm</small><mark>m</mark><kbd>k</kbd><abbr title=\"a\">ab</abbr>"
+    },
+    {
+        "html": "<figure><img src=\"f.png\"><figcaption>cap</figcaption></figure><picture><source srcset=\"a.webp\" media=\"(min-width:1px)\"><img src=\"p.png\"></picture>",
+        "base": "http://example.org/dir/page",
+        "out": "<figure><img src=\"http://example.org/dir/f.png\"><figcaption>cap</figcaption></figure><picture><source media=\"(min-width:1px)\"><img src=\"http://example.org/dir/p.png\"></picture>"
+    },
+    {
+        "html": "<a href=\"x\" name=\"n\">named</a><area href=\"y\"><map name=\"m\"></map>",
+        "base": "http://example.org/dir/page",
+        "out": "<a href=\"http://example.org/dir/x\">named</a>"
+    },
+    {
+        "html": "<p>line1\n\nline2\t tab</p>\n\n<p>p2</p>",
+        "base": "http://example.org/dir/page",
+        "out": "<p>line1\n\nline2\t tab</p>\n\n<p>p2</p>"
+    },
+    {
+        "html": "  \n <p>trim</p> \n ",
+        "base": "http://example.org/dir/page",
+        "out": "<p>trim</p>"
+    },
+    {
+        "html": "<p title=\"a &amp; b &lt; &quot;c&quot;\">attr entities</p>",
+        "base": "http://example.org/dir/page",
+        "out": "<p title='a &amp; b &lt; \"c\"'>attr entities</p>"
+    },
+    {
+        "html": "<unknown attr=\"1\">u &amp; v &lt;w&gt;</unknown>",
+        "base": "http://example.org/dir/page",
+        "out": "u &amp;amp; v &amp;lt;w&amp;gt;"
+    },
+    {
+        "html": "<article><header><h2>t</h2></header><section>s</section><footer>f</footer><aside>a</aside><nav>n</nav><main>m</main></article>",
+        "base": "http://example.org/dir/page",
+        "out": "<article><header><h2>t</h2></header><section>s</section><footer>f</footer><aside>a</aside><nav>n</nav><main>m</main></article>"
+    },
+    {
+        "html": "<video controls autoplay loop muted src=\"v.mp4\" width=\"1\" height=\"2\"></video><audio controls loop muted><source src=\"a.ogg\" type=\"audio/ogg\"></audio>",
+        "base": "http://example.org/dir/page",
+        "out": "<video loop muted src=\"http://example.org/dir/v.mp4\" width=\"1\" height=\"2\" controls=\"controls\" preload=\"none\"></video><audio loop muted controls=\"controls\" preload=\"none\"><source src=\"http://example.org/dir/a.ogg\" type=\"audio/ogg\"></audio>"
+    },
+    {
+        "html": "<dl><dt>t</dt><dd>d</dd></dl><ruby>漢<rp>(</rp><rt>kan</rt><rp>)</rp></ruby><wbr><bdi>b</bdi><bdo dir=\"rtl\">o</bdo>",
+        "base": "http://example.org/dir/page",
+        "out": "<dl><dt>t</dt><dd>d</dd></dl><ruby>漢<rp>(</rp><rt>kan</rt><rp>)</rp></ruby><wbr><bdi>b</bdi><bdo dir=\"rtl\">o</bdo></wbr>"
+    },
+    {
+        "html": "<center>c</center><big>b</big><tt>t</tt><strike>s</strike><nobr>n</nobr><acronym>a</acronym><marquee loop=\"1\">m</marquee><blink>bl</blink>",
+        "base": "http://example.org/dir/page",
+        "out": "<center>c</center><big>b</big><tt>t</tt><strike>s</strike><nobr>n</nobr><acronym>a</acronym><marquee loop=\"1\">m</marquee><blink>bl</blink>"
+    },
+    {
+        "html": "<a href=\"http://example.org/a?x=1&y=2&amp;z=3\">amp</a>",
+        "base": "http://example.org/dir/page",
+        "out": "<a href=\"http://example.org/a?x=1&amp;y=2&amp;z=3\">amp</a>"
+    },
+    {
+        "html": "<P ALIGN=\"CENTER\" Title=\"T\">Upper</P><IMG SRC=\"U.PNG\">",
+        "base": "http://example.org/dir/page",
+        "out": "<p align=\"CENTER\" title=\"T\">Upper</p><img src=\"http://example.org/dir/U.PNG\">"
+    }
+]

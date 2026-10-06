@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>t</title><link>http://base.test/dir/page</link>
+<item><title>i0</title><link>http://e.test/i0</link><guid isPermaLink="false">http://github.com/x</guid></item>
+<item><title>i1</title><link>http://e.test/i1</link><guid isPermaLink="false">http://GitHub.com/x1</guid></item>
+<item><title>i2</title><link>http://e.test/i2</link><guid isPermaLink="false">http://github.com:99999/x2</guid></item>
+<item><title>i3</title><link>http://e.test/i3</link><guid isPermaLink="false">http://user@github.com/x3</guid></item>
+<item><title>i4</title><link>http://e.test/i4</link><guid isPermaLink="false">http://github.com</guid></item>
+<item><title>i5</title><link>http://e.test/i5</link><guid isPermaLink="false">http://github.com?x5</guid></item>
+<item><title>i6</title><link>http://e.test/i6</link><guid isPermaLink="false">HTTP://github.com/x6</guid></item>
+<item><title>i7</title><link>http://e.test/i7</link><guid isPermaLink="false">tag é ü</guid></item>
+<item><title>i8</title><link>http://e.test/i8</link><guid isPermaLink="false">a&amp;b &lt;c&gt; "q" 'r'</guid></item>
+<item><title>i9</title><link>http://e.test/i9</link><guid isPermaLink="false">LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL</guid></item>
+<item><title>i10</title><link>http://e.test/i10</link><guid isPermaLink="false">http://foo.github.com./x9</guid></item>
+<item><title>i11</title><link>http://e.test/i11</link><guid isPermaLink="false"> http://www.youtube.com/watch?v=1 </guid></item>
+<item><title>i12</title><link>http://e.test/i12</link><guid isPermaLink="false">http://github.com\@evil/x</guid></item>
+<item><title>i13</title><link>http://e.test/i13</link><guid isPermaLink="false">http:///github.com/x</guid></item>
+<item><title>i14</title><link>http://e.test/i14</link><guid isPermaLink="false">http://github.com#x</guid></item>
+<item><title>i15</title><link>http://e.test/i15</link><guid isPermaLink="false">http://example.net:8080/x</guid></item>
+<item><title>i16</title><link>http://e.test/i16</link><guid isPermaLink="false">http://u:p@github.com:80/x</guid></item>
+<item><title>i17</title><link>http://e.test/i17</link><guid isPermaLink="false">http://github.com:/x</guid></item>
+<item><title>i18</title><link>http://e.test/i18</link><guid isPermaLink="false">http://github.com /x</guid></item>
+<item><title>i19</title><link>http://e.test/i19</link><guid isPermaLink="false">http://[github.com]/x</guid></item>
+<item><title>i20</title><link>http://e.test/i20</link><guid isPermaLink="false">http://sub.example.net/a b</guid></item>
+<item><title>i21</title><link>http://e.test/i21</link><guid isPermaLink="false">http://github.com:80x/y</guid></item>
+<item><title>i22</title><link>http://e.test/i22</link><guid isPermaLink="false">http://githUb.com/y</guid></item>
+<item><title>i23</title><link>http://e.test/i23</link><guid isPermaLink="false">http://github.com.:80/z</guid></item>
+<item><title>i24</title><link>http://e.test/i24</link><guid isPermaLink="false">http://.github.com/q</guid></item>
+<item><title>i25</title><link>http://e.test/i25</link><guid isPermaLink="false">http://x@y@github.com/w</guid></item>
+<item><title>i26</title><link>http://e.test/i26</link><guid isPermaLink="false">http://github.com:pw@evil.test/</guid></item>
+<item><title>i27</title><link>http://e.test/i27</link><guid isPermaLink="false">http://evil.test?@github.com/</guid></item>
+<item><title>i28</title><link>http://e.test/i28</link><guid isPermaLink="false">http://github.com	/tab</guid></item>
+<item><title>i29</title><link>http://e.test/i29</link><guid isPermaLink="false">line1
+line2</guid></item>
+<item><title>i30</title><link>http://e.test/i30</link><guid isPermaLink="false">http://www.github.com:65536/p</guid></item>
+<item><title>i31</title><link>http://e.test/i31</link><guid isPermaLink="false">http://www.github.com:65535/p</guid></item>
+<item><title>i32</title><link>http://e.test/i32</link><guid isPermaLink="false">http://www.github.com:0/p</guid></item>
+<item><title>i33</title><link>http://e.test/i33</link><guid isPermaLink="false">http://github.com/a?b=c&amp;d</guid></item>
+<item><title>i34</title><link>http://e.test/i34</link><guid isPermaLink="false">http://-github.com/</guid></item>
+<item><title>i35</title><link>http://e.test/i35</link><guid isPermaLink="false">http://github.com//</guid></item>
+<item><title>i36</title><link>http://e.test/i36</link><guid isPermaLink="false">http://#github.com</guid></item>
+<item><title>i37</title><link>http://e.test/i37</link><guid isPermaLink="false">http://?github.com</guid></item>
+<item><title>i38</title><link>http://e.test/i38</link><guid isPermaLink="false">http://github.com%2Fx</guid></item>
+<item><title>i39</title><link>http://e.test/i39</link><guid isPermaLink="false">http://user:pa:ss@github.com/m</guid></item>
+<item><title>i40</title><link>http://e.test/i40</link><guid isPermaLink="false">http://youtu.be/abc</guid></item>
+<item><title>i41</title><link>http://e.test/i41</link><guid isPermaLink="false">http://medium.com/x</guid></item>
+<item><title>i42</title><link>http://e.test/i42</link><guid isPermaLink="false">0</guid></item>
+<item><title>i43</title><link>http://e.test/i43</link><guid isPermaLink="false">http://github.com:80:80/</guid></item>
+<item><title>i44</title><link>http://e.test/i44</link><guid isPermaLink="false">http://[::1]:80/github.com</guid></item>
+<item><title>i45</title><link>http://e.test/i45</link><guid isPermaLink="false">http://example.net</guid></item>
+<item><title>i46</title><link>http://e.test/i46</link><guid isPermaLink="false">http://EXAMPLE.net/x</guid></item>
+<item><title>i47</title><link>http://e.test/i47</link><guid isPermaLink="false">http://example.net:8080:1/x</guid></item>
+<item><title>i48</title><link>http://e.test/i48</link><guid isPermaLink="false">http://é.github.com/x</guid></item>
+<item><title>i49</title><link>http://e.test/i49</link><guid isPermaLink="false">http://github.com:080/x</guid></item>
+<item><title>i50</title><link>http://e.test/i50</link><guid isPermaLink="false">http://github.com: 80/x</guid></item>
+<item><title>i51</title><link>http://e.test/i51</link><guid isPermaLink="false">http://:80/x</guid></item>
+<item><title>i52</title><link>http://e.test/i52</link><guid isPermaLink="false">http://a b@github.com/</guid></item>
+</channel></rss>

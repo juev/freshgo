@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed version="0.3" xmlns="http://purl.org/atom/ns#">
+  <title>Atom 0.3</title>
+  <tagline>Old format</tagline>
+  <link rel="alternate" type="text/html" href="http://old.example.org/"/>
+  <modified>2024-01-10T00:00:00Z</modified>
+  <author><name>Old Author</name></author>
+  <entry>
+    <title>Old entry</title>
+    <link rel="alternate" type="text/html" href="http://old.example.org/1"/>
+    <id>tag:old.example.org,2004:1</id>
+    <issued>2024-01-09T08:00:00Z</issued>
+    <modified>2024-01-10T08:00:00Z</modified>
+    <content type="text/html" mode="escaped">&lt;p&gt;Escaped &lt;i&gt;content&lt;/i&gt;&lt;/p&gt;</content>
+  </entry>
+  <entry>
+    <title mode="xml" type="application/xhtml+xml"><div xmlns="http://www.w3.org/1999/xhtml">XML <b>mode</b></div></title>
+    <link rel="alternate" type="text/html" href="http://old.example.org/2"/>
+    <id>tag:old.example.org,2004:2</id>
+    <created>2024-01-08T08:00:00Z</created>
+    <summary type="text/plain">Plain &lt;summary&gt;</summary>
+  </entry>
+</feed>

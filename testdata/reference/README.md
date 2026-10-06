@@ -10,6 +10,7 @@ What a real FreshRSS produces from a fixed set of feeds. Tests compare freshgo a
 | `set-custom-icon.php`, `custom-icon.png` | Give feed 2 of alice a custom icon. |
 | `sqlite/data/` | Data directory of the FreshRSS that ran on SQLite. |
 | `pgsql/data/`, `pgsql/dump.sql` | Data directory and database dump of the FreshRSS that ran on PostgreSQL. |
+| `oracle/` | What FreshRSS code makes of single inputs, without an installation: see below. |
 
 `sqlite/` and `pgsql/` are generated and committed, so tests need no Docker to read them.
 
@@ -23,6 +24,18 @@ testdata/reference/generate.sh sqlite   # one of them
 Needs Docker and Go. The script starts `freshrss/freshrss:1.30.1`, a web server with the corpus and, for `pgsql`, PostgreSQL; installs FreshRSS, creates alice and bob, imports their OPML, refreshes the feeds, runs the scenario and copies the result out.
 
 Entry identifiers, salts and password hashes change on every run. Tests therefore read expected values from the generated files or find entries by title; after regenerating, only counts written into tests (`internal/importer/importer_test.go`, `cmd/freshgo/main_test.go`) need a look, and only if the corpus or the scenario changed.
+
+## The oracle
+
+`oracle/generate.sh` runs PHP from the same image over inputs kept next to it and writes the results down:
+
+- `feed.php` parses the RSS and Atom files of the corpus and of `oracle/feeds/` the way a refresh does → `feeds.json`: feed title and links, the uniqueness criteria after degradation, and every entry as it would be stored.
+- `sanitize.php` runs the HTML sanitizer over `sanitize-cases.json` → `sanitize.json`.
+- `force-https.txt` is the installation's own force-https list for these runs.
+
+A new case is a file in `oracle/feeds/` or an entry in `sanitize-cases.json`, then `oracle/generate.sh`. Unlike the installations above, the output is stable from run to run, so `git diff` after regenerating shows exactly what the new case added.
+
+The documents are parsed without an address, so relative links stay unresolved against the feed URL here; the installations cover that.
 
 ## What the corpus covers
 

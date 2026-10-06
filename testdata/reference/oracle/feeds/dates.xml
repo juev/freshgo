@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>t</title><link>http://base.test/dir/page</link>
+<item><title>d0</title><link>http://e.test/d0</link><pubDate>Tue, 06 Oct 2026 10:00:00 +02:00</pubDate></item>
+<item><title>d1</title><link>http://e.test/d1</link><pubDate>Thu, 01 Jan 1970 00:00:00 GMT</pubDate></item>
+<item><title>d2</title><link>http://e.test/d2</link><pubDate>2026-10-06T10:00:00</pubDate></item>
+<item><title>d3</title><link>http://e.test/d3</link><pubDate>Tue, 06 Oct 2026 10:00:00</pubDate></item>
+<item><title>d4</title><link>http://e.test/d4</link><pubDate>Tue, 06 Oct 2026 10:00:00 CEST</pubDate></item>
+<item><title>d5</title><link>http://e.test/d5</link><pubDate>2026-10-06 10:00:00 +02:00</pubDate></item>
+<item><title>d6</title><link>http://e.test/d6</link><pubDate>06/10/2026 10:00</pubDate></item>
+<item><title>d7</title><link>http://e.test/d7</link><pubDate>October 6, 2026 10:00 am</pubDate></item>
+<item><title>d8</title><link>http://e.test/d8</link><pubDate>
+  Tue, 06 Oct 2026 10:00:00 GMT
+ </pubDate></item>
+<item><title>d9</title><link>http://e.test/d9</link><pubDate>Tue, 06 Oct 2026 10:00:00 GMT+2</pubDate></item>
+<item><title>d10</title><link>http://e.test/d10</link><pubDate>2026-10-06T10:00:00.5Z</pubDate></item>
+<item><title>d11</title><link>http://e.test/d11</link><pubDate>Tue, 6 Oct 2026 8:05:00 GMT</pubDate></item>
+<item><title>d12</title><link>http://e.test/d12</link><pubDate>Tue, 06 Oct 2026 10:00:00 Z</pubDate></item>
+<item><title>d13</title><link>http://e.test/d13</link><pubDate>1759744800</pubDate></item>
+<item><title>d14</title><link>http://e.test/d14</link><pubDate>Tue, 06 Oct 2026 10:00:00 -0000</pubDate></item>
+<item><title>d15</title><link>http://e.test/d15</link><pubDate>tue, 06 oct 2026 10:00:00 gmt</pubDate></item>
+<item><title>d16</title><link>http://e.test/d16</link><pubDate>2026-10-06T10:00:00+02</pubDate></item>
+<item><title>d17</title><link>http://e.test/d17</link><pubDate>Tuesday, October 6, 2026 10:00 AM</pubDate></item>
+<item><title>d18</title><link>http://e.test/d18</link><pubDate>Tue, 06 Oct 2026 10:00:00 PDT</pubDate></item>
+<item><title>d19</title><link>http://e.test/d19</link><pubDate>Wed, 06 Oct 2026 10:00:00 GMT</pubDate></item>
+<item><title>d20</title><link>http://e.test/d20</link><pubDate>6 Oct 2026</pubDate></item>
+<item><title>d21</title><link>http://e.test/d21</link><pubDate>2026-10-06</pubDate></item>
+<item><title>d22</title><link>http://e.test/d22</link><pubDate>Tue, 06 Oct 26 10:00:00 GMT</pubDate></item>
+<item><title>d23</title><link>http://e.test/d23</link><pubDate>Mon, 30 Feb 2026 10:00:00 GMT</pubDate></item>
+<item><title>d24</title><link>http://e.test/d24</link><pubDate>Tue, 06 Oct 2026 24:00:00 GMT</pubDate></item>
+<item><title>d25</title><link>http://e.test/d25</link><pubDate>Di, 06 Okt 2026 10:00:00 +0200</pubDate></item>
+<item><title>d26</title><link>http://e.test/d26</link><pubDate>2026-10-06T10:00:00 +0200</pubDate></item>
+<item><title>d27</title><link>http://e.test/d27</link><pubDate>Tue, 06 Oct 2026 10:00:00 +0200 (CEST)</pubDate></item>
+<item><title>d28</title><link>http://e.test/d28</link><pubDate>2026-10-06T10:00:00Z </pubDate></item>
+<item><title>d29</title><link>http://e.test/d29</link><pubDate>Tue, 06 Oct 2026 10:00 +0200</pubDate></item>
+<item><title>d30</title><link>http://e.test/d30</link><pubDate>Tue Oct 06 2026 10:00:00 GMT+0200</pubDate></item>
+<item><title>d31</title><link>http://e.test/d31</link><pubDate>2026-10-06T10:00:00.000000+00:00</pubDate></item>
+<item><title>d32</title><link>http://e.test/d32</link><pubDate>Sept 6, 2026</pubDate></item>
+<item><title>d33</title><link>http://e.test/d33</link><pubDate>2026-10-06T10:00Z</pubDate></item>
+<item><title>d34</title><link>http://e.test/d34</link><pubDate>20261006T100000Z</pubDate></item>
+<item><title>d35</title><link>http://e.test/d35</link><pubDate>Tue, 06 Oct 2026 10:00:00 UTC</pubDate></item>
+<item><title>d36</title><link>http://e.test/d36</link><pubDate>Tue, 06 Oct 2026 10:00:00 EST</pubDate></item>
+<item><title>d37</title><link>http://e.test/d37</link><pubDate>Tue, 06 Oct 2026 10:00:00 +0530</pubDate></item>
+<item><title>d38</title><link>http://e.test/d38</link><pubDate>2026-10-06T10:00:00-07:00</pubDate></item>
+<item><title>d39</title><link>http://e.test/d39</link><pubDate>Tue, 06 Oct 2026 10:00:00 GMT.</pubDate></item>
+<item><title>d40</title><link>http://e.test/d40</link><pubDate>06 Oct 2026 10:00:00 +0000</pubDate></item>
+<item><title>d41</title><link>http://e.test/d41</link><pubDate>Tue,06 Oct 2026 10:00:00 GMT</pubDate></item>
+<item><title>d42</title><link>http://e.test/d42</link><pubDate>Tue, 06 October 2026 10:00:00 GMT</pubDate></item>
+<item><title>d43</title><link>http://e.test/d43</link><pubDate>2026-10-06 10:00:00</pubDate></item>
+<item><title>d44</title><link>http://e.test/d44</link><pubDate>2026-10-06T10:00:00.123456789Z</pubDate></item>
+<item><title>d45</title><link>http://e.test/d45</link><pubDate>Tue, 06 Oct 2026 10:00:00 Europe/Berlin</pubDate></item>
+<item><title>d46</title><link>http://e.test/d46</link><pubDate>2026-10-06T10:00:00 UTC</pubDate></item>
+<item><title>d47</title><link>http://e.test/d47</link><pubDate>Tue, 06 Oct 2026 10:00:00 +2</pubDate></item>
+<item><title>d48</title><link>http://e.test/d48</link><pubDate>06.10.2026 10:00</pubDate></item>
+<item><title>d49</title><link>http://e.test/d49</link><pubDate>2026/10/06 10:00:00</pubDate></item>
+<item><title>d50</title><link>http://e.test/d50</link><pubDate>Tue, 06 Oct 2026 10:00:00 A</pubDate></item>
+<item><title>d51</title><link>http://e.test/d51</link><pubDate>0</pubDate></item>
+<item><title>d52</title><link>http://e.test/d52</link><pubDate>Tue, 06 Oct 2026 1:00 PM GMT</pubDate></item>
+<item><title>d53</title><link>http://e.test/d53</link><pubDate>Thu, 01 Jan 1970 00:00:00 +0000</pubDate></item>
+</channel></rss>

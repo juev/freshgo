@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>Mixed &amp;amp; matched &lt;i&gt;feed&lt;/i&gt;</title>
+    <link>http://mixed.example.org/blog/</link>
+    <description>&lt;p&gt;Channel &lt;b&gt;description&lt;/b&gt;&lt;/p&gt;</description>
+    <atom:link rel="self" href="http://mixed.example.org/feed.xml"/>
+    <atom:link rel="hub" href="http://hub.example.org/"/>
+    <dc:creator>Feed Owner</dc:creator>
+    <item>
+      <title>Atom id wins over guid</title>
+      <link>http://mixed.example.org/blog/a</link>
+      <atom:id>tag:mixed.example.org,2024:a</atom:id>
+      <guid isPermaLink="false">guid-a</guid>
+      <pubDate>Mon, 01 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Only a Dublin Core identifier</title>
+      <link>http://mixed.example.org/blog/b</link>
+      <dc:identifier>dc-b</dc:identifier>
+      <pubDate>Tue, 02 Jan 24 10:00:00 EST</pubDate>
+      <author>editor@example.org</author>
+      <dc:creator>Second &amp; Author</dc:creator>
+      <itunes:author>Third Author</itunes:author>
+    </item>
+    <item>
+      <title>Guid is the link</title>
+      <guid>http://mixed.example.org/blog/c?x=1&amp;y=2</guid>
+      <pubDate>Wed, 03 Jan 2024 10:00:00 +0300</pubDate>
+      <category>one, two,three</category>
+      <category domain="d">one</category>
+      <category>Four &amp; five</category>
+    </item>
+    <item>
+      <title><![CDATA[CDATA <b>title</b> & more]]></title>
+      <link>/relative/d</link>
+      <guid isPermaLink="false">d</guid>
+      <pubDate>2024-01-04T10:00:00Z</pubDate>
+      <description><![CDATA[<p>Description</p>]]></description>
+      <content:encoded><![CDATA[<p>Content wins <img src="pic.png"></p>]]></content:encoded>
+    </item>
+    <item>
+      <title>Entity &amp;amp; and &amp;lt;tag&amp;gt; in a title</title>
+      <link>http://mixed.example.org/blog/e</link>
+      <guid isPermaLink="false">e</guid>
+      <pubDate>Fri Jan  5 10:00:00 2024</pubDate>
+    </item>
+    <item>
+      <title>Only an enclosure</title>
+      <enclosure url="http://mixed.example.org/files/f.mp3" length="100" type="audio/mpeg"/>
+      <pubDate>Saturday, 06-Jan-24 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>No date at all</title>
+      <link>http://mixed.example.org/blog/g</link>
+      <guid isPermaLink="false">g</guid>
+    </item>
+    <item>
+      <title>Unparsable date</title>
+      <link>http://mixed.example.org/blog/h</link>
+      <guid isPermaLink="false">h</guid>
+      <pubDate>the day before yesterday-ish</pubDate>
+    </item>
+    <item>
+      <title>Guid with spaces, non-ASCII и control</title>
+      <link>http://mixed.example.org/blog/i</link>
+      <guid isPermaLink="false">  id с пробелами	tab  </guid>
+      <pubDate>7 Jan 2024 10:00 UT</pubDate>
+    </item>
+    <item>
+      <title>Guid permalink false value</title>
+      <link>HTTP://Mixed.Example.org:80/blog/../blog/j%7e</link>
+      <guid isPermaLink="FALSE">http://youtube.com/not-a-link</guid>
+      <pubDate>Mon, 08 Jan 2024 10:00:00 (comment) -0500 (EST)</pubDate>
+    </item>
+    <item>
+      <description>No title, no link, no guid: only text.</description>
+      <pubDate>Tue, 09 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Russian month</title>
+      <link>http://mixed.example.org/blog/k</link>
+      <guid isPermaLink="false">k</guid>
+      <pubDate>Ср, 10 янв 2024 10:00:00 +0300</pubDate>
+    </item>
+    <item>
+      <title>Guid that is not a permalink and no link</title>
+      <guid isPermaLink="false">http://mixed.example.org/blog/not-a-link</guid>
+      <pubDate>Thu, 11 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Guid marked as a permalink in another case</title>
+      <guid isPermaLink=" True ">http://mixed.example.org/blog/is-a-link</guid>
+      <pubDate>Fri, 12 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

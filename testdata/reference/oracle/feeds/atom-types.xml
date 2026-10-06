@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom" xml:base="http://atom.example.org/base/">
+  <title type="html">Atom &amp;lt;i&amp;gt;types&amp;lt;/i&amp;gt; &amp;amp; bases</title>
+  <subtitle type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">An <b>XHTML</b> subtitle</div></subtitle>
+  <link href="site/"/>
+  <link rel="self" href="feed.atom"/>
+  <id>urn:atom-types</id>
+  <updated>2024-02-10T00:00:00Z</updated>
+  <author><name>Feed Author</name><email>feed@example.org</email></author>
+  <entry>
+    <title type="html">HTML &amp;lt;b&amp;gt;title&amp;lt;/b&amp;gt; &amp;amp; entity</title>
+    <link href="one"/>
+    <id>urn:one</id>
+    <updated>2024-02-01T12:00:00.750Z</updated>
+    <summary type="html">&lt;img src="lonely.png"&gt;</summary>
+  </entry>
+  <entry>
+    <title type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">XHTML <em>title</em> &amp; more</div></title>
+    <link rel="alternate" type="text/html" href="http://atom.example.org/two"/>
+    <link rel="alternate" href="http://atom.example.org/two-alt"/>
+    <link rel="related" href="http://atom.example.org/related"/>
+    <id>urn:two</id>
+    <published>2024-02-02T12:00:00-05:00</published>
+    <updated>2024-02-03T12:00:00Z</updated>
+    <author><email>only@example.org</email></author>
+    <author><name>Named</name><uri>http://named.example.org/</uri></author>
+    <author><name>Named</name><uri>http://named.example.org/</uri></author>
+    <category term="t1" label="Label One"/>
+    <category term="t2"/>
+    <category term="t2" scheme="http://scheme"/>
+    <summary>Text summary with &lt;b&gt;literal&lt;/b&gt; markup</summary>
+    <content type="html">&lt;p&gt;Content &lt;a href="rel/page"&gt;link&lt;/a&gt;&lt;/p&gt;</content>
+  </entry>
+  <entry xml:base="http://other.example.org/dir/">
+    <title>Own base</title>
+    <link href="three"/>
+    <id>urn:three</id>
+    <updated>2024-02-04T12:00:00Z</updated>
+    <content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml"><p>Para <a href="x">x</a><br/><img src="i.png" alt="a &quot;q&quot;"/></p><p>Second</p></div></content>
+  </entry>
+  <entry>
+    <title type="text">Text title &lt;not a tag&gt; &amp; ampersand</title>
+    <id>urn:four</id>
+    <updated>2024-02-05T12:00:00Z</updated>
+    <content type="text">Text content &lt;b&gt;not bold&lt;/b&gt;</content>
+    <source><author><name>Source Author</name></author></source>
+  </entry>
+  <entry>
+    <title>No link, enclosure link</title>
+    <link rel="enclosure" href="files/five.mp3" type="audio/mpeg" length="5"/>
+    <id>urn:five</id>
+    <updated>2024-02-06T12:00:00Z</updated>
+    <content type="text/plain">Typed as text/plain</content>
+  </entry>
+</feed>

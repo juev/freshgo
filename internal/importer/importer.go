@@ -324,7 +324,7 @@ func (u *userImport) feeds() error {
 				auth = nil
 			}
 			// FreshRSS encodes the form input before the base64 and decodes it on use.
-		f.HTTPAuth = decodeText(string(auth))
+			f.HTTPAuth = decodeText(string(auth))
 		}
 		f.Attributes = u.attributes(attributes.String, "feed %d", f.ID)
 		if err := u.dst.CreateFeed(u.ctx, f); err != nil {

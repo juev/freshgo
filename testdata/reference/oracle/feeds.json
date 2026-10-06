@@ -1,0 +1,3397 @@
+{
+    "atom.xml": {
+        "error": null,
+        "title": "Atom corpus &amp; friends",
+        "link": "http://feeds.freshgo.test/atom/",
+        "description": "Atom feed with stable identifiers",
+        "self": [
+            "http://feeds.freshgo.test/atom.xml"
+        ],
+        "hub": null,
+        "unicityCriteria": null,
+        "inError": false,
+        "guids": [
+            "urn:uuid:1225c695-cfb8-4ebb-aaaa-80da344efa6a",
+            "https://github.com/juev/freshgo/issues/1",
+            "http://feeds.freshgo.test/atom/query?a=1&amp;b=2&amp;=",
+            "tag:feeds.freshgo.test,2026:atom/plain"
+        ],
+        "entries": [
+            {
+                "guid": "urn:uuid:1225c695-cfb8-4ebb-aaaa-80da344efa6a",
+                "title": "Identifier with surrounding spaces",
+                "authors": [],
+                "content": "Plain text content",
+                "link": "http://feeds.freshgo.test/atom/spaces",
+                "date": 1788084000,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://github.com/juev/freshgo/issues/1",
+                "title": "Identifier on a force-https domain",
+                "authors": [],
+                "content": "<p>XHTML <em>content</em> with an image <img src=\"https://github.com/juev/freshgo/issues/img/pic.png\" alt=\"pic\"></p>",
+                "link": "https://github.com/juev/freshgo/issues/1",
+                "date": 1788429600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://feeds.freshgo.test/atom/query?a=1&amp;b=2&amp;=",
+                "title": "Identifier with an ampersand & non-ASCII: Привет",
+                "authors": [
+                    "Иван Петров",
+                    "O'Neil & Sons"
+                ],
+                "content": "Summary with &lt;angle brackets&gt; &amp; &quot;quotes&quot;.",
+                "link": "http://feeds.freshgo.test/atom/query?a=1&b=2",
+                "date": 1788325200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "tag:feeds.freshgo.test,2026:atom/plain",
+                "title": "Plain entry",
+                "authors": [
+                    "Alice Author"
+                ],
+                "content": "<p>First paragraph with an <a href=\"http://feeds.freshgo.test/atom/relative\">relative link</a>.</p>",
+                "link": "http://feeds.freshgo.test/atom/plain",
+                "date": 1788249600,
+                "tags": [
+                    "go",
+                    "rss readers"
+                ],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "rss.xml": {
+        "error": null,
+        "title": "RSS corpus",
+        "link": "http://feeds.freshgo.test/rss/",
+        "description": "RSS 2.0 feed with guid elements",
+        "self": null,
+        "hub": null,
+        "unicityCriteria": null,
+        "inError": false,
+        "guids": [
+            "https://www.example.net/custom?id=9",
+            "https://blog.wordpress.com/?p=7",
+            "id &lt;3&gt; &quot;quoted&quot; 'single' &amp; done",
+            "post-42",
+            "http://feeds.freshgo.test/rss/permalink"
+        ],
+        "entries": [
+            {
+                "guid": "https://www.example.net/custom?id=9",
+                "title": "Guid on a domain from the custom force-https list",
+                "authors": [],
+                "content": "The domain is listed in data/force-https.txt of the reference installation.",
+                "link": "https://www.example.net/custom",
+                "date": 1788609600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://blog.wordpress.com/?p=7",
+                "title": "Guid on a force-https subdomain",
+                "authors": [],
+                "content": "Subdomain of a domain from the force-https list.",
+                "link": "https://blog.wordpress.com/post",
+                "date": 1788523200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "id &lt;3&gt; &quot;quoted&quot; 'single' &amp; done",
+                "title": "Guid with markup characters",
+                "authors": [],
+                "content": "Guid with characters that are HTML-encoded.",
+                "link": "http://feeds.freshgo.test/rss/markup",
+                "date": 1788436800,
+                "tags": [],
+                "attributes": {
+                    "thumbnail": {
+                        "url": "http://feeds.freshgo.test/rss/thumb.jpg"
+                    },
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "post-42",
+                "title": "Opaque guid",
+                "authors": [
+                    "carol@example.org (Carol)"
+                ],
+                "content": "<p>Escaped HTML description</p>",
+                "link": "http://feeds.freshgo.test/rss/opaque",
+                "date": 1788343200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": [
+                        {
+                            "url": "http://feeds.freshgo.test/rss/audio.mp3",
+                            "type": "audio/mpeg",
+                            "length": 12345
+                        }
+                    ]
+                }
+            },
+            {
+                "guid": "http://feeds.freshgo.test/rss/permalink",
+                "title": "Permalink guid",
+                "authors": [
+                    "Bob Writer"
+                ],
+                "content": "<p>Full <b>content</b> with <img src=\"http://feeds.freshgo.test/rss/img.png\"> and a <a href=\"http://feeds.freshgo.test/rss/relative/page\">link</a>.</p>",
+                "link": "http://feeds.freshgo.test/rss/permalink",
+                "date": 1788264000,
+                "tags": [
+                    "news",
+                    "tech & science"
+                ],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "rss-noid.xml": {
+        "error": null,
+        "title": "RSS without identifiers",
+        "link": "http://feeds.freshgo.test/noid/",
+        "description": "Items have no guid: the key falls back to link and date",
+        "self": null,
+        "hub": null,
+        "unicityCriteria": null,
+        "inError": false,
+        "guids": [
+            "dfc9f68062269afebc8ee3feedf00876b1950a30",
+            "0060234b88e085ad6c747ecad77d3334b03ddd8a",
+            "f0e70b21e3038ec24999d8987f3030f4859a2e5d"
+        ],
+        "entries": [
+            {
+                "guid": "dfc9f68062269afebc8ee3feedf00876b1950a30",
+                "title": "Third on a force-https domain",
+                "authors": [],
+                "content": "Third.",
+                "link": "https://youtube.com/watch?v=abc",
+                "date": 1788415200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "0060234b88e085ad6c747ecad77d3334b03ddd8a",
+                "title": "Second without guid",
+                "authors": [],
+                "content": "Second.",
+                "link": "http://feeds.freshgo.test/noid/second",
+                "date": 1788328800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "f0e70b21e3038ec24999d8987f3030f4859a2e5d",
+                "title": "First without guid",
+                "authors": [],
+                "content": "First.",
+                "link": "http://feeds.freshgo.test/noid/first?x=1&y=2",
+                "date": 1788242400,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "atom-types.xml": {
+        "error": null,
+        "title": "Atom &lt;i&gt;types&lt;/i&gt; &amp; bases",
+        "link": "http://atom.example.org/base/site/",
+        "description": "An <b>XHTML</b> subtitle",
+        "self": [
+            "http://atom.example.org/base/feed.atom"
+        ],
+        "hub": null,
+        "unicityCriteria": null,
+        "inError": false,
+        "guids": [
+            "urn:five",
+            "urn:four",
+            "urn:three",
+            "urn:two",
+            "urn:one"
+        ],
+        "entries": [
+            {
+                "guid": "urn:five",
+                "title": "No link, enclosure link",
+                "authors": [
+                    "Feed Author"
+                ],
+                "content": "Typed as text/plain",
+                "link": "http://atom.example.org/base/files/five.mp3",
+                "date": 1707220800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": [
+                        {
+                            "url": "http://atom.example.org/base/files/five.mp3",
+                            "type": "audio/mpeg",
+                            "length": 5
+                        }
+                    ]
+                }
+            },
+            {
+                "guid": "urn:four",
+                "title": "Text title <not a tag> & ampersand",
+                "authors": [
+                    "Source Author"
+                ],
+                "content": "Text content &lt;b&gt;not bold&lt;/b&gt;",
+                "link": "",
+                "date": 1707134400,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:three",
+                "title": "Own base",
+                "authors": [
+                    "Feed Author"
+                ],
+                "content": "<p>Para <a href=\"http://other.example.org/dir/x\">x</a><br><img src=\"http://other.example.org/dir/i.png\" alt='a \"q\"'></p><p>Second</p>",
+                "link": "http://other.example.org/dir/three",
+                "date": 1707048000,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:two",
+                "title": "XHTML title & more",
+                "authors": [
+                    "only@example.org",
+                    "Named"
+                ],
+                "content": "<p>Content <a href=\"http://atom.example.org/base/rel/page\">link</a></p>",
+                "link": "http://atom.example.org/two",
+                "date": 1706893200,
+                "tags": [
+                    "Label One",
+                    "t2"
+                ],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:one",
+                "title": "HTML <b>title</b> & entity",
+                "authors": [
+                    "Feed Author"
+                ],
+                "content": "<img src=\"http://atom.example.org/base/lonely.png\">",
+                "link": "http://atom.example.org/base/one",
+                "date": 1706788801,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "atom03.xml": {
+        "error": null,
+        "title": "Atom 0.3",
+        "link": "http://old.example.org/",
+        "description": "Old format",
+        "self": null,
+        "hub": null,
+        "unicityCriteria": null,
+        "inError": false,
+        "guids": [
+            "tag:old.example.org,2004:2",
+            "tag:old.example.org,2004:1"
+        ],
+        "entries": [
+            {
+                "guid": "tag:old.example.org,2004:2",
+                "title": "XML mode",
+                "authors": [
+                    "Old Author"
+                ],
+                "content": "Plain &lt;summary&gt;",
+                "link": "http://old.example.org/2",
+                "date": 1704700800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "tag:old.example.org,2004:1",
+                "title": "Old entry",
+                "authors": [
+                    "Old Author"
+                ],
+                "content": "<p>Escaped <i>content</i></p>",
+                "link": "http://old.example.org/1",
+                "date": 1704787200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "dates.xml": {
+        "error": null,
+        "title": "t",
+        "link": "http://base.test/dir/page",
+        "description": null,
+        "self": null,
+        "hub": null,
+        "unicityCriteria": null,
+        "inError": false,
+        "guids": [
+            "f04de442390c29d59b2ac5f3eee462237b42693f",
+            "326c17cae8027babca18c6f79a5d93ce27aa2670",
+            "4e6f06a9417d6755fd76f38efeb9f3effeee2fb1",
+            "fe47ae6add374c3159e6da579228d89a1dbea35e",
+            "473e22e90c953d6ad9b69192aa86fa65a4f0b87d",
+            "fee7d5b73cc38302c598f10cc8e2dcfc6a9fba7f",
+            "86042148e70e17dd5fad8ec5cac3a1ce03044333",
+            "0e71a2cf2cdb207d2890af30a9af60b6a3e6dfb8",
+            "d1c767c087c0389b7b6589ebd9a9f39049cb91ec",
+            "02e850e48e1565c2809ff8b215801e08daf9cbe1",
+            "e624003bdd0710c6ccb727213765a6b1bf3fe91a",
+            "45ef1e035d4b65d0085213443f3a113de66f8b72",
+            "d64a430dbc881995fb250ba4113102482e4ce67c",
+            "27843aca99d6c241f9dd76aa339b55ae4b9ecf09",
+            "1d276f485fedc1b61a9cba1aa1091c848c52d412",
+            "e45685cc76337ca2ddf5ac1b00d758b0af0ba2cf",
+            "22fadb606e029343546c1e2b20aac6eb2815fe72",
+            "30b18299dbfb9a165560262533bd7d73e086309e",
+            "f006b908d9b6ef66334d5fb79c4638d810750696",
+            "ec607225ab0d76871eb1de537693675704e1631f",
+            "d43f00d8cb02d5a3f15ce208bbb8fb52dd1f2258",
+            "d1605361d55e826999f4689c09c0008399d9f8fa",
+            "d334853b72dd8fe456458da5e62ce3d239f52291",
+            "31e4546575b6479545b67545374a49669afd620a",
+            "56880f5ff5e5b54d0816579853de5328acaaca07",
+            "1a428a3603dc61b1c72cfa5cdb683a86fc972f1b",
+            "a512eee70be941be3ee9bf48296199ef99c6dcdf",
+            "65c328fd43dc2e7095fd13237df0cd270e36e85c",
+            "c816467d0489aa3940acdf235cff629c4ebcd9ad",
+            "e0c213be03986656bd5a470bff20262610d428dc",
+            "55b3b83c151fa98726d2b037dc84cba81839f019",
+            "a456304b6f0f9167350d731a769852720e610bff",
+            "fd526318daaf3ff08ad499be819e14ac788219bb",
+            "53b8868b8945e6512889b306608f73d416243497",
+            "17e299e73ea423d6cf0b56cd146037a1708043cc",
+            "fce12c22043052de06b74dc10dab609ff493f6d6",
+            "22663bfdaf88b6d695232cb7df12f775fb3894eb",
+            "9d9e6fd39c004d307d75b6a65a5a7c9add10f7ec",
+            "4a50f2fe8f7e97a806ee19c6186fd94e661c9327",
+            "7485691ed3252ac9cc46864878eb06e6e09a76ad",
+            "84b4845cc284be26a591f7baea5e9700dba60a97",
+            "59fc53883d3af4f5bbf0b029a87fbdfbb523c825",
+            "8d64497801fae14bd1a910f80773d3528684e7a3",
+            "af4e683381c6735cc577cb972355ccbbafd8089e",
+            "5398e402c3513c3fd8044e656e867ca720da89ba",
+            "68493740a428ac20d2cb2223bbf6ec8d6997ef9f",
+            "ee3ec3b7f84e74367f4a436b4e2e3c3a59547a06",
+            "d265585d0bb9e9df80ad2a1b27d4d72c3487400c",
+            "bb3733e3adf47878b6fc88d5e21f145c385a8e19",
+            "ccc404e1412f390b71884d38998e554db8920765",
+            "f0a271635d496e0bab6e19f15f53b8ebe18faac4",
+            "87df8a114a545899fd4ac86d85305a692b4e36d4",
+            "0488b6c14a6bb1bed5efb6e6c1a89976cc0c3b88",
+            "85427d9e1391b8a5a6dbffb254330a9c766e00c9"
+        ],
+        "entries": [
+            {
+                "guid": "f04de442390c29d59b2ac5f3eee462237b42693f",
+                "title": "d53",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d53",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "326c17cae8027babca18c6f79a5d93ce27aa2670",
+                "title": "d52",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d52",
+                "date": 1791291600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "4e6f06a9417d6755fd76f38efeb9f3effeee2fb1",
+                "title": "d51",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d51",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "fe47ae6add374c3159e6da579228d89a1dbea35e",
+                "title": "d50",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d50",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "473e22e90c953d6ad9b69192aa86fa65a4f0b87d",
+                "title": "d49",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d49",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "fee7d5b73cc38302c598f10cc8e2dcfc6a9fba7f",
+                "title": "d48",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d48",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "86042148e70e17dd5fad8ec5cac3a1ce03044333",
+                "title": "d47",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d47",
+                "date": 1791273600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "0e71a2cf2cdb207d2890af30a9af60b6a3e6dfb8",
+                "title": "d46",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d46",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "d1c767c087c0389b7b6589ebd9a9f39049cb91ec",
+                "title": "d45",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d45",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "02e850e48e1565c2809ff8b215801e08daf9cbe1",
+                "title": "d44",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d44",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "e624003bdd0710c6ccb727213765a6b1bf3fe91a",
+                "title": "d43",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d43",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "45ef1e035d4b65d0085213443f3a113de66f8b72",
+                "title": "d42",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d42",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "d64a430dbc881995fb250ba4113102482e4ce67c",
+                "title": "d41",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d41",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "27843aca99d6c241f9dd76aa339b55ae4b9ecf09",
+                "title": "d40",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d40",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "1d276f485fedc1b61a9cba1aa1091c848c52d412",
+                "title": "d39",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d39",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "e45685cc76337ca2ddf5ac1b00d758b0af0ba2cf",
+                "title": "d38",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d38",
+                "date": 1791306000,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "22fadb606e029343546c1e2b20aac6eb2815fe72",
+                "title": "d37",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d37",
+                "date": 1791261000,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "30b18299dbfb9a165560262533bd7d73e086309e",
+                "title": "d36",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d36",
+                "date": 1791298800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "f006b908d9b6ef66334d5fb79c4638d810750696",
+                "title": "d35",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d35",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "ec607225ab0d76871eb1de537693675704e1631f",
+                "title": "d34",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d34",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "d43f00d8cb02d5a3f15ce208bbb8fb52dd1f2258",
+                "title": "d33",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d33",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "d1605361d55e826999f4689c09c0008399d9f8fa",
+                "title": "d32",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d32",
+                "date": 1788652800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "d334853b72dd8fe456458da5e62ce3d239f52291",
+                "title": "d31",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d31",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "31e4546575b6479545b67545374a49669afd620a",
+                "title": "d30",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d30",
+                "date": 1791273600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "56880f5ff5e5b54d0816579853de5328acaaca07",
+                "title": "d29",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d29",
+                "date": 1791273600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "1a428a3603dc61b1c72cfa5cdb683a86fc972f1b",
+                "title": "d28",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d28",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "a512eee70be941be3ee9bf48296199ef99c6dcdf",
+                "title": "d27",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d27",
+                "date": 1791273600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "65c328fd43dc2e7095fd13237df0cd270e36e85c",
+                "title": "d26",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d26",
+                "date": 1791273600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "c816467d0489aa3940acdf235cff629c4ebcd9ad",
+                "title": "d25",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d25",
+                "date": 1791273600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "e0c213be03986656bd5a470bff20262610d428dc",
+                "title": "d24",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d24",
+                "date": 1791331200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "55b3b83c151fa98726d2b037dc84cba81839f019",
+                "title": "d23",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d23",
+                "date": 1772445600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "a456304b6f0f9167350d731a769852720e610bff",
+                "title": "d22",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d22",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "fd526318daaf3ff08ad499be819e14ac788219bb",
+                "title": "d21",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d21",
+                "date": 1791244800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "53b8868b8945e6512889b306608f73d416243497",
+                "title": "d20",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d20",
+                "date": 1791244800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "17e299e73ea423d6cf0b56cd146037a1708043cc",
+                "title": "d19",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d19",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "fce12c22043052de06b74dc10dab609ff493f6d6",
+                "title": "d18",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d18",
+                "date": 1791306000,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "22663bfdaf88b6d695232cb7df12f775fb3894eb",
+                "title": "d17",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d17",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "9d9e6fd39c004d307d75b6a65a5a7c9add10f7ec",
+                "title": "d16",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d16",
+                "date": 1791280680,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "4a50f2fe8f7e97a806ee19c6186fd94e661c9327",
+                "title": "d15",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d15",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "7485691ed3252ac9cc46864878eb06e6e09a76ad",
+                "title": "d14",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d14",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "84b4845cc284be26a591f7baea5e9700dba60a97",
+                "title": "d13",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d13",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "59fc53883d3af4f5bbf0b029a87fbdfbb523c825",
+                "title": "d12",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d12",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "8d64497801fae14bd1a910f80773d3528684e7a3",
+                "title": "d11",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d11",
+                "date": 1791273900,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "af4e683381c6735cc577cb972355ccbbafd8089e",
+                "title": "d10",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d10",
+                "date": 1791280801,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "5398e402c3513c3fd8044e656e867ca720da89ba",
+                "title": "d9",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d9",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "68493740a428ac20d2cb2223bbf6ec8d6997ef9f",
+                "title": "d8",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d8",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "ee3ec3b7f84e74367f4a436b4e2e3c3a59547a06",
+                "title": "d7",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d7",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "d265585d0bb9e9df80ad2a1b27d4d72c3487400c",
+                "title": "d6",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d6",
+                "date": 1781085600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "bb3733e3adf47878b6fc88d5e21f145c385a8e19",
+                "title": "d5",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d5",
+                "date": 1791273600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "ccc404e1412f390b71884d38998e554db8920765",
+                "title": "d4",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d4",
+                "date": 1791273600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "f0a271635d496e0bab6e19f15f53b8ebe18faac4",
+                "title": "d3",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d3",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "87df8a114a545899fd4ac86d85305a692b4e36d4",
+                "title": "d2",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d2",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "0488b6c14a6bb1bed5efb6e6c1a89976cc0c3b88",
+                "title": "d1",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d1",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "85427d9e1391b8a5a6dbffb254330a9c766e00c9",
+                "title": "d0",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/d0",
+                "date": 1791273600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "dup-guids.xml": {
+        "error": null,
+        "title": "Duplicates",
+        "link": "http://dup.example.org/",
+        "description": "d",
+        "self": null,
+        "hub": null,
+        "unicityCriteria": "sha1:link_published",
+        "inError": false,
+        "guids": [
+            "614bf0c67ba75dfff601ad466e224a13a8011630",
+            "4b442928b4c88127ba76cc993981d22f9cd5b189",
+            "e039114346aef2505dd0d91c0cd5c61a70cad0fc",
+            "2e8d08ded71bea072715a977ce13775d06123a86",
+            "c9dcdbb4097568ae61956341bc8a3aaf9394fb44"
+        ],
+        "entries": [
+            {
+                "guid": "614bf0c67ba75dfff601ad466e224a13a8011630",
+                "title": "Duplicate guid 5",
+                "authors": [],
+                "content": "",
+                "link": "http://dup.example.org/5",
+                "date": 1704448800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "4b442928b4c88127ba76cc993981d22f9cd5b189",
+                "title": "Duplicate guid 4",
+                "authors": [],
+                "content": "",
+                "link": "http://dup.example.org/4",
+                "date": 1704362400,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "e039114346aef2505dd0d91c0cd5c61a70cad0fc",
+                "title": "Duplicate guid 3",
+                "authors": [],
+                "content": "",
+                "link": "http://dup.example.org/3",
+                "date": 1704276000,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "2e8d08ded71bea072715a977ce13775d06123a86",
+                "title": "Duplicate guid 2",
+                "authors": [],
+                "content": "",
+                "link": "http://dup.example.org/2",
+                "date": 1704189600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "c9dcdbb4097568ae61956341bc8a3aaf9394fb44",
+                "title": "Duplicate guid 1",
+                "authors": [],
+                "content": "",
+                "link": "http://dup.example.org/1",
+                "date": 1704103200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "dup-links.xml": {
+        "error": null,
+        "title": "Same links",
+        "link": "http://same.example.org/",
+        "description": "d",
+        "self": null,
+        "hub": null,
+        "unicityCriteria": "sha1:link_published_title",
+        "inError": false,
+        "guids": [
+            "a6e9094a63694bb12268e00eefa990c272a3fcb5",
+            "57fce92793ce4d6d247283afffc989d50540791a",
+            "e851a898defefa88dac89715ed6b46a808384298"
+        ],
+        "entries": [
+            {
+                "guid": "a6e9094a63694bb12268e00eefa990c272a3fcb5",
+                "title": "Same link C",
+                "authors": [],
+                "content": "",
+                "link": "http://same.example.org/page",
+                "date": 1704103200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "57fce92793ce4d6d247283afffc989d50540791a",
+                "title": "Same link B",
+                "authors": [],
+                "content": "",
+                "link": "http://same.example.org/page",
+                "date": 1704103200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "e851a898defefa88dac89715ed6b46a808384298",
+                "title": "Same link A",
+                "authors": [],
+                "content": "",
+                "link": "http://same.example.org/page",
+                "date": 1704103200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "dup-tolerated.xml": {
+        "error": null,
+        "title": "One duplicate in ten",
+        "link": "http://ok.example.org/",
+        "description": "d",
+        "self": null,
+        "hub": null,
+        "unicityCriteria": null,
+        "inError": true,
+        "guids": [
+            "id-9",
+            "id-8",
+            "id-7",
+            "id-6",
+            "id-5",
+            "id-4",
+            "id-3",
+            "id-2",
+            "twice",
+            "twice"
+        ],
+        "entries": [
+            {
+                "guid": "id-9",
+                "title": "Tolerated 9",
+                "authors": [],
+                "content": "",
+                "link": "http://ok.example.org/9",
+                "date": 1704103740,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "id-8",
+                "title": "Tolerated 8",
+                "authors": [],
+                "content": "",
+                "link": "http://ok.example.org/8",
+                "date": 1704103680,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "id-7",
+                "title": "Tolerated 7",
+                "authors": [],
+                "content": "",
+                "link": "http://ok.example.org/7",
+                "date": 1704103620,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "id-6",
+                "title": "Tolerated 6",
+                "authors": [],
+                "content": "",
+                "link": "http://ok.example.org/6",
+                "date": 1704103560,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "id-5",
+                "title": "Tolerated 5",
+                "authors": [],
+                "content": "",
+                "link": "http://ok.example.org/5",
+                "date": 1704103500,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "id-4",
+                "title": "Tolerated 4",
+                "authors": [],
+                "content": "",
+                "link": "http://ok.example.org/4",
+                "date": 1704103440,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "id-3",
+                "title": "Tolerated 3",
+                "authors": [],
+                "content": "",
+                "link": "http://ok.example.org/3",
+                "date": 1704103380,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "id-2",
+                "title": "Tolerated 2",
+                "authors": [],
+                "content": "",
+                "link": "http://ok.example.org/2",
+                "date": 1704103320,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "twice",
+                "title": "Tolerated 1",
+                "authors": [],
+                "content": "",
+                "link": "http://ok.example.org/1",
+                "date": 1704103260,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "twice",
+                "title": "Tolerated 0",
+                "authors": [],
+                "content": "",
+                "link": "http://ok.example.org/0",
+                "date": 1704103200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "entities.xml": {
+        "error": null,
+        "title": "Entities © undeclared",
+        "link": "http://ent.example.org/",
+        "description": "d",
+        "self": null,
+        "hub": null,
+        "unicityCriteria": null,
+        "inError": false,
+        "guids": [
+            "caf"
+        ],
+        "entries": [
+            {
+                "guid": "caf",
+                "title": "Café — naïve & <plain>",
+                "authors": [],
+                "content": "Nbsp here …",
+                "link": "http://ent.example.org/1",
+                "date": 1704103200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "ids.xml": {
+        "error": null,
+        "title": "t",
+        "link": "http://base.test/dir/page",
+        "description": null,
+        "self": null,
+        "hub": null,
+        "unicityCriteria": null,
+        "inError": false,
+        "guids": [
+            "https://a b@github.com/",
+            "http://:80/x",
+            "https://github.com: 80/x",
+            "https://github.com:080/x",
+            "https://.github.com/x",
+            "http://example.net:8080:1/x",
+            "http://EXAMPLE.net/x",
+            "https://example.net",
+            "http://[::1]:80/github.com",
+            "http://github.com:80:80/",
+            "8ea35526a73931818226a79c18f18da4d3a481da",
+            "http://medium.com/x",
+            "http://youtu.be/abc",
+            "https://user:pa:ss@github.com/m",
+            "http://github.com%2Fx",
+            "http://?github.com",
+            "http://#github.com",
+            "https://github.com//",
+            "http://-github.com/",
+            "https://github.com/a?b=c&amp;d",
+            "https://www.github.com:0/p",
+            "https://www.github.com:65535/p",
+            "http://www.github.com:65536/p",
+            "line1line2",
+            "http://github.com/tab",
+            "http://evil.test?@github.com/",
+            "http://github.com:pw@evil.test/",
+            "https://x@y@github.com/w",
+            "https://.github.com/q",
+            "https://github.com.:80/z",
+            "http://githUb.com/y",
+            "https://github.com:80x/y",
+            "https://sub.example.net/a b",
+            "http://[github.com]/x",
+            "https://github.com /x",
+            "https://github.com:/x",
+            "https://u:p@github.com:80/x",
+            "https://example.net:8080/x",
+            "https://github.com#x",
+            "http:///github.com/x",
+            "http://github.com\\@evil/x",
+            "https://www.youtube.com/watch?v=1",
+            "https://foo.github.com./x9",
+            "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL",
+            "a&amp;b &lt;c&gt; &quot;q&quot; 'r'",
+            "tag  ",
+            "HTTPs://github.com/x6",
+            "https://github.com?x5",
+            "https://github.com",
+            "https://user@github.com/x3",
+            "http://github.com:99999/x2",
+            "http://GitHub.com/x1",
+            "https://github.com/x"
+        ],
+        "entries": [
+            {
+                "guid": "https://a b@github.com/",
+                "title": "i52",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i52",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://:80/x",
+                "title": "i51",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i51",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://github.com: 80/x",
+                "title": "i50",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i50",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://github.com:080/x",
+                "title": "i49",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i49",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://.github.com/x",
+                "title": "i48",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i48",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://example.net:8080:1/x",
+                "title": "i47",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i47",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://EXAMPLE.net/x",
+                "title": "i46",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i46",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://example.net",
+                "title": "i45",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i45",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://[::1]:80/github.com",
+                "title": "i44",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i44",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://github.com:80:80/",
+                "title": "i43",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i43",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "8ea35526a73931818226a79c18f18da4d3a481da",
+                "title": "i42",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i42",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://medium.com/x",
+                "title": "i41",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i41",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://youtu.be/abc",
+                "title": "i40",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i40",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://user:pa:ss@github.com/m",
+                "title": "i39",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i39",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://github.com%2Fx",
+                "title": "i38",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i38",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://?github.com",
+                "title": "i37",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i37",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://#github.com",
+                "title": "i36",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i36",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://github.com//",
+                "title": "i35",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i35",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://-github.com/",
+                "title": "i34",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i34",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://github.com/a?b=c&amp;d",
+                "title": "i33",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i33",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://www.github.com:0/p",
+                "title": "i32",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i32",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://www.github.com:65535/p",
+                "title": "i31",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i31",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://www.github.com:65536/p",
+                "title": "i30",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i30",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "line1line2",
+                "title": "i29",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i29",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://github.com/tab",
+                "title": "i28",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i28",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://evil.test?@github.com/",
+                "title": "i27",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i27",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://github.com:pw@evil.test/",
+                "title": "i26",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i26",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://x@y@github.com/w",
+                "title": "i25",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i25",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://.github.com/q",
+                "title": "i24",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i24",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://github.com.:80/z",
+                "title": "i23",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i23",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://githUb.com/y",
+                "title": "i22",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i22",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://github.com:80x/y",
+                "title": "i21",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i21",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://sub.example.net/a b",
+                "title": "i20",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i20",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://[github.com]/x",
+                "title": "i19",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i19",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://github.com /x",
+                "title": "i18",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i18",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://github.com:/x",
+                "title": "i17",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i17",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://u:p@github.com:80/x",
+                "title": "i16",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i16",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://example.net:8080/x",
+                "title": "i15",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i15",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://github.com#x",
+                "title": "i14",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i14",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http:///github.com/x",
+                "title": "i13",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i13",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://github.com\\@evil/x",
+                "title": "i12",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i12",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://www.youtube.com/watch?v=1",
+                "title": "i11",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i11",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://foo.github.com./x9",
+                "title": "i10",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i10",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL",
+                "title": "i9",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i9",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "a&amp;b &lt;c&gt; &quot;q&quot; 'r'",
+                "title": "i8",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i8",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "tag",
+                "title": "i7",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i7",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "HTTPs://github.com/x6",
+                "title": "i6",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i6",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://github.com?x5",
+                "title": "i5",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i5",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://github.com",
+                "title": "i4",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i4",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://user@github.com/x3",
+                "title": "i3",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i3",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://github.com:99999/x2",
+                "title": "i2",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://GitHub.com/x1",
+                "title": "i1",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i1",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://github.com/x",
+                "title": "i0",
+                "authors": [],
+                "content": "",
+                "link": "http://e.test/i0",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "links.xml": {
+        "error": null,
+        "title": "t",
+        "link": "http://base.test/dir/page",
+        "description": null,
+        "self": null,
+        "hub": null,
+        "unicityCriteria": null,
+        "inError": false,
+        "guids": [
+            "51bc58d5050669802ae2b5cefb76d2f846f2cb0a",
+            "14ff2c01213ced1517425e4ec5fa32ead35d2255",
+            "bdbf406a57fe04b9c40a8dcc2bb0b8735f224399",
+            "bd2fb1124fd919d81c0a59e9dc6bc77e39cbf0b6",
+            "321bb05a33e3444bcee125b0a6cd5334f5e6cf76",
+            "89665baa554a18b9209d5a936c6928cc2969bef3",
+            "aaa28114d9f556b1fb9c82ba436d444c73cd5872",
+            "c795b854ba9380c4d98f844d8085036620ad930d",
+            "7b38f5575f7ad709e1284ed9518a017a625d52c6",
+            "58daaea9544c1e3e3bcfbe381444e8d571497c61",
+            "4b05697bd2da2610f8f5a7fb8d4a56ad25f3283b",
+            "2e03da72ac4454358dbb27dbda3ad30234f4452f",
+            "45576e15378e692468922f8bc500f8fb2622b878",
+            "c3bdcd68ad8391f30b5cebe119e0bbd98a419c34",
+            "36a315eedcaf4d34fb3f20e122d067b57d2e3a21",
+            "30dc1339c4f7e9b2252ad69e4cf4c1d4eb66bb40",
+            "0c125e4200b8dfc336d3f50f885bc5d7eb9f4759",
+            "89915fae70395c7023bb259fb7c122b5a6fd92b5",
+            "b79b673d8066b96aa0449c4aa8d7d9737376f71d",
+            "f7cc4f865bc4cb540fe6c4ade5ed9b369058ec73",
+            "b50f30ebdb7ed6f7be8d2cbf850db7f91a506875",
+            "581036b1936d839cd785e7620f3f4707a0bc9e95",
+            "6e04aac0c734b95ef26e598bd22cefb138ad1647",
+            "cf5b848e81bcb0f9e68af41dc693ad98fd606e72",
+            "7af1d339844e22d8e227c95329599c5df69483b4",
+            "4cdfe14e5c8c3e429b44f7e8564d2fd4b3a1ffd1",
+            "64f2e4a8bb1de30ebc8b299a4726dc5a145e6d23",
+            "34e1116d6d2c6732dd5968ef73e37d5f4ad64acc",
+            "c9cc377cb3773f534ff883c52eb780e7759571f9",
+            "b08f171695e7ee2ef2d054b87409695f0168600a",
+            "465426cb052c62039e806098ff4cb37b349927ee",
+            "9b1b5d600e1f99a4443b6ba1a553e8983605580e",
+            "14e638c5f3d0e5b3c3f08ff319ebb88126f303da",
+            "91f578bc90b95013cf5fdfdd919f5dda4ddde31b",
+            "72ac458fa5a780fd4964d7edb8f985d1514ef8c1",
+            "990448412c01d4fccfe739898dd191a3ca0fb4bd",
+            "80225d9eb4996cc7e0a25caf6ce087a95d722484",
+            "1689c65b99f75b99ed470260a0e971d76f4ed03a",
+            "38c8aea0c73d00bd8cd5f9460ac9bc486e2a6402",
+            "b3d1fbb45483af9101a0035fe3ed4c2887b520e4",
+            "c9ac111956fb068b3493cfcbafca8edfb8ac6bc5",
+            "c3b00a17821887b8f9d99377ab2b5913d3c46f67",
+            "a8d63deb33ddcb5ac7dce6e43185503e0fef3e07",
+            "2c4c778188d23a3f4d2f4e1be90d18253eaabde5",
+            "837a578b03c97b9068fc12a5481fa17f6723d541",
+            "f48f894eafbfd7e675e72020a87f312e3cc17e11",
+            "b6473e36f0e683615fb722fd6b01ee97f004e09b",
+            "cf40c300da0f2d437704cb415bdfa26d88286ce2",
+            "1e4d7e0fe7aa04b2b06fdd28de6c56e78d0f4117",
+            "88dadcf2ec382415b6a9ab524baa44cb7669a5c3",
+            "d973eca9eae111c62d9a17d4f85f94cdc7ae44a1",
+            "ec4a79395c04afd11989c6c89751ad5fb4754ac4",
+            "5b6bd1ab4e0639c5b182dfd884c3c756613b4782",
+            "fc472c3e7f7fcea44f5e7cf924f1687159258455",
+            "adce6e0c6ce2d2a2def1754a890688a8e3195c53",
+            "b26c42db79a555174af1886243e3f05adba52fdd",
+            "0bd438fb9cc45597f7b1505611039d72a3683f5b",
+            "51812adcaa8c1e8854f6e92073d26af44827ddfc",
+            "a2adc1d1f2ffe02cae5c57e9ba5c562f433eff24",
+            "c526cedc741a2e292bee0f3298b7e2ae94facc87",
+            "2a78da1680b4463159c2e64396a2ba8fc9c49a09",
+            "b8a20243a307f464ad5a2541b1320cdbaf71afd0",
+            "7c79774646b8fb1d6b3ea602f079d8cdd3980c25"
+        ],
+        "entries": [
+            {
+                "guid": "51bc58d5050669802ae2b5cefb76d2f846f2cb0a",
+                "title": "l62",
+                "authors": [],
+                "content": "k62",
+                "link": "http://e.test/a%20b%C3%A9%E2%82%AC",
+                "date": 1791280802,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "14ff2c01213ced1517425e4ec5fa32ead35d2255",
+                "title": "l61",
+                "authors": [],
+                "content": "k61",
+                "link": "http://e.test/sp",
+                "date": 1791280801,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "bdbf406a57fe04b9c40a8dcc2bb0b8735f224399",
+                "title": "l60",
+                "authors": [],
+                "content": "k60",
+                "link": "http://e.test/A",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "bd2fb1124fd919d81c0a59e9dc6bc77e39cbf0b6",
+                "title": "l59",
+                "authors": [],
+                "content": "k59",
+                "link": "http://e.test/a?b=c&d",
+                "date": 1791280809,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "321bb05a33e3444bcee125b0a6cd5334f5e6cf76",
+                "title": "l58",
+                "authors": [],
+                "content": "k58",
+                "link": "http://xn--mnchen-3ya.test/a",
+                "date": 1791280808,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "89665baa554a18b9209d5a936c6928cc2969bef3",
+                "title": "l57",
+                "authors": [],
+                "content": "k57",
+                "link": "http://e.test/a?b=%3Cc%3E",
+                "date": 1791280807,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "aaa28114d9f556b1fb9c82ba436d444c73cd5872",
+                "title": "l56",
+                "authors": [],
+                "content": "k56",
+                "link": "http://e.test/a#b%25",
+                "date": 1791280806,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "c795b854ba9380c4d98f844d8085036620ad930d",
+                "title": "l55",
+                "authors": [],
+                "content": "k55",
+                "link": "http://e.test/%5Bx%5D",
+                "date": 1791280805,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "7b38f5575f7ad709e1284ed9518a017a625d52c6",
+                "title": "l54",
+                "authors": [],
+                "content": "k54",
+                "link": "http://e.test/a?%25",
+                "date": 1791280804,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "58daaea9544c1e3e3bcfbe381444e8d571497c61",
+                "title": "l53",
+                "authors": [],
+                "content": "k53",
+                "link": "http://e.test/~user",
+                "date": 1791280803,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "4b05697bd2da2610f8f5a7fb8d4a56ad25f3283b",
+                "title": "l52",
+                "authors": [],
+                "content": "k52",
+                "link": "https://e.test/",
+                "date": 1791280802,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "2e03da72ac4454358dbb27dbda3ad30234f4452f",
+                "title": "l51",
+                "authors": [],
+                "content": "k51",
+                "link": "http://e.test/a%09b",
+                "date": 1791280801,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "45576e15378e692468922f8bc500f8fb2622b878",
+                "title": "l50",
+                "authors": [],
+                "content": "k50",
+                "link": "http://e.test/a%20b?c%20d#e%20f",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "c3bdcd68ad8391f30b5cebe119e0bbd98a419c34",
+                "title": "l49",
+                "authors": [],
+                "content": "k49",
+                "link": "http://base.test/dir/page#frag",
+                "date": 1791280809,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "36a315eedcaf4d34fb3f20e122d067b57d2e3a21",
+                "title": "l48",
+                "authors": [],
+                "content": "k48",
+                "link": "http://base.test/dir/page?only=query",
+                "date": 1791280808,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "30dc1339c4f7e9b2252ad69e4cf4c1d4eb66bb40",
+                "title": "l47",
+                "authors": [],
+                "content": "k47",
+                "link": "http://e.test/a/b/",
+                "date": 1791280807,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "0c125e4200b8dfc336d3f50f885bc5d7eb9f4759",
+                "title": "l46",
+                "authors": [],
+                "content": "k46",
+                "link": "http://e.test/c",
+                "date": 1791280806,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "89915fae70395c7023bb259fb7c122b5a6fd92b5",
+                "title": "l45",
+                "authors": [],
+                "content": "k45",
+                "link": "https://github.com/x",
+                "date": 1791280805,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "b79b673d8066b96aa0449c4aa8d7d9737376f71d",
+                "title": "l44",
+                "authors": [],
+                "content": "k44",
+                "link": "http://e.test/%E4%B8%AD%E6%96%87?%D0%BA=%D0%B2",
+                "date": 1791280804,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "f7cc4f865bc4cb540fe6c4ade5ed9b369058ec73",
+                "title": "l43",
+                "authors": [],
+                "content": "k43",
+                "link": "http://e.test/%E4%B8%AD",
+                "date": 1791280803,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "b50f30ebdb7ed6f7be8d2cbf850db7f91a506875",
+                "title": "l42",
+                "authors": [],
+                "content": "k42",
+                "link": "http://e.test/~u/!$&'()*+,;=:@",
+                "date": 1791280802,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "581036b1936d839cd785e7620f3f4707a0bc9e95",
+                "title": "l41",
+                "authors": [],
+                "content": "k41",
+                "link": "http://e.test/a?b=http://x/y?z",
+                "date": 1791280801,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "6e04aac0c734b95ef26e598bd22cefb138ad1647",
+                "title": "l40",
+                "authors": [],
+                "content": "k40",
+                "link": "http://e.test:8080/",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "cf5b848e81bcb0f9e68af41dc693ad98fd606e72",
+                "title": "l39",
+                "authors": [],
+                "content": "k39",
+                "link": "http://e.test/a?q=%20+%2B",
+                "date": 1791280809,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "7af1d339844e22d8e227c95329599c5df69483b4",
+                "title": "l38",
+                "authors": [],
+                "content": "k38",
+                "link": "http://e.test/a%5Eb%60c",
+                "date": 1791280808,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "4cdfe14e5c8c3e429b44f7e8564d2fd4b3a1ffd1",
+                "title": "l37",
+                "authors": [],
+                "content": "k37",
+                "link": "http://e.test/a?b#c%23d",
+                "date": 1791280807,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "64f2e4a8bb1de30ebc8b299a4726dc5a145e6d23",
+                "title": "l36",
+                "authors": [],
+                "content": "k36",
+                "link": "http://e.test//double//slash",
+                "date": 1791280806,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "34e1116d6d2c6732dd5968ef73e37d5f4ad64acc",
+                "title": "l35",
+                "authors": [],
+                "content": "k35",
+                "link": "http://e.test//x",
+                "date": 1791280805,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "c9cc377cb3773f534ff883c52eb780e7759571f9",
+                "title": "l34",
+                "authors": [],
+                "content": "k34",
+                "link": "http://e.test/?",
+                "date": 1791280804,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "b08f171695e7ee2ef2d054b87409695f0168600a",
+                "title": "l33",
+                "authors": [],
+                "content": "k33",
+                "link": "ftp://e.test/x",
+                "date": 1791280803,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "465426cb052c62039e806098ff4cb37b349927ee",
+                "title": "l32",
+                "authors": [],
+                "content": "k32",
+                "link": "http://e.test/%25",
+                "date": 1791280802,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "9b1b5d600e1f99a4443b6ba1a553e8983605580e",
+                "title": "l31",
+                "authors": [],
+                "content": "k31",
+                "link": "http://e.test./x",
+                "date": 1791280801,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "14e638c5f3d0e5b3c3f08ff319ebb88126f303da",
+                "title": "l30",
+                "authors": [],
+                "content": "k30",
+                "link": "http://[::1]/x",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "91f578bc90b95013cf5fdfdd919f5dda4ddde31b",
+                "title": "l29",
+                "authors": [],
+                "content": "k29",
+                "link": "http://e.test/a%0A/b",
+                "date": 1791280809,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "72ac458fa5a780fd4964d7edb8f985d1514ef8c1",
+                "title": "l28",
+                "authors": [],
+                "content": "k28",
+                "link": "unsafe:javascript:alert(1)",
+                "date": 1791280808,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "990448412c01d4fccfe739898dd191a3ca0fb4bd",
+                "title": "l27",
+                "authors": [],
+                "content": "k27",
+                "link": "http://e.test/a#%C3%A9",
+                "date": 1791280807,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "80225d9eb4996cc7e0a25caf6ce087a95d722484",
+                "title": "l26",
+                "authors": [],
+                "content": "k26",
+                "link": "http://e.test/a?q=%C3%A9",
+                "date": 1791280806,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "1689c65b99f75b99ed470260a0e971d76f4ed03a",
+                "title": "l25",
+                "authors": [],
+                "content": "k25",
+                "link": "https://e.test/A-",
+                "date": 1791280805,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "38c8aea0c73d00bd8cd5f9460ac9bc486e2a6402",
+                "title": "l24",
+                "authors": [],
+                "content": "k24",
+                "link": "http://e.test/a%3Cb",
+                "date": 1791280804,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "b3d1fbb45483af9101a0035fe3ed4c2887b520e4",
+                "title": "l23",
+                "authors": [],
+                "content": "k23",
+                "link": "http://e.test/a%22b",
+                "date": 1791280803,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "c9ac111956fb068b3493cfcbafca8edfb8ac6bc5",
+                "title": "l22",
+                "authors": [],
+                "content": "k22",
+                "link": "http://e.test/a%25zz",
+                "date": 1791280802,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "c3b00a17821887b8f9d99377ab2b5913d3c46f67",
+                "title": "l21",
+                "authors": [],
+                "content": "k21",
+                "link": "http://e.test/a;b=c",
+                "date": 1791280801,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "a8d63deb33ddcb5ac7dce6e43185503e0fef3e07",
+                "title": "l20",
+                "authors": [],
+                "content": "k20",
+                "link": "http://user:p@e.test/",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "2c4c778188d23a3f4d2f4e1be90d18253eaabde5",
+                "title": "l19",
+                "authors": [],
+                "content": "k19",
+                "link": "mailto:x@y.z",
+                "date": 1791280809,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "837a578b03c97b9068fc12a5481fa17f6723d541",
+                "title": "l18",
+                "authors": [],
+                "content": "k18",
+                "link": "http://e.test/a%7Bb%7D",
+                "date": 1791280808,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "f48f894eafbfd7e675e72020a87f312e3cc17e11",
+                "title": "l17",
+                "authors": [],
+                "content": "k17",
+                "link": "http://base.test/dir/relative",
+                "date": 1791280807,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "b6473e36f0e683615fb722fd6b01ee97f004e09b",
+                "title": "l16",
+                "authors": [],
+                "content": "k16",
+                "link": "http://base.test/relative/path",
+                "date": 1791280806,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "cf40c300da0f2d437704cb415bdfa26d88286ce2",
+                "title": "l15",
+                "authors": [],
+                "content": "k15",
+                "link": "http://e.test/proto-relative",
+                "date": 1791280805,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "1e4d7e0fe7aa04b2b06fdd28de6c56e78d0f4117",
+                "title": "l14",
+                "authors": [],
+                "content": "k14",
+                "link": "http://e.test/a%5Cb",
+                "date": 1791280804,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "88dadcf2ec382415b6a9ab524baa44cb7669a5c3",
+                "title": "l13",
+                "authors": [],
+                "content": "k13",
+                "link": "http://m%C3%BCnchen.test/a",
+                "date": 1791280803,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "d973eca9eae111c62d9a17d4f85f94cdc7ae44a1",
+                "title": "l12",
+                "authors": [],
+                "content": "k12",
+                "link": "http://e.test/a?q=~%2F",
+                "date": 1791280802,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "ec4a79395c04afd11989c6c89751ad5fb4754ac4",
+                "title": "l11",
+                "authors": [],
+                "content": "k11",
+                "link": "http://e.test/a?q=a+b&c='d'",
+                "date": 1791280801,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "5b6bd1ab4e0639c5b182dfd884c3c756613b4782",
+                "title": "l10",
+                "authors": [],
+                "content": "k10",
+                "link": "http://e.test/b",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "fc472c3e7f7fcea44f5e7cf924f1687159258455",
+                "title": "l9",
+                "authors": [],
+                "content": "k9",
+                "link": "http://e.test/x",
+                "date": 1791280809,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "adce6e0c6ce2d2a2def1754a890688a8e3195c53",
+                "title": "l8",
+                "authors": [],
+                "content": "k8",
+                "link": "http://e.test/",
+                "date": 1791280808,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "b26c42db79a555174af1886243e3f05adba52fdd",
+                "title": "l7",
+                "authors": [],
+                "content": "k7",
+                "link": "http://e.test/A",
+                "date": 1791280807,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "0bd438fb9cc45597f7b1505611039d72a3683f5b",
+                "title": "l6",
+                "authors": [],
+                "content": "k6",
+                "link": "http://e.test/a?",
+                "date": 1791280806,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "51812adcaa8c1e8854f6e92073d26af44827ddfc",
+                "title": "l5",
+                "authors": [],
+                "content": "k5",
+                "link": "http://e.test/a#",
+                "date": 1791280805,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "a2adc1d1f2ffe02cae5c57e9ba5c562f433eff24",
+                "title": "l4",
+                "authors": [],
+                "content": "k4",
+                "link": "http://e.test/a?x=%5B1%5D",
+                "date": 1791280804,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "c526cedc741a2e292bee0f3298b7e2ae94facc87",
+                "title": "l3",
+                "authors": [],
+                "content": "k3",
+                "link": "http://e.test/a?b=c%7Cd",
+                "date": 1791280803,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "2a78da1680b4463159c2e64396a2ba8fc9c49a09",
+                "title": "l2",
+                "authors": [],
+                "content": "k2",
+                "link": "http://e.test/%C3%A9",
+                "date": 1791280802,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "b8a20243a307f464ad5a2541b1320cdbaf71afd0",
+                "title": "l1",
+                "authors": [],
+                "content": "k1",
+                "link": "http://e.test/%C3%A9",
+                "date": 1791280801,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "7c79774646b8fb1d6b3ea602f079d8cdd3980c25",
+                "title": "l0",
+                "authors": [],
+                "content": "k0",
+                "link": "http://e.test/a%20b",
+                "date": 1791280800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "media.xml": {
+        "error": null,
+        "title": "Media",
+        "link": "http://media.example.org/",
+        "description": "Media RSS",
+        "self": null,
+        "hub": null,
+        "unicityCriteria": null,
+        "inError": false,
+        "guids": [
+            "m4",
+            "m3",
+            "m2",
+            "m1"
+        ],
+        "entries": [
+            {
+                "guid": "m4",
+                "title": "Relative thumbnail",
+                "authors": [],
+                "content": "",
+                "link": "http://media.example.org/dir/4",
+                "date": 1704362400,
+                "tags": [],
+                "attributes": {
+                    "thumbnail": {
+                        "url": "http://media.example.org/dir/thumb4.jpg"
+                    },
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "m3",
+                "title": "Enclosures of every kind",
+                "authors": [],
+                "content": "",
+                "link": "http://media.example.org/3",
+                "date": 1704276000,
+                "tags": [],
+                "attributes": {
+                    "enclosures": [
+                        {
+                            "url": "http://media.example.org/3.png",
+                            "credit": [
+                                "Channel Credit"
+                            ]
+                        },
+                        {
+                            "url": "http://media.example.org/3.pdf",
+                            "title": "A PDF",
+                            "credit": [
+                                "Channel Credit"
+                            ],
+                            "type": "application/pdf",
+                            "length": 42
+                        },
+                        {
+                            "url": "https://youtube.com/audio.mp3",
+                            "credit": [
+                                "Channel Credit"
+                            ],
+                            "type": "audio/mpeg",
+                            "length": 123
+                        },
+                        {
+                            "url": "http://media.example.org/relative.ogg",
+                            "credit": [
+                                "Channel Credit"
+                            ],
+                            "type": "audio/ogg"
+                        }
+                    ]
+                }
+            },
+            {
+                "guid": "m2",
+                "title": "Single media content",
+                "authors": [],
+                "content": "",
+                "link": "http://media.example.org/2",
+                "date": 1704189600,
+                "tags": [],
+                "attributes": {
+                    "thumbnail": {
+                        "url": "http://media.example.org/2-thumb.jpg",
+                        "width": "75",
+                        "height": "50"
+                    },
+                    "enclosures": [
+                        {
+                            "url": "http://media.example.org/2.jpg?a=1&amp;b=2",
+                            "title": "Item media title",
+                            "credit": [
+                                "Item Credit",
+                                "Second Credit"
+                            ],
+                            "description": "Item media description &amp; more",
+                            "type": "image/jpeg",
+                            "medium": "image",
+                            "thumbnails": [
+                                "http://media.example.org/2-thumb-b.jpg"
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                "guid": "m1",
+                "title": "Group with alternatives",
+                "authors": [],
+                "content": "",
+                "link": "http://media.example.org/1",
+                "date": 1704103200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": [
+                        {
+                            "url": "http://media.example.org/v-high.mp4",
+                            "title": "Own title",
+                            "credit": [
+                                "Channel Credit"
+                            ],
+                            "description": "Group description",
+                            "type": "video/mp4",
+                            "medium": "video",
+                            "length": 9000,
+                            "height": 1080,
+                            "width": 1920,
+                            "thumbnails": [
+                                "http://media.example.org/g-thumb.jpg"
+                            ]
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "mixed.xml": {
+        "error": null,
+        "title": "Mixed &amp;amp; matched &lt;i&gt;feed&lt;/i&gt;",
+        "link": "http://mixed.example.org/blog/",
+        "description": "<p>Channel <b>description</b></p>",
+        "self": [
+            "http://mixed.example.org/feed.xml"
+        ],
+        "hub": [
+            "http://hub.example.org/"
+        ],
+        "unicityCriteria": null,
+        "inError": false,
+        "guids": [
+            "http://mixed.example.org/blog/is-a-link",
+            "http://mixed.example.org/blog/not-a-link",
+            "k",
+            "b587b8d41bcc7185a65ddc45d258cb8a784a1d06",
+            "https://youtube.com/not-a-link",
+            "id  tab",
+            "h",
+            "g",
+            "f070c2417869b449ca77bb6f9abff143b46cf866",
+            "e",
+            "d",
+            "http://mixed.example.org/blog/c?x=1&amp;y=2",
+            "dc-b",
+            "tag:mixed.example.org,2024:a"
+        ],
+        "entries": [
+            {
+                "guid": "http://mixed.example.org/blog/is-a-link",
+                "title": "Guid marked as a permalink in another case",
+                "authors": [
+                    "Feed Owner"
+                ],
+                "content": "",
+                "link": "http://mixed.example.org/blog/is-a-link",
+                "date": 1705053600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://mixed.example.org/blog/not-a-link",
+                "title": "Guid that is not a permalink and no link",
+                "authors": [
+                    "Feed Owner"
+                ],
+                "content": "",
+                "link": "",
+                "date": 1704967200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "k",
+                "title": "Russian month",
+                "authors": [
+                    "Feed Owner"
+                ],
+                "content": "",
+                "link": "http://mixed.example.org/blog/k",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "b587b8d41bcc7185a65ddc45d258cb8a784a1d06",
+                "title": "b587b8d41bcc7185a65ddc45d258cb8a784a1d06",
+                "authors": [
+                    "Feed Owner"
+                ],
+                "content": "No title, no link, no guid: only text.",
+                "link": "",
+                "date": 1704794400,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "https://youtube.com/not-a-link",
+                "title": "Guid permalink false value",
+                "authors": [
+                    "Feed Owner"
+                ],
+                "content": "",
+                "link": "http://mixed.example.org/blog/j~",
+                "date": 1704726000,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "id  tab",
+                "title": "Guid with spaces, non-ASCII и control",
+                "authors": [
+                    "Feed Owner"
+                ],
+                "content": "",
+                "link": "http://mixed.example.org/blog/i",
+                "date": 1704621600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "h",
+                "title": "Unparsable date",
+                "authors": [
+                    "Feed Owner"
+                ],
+                "content": "",
+                "link": "http://mixed.example.org/blog/h",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "g",
+                "title": "No date at all",
+                "authors": [
+                    "Feed Owner"
+                ],
+                "content": "",
+                "link": "http://mixed.example.org/blog/g",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "f070c2417869b449ca77bb6f9abff143b46cf866",
+                "title": "Only an enclosure",
+                "authors": [
+                    "Feed Owner"
+                ],
+                "content": "",
+                "link": "http://mixed.example.org/files/f.mp3",
+                "date": 1704535200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": [
+                        {
+                            "url": "http://mixed.example.org/files/f.mp3",
+                            "type": "audio/mpeg",
+                            "length": 100
+                        }
+                    ]
+                }
+            },
+            {
+                "guid": "e",
+                "title": "Entity &amp; and &lt;tag&gt; in a title",
+                "authors": [
+                    "Feed Owner"
+                ],
+                "content": "",
+                "link": "http://mixed.example.org/blog/e",
+                "date": 1704448800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "d",
+                "title": "CDATA <b>title</b> & more",
+                "authors": [
+                    "Feed Owner"
+                ],
+                "content": "<p>Content wins <img src=\"http://mixed.example.org/relative/pic.png\"></p>",
+                "link": "http://mixed.example.org/relative/d",
+                "date": 1704362400,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://mixed.example.org/blog/c?x=1&amp;y=2",
+                "title": "Guid is the link",
+                "authors": [
+                    "Feed Owner"
+                ],
+                "content": "",
+                "link": "http://mixed.example.org/blog/c?x=1&y=2",
+                "date": 1704265200,
+                "tags": [
+                    "one",
+                    "two",
+                    "three",
+                    "Four & five"
+                ],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "dc-b",
+                "title": "Only a Dublin Core identifier",
+                "authors": [
+                    "editor@example.org",
+                    "Second & Author",
+                    "Third Author"
+                ],
+                "content": "",
+                "link": "http://mixed.example.org/blog/b",
+                "date": 1704207600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "tag:mixed.example.org,2024:a",
+                "title": "Atom id wins over guid",
+                "authors": [
+                    "Feed Owner"
+                ],
+                "content": "",
+                "link": "http://mixed.example.org/blog/a",
+                "date": 1704103200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "rdf.xml": {
+        "error": null,
+        "title": "RDF &amp; RSS 1.0",
+        "link": "http://rdf.example.org/",
+        "description": "An RSS 1.0 feed",
+        "self": null,
+        "hub": null,
+        "unicityCriteria": null,
+        "inError": false,
+        "guids": [
+            "fc71875a5bcd117ae2fe96a55c331ff4fc97c919",
+            "urn:dc:two",
+            "http://rdf.example.org/one?a=1&amp;b=2"
+        ],
+        "entries": [
+            {
+                "guid": "fc71875a5bcd117ae2fe96a55c331ff4fc97c919",
+                "title": "No about attribute",
+                "authors": [
+                    "Channel Creator"
+                ],
+                "content": "",
+                "link": "http://rdf.example.org/three",
+                "date": 1709424000,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:dc:two",
+                "title": "Second item",
+                "authors": [
+                    "Channel Creator"
+                ],
+                "content": "<p>Encoded <a href=\"http://rdf.example.org/rel\">content</a></p>",
+                "link": "http://rdf.example.org/two",
+                "date": 1709337600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "http://rdf.example.org/one?a=1&amp;b=2",
+                "title": "First <b>RDF</b> item",
+                "authors": [
+                    "Dana",
+                    "Eli"
+                ],
+                "content": "Plain description with <em>escaped markup</em>.",
+                "link": "http://rdf.example.org/one",
+                "date": 1709283600,
+                "tags": [
+                    "one",
+                    "two",
+                    "three"
+                ],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "win1251.xml": {
+        "error": null,
+        "title": "Кириллица в windows-1251",
+        "link": "http://cp.example.org/",
+        "description": "Описание",
+        "self": null,
+        "hub": null,
+        "unicityCriteria": null,
+        "inError": false,
+        "guids": [
+            "-1"
+        ],
+        "entries": [
+            {
+                "guid": "-1",
+                "title": "Заголовок статьи",
+                "authors": [
+                    "Автор"
+                ],
+                "content": "Текст «в кавычках»",
+                "link": "http://cp.example.org/1",
+                "date": 1704103200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    }
+}

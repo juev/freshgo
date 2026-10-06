@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<rss version="2.0"><channel><title>Кириллица в windows-1251</title><link>http://cp.example.org/</link><description>Описание</description>
+<item><title>Заголовок статьи</title><link>http://cp.example.org/1</link><guid isPermaLink="false">идентификатор-1</guid><pubDate>Mon, 01 Jan 2024 10:00:00 GMT</pubDate><description>Текст &amp;laquo;в кавычках&amp;raquo;</description><author>Автор</author></item>
+</channel></rss>

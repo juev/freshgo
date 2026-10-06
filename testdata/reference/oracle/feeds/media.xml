@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Media</title>
+    <link>http://media.example.org/</link>
+    <description>Media RSS</description>
+    <media:credit>Channel Credit</media:credit>
+    <item>
+      <title>Group with alternatives</title>
+      <link>http://media.example.org/1</link>
+      <guid isPermaLink="false">m1</guid>
+      <pubDate>Mon, 01 Jan 2024 10:00:00 GMT</pubDate>
+      <media:group>
+        <media:title>Group title</media:title>
+        <media:description>Group description</media:description>
+        <media:thumbnail url="http://media.example.org/g-thumb.jpg"/>
+        <media:content url="http://media.example.org/v-low.mp4" type="video/mp4" medium="video" height="240" width="320" fileSize="1000"/>
+        <media:content url="http://media.example.org/v-high.mp4" type="Video/MP4" medium="VIDEO" height="1080" width="1920" fileSize="9000" isDefault="true">
+          <media:title>Own title</media:title>
+        </media:content>
+        <media:content url="http://media.example.org/v-mid.webm" type="video/webm"/>
+      </media:group>
+    </item>
+    <item>
+      <title>Single media content</title>
+      <link>http://media.example.org/2</link>
+      <guid isPermaLink="false">m2</guid>
+      <pubDate>Tue, 02 Jan 2024 10:00:00 GMT</pubDate>
+      <media:title>Item media title</media:title>
+      <media:description>Item media description &amp; more</media:description>
+      <media:credit role="author">Item Credit</media:credit>
+      <media:credit>Second Credit</media:credit>
+      <media:thumbnail url="http://media.example.org/2-thumb.jpg" width="75" height="50"/>
+      <media:thumbnail url="http://media.example.org/2-thumb-b.jpg"/>
+      <media:content url="http://media.example.org/2.jpg?a=1&amp;b=2" type="image/jpeg" medium="image"/>
+    </item>
+    <item>
+      <title>Enclosures of every kind</title>
+      <link>http://media.example.org/3</link>
+      <guid isPermaLink="false">m3</guid>
+      <pubDate>Wed, 03 Jan 2024 10:00:00 GMT</pubDate>
+      <enclosure url="http://youtube.com/audio.mp3" length="123abc" type="audio/mpeg"/>
+      <enclosure url="http://youtube.com/audio.mp3" length="123abc" type="audio/mpeg"/>
+      <enclosure url="/relative.ogg" type="audio/ogg"/>
+      <enclosure url="ftp://media.example.org/file.bin" length="0"/>
+      <atom:link rel="enclosure" href="http://media.example.org/3.pdf" type="application/pdf" length="42" title="A PDF"/>
+      <media:content url="http://media.example.org/3.png"/>
+    </item>
+    <item>
+      <title>Relative thumbnail</title>
+      <link>http://media.example.org/dir/4</link>
+      <guid isPermaLink="false">m4</guid>
+      <pubDate>Thu, 04 Jan 2024 10:00:00 GMT</pubDate>
+      <media:thumbnail url="thumb4.jpg"/>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<rss version="2.0"><channel><title>One duplicate in ten</title><link>http://ok.example.org/</link><description>d</description>
+    <item>
+      <title>Tolerated 0</title>
+      <link>http://ok.example.org/0</link>
+      <guid isPermaLink="false">twice</guid>
+      <pubDate>Mon, 01 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Tolerated 1</title>
+      <link>http://ok.example.org/1</link>
+      <guid isPermaLink="false">twice</guid>
+      <pubDate>Mon, 01 Jan 2024 10:01:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Tolerated 2</title>
+      <link>http://ok.example.org/2</link>
+      <guid isPermaLink="false">id-2</guid>
+      <pubDate>Mon, 01 Jan 2024 10:02:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Tolerated 3</title>
+      <link>http://ok.example.org/3</link>
+      <guid isPermaLink="false">id-3</guid>
+      <pubDate>Mon, 01 Jan 2024 10:03:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Tolerated 4</title>
+      <link>http://ok.example.org/4</link>
+      <guid isPermaLink="false">id-4</guid>
+      <pubDate>Mon, 01 Jan 2024 10:04:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Tolerated 5</title>
+      <link>http://ok.example.org/5</link>
+      <guid isPermaLink="false">id-5</guid>
+      <pubDate>Mon, 01 Jan 2024 10:05:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Tolerated 6</title>
+      <link>http://ok.example.org/6</link>
+      <guid isPermaLink="false">id-6</guid>
+      <pubDate>Mon, 01 Jan 2024 10:06:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Tolerated 7</title>
+      <link>http://ok.example.org/7</link>
+      <guid isPermaLink="false">id-7</guid>
+      <pubDate>Mon, 01 Jan 2024 10:07:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Tolerated 8</title>
+      <link>http://ok.example.org/8</link>
+      <guid isPermaLink="false">id-8</guid>
+      <pubDate>Mon, 01 Jan 2024 10:08:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Tolerated 9</title>
+      <link>http://ok.example.org/9</link>
+      <guid isPermaLink="false">id-9</guid>
+      <pubDate>Mon, 01 Jan 2024 10:09:00 GMT</pubDate>
+    </item>
+</channel></rss>

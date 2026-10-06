@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<rss version="2.0"><channel><title>Same links</title><link>http://same.example.org/</link><description>d</description>
+    <item>
+      <title>Same link A</title>
+      <link>http://same.example.org/page</link>
+      <pubDate>Mon, 01 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Same link B</title>
+      <link>http://same.example.org/page</link>
+      <pubDate>Mon, 01 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Same link C</title>
+      <link>http://same.example.org/page</link>
+      <pubDate>Mon, 01 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+</channel></rss>

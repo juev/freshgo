@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<rss version="2.0"><channel><title>Duplicates</title><link>http://dup.example.org/</link><description>d</description>
+    <item>
+      <title>Duplicate guid 1</title>
+      <link>http://dup.example.org/1</link>
+      <guid isPermaLink="false">same</guid>
+      <pubDate>Mon, 01 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Duplicate guid 2</title>
+      <link>http://dup.example.org/2</link>
+      <guid isPermaLink="false">same</guid>
+      <pubDate>Mon, 02 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Duplicate guid 3</title>
+      <link>http://dup.example.org/3</link>
+      <guid isPermaLink="false">unique-3</guid>
+      <pubDate>Mon, 03 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Duplicate guid 4</title>
+      <link>http://dup.example.org/4</link>
+      <guid isPermaLink="false">unique-4</guid>
+      <pubDate>Mon, 04 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Duplicate guid 5</title>
+      <link>http://dup.example.org/5</link>
+      <guid isPermaLink="false">unique-5</guid>
+      <pubDate>Mon, 05 Jan 2024 10:00:00 GMT</pubDate>
+    </item>
+</channel></rss>
