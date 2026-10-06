@@ -13,6 +13,7 @@
 <a class="site-title" href="{{.URL "/"}}">{{.Site}}</a>
 <nav class="site-nav" aria-label="{{.T "nav.main"}}">
 <ul>
+<li><a href="{{.URL "/"}}"{{if eq .Section "reader"}} aria-current="page"{{end}}>{{.T "nav.reader"}}</a></li>
 <li><a href="{{.URL "/about"}}"{{if eq .Section "about"}} aria-current="page"{{end}}>{{.T "nav.about"}}</a></li>
 </ul>
 </nav>
@@ -22,8 +23,8 @@
 {{if .CanLogin}}<a href="{{.URL "/login"}}"{{if eq .Section "login"}} aria-current="page"{{end}}>{{.T "nav.login"}}</a>{{end}}
 </div>
 </header>
-<div class="messages" id="messages" role="status" aria-live="polite"></div>
-<main class="page" id="content" tabindex="-1">
+<div class="messages" id="messages" role="status" aria-live="polite">{{if .Notice}}<p>{{.Notice}}</p>{{end}}</div>
+<main class="page{{if .Wide}} wide{{end}}" id="content" tabindex="-1">
 {{template "content" .}}
 </main>
 </body>

@@ -581,8 +581,11 @@ func TestBehindProxy(t *testing.T) {
 		if a := s.do(http.MethodPost, "http://10.0.0.5:8080/logout", map[string]string{"Origin": "https://evil.example"}); a.status != http.StatusForbidden {
 			t.Errorf("POST /logout from another origin through the proxy: status %d", a.status)
 		}
-		if a := s.get("/"); a.status != http.StatusSeeOther || a.header.Get("Location") != "/reader/about" {
-			t.Errorf("GET / when logged in: status %d, Location %q", a.status, a.header.Get("Location"))
+		// The reading screen spells its links and forms with the public path.
+		a = s.get("/")
+		if a.status != http.StatusOK || !strings.Contains(a.body, `href="/reader/starred"`) ||
+			!strings.Contains(a.body, `action="/reader/read-all"`) || strings.Contains(a.body, `href="/starred"`) {
+			t.Errorf("GET / when logged in: status %d, body\n%s", a.status, a.body)
 		}
 	})
 }

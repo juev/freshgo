@@ -1,0 +1,101 @@
+{{define "branch"}}<a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}{{if .Failing}} class="failing"{{else if .Muted}} class="muted"{{end}}>{{.Name}}</a>{{end}}
+
+{{define "content"}}
+<div class="reader">
+<nav class="tree" aria-label="{{.T "tree.label"}}">
+<details open>
+<summary>{{.T "tree.label"}}</summary>
+<ul>
+{{range .Data.Tree.Streams}}<li>{{template "branch" .}}{{if .Unread}} <span class="count" title="{{$.N "tree.unread" .Unread}}">{{.Unread}}</span>{{end}}</li>
+{{end}}</ul>
+<h2>{{.T "tree.categories"}}</h2>
+<ul>
+{{range .Data.Tree.Categories}}<li>{{template "branch" .}}{{if .Unread}} <span class="count" title="{{$.N "tree.unread" .Unread}}">{{.Unread}}</span>{{end}}
+{{if .Feeds}}<ul>
+{{range .Feeds}}<li>{{template "branch" .}}{{if .Unread}} <span class="count" title="{{$.N "tree.unread" .Unread}}">{{.Unread}}</span>{{end}}{{if .Failing}} <span class="mark" title="{{$.T "tree.failing"}}">!</span>{{end}}</li>
+{{end}}</ul>{{end}}
+</li>
+{{end}}</ul>
+{{if .Data.Tree.Labels}}
+<h2>{{.T "tree.labels"}}</h2>
+<ul>
+{{range .Data.Tree.Labels}}<li>{{template "branch" .}}{{if .Unread}} <span class="count" title="{{$.N "tree.unread" .Unread}}">{{.Unread}}</span>{{end}}</li>
+{{end}}</ul>
+{{end}}
+</details>
+</nav>
+
+<section class="stream" aria-labelledby="stream-heading">
+<h1 id="stream-heading">{{.Heading}}</h1>
+
+<form method="get" action="{{.URL .Data.Path}}" class="search" role="search">
+{{range $key, $values := .Data.Asked}}{{if ne $key "q"}}<input type="hidden" name="{{$key}}" value="{{index $values 0}}">{{end}}{{end}}
+<label for="q">{{.T "search.label"}}</label>
+<input type="search" id="q" name="q" value="{{.Data.Query}}"{{if .Data.Problem}} aria-invalid="true" aria-describedby="q-problem"{{end}}>
+<button type="submit">{{.T "search.submit"}}</button>
+</form>
+{{if .Data.Problem}}<p class="alert" role="alert" id="q-problem">{{.Data.Problem}}</p>{{end}}
+
+<div class="toolbar">
+<ul class="choices" aria-label="{{.T "state.label"}}">
+{{range .Data.States}}<li><a href="{{.URL}}"{{if .Current}} aria-current="true"{{end}}>{{.Name}}</a></li>
+{{end}}</ul>
+<form method="get" action="{{.URL .Data.Path}}" class="sorting">
+{{range $key, $values := .Data.Asked}}{{if and (ne $key "sort") (ne $key "order")}}<input type="hidden" name="{{$key}}" value="{{index $values 0}}">{{end}}{{end}}
+<label for="sort">{{.T "sort.label"}}</label>
+<select id="sort" name="sort">
+{{range .Data.Sorts}}<option value="{{.URL}}"{{if .Current}} selected{{end}}>{{.Name}}</option>
+{{end}}</select>
+<label for="order">{{.T "order.label"}}</label>
+<select id="order" name="order">
+<option value="desc"{{if not .Data.Asc}} selected{{end}}>{{.T "order.desc"}}</option>
+<option value="asc"{{if .Data.Asc}} selected{{end}}>{{.T "order.asc"}}</option>
+</select>
+<button type="submit">{{.T "sort.submit"}}</button>
+</form>
+{{if .Data.CanChange}}
+<details class="menu">
+<summary>{{.T "mark-all.label"}}</summary>
+<form method="post" action="{{.URL "/read-all"}}">
+<input type="hidden" name="stream" value="{{.Data.Path}}">
+<input type="hidden" name="state" value="{{.Data.State}}">
+<input type="hidden" name="q" value="{{.Data.Query}}">
+<input type="hidden" name="before" value="{{.Data.Before}}">
+<input type="hidden" name="next" value="{{.Data.Here}}">
+<button type="submit" name="older" value="">{{.T "mark-all.shown"}}</button>
+<button type="submit" name="older" value="day">{{.T "mark-all.day"}}</button>
+<button type="submit" name="older" value="week">{{.T "mark-all.week"}}</button>
+</form>
+</details>
+{{end}}
+</div>
+
+{{if not .Data.Entries}}{{if not .Data.Problem}}<p class="muted">{{.T "stream.empty"}}</p>{{end}}{{end}}
+<div class="entries">
+{{range .Data.Entries}}
+<article class="entry{{if .Read}} read{{end}}" id="e{{.ID}}" aria-labelledby="t{{.ID}}" tabindex="-1">
+<details{{if $.Data.Expanded}} open{{end}}>
+<summary>
+<h2 class="entry-title" id="t{{.ID}}">{{.Title}}</h2>
+<span class="entry-feed">{{.Feed}}</span>
+<time datetime="{{.DateTime}}">{{.Date}}</time>
+<span class="entry-state">{{if not .Read}}{{$.T "entry.unread"}}{{end}}{{if .Starred}} {{$.T "entry.starred"}}{{end}}</span>
+</summary>
+<div class="entry-body">
+{{template "entry-body" .}}
+{{if .Tags}}<p class="entry-tags">{{$.T "entry.tags"}} {{range $i, $tag := .Tags}}{{if $i}}, {{end}}{{$tag}}{{end}}</p>{{end}}
+{{if .Labels}}<p class="entry-labels">{{$.T "entry.labels"}} {{range $i, $label := .Labels}}{{if $i}}, {{end}}{{$label}}{{end}}</p>{{end}}
+</div>
+</details>
+<div class="entry-actions">
+{{if $.Data.CanChange}}{{template "entry-actions" (dict "Entry" . "Here" $.Data.Here "Page" $)}}{{end}}
+{{if .Link}}<a href="{{.Link}}" rel="noopener noreferrer">{{$.T "entry.original"}}</a>{{end}}
+<a href="{{.URL}}">{{$.T "entry.page"}}</a>
+</div>
+</article>
+{{end}}
+</div>
+{{if .Data.Next}}<p class="more"><a href="{{.Data.Next}}" rel="next">{{.T "stream.next"}}</a></p>{{end}}
+</section>
+</div>
+{{end}}

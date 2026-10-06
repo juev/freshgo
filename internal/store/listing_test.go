@@ -112,6 +112,7 @@ func TestListPage(t *testing.T) {
 			"feed, backwards":      {Listing{Order: OrderFeed}, []int64{s5, s3, s1, s6, s4, s2}},
 			"unread by title":      {Listing{Order: OrderTitle, Ascending: true, Read: boolPtr(false)}, []int64{s5, s2, s1, s3}},
 			"starred by date":      {Listing{Order: OrderPublished, Favorite: boolPtr(true)}, []int64{s6, s5}},
+			"unread or starred":    {Listing{UnreadOrFavorite: true}, []int64{s6, s5, s3, s2, s1}},
 			"read and not starred": {Listing{Read: boolPtr(true), Favorite: boolPtr(false)}, []int64{s4}},
 			"a category by title":  {Listing{Set: EntrySet{CategoryID: 2}, Order: OrderTitle, Ascending: true}, []int64{s2, s4, s6}},
 			"a feed by date":       {Listing{Set: EntrySet{FeedID: 1}, Order: OrderPublished, Ascending: true}, []int64{s3, s5, s1}},

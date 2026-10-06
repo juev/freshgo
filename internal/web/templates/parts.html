@@ -1,0 +1,33 @@
+{{define "entry-body"}}
+<p class="entry-meta">
+{{if .Feed}}<a href="{{.FeedURL}}">{{.Feed}}</a>{{end}}
+{{if .Authors}}<span class="entry-authors">{{.Authors}}</span>{{end}}
+<time datetime="{{.DateTime}}">{{.Date}}</time>
+</p>
+<div class="entry-content">{{.Content}}</div>
+{{if .Attachments}}
+<ul class="attachments">
+{{range .Attachments}}
+<li>
+{{if eq .Kind "image"}}<img src="{{.URL}}" alt="{{.Title}}" loading="lazy">
+{{else if eq .Kind "audio"}}<audio controls preload="none" src="{{.URL}}"></audio> <a href="{{.URL}}" rel="noopener noreferrer">{{.Title}}</a>
+{{else if eq .Kind "video"}}<video controls preload="none" src="{{.URL}}"></video> <a href="{{.URL}}" rel="noopener noreferrer">{{.Title}}</a>
+{{else}}<a href="{{.URL}}" rel="noopener noreferrer"{{if .Type}} type="{{.Type}}"{{end}}>{{.Title}}</a>{{end}}
+</li>
+{{end}}
+</ul>
+{{end}}
+{{end}}
+
+{{define "entry-actions"}}
+<form method="post" action="{{.Entry.URL}}/read">
+<input type="hidden" name="next" value="{{.Here}}">
+<input type="hidden" name="read" value="{{if .Entry.Read}}0{{else}}1{{end}}">
+<button type="submit" class="link">{{if .Entry.Read}}{{.Page.T "entry.mark-unread"}}{{else}}{{.Page.T "entry.mark-read"}}{{end}}</button>
+</form>
+<form method="post" action="{{.Entry.URL}}/star">
+<input type="hidden" name="next" value="{{.Here}}">
+<input type="hidden" name="starred" value="{{if .Entry.Starred}}0{{else}}1{{end}}">
+<button type="submit" class="link">{{if .Entry.Starred}}{{.Page.T "entry.unstar"}}{{else}}{{.Page.T "entry.star"}}{{end}}</button>
+</form>
+{{end}}

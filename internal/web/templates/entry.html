@@ -1,0 +1,31 @@
+{{define "content"}}
+<article class="entry single{{if .Data.Entry.Read}} read{{end}}" id="e{{.Data.Entry.ID}}">
+<h1>{{if .Data.Entry.Link}}<a href="{{.Data.Entry.Link}}" rel="noopener noreferrer">{{.Heading}}</a>{{else}}{{.Heading}}{{end}}</h1>
+{{template "entry-body" .Data.Entry}}
+{{if .Data.Entry.Tags}}<p class="entry-tags">{{.T "entry.tags"}} {{range $i, $tag := .Data.Entry.Tags}}{{if $i}}, {{end}}{{$tag}}{{end}}</p>{{end}}
+{{if .Data.CanChange}}
+<div class="entry-actions">
+{{template "entry-actions" (dict "Entry" .Data.Entry "Here" .Data.Here "Page" .)}}
+</div>
+<form method="post" action="{{.Data.Entry.URL}}/labels" class="form labels" id="labels">
+<input type="hidden" name="next" value="{{.Data.Here}}">
+<fieldset>
+<legend>{{.T "entry.labels"}}</legend>
+{{range .Data.Labels}}
+<p class="check">
+<input type="checkbox" id="label-{{.ID}}" name="label" value="{{.ID}}"{{if .On}} checked{{end}}>
+<label for="label-{{.ID}}">{{.Name}}</label>
+</p>
+{{end}}
+<p>
+<label for="new-label">{{.T "entry.new-label"}}</label>
+<input type="text" id="new-label" name="new" maxlength="191">
+</p>
+<p><button type="submit">{{.T "entry.save-labels"}}</button></p>
+</fieldset>
+</form>
+{{else}}
+{{if .Data.Entry.Labels}}<p class="entry-labels">{{.T "entry.labels"}} {{range $i, $label := .Data.Entry.Labels}}{{if $i}}, {{end}}{{$label}}{{end}}</p>{{end}}
+{{end}}
+</article>
+{{end}}

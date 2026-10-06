@@ -281,3 +281,262 @@ button.link {
 	border-radius: var(--radius);
 	padding: var(--space) calc(var(--space) * 1.5);
 }
+
+/* The reading screen: the tree of subscriptions beside the stream. */
+
+.page.wide {
+	max-width: none;
+}
+
+.messages p {
+	margin: var(--space) 0;
+	padding: var(--space) calc(var(--space) * 1.5);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--bg-raised);
+}
+
+.reader {
+	display: grid;
+	grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr);
+	gap: calc(var(--space) * 4);
+	align-items: start;
+}
+
+@media (max-width: 48rem) {
+	.reader {
+		grid-template-columns: minmax(0, 1fr);
+	}
+}
+
+.tree summary {
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.tree h2 {
+	margin: calc(var(--space) * 2) 0 var(--space);
+	font-size: 0.85rem;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--text-muted);
+}
+
+.tree ul {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.tree ul ul {
+	padding-left: calc(var(--space) * 2);
+}
+
+.tree li {
+	padding: calc(var(--space) / 2) 0;
+}
+
+.tree a {
+	text-decoration: none;
+}
+
+.tree a[aria-current="page"] {
+	color: var(--text);
+	font-weight: 600;
+}
+
+.tree a.failing {
+	color: var(--danger);
+}
+
+.count {
+	padding: 0 calc(var(--space) * 0.75);
+	border-radius: 1em;
+	background: var(--bg-raised);
+	color: var(--text-muted);
+	font-size: 0.85rem;
+}
+
+.mark {
+	color: var(--danger);
+	font-weight: 700;
+}
+
+.stream {
+	max-width: calc(var(--reading-width) + 8rem);
+}
+
+.search {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space);
+	margin-bottom: calc(var(--space) * 2);
+}
+
+.search input {
+	flex: 1;
+	min-width: 10rem;
+}
+
+.toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space) calc(var(--space) * 3);
+	margin-bottom: calc(var(--space) * 2);
+	padding-bottom: calc(var(--space) * 2);
+	border-bottom: 1px solid var(--border);
+}
+
+.choices {
+	display: flex;
+	gap: calc(var(--space) * 2);
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.choices a[aria-current="true"] {
+	color: var(--text);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.sorting {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: var(--space);
+}
+
+.menu {
+	position: relative;
+}
+
+.menu summary {
+	cursor: pointer;
+	color: var(--accent);
+}
+
+.menu form {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space);
+	margin-top: var(--space);
+}
+
+.entry {
+	padding: var(--space) 0;
+	border-bottom: 1px solid var(--border);
+	scroll-margin-top: calc(var(--space) * 2);
+}
+
+.entry summary {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0 calc(var(--space) * 2);
+	cursor: pointer;
+	color: var(--text-muted);
+	font-size: 0.9rem;
+}
+
+.entry-title {
+	flex: 1 1 100%;
+	margin: 0;
+	font-size: 1.05rem;
+	font-weight: 600;
+	color: var(--unread);
+}
+
+.entry.read .entry-title {
+	font-weight: 400;
+	color: var(--read);
+}
+
+.entry-state {
+	font-weight: 600;
+}
+
+.entry-body {
+	max-width: var(--reading-width);
+	padding: var(--space) 0;
+}
+
+.entry-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 calc(var(--space) * 2);
+	color: var(--text-muted);
+	font-size: 0.9rem;
+}
+
+.entry-content {
+	overflow-wrap: anywhere;
+	line-height: 1.6;
+}
+
+.entry-content img,
+.entry-content video,
+.entry-content iframe,
+.attachments img,
+.attachments video {
+	max-width: 100%;
+	height: auto;
+}
+
+.entry-content pre {
+	overflow-x: auto;
+}
+
+.attachments {
+	padding: 0;
+	list-style: none;
+}
+
+.entry-tags,
+.entry-labels {
+	color: var(--text-muted);
+	font-size: 0.9rem;
+}
+
+.entry-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0 calc(var(--space) * 2);
+	font-size: 0.9rem;
+}
+
+.entry-actions form {
+	margin: 0;
+}
+
+.entry.single {
+	max-width: var(--reading-width);
+	margin: 0 auto;
+}
+
+.labels fieldset {
+	margin-top: calc(var(--space) * 2);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+}
+
+.more {
+	margin-top: calc(var(--space) * 3);
+}
+
+.sorting select {
+	width: auto;
+}
+
+.stream,
+.search input {
+	min-width: 0;
+}
+
+.sorting select {
+	max-width: 100%;
+}

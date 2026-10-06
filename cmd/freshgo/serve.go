@@ -101,7 +101,7 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 		return err
 	}
 	pages, err := web.New(web.Options{
-		DB: db, Log: s.log, BaseURL: conf.BaseURL, Version: buildVersion(), TrustedProxies: proxies,
+		DB: db, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL, Version: buildVersion(), TrustedProxies: proxies,
 	})
 	if err != nil {
 		return err

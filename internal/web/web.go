@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/web/i18n"
 )
@@ -32,6 +33,8 @@ const StaticPath = "/static/"
 type Options struct {
 	DB  *store.Store
 	Log *slog.Logger
+	// Hooks are the extension points pages call; nil stands for none.
+	Hooks *hooks.Registry
 	// BaseURL is the public address of the server, empty when unknown. Its
 	// path, if it has one, is where a reverse proxy has put the interface:
 	// links start with it, requests arrive without it.
@@ -47,6 +50,7 @@ type Options struct {
 type Handler struct {
 	db      *store.Store
 	log     *slog.Logger
+	hooks   *hooks.Registry
 	baseURL string
 	// prefix is the path of the public address, without a trailing slash.
 	prefix  string
@@ -71,7 +75,10 @@ type Handler struct {
 func New(o Options) (*Handler, error) {
 	h := &Handler{
 		db: o.DB, log: o.Log, baseURL: o.BaseURL, version: o.Version, assets: map[string]string{},
-		proxies: o.TrustedProxies, crossOrigin: http.NewCrossOriginProtection(), now: time.Now,
+		proxies: o.TrustedProxies, crossOrigin: http.NewCrossOriginProtection(), now: time.Now, hooks: o.Hooks,
+	}
+	if h.hooks == nil {
+		h.hooks = &hooks.Registry{}
 	}
 	if o.BaseURL != "" {
 		public, err := url.Parse(o.BaseURL)
@@ -128,9 +135,17 @@ func New(o Options) (*Handler, error) {
 		}
 		files.ServeHTTP(w, r)
 	})
-	h.mux.HandleFunc("GET /{$}", h.protect(readers, func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, h.url("/about"), http.StatusSeeOther)
-	}))
+	h.mux.HandleFunc("GET /{$}", h.protect(readers, h.reader(streamMain)))
+	h.mux.HandleFunc("GET /all", h.protect(readers, h.reader(streamAll)))
+	h.mux.HandleFunc("GET /starred", h.protect(readers, h.reader(streamStarred)))
+	h.mux.HandleFunc("GET /feeds/{id}", h.protect(readers, h.reader(streamFeed)))
+	h.mux.HandleFunc("GET /categories/{id}", h.protect(readers, h.reader(streamCategory)))
+	h.mux.HandleFunc("GET /labels/{id}", h.protect(readers, h.reader(streamLabel)))
+	h.mux.HandleFunc("GET /entries/{id}", h.protect(readers, h.entry))
+	h.mux.HandleFunc("POST /entries/{id}/read", h.protect(members, h.markEntry))
+	h.mux.HandleFunc("POST /entries/{id}/star", h.protect(members, h.starEntry))
+	h.mux.HandleFunc("POST /entries/{id}/labels", h.protect(members, h.labelEntry))
+	h.mux.HandleFunc("POST /read-all", h.protect(members, h.markAll))
 	h.mux.HandleFunc("GET /about", h.about)
 	h.mux.HandleFunc("GET /login", h.loginPage)
 	h.mux.HandleFunc("POST /login", h.login)
@@ -227,6 +242,8 @@ func (h *Handler) about(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) fail(w http.ResponseWriter, r *http.Request, status int) {
 	key := "error.500"
 	switch status {
+	case http.StatusBadRequest:
+		key = "error.400"
 	case http.StatusForbidden:
 		key = "error.403"
 	case http.StatusNotFound:

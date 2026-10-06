@@ -42,6 +42,8 @@ type Listing struct {
 	// Read and Favorite, when set, keep the entries in that state.
 	Read     *bool
 	Favorite *bool
+	// UnreadOrFavorite keeps the entries that are unread or starred.
+	UnreadOrFavorite bool
 	// Search, when set, keeps the entries the query matches.
 	Search *search.Query
 	Order  Order
@@ -136,6 +138,10 @@ func (s *Store) ListPage(ctx context.Context, userID int64, l Listing) (entries 
 	if l.Favorite != nil {
 		query += ` AND is_favorite = ?`
 		args = append(args, *l.Favorite)
+	}
+	if l.UnreadOrFavorite {
+		query += ` AND (is_read = ? OR is_favorite = ?)`
+		args = append(args, false, true)
 	}
 	if l.Search != nil {
 		var b strings.Builder
