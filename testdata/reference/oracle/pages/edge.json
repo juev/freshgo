@@ -1,0 +1,97 @@
+{
+ "site": {
+  "name": "Edge & JSON",
+  "a.b": "dotted key",
+  "a": {
+   "b": "nested"
+  }
+ },
+ "list": [
+  {
+   "id": 101,
+   "url": "http://j.example.org/1",
+   "title": "Number id",
+   "html": "<p>One</p>",
+   "by": {
+    "first": "Ann",
+    "last": "Lee"
+   },
+   "ts": 1788343200,
+   "tags": [
+    "t1",
+    2,
+    "t,3"
+   ],
+   "img": "http://j.example.org/1.png",
+   "score": 1.5,
+   "flag": true
+  },
+  {
+   "id": "s2",
+   "url": "http://j.example.org/2?a=1&b=2",
+   "title": "",
+   "html": "",
+   "by": "Solo",
+   "ts": "1788343200456",
+   "tags": "single"
+  },
+  {
+   "id": "s3",
+   "title": "No link is skipped",
+   "html": "<p>x</p>"
+  },
+  {
+   "id": "",
+   "url": "0",
+   "title": "Link zero is skipped"
+  },
+  {
+   "id": null,
+   "url": "http://j.example.org/5",
+   "title": "Null id & <chars>",
+   "html": "<p>five</p>",
+   "ts": "2026-09-01T10:00:00+02:00",
+   "tags": []
+  },
+  {
+   "id": 0,
+   "url": "/relative/6",
+   "title": 7,
+   "html": false,
+   "ts": 1788343200.0,
+   "tags": {
+    "k": "obj-tag",
+    "n": 3
+   }
+  },
+  {
+   "id": "s7",
+   "url": "http://j.example.org/7",
+   "title": "Float title source",
+   "f": 1.0,
+   "g": 0.1,
+   "h": 1e+25,
+   "i": 12345678901234567890,
+   "t": true,
+   "n": null
+  }
+ ],
+ "byId": {
+  "zeta": {
+   "url": "http://j.example.org/z",
+   "title": "Zeta first"
+  },
+  "alpha": {
+   "url": "http://j.example.org/a",
+   "title": "Alpha second"
+  }
+ },
+ "nested": [
+  [
+   {
+    "url": "http://j.example.org/n",
+    "title": "Nested list"
+   }
+  ]
+ ]
+}

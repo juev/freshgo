@@ -1,0 +1,1048 @@
+{
+    "html-basic": {
+        "failed": false,
+        "title": "Edge page title",
+        "entries": [
+            {
+                "guid": "urn:sha1:d714c5e8c2ae23b98f5c9c089a88caebc2925f1b",
+                "title": "Zero id",
+                "authors": [],
+                "content": "",
+                "link": "http://base.example.org/root/five",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "a4",
+                "title": "Fourth",
+                "authors": [],
+                "content": "",
+                "link": "https://github.com/four",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "a3",
+                "title": "No title and no link",
+                "authors": [],
+                "content": "<div data-sanitized-class=\"text\"><p>No title and no link</p></div>",
+                "link": "http://base.example.org/root/",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:f7636776b0e8b4bf0566f254e5df6f53f8f69bec",
+                "title": "Second title",
+                "authors": [
+                    "Ann & Bob",
+                    "Carl"
+                ],
+                "content": "<div data-sanitized-class=\"text\">Plain &lt;text&gt; only</div>",
+                "link": "http://base.example.org/two",
+                "date": 1788349500,
+                "tags": [
+                    "solo"
+                ],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "a1",
+                "title": "First & marked title",
+                "authors": [
+                    "Smith",
+                    "John"
+                ],
+                "content": "<div data-sanitized-class=\"text\"><p>Para <a href=\"http://base.example.org/root/rel/link\">link</a> <img src=\"http://base.example.org/root/img.png\"></p></div>\n<div data-sanitized-class=\"text\"><p>Second block</p></div>",
+                "link": "http://base.example.org/root/one?x=1&y=2",
+                "date": 1788258600,
+                "tags": [
+                    "red",
+                    "green",
+                    "blue"
+                ],
+                "attributes": {
+                    "thumbnail": {
+                        "url": "http://base.example.org/root/thumbs/one.jpg"
+                    },
+                    "enclosures": [
+                        {
+                            "url": "http://base.example.org/root/thumbs/one.jpg",
+                            "medium": "image"
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "html-typed": {
+        "failed": false,
+        "title": "Stored name",
+        "entries": [
+            {
+                "guid": "urn:sha1:3143550337d1680161a2f043a4c90866610f1ead",
+                "title": "T: Zero id",
+                "authors": [],
+                "content": "",
+                "link": "http://base.example.org/root/five",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:d61a8ca37ef4bb687953b8945d401fa3dde4e95d",
+                "title": "T: Fourth",
+                "authors": [],
+                "content": "",
+                "link": "https://github.com/four",
+                "date": 1788343200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:e5528e45516195e315d9b24c06108ae248608945",
+                "title": "T: Second title",
+                "authors": [],
+                "content": "Plain  only",
+                "link": "http://base.example.org/two",
+                "date": 0,
+                "tags": [
+                    "solo"
+                ],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:9a357397ae33146ab70b4c6617d4ff81e49ec0ae",
+                "title": "T: First & marked title",
+                "authors": [],
+                "content": "Para link alert(1)",
+                "link": "http://base.example.org/root/one?x=1&y=2",
+                "date": 0,
+                "tags": [
+                    "red",
+                    "green"
+                ],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "html-count": {
+        "failed": false,
+        "title": "N",
+        "entries": [
+            {
+                "guid": "urn:sha1:b09abd148c53c83a54920f4b2db8375114ef929f",
+                "title": "First & marked title",
+                "authors": [],
+                "content": "",
+                "link": "http://base.example.org/root/one?x=1&y=2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "html-bool": {
+        "failed": false,
+        "title": "N",
+        "entries": [
+            {
+                "guid": "urn:sha1:0b88f0165a6fe042426bebc9f49dd90c5f73cea9",
+                "title": "First & marked title",
+                "authors": [],
+                "content": "1",
+                "link": "http://base.example.org/root/one?x=1&y=2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "html-table": {
+        "failed": false,
+        "title": "N",
+        "entries": [
+            {
+                "guid": "urn:sha1:80acbbf053b5ea162df1d597a50383b5aaf4adf0",
+                "title": "cell two",
+                "authors": [],
+                "content": "cell two",
+                "link": "http://base.example.org/root/t2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:58e229fe2fb4ceb2b3b380bc4d74046fa89aa651",
+                "title": "cell one",
+                "authors": [],
+                "content": "cell one",
+                "link": "http://base.example.org/root/t1",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "html-attr-content": {
+        "failed": false,
+        "title": "N",
+        "entries": [
+            {
+                "guid": "urn:sha1:ab7bc7f8f26581d9427ba83d99481bae8929d22d",
+                "title": "First & marked title",
+                "authors": [],
+                "content": "src=\"img.png\"\n src=\"thumbs/one.jpg\"",
+                "link": "http://base.example.org/root/one?x=1&y=2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "html-none": {
+        "failed": true,
+        "entries": []
+    },
+    "html-no-item": {
+        "failed": true,
+        "entries": []
+    },
+    "xml-ms": {
+        "failed": false,
+        "title": "XML edge title",
+        "entries": [
+            {
+                "guid": "5",
+                "title": "Short",
+                "authors": [],
+                "content": "",
+                "link": "http://x.example.org/r/5",
+                "date": 123,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "4",
+                "title": "Slashed date",
+                "authors": [],
+                "content": "",
+                "link": "http://x.example.org/r/4",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "3",
+                "title": "RFC date",
+                "authors": [],
+                "content": "",
+                "link": "http://x.example.org/r/3",
+                "date": 1788264000,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "2",
+                "title": "Seconds",
+                "authors": [],
+                "content": "<p>Nested <i>markup</i></p>",
+                "link": "http://x.example.org/r/2",
+                "date": 1788343200,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "1",
+                "title": "Milliseconds",
+                "authors": [],
+                "content": "Body &amp;lt;b&amp;gt;escaped&amp;lt;/b&amp;gt; text",
+                "link": "http://127.0.0.1:8080/r/1",
+                "date": 1788343200,
+                "tags": [
+                    "a",
+                    "b",
+                    "c"
+                ],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "xml-noformat": {
+        "failed": false,
+        "title": "Stored",
+        "entries": [
+            {
+                "guid": "urn:sha1:334ec0f08595b66a98bda708456a93bee91ee618",
+                "title": "Short",
+                "authors": [],
+                "content": "",
+                "link": "http://x.example.org/r/5",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:ee3c266a973036fa58bcbffac8e20706a231b5e2",
+                "title": "Slashed date",
+                "authors": [],
+                "content": "",
+                "link": "http://x.example.org/r/4",
+                "date": 1788264000,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:7cc7830afdda59b9d77fd1395990d2ea7f48a7a8",
+                "title": "RFC date",
+                "authors": [],
+                "content": "",
+                "link": "http://x.example.org/r/3",
+                "date": 1788256800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:4355f361f55016b50c507c03d0498f1cd3da3c5f",
+                "title": "Seconds",
+                "authors": [],
+                "content": "<p>Nested <i>markup</i></p>",
+                "link": "http://x.example.org/r/2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:16ab59a66b2ce4695471788094ead2a166433b75",
+                "title": "Milliseconds",
+                "authors": [],
+                "content": "Body &lt;b&gt;escaped&lt;/b&gt; text",
+                "link": "http://127.0.0.1:8080/r/1",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "xml-format-mismatch": {
+        "failed": false,
+        "title": "Stored",
+        "entries": [
+            {
+                "guid": "urn:sha1:334ec0f08595b66a98bda708456a93bee91ee618",
+                "title": "Short",
+                "authors": [],
+                "content": "",
+                "link": "http://x.example.org/r/5",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:ee3c266a973036fa58bcbffac8e20706a231b5e2",
+                "title": "Slashed date",
+                "authors": [],
+                "content": "",
+                "link": "http://x.example.org/r/4",
+                "date": 1788264000,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:7cc7830afdda59b9d77fd1395990d2ea7f48a7a8",
+                "title": "RFC date",
+                "authors": [],
+                "content": "",
+                "link": "http://x.example.org/r/3",
+                "date": 1788256800,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:4c294c62efd868284b118d366bbc72449fd60346",
+                "title": "Seconds",
+                "authors": [],
+                "content": "",
+                "link": "http://x.example.org/r/2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:3b6842d21d89000ef6181e97c805d3fc54507d1d",
+                "title": "Milliseconds",
+                "authors": [],
+                "content": "",
+                "link": "http://127.0.0.1:8080/r/1",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "json-list": {
+        "failed": false,
+        "title": "Edge & JSON",
+        "entries": [
+            {
+                "guid": "s7",
+                "title": "Float title source",
+                "authors": [],
+                "content": "",
+                "link": "http://j.example.org/7",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:ab6baa2acb5df55a549bf599318d5736c06227d0",
+                "title": "7",
+                "authors": [],
+                "content": "",
+                "link": "http://127.0.0.1:8080/relative/6",
+                "date": 1788343200,
+                "tags": [
+                    "obj-tag"
+                ],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:56cc528369dae824b39dbb19919f4c95d7058a0f",
+                "title": "Null id & <chars>",
+                "authors": [],
+                "content": "<p>five</p>",
+                "link": "http://j.example.org/5",
+                "date": 1788249600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "s2",
+                "title": "s2",
+                "authors": [],
+                "content": "",
+                "link": "http://j.example.org/2?a=1&b=2",
+                "date": 1788343200,
+                "tags": [
+                    "single"
+                ],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "101",
+                "title": "Number id",
+                "authors": [
+                    "Ann Lee"
+                ],
+                "content": "<p>One</p>",
+                "link": "http://j.example.org/1",
+                "date": 1788343200,
+                "tags": [
+                    "t1",
+                    "t",
+                    "3"
+                ],
+                "attributes": {
+                    "thumbnail": {
+                        "url": "http://j.example.org/1.png"
+                    },
+                    "enclosures": [
+                        {
+                            "url": "http://j.example.org/1.png",
+                            "medium": "image"
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "json-noformat": {
+        "failed": false,
+        "title": "Stored",
+        "entries": [
+            {
+                "guid": "s7",
+                "title": "Float title source",
+                "authors": [],
+                "content": "",
+                "link": "http://j.example.org/7",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:ab6baa2acb5df55a549bf599318d5736c06227d0",
+                "title": "7",
+                "authors": [],
+                "content": "",
+                "link": "http://127.0.0.1:8080/relative/6",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:56cc528369dae824b39dbb19919f4c95d7058a0f",
+                "title": "Null id & <chars>",
+                "authors": [],
+                "content": "<p>five</p>",
+                "link": "http://j.example.org/5",
+                "date": 1788249600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "s2",
+                "title": "s2",
+                "authors": [
+                    "Solo"
+                ],
+                "content": "",
+                "link": "http://j.example.org/2?a=1&b=2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "101",
+                "title": "Number id",
+                "authors": [],
+                "content": "<p>One</p>",
+                "link": "http://j.example.org/1",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "json-literals": {
+        "failed": false,
+        "title": "Stored",
+        "entries": [
+            {
+                "guid": "fixed-s7",
+                "title": "f=1 g=0.1 h=1.0E+25 i=1.2345678901235E+19 t=1 n= score= flag=",
+                "authors": [
+                    "1.0E+25|0.1|1|1.2345678901235E+19|||"
+                ],
+                "content": "",
+                "link": "http://j.example.org/7",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "fixed-0",
+                "title": "f= g= h= i= t= n= score= flag=",
+                "authors": [
+                    "||||||"
+                ],
+                "content": "",
+                "link": "http://127.0.0.1:8080/relative/6",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "fixed-",
+                "title": "f= g= h= i= t= n= score= flag=",
+                "authors": [
+                    "||||||"
+                ],
+                "content": "",
+                "link": "http://j.example.org/5",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "fixed-s2",
+                "title": "f= g= h= i= t= n= score= flag=",
+                "authors": [
+                    "||||||Solo"
+                ],
+                "content": "",
+                "link": "http://j.example.org/2?a=1&b=2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "fixed-101",
+                "title": "f= g= h= i= t= n= score=1.5 flag=1",
+                "authors": [
+                    "||||||"
+                ],
+                "content": "",
+                "link": "http://j.example.org/1",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "json-object-items": {
+        "failed": false,
+        "title": "nested",
+        "entries": [
+            {
+                "guid": "urn:sha1:56849e1c1933810786dc7cb1d2c5fa90f37eba85",
+                "title": "Alpha second",
+                "authors": [],
+                "content": "",
+                "link": "http://j.example.org/a",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:162915cc0123fb3be800e4aae57c142054043bac",
+                "title": "Zeta first",
+                "authors": [],
+                "content": "",
+                "link": "http://j.example.org/z",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "json-brackets": {
+        "failed": false,
+        "title": "Stored",
+        "entries": [
+            {
+                "guid": "urn:sha1:556bc5cda985d952afc8eab1f0321214f303c72f",
+                "title": "Nested list",
+                "authors": [],
+                "content": "",
+                "link": "http://j.example.org/n",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "json-missing-items": {
+        "failed": true,
+        "entries": []
+    },
+    "json-root-list": {
+        "failed": false,
+        "title": "Stored",
+        "entries": [
+            {
+                "guid": "urn:sha1:c20e960b1e1092817e4a1ab47a18bc5e71fc82c5",
+                "title": "Root list two",
+                "authors": [],
+                "content": "",
+                "link": "http://l.example.org/2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:06214c6c463feb9fb20efa81b8d93a102c506bc0",
+                "title": "Root list one",
+                "authors": [],
+                "content": "",
+                "link": "http://l.example.org/1",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "json-dot-root": {
+        "failed": false,
+        "title": "Stored",
+        "entries": [
+            {
+                "guid": "urn:sha1:c20e960b1e1092817e4a1ab47a18bc5e71fc82c5",
+                "title": "Root list two",
+                "authors": [],
+                "content": "",
+                "link": "http://l.example.org/2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:06214c6c463feb9fb20efa81b8d93a102c506bc0",
+                "title": "Root list one",
+                "authors": [],
+                "content": "",
+                "link": "http://l.example.org/1",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "jsonfeed-edge": {
+        "failed": false,
+        "title": "JSON Feed edge",
+        "entries": [
+            {
+                "guid": "urn:sha1:f125604ae692d20a278000a4274be15c298bc1df",
+                "title": "No id",
+                "authors": [],
+                "content": "<p>f</p>",
+                "link": "http://f.example.org/6",
+                "date": 1788267600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "4",
+                "title": "No date",
+                "authors": [],
+                "content": "<p>d</p>",
+                "link": "http://f.example.org/4",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "3",
+                "title": "No title",
+                "authors": [],
+                "content": "<p>No title</p>",
+                "link": "http://f.example.org/3",
+                "date": 1788260400,
+                "tags": [
+                    "a",
+                    "b"
+                ],
+                "attributes": {
+                    "thumbnail": {
+                        "url": "http://f.example.org/3.png"
+                    },
+                    "enclosures": [
+                        {
+                            "url": "http://f.example.org/3.png",
+                            "medium": "image"
+                        }
+                    ]
+                }
+            },
+            {
+                "guid": "2",
+                "title": "Millis and offset",
+                "authors": [],
+                "content": "",
+                "link": "http://f.example.org/2",
+                "date": 1788260400,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "1",
+                "title": "Millis and Z",
+                "authors": [],
+                "content": "<p>a</p>",
+                "link": "http://f.example.org/1",
+                "date": 1788267600,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "embedded-nodes": {
+        "failed": false,
+        "title": "Stored",
+        "entries": [
+            {
+                "guid": "urn:sha1:51c6acb177da523530dd7eb9a1625051b3676e0a",
+                "title": "From first script",
+                "authors": [],
+                "content": "",
+                "link": "http://e.example.org/1",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "embedded-nodes-second": {
+        "failed": false,
+        "title": "Stored",
+        "entries": [
+            {
+                "guid": "urn:sha1:f229c246f44f41f0a4d8d95bdb75312e12522ae2",
+                "title": "From list script",
+                "authors": [],
+                "content": "",
+                "link": "http://e.example.org/2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "embedded-string": {
+        "failed": false,
+        "title": "Stored",
+        "entries": [
+            {
+                "guid": "urn:sha1:de8615909fa268a8710e3e61c9df9458c4f9b5b4",
+                "title": "String result",
+                "authors": [],
+                "content": "",
+                "link": "http://e.example.org/3",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "embedded-nothing": {
+        "failed": true,
+        "entries": []
+    },
+    "html-nobase": {
+        "failed": false,
+        "title": "N",
+        "entries": [
+            {
+                "guid": "urn:sha1:d7e4edb7f5bcf785820985e60c164a52a8abec37",
+                "title": "Second",
+                "authors": [],
+                "content": "<div data-sanitized-class=\"text\">text <b title='single \"double\"'>bold</b>   &lt;escaped&gt;</div>",
+                "link": "http://127.0.0.1:8080/two",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:c5b1248365aa47d00c40ea7b26b4976dd7b8d7de",
+                "title": "Relative content",
+                "authors": [],
+                "content": "<div data-sanitized-class=\"text\"><p>Don't \"panic\" &amp; carry on</p><img src=\"http://127.0.0.1:8080/img/a.png\" alt=\"\"><br>line<br>break <a href=\"http://127.0.0.1:8080/nobase.html?q=1\">q</a></div>",
+                "link": "http://127.0.0.1:8080/posts/one/",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "thumbnail": {
+                        "url": "http://127.0.0.1:8080/real.jpg"
+                    },
+                    "enclosures": [
+                        {
+                            "url": "http://127.0.0.1:8080/real.jpg",
+                            "medium": "image"
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    "html-nobase-children": {
+        "failed": false,
+        "title": "N",
+        "entries": [
+            {
+                "guid": "urn:sha1:8298490205374ba9c806537d035962814381ba77",
+                "title": "Second",
+                "authors": [],
+                "content": "text \n<b title='single \"double\"'>bold</b>\n \n\n \n\n &lt;escaped&gt;",
+                "link": "http://127.0.0.1:8080/two",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:6cab59355fd129e3b078619ab7c6e975698ea5f5",
+                "title": "Relative content",
+                "authors": [],
+                "content": "<p>Don't \"panic\" &amp; carry on</p>\n<img src=\"http://127.0.0.1:8080/img/a.png\" alt=\"\">\n<br>\nline\n<br>\nbreak \n<a href=\"http://127.0.0.1:8080/nobase.html?q=1\">q</a>",
+                "link": "http://127.0.0.1:8080/posts/one/",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "xml-markup": {
+        "failed": false,
+        "title": "N",
+        "entries": [
+            {
+                "guid": "urn:sha1:57c2250d3f40ea917fc4e57d1b6e6a4cee6abef7",
+                "title": "XML empty",
+                "authors": [],
+                "content": "<p>x</p>\n<p></p>",
+                "link": "http://x.example.org/m/2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:751d41ee0430c5cd983aaa5c889161aa768f1378",
+                "title": "XML markup",
+                "authors": [],
+                "content": "<p>It's \"quoted\" &amp; <br>done <a href=\"http://x.example.org/m/rel\">rel</a></p>",
+                "link": "http://x.example.org/m/1",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    },
+    "json-quoted-literals": {
+        "failed": false,
+        "title": "N",
+        "entries": [
+            {
+                "guid": "urn:sha1:da3fbac6bc0c16257ce3631308515387a38fae94",
+                "title": "it's",
+                "authors": [
+                    "say \"hi\""
+                ],
+                "content": "a' 'b",
+                "link": "http://l.example.org/2",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            },
+            {
+                "guid": "urn:sha1:01a898b2fb5acf5af7d467897a1da3c932ed1a38",
+                "title": "it's",
+                "authors": [
+                    "say \"hi\""
+                ],
+                "content": "a' 'b",
+                "link": "http://l.example.org/1",
+                "date": 0,
+                "tags": [],
+                "attributes": {
+                    "enclosures": []
+                }
+            }
+        ]
+    }
+}

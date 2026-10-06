@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <meta><name>XML   edge title</name></meta>
+  <row n="1"><t>Milliseconds</t><u>/r/1</u><w>1788343200123</w><c>Body &lt;b&gt;escaped&lt;/b&gt; text</c><k>a</k><k>b,c</k></row>
+  <row n="2"><t>Seconds</t><u>http://x.example.org/r/2</u><w>1788343200</w><c><p>Nested <i>markup</i></p></c></row>
+  <row n="3"><t>RFC date</t><u>http://x.example.org/r/3</u><w>Tue, 01 Sep 2026 12:00:00 +0200</w><c/></row>
+  <row n="4"><t>Slashed date</t><u>http://x.example.org/r/4</u><w>2026/09/01 12:00</w></row>
+  <row n="5"><t>Short</t><u>http://x.example.org/r/5</u><w>123</w></row>
+</data>

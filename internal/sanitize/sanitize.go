@@ -292,8 +292,35 @@ var (
 	attributeEscaper = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;")
 )
 
+// Markup writes a node as HTML the way libxml does, as far as that is known:
+// void elements without a closing tag, quotes in text left alone, an
+// attribute value with a double quote in single quotes. Scraped content is
+// hashed in this form.
+func Markup(n *html.Node) string {
+	var b strings.Builder
+	write(&b, n)
+	return b.String()
+}
+
 func write(b *strings.Builder, n *html.Node) {
+	switch n.Type {
+	case html.CommentNode:
+		b.WriteString("<!--" + n.Data + "-->")
+		return
+	case html.DoctypeNode:
+		return
+	case html.DocumentNode:
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			write(b, c)
+		}
+		return
+	}
 	if n.Type == html.TextNode {
+		// The text of script and style is not markup.
+		if p := n.Parent; p != nil && p.Type == html.ElementNode && (p.Data == "script" || p.Data == "style") {
+			b.WriteString(n.Data)
+			return
+		}
 		b.WriteString(textEscaper.Replace(n.Data))
 		return
 	}

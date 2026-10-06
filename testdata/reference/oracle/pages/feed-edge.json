@@ -1,0 +1,56 @@
+{
+ "version": "https://jsonfeed.org/version/1.1",
+ "title": "JSON Feed edge",
+ "icon": "http://f.example.org/icon.png",
+ "items": [
+  {
+   "id": "1",
+   "url": "http://f.example.org/1",
+   "title": "Millis and Z",
+   "content_html": "<p>a</p>",
+   "date_published": "2026-09-01T13:00:00.123Z"
+  },
+  {
+   "id": "2",
+   "url": "http://f.example.org/2",
+   "title": "Millis and offset",
+   "content_text": "text only",
+   "date_published": "2026-09-01T13:00:00.500+02:00"
+  },
+  {
+   "id": 3,
+   "url": "http://f.example.org/3",
+   "content_html": "<p>No title</p>",
+   "date_published": "2026-09-01T13:00:00+02:00",
+   "tags": [
+    "a",
+    "b"
+   ],
+   "image": "http://f.example.org/3.png",
+   "attachments": [
+    {
+     "url": "http://f.example.org/3.mp3",
+     "mime_type": "audio/mpeg",
+     "size_in_bytes": 1000
+    }
+   ]
+  },
+  {
+   "id": "4",
+   "url": "http://f.example.org/4",
+   "title": "No date",
+   "content_html": "<p>d</p>"
+  },
+  {
+   "id": "5",
+   "title": "No url",
+   "content_html": "<p>e</p>"
+  },
+  {
+   "url": "http://f.example.org/6",
+   "title": "No id",
+   "content_html": "<p>f</p>",
+   "date_published": "2026-09-01 13:00:00"
+  }
+ ]
+}

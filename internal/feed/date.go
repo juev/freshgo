@@ -9,7 +9,7 @@ import (
 
 // Date formats in the order SimplePie tries them (Parse\Date).
 var (
-	dateW3C = regexp.MustCompile(`^([0-9]{4})(?:-?([0-9]{2})(?:-?([0-9]{2})(?:[Tt\t ]+([0-9]{2})(?::?([0-9]{2})(?::?([0-9]{2})(?:.([0-9]*))?)?)?(?:(Z)|([+\-])([0-9]{1,2}):?([0-9]{1,2})))?)?)?$`)
+	dateW3C = regexp.MustCompile(`^([0-9]{4})(?:-?([0-9]{2})(?:-?([0-9]{2})(?:[Tt\t ]+([0-9]{2})(?::?([0-9]{2})(?::?([0-9]{2})(?:.([0-9]*))?)?)?(?:(Z)|([+\-])([0-9]{1,2}):?([0-9]{1,2})))?)?)?\n?$`)
 
 	dayPattern   = "(?:" + alternation(dayNames) + ")"
 	monthPattern = "(" + alternation(mapKeys(monthNames)) + ")"
@@ -41,6 +41,15 @@ var (
 	looseOffset = regexp.MustCompile(`(?i)\s*(?:GMT|UTC)?([+\-])([0-9]{1,2})(?::?([0-9]{2}))?$`)
 	looseZone   = regexp.MustCompile(`\s([A-Za-z]{1,5})$`)
 )
+
+// cutZulu removes a Z that directly follows the time.
+func cutZulu(date string) (string, bool) {
+	n := len(date)
+	if n > 1 && (date[n-1] == 'Z' || date[n-1] == 'z') && date[n-2] >= '0' && date[n-2] <= '9' {
+		return date[:n-1], true
+	}
+	return date, false
+}
 
 func alternation(names []string) string {
 	quoted := make([]string, len(names))
@@ -87,7 +96,7 @@ func parseDate(date string, location *time.Location) (int64, bool) {
 	if t, ok := parseNamed(date); ok {
 		return t, true
 	}
-	return parseLoose(strings.TrimSpace(date), location)
+	return Strtotime(date, location)
 }
 
 func parseW3C(date string) (int64, bool) {
@@ -151,16 +160,26 @@ func parseNamed(date string) (int64, bool) {
 	return 0, false
 }
 
-// parseLoose reads the dates left to PHP strtotime. A date without a zone
-// is in the given location.
-func parseLoose(date string, location *time.Location) (int64, bool) {
+// Strtotime approximates PHP strtotime for the absolute dates met in feeds:
+// a date, optionally a time, optionally a zone. A date without a zone is in
+// the given location. FreshRSS reads with it the dates SimplePie does not
+// recognize and the dates of scraped pages.
+func Strtotime(date string, location *time.Location) (int64, bool) {
+	date = strings.TrimSpace(date)
+	if t, ok := strtotime(date, location); ok {
+		return t, true
+	}
+	if t, ok := parseNamed(date); ok {
+		return t, true
+	}
+	// Letters in lower case stop the strict pattern.
+	return parseW3C(strings.ToUpper(date))
+}
+
+func strtotime(date string, location *time.Location) (int64, bool) {
 	if seconds, ok := strings.CutPrefix(date, "@"); ok {
 		t, err := strconv.ParseInt(seconds, 10, 64)
 		return t, err == nil
-	}
-	// Surrounding whitespace and letters in lower case stop the strict pattern.
-	if t, ok := parseW3C(strings.ToUpper(date)); ok {
-		return t, true
 	}
 	date = strings.Replace(date, "Sept ", "Sep ", 1)
 	offset, zoned := 0, false
@@ -171,6 +190,8 @@ func parseLoose(date string, location *time.Location) (int64, bool) {
 				offset = -offset
 			}
 			date, zoned = strings.TrimSuffix(date, m[0]), true
+		} else if rest, ok := cutZulu(date); ok {
+			date, zoned = rest, true
 		} else if m := looseZone.FindStringSubmatch(date); m != nil {
 			name := strings.ToUpper(m[1])
 			if seconds, ok := zoneOffsets[name]; ok || name == "Z" || name == "UTC" || name == "GMT" || name == "UT" {

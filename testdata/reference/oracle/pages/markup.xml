@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<data>
+  <row><t>XML markup</t><u>http://x.example.org/m/1</u><c><p>It's "quoted" &amp; <br/>done <a href="rel">rel</a></p></c></row>
+  <row><t>XML empty</t><u>http://x.example.org/m/2</u><c><p attr="v">x</p><p/></c></row>
+</data>

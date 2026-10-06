@@ -3,6 +3,9 @@ module github.com/juev/freshgo
 go 1.27
 
 require (
+	github.com/antchfx/htmlquery v1.3.7
+	github.com/antchfx/xmlquery v1.5.2
+	github.com/antchfx/xpath v1.3.9
 	github.com/jackc/pgx/v5 v5.11.0
 	golang.org/x/net v0.59.0
 	modernc.org/sqlite v1.60.1
@@ -10,6 +13,7 @@ require (
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
+	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

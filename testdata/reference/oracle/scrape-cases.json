@@ -1,0 +1,412 @@
+[
+ {
+  "name": "html-basic",
+  "kind": 10,
+  "page": "edge.html",
+  "feedName": "Stored name",
+  "attributes": {
+   "xpath": {
+    "feedTitle": "//title",
+    "item": "//article",
+    "itemTitle": "descendant::h2",
+    "itemContent": "descendant::div[@class='text']",
+    "itemUri": "descendant::h2/a/@href",
+    "itemAuthor": "descendant::span[@class='by']",
+    "itemTimestamp": "@data-ts",
+    "itemTimeFormat": "d.m.Y H:i",
+    "itemThumbnail": "descendant::img[@class='thumb']/@src",
+    "itemCategories": "descendant::span[@class='tag']",
+    "itemUid": "@id"
+   }
+  }
+ },
+ {
+  "name": "html-typed",
+  "kind": 10,
+  "page": "edge.html",
+  "feedName": "Stored name",
+  "attributes": {
+   "xpath": {
+    "item": "//article[h2]",
+    "itemTitle": "concat('T: ', descendant::h2)",
+    "itemContent": "string(descendant::div[@class='text'])",
+    "itemUri": "descendant::h2/a/@href",
+    "itemTimestamp": "@data-ts",
+    "itemTimeFormat": "U",
+    "itemCategories": "string(descendant::span[@class='tag'])"
+   }
+  }
+ },
+ {
+  "name": "html-count",
+  "kind": 10,
+  "page": "edge.html",
+  "feedName": "N",
+  "attributes": {
+   "xpath": {
+    "item": "//article[@id='a1']",
+    "itemTitle": "descendant::h2",
+    "itemContent": "count(descendant::div)",
+    "itemUri": "descendant::h2/a/@href",
+    "itemCategories": "descendant::nothing",
+    "itemUid": "descendant::nothing"
+   }
+  }
+ },
+ {
+  "name": "html-bool",
+  "kind": 10,
+  "page": "edge.html",
+  "feedName": "N",
+  "attributes": {
+   "xpath": {
+    "item": "//article[@id='a1']",
+    "itemTitle": "descendant::h2",
+    "itemContent": "boolean(descendant::div)",
+    "itemUri": "descendant::h2/a/@href"
+   }
+  }
+ },
+ {
+  "name": "html-table",
+  "kind": 10,
+  "page": "edge.html",
+  "feedName": "N",
+  "attributes": {
+   "xpath": {
+    "item": "//tr[@class='row']",
+    "itemTitle": "td[1]",
+    "itemUri": "td[2]/a/@href",
+    "itemContent": "td[1]/text()"
+   }
+  }
+ },
+ {
+  "name": "html-attr-content",
+  "kind": 10,
+  "page": "edge.html",
+  "feedName": "N",
+  "attributes": {
+   "xpath": {
+    "item": "//article[@id='a1']",
+    "itemTitle": "descendant::h2",
+    "itemContent": "descendant::img/@src",
+    "itemUri": "descendant::h2/a/@href"
+   }
+  }
+ },
+ {
+  "name": "html-none",
+  "kind": 10,
+  "page": "edge.html",
+  "feedName": "N",
+  "attributes": {
+   "xpath": {
+    "item": "//nothing",
+    "itemTitle": "."
+   }
+  }
+ },
+ {
+  "name": "html-no-item",
+  "kind": 10,
+  "page": "edge.html",
+  "feedName": "N",
+  "attributes": {
+   "xpath": {
+    "itemTitle": "."
+   }
+  }
+ },
+ {
+  "name": "xml-ms",
+  "kind": 15,
+  "page": "edge.xml",
+  "feedName": "Stored",
+  "attributes": {
+   "xpath": {
+    "feedTitle": "/data/meta/name",
+    "item": "//row",
+    "itemTitle": "t",
+    "itemContent": "c",
+    "itemUri": "u",
+    "itemTimestamp": "w",
+    "itemTimeFormat": "U",
+    "itemCategories": "k",
+    "itemUid": "@n"
+   }
+  }
+ },
+ {
+  "name": "xml-noformat",
+  "kind": 15,
+  "page": "edge.xml",
+  "feedName": "Stored",
+  "attributes": {
+   "xpath": {
+    "item": "//row",
+    "itemTitle": "t",
+    "itemContent": "c/node()",
+    "itemUri": "u",
+    "itemTimestamp": "w"
+   }
+  }
+ },
+ {
+  "name": "xml-format-mismatch",
+  "kind": 15,
+  "page": "edge.xml",
+  "feedName": "Stored",
+  "attributes": {
+   "xpath": {
+    "item": "//row",
+    "itemTitle": "t",
+    "itemUri": "u",
+    "itemTimestamp": "w",
+    "itemTimeFormat": "Y/m/d H:i"
+   }
+  }
+ },
+ {
+  "name": "json-list",
+  "kind": 30,
+  "page": "edge.json",
+  "feedName": "Stored",
+  "attributes": {
+   "json_dotnotation": {
+    "feedTitle": "site.name",
+    "item": "list",
+    "itemTitle": "title",
+    "itemContent": "html",
+    "itemUri": "url",
+    "itemAuthor": "by.first & ' ' & by.last",
+    "itemTimestamp": "ts",
+    "itemTimeFormat": "U",
+    "itemThumbnail": "img",
+    "itemCategories": "tags",
+    "itemUid": "id"
+   }
+  }
+ },
+ {
+  "name": "json-noformat",
+  "kind": 30,
+  "page": "edge.json",
+  "feedName": "Stored",
+  "attributes": {
+   "json_dotnotation": {
+    "item": "list",
+    "itemTitle": "title",
+    "itemContentHTML": "html",
+    "itemUri": "url",
+    "itemAuthor": "by",
+    "itemTimestamp": "ts",
+    "itemUid": "id"
+   }
+  }
+ },
+ {
+  "name": "json-literals",
+  "kind": 30,
+  "page": "edge.json",
+  "feedName": "Stored",
+  "attributes": {
+   "json_dotnotation": {
+    "feedTitle": "'Literal & title'",
+    "item": "list",
+    "itemTitle": "'f=' & f & ' g=' & g & ' h=' & h & ' i=' & i & ' t=' & t & ' n=' & n & ' score=' & score & ' flag=' & flag",
+    "itemUri": "url",
+    "itemContent": "\"double & quoted\"",
+    "itemUid": "'fixed-' & id",
+    "itemAuthor": "h & '|' & g & '|' & f & '|' & i & '|' & site.name & '|' & missing & '|' & by"
+   }
+  }
+ },
+ {
+  "name": "json-object-items",
+  "kind": 30,
+  "page": "edge.json",
+  "feedName": "Stored",
+  "attributes": {
+   "json_dotnotation": {
+    "feedTitle": "site.a.b",
+    "item": "byId",
+    "itemTitle": "title",
+    "itemUri": "url"
+   }
+  }
+ },
+ {
+  "name": "json-brackets",
+  "kind": 30,
+  "page": "edge.json",
+  "feedName": "Stored",
+  "attributes": {
+   "json_dotnotation": {
+    "feedTitle": "site.missing",
+    "item": "nested[0]",
+    "itemTitle": "title",
+    "itemUri": "url"
+   }
+  }
+ },
+ {
+  "name": "json-missing-items",
+  "kind": 30,
+  "page": "edge.json",
+  "feedName": "Stored",
+  "attributes": {
+   "json_dotnotation": {
+    "item": "site.name",
+    "itemUri": "url"
+   }
+  }
+ },
+ {
+  "name": "json-root-list",
+  "kind": 30,
+  "page": "list.json",
+  "feedName": "Stored",
+  "attributes": {
+   "json_dotnotation": {
+    "item": "$",
+    "itemTitle": "t",
+    "itemUri": "u"
+   }
+  }
+ },
+ {
+  "name": "json-dot-root",
+  "kind": 30,
+  "page": "list.json",
+  "feedName": "Stored",
+  "attributes": {
+   "json_dotnotation": {
+    "item": ".",
+    "itemTitle": "t",
+    "itemUri": "u",
+    "itemUid": "01"
+   }
+  }
+ },
+ {
+  "name": "jsonfeed-edge",
+  "kind": 25,
+  "page": "feed-edge.json",
+  "feedName": "Stored",
+  "attributes": {}
+ },
+ {
+  "name": "embedded-nodes",
+  "kind": 35,
+  "page": "embedded-edge.html",
+  "feedName": "Stored",
+  "attributes": {
+   "xPathToJson": "//script[@class='d']",
+   "json_dotnotation": {
+    "item": "0.posts",
+    "itemTitle": "t",
+    "itemUri": "u"
+   }
+  }
+ },
+ {
+  "name": "embedded-nodes-second",
+  "kind": 35,
+  "page": "embedded-edge.html",
+  "feedName": "Stored",
+  "attributes": {
+   "xPathToJson": "//script[@class='d']",
+   "json_dotnotation": {
+    "item": "1",
+    "itemTitle": "t",
+    "itemUri": "u"
+   }
+  }
+ },
+ {
+  "name": "embedded-string",
+  "kind": 35,
+  "page": "embedded-edge.html",
+  "feedName": "Stored",
+  "attributes": {
+   "xPathToJson": "string(//script[@id='one'])",
+   "json_dotnotation": {
+    "item": "posts",
+    "itemTitle": "t",
+    "itemUri": "u"
+   }
+  }
+ },
+ {
+  "name": "embedded-nothing",
+  "kind": 35,
+  "page": "embedded-edge.html",
+  "feedName": "Stored",
+  "attributes": {
+   "xPathToJson": "//script[@id='absent']",
+   "json_dotnotation": {
+    "item": "posts",
+    "itemUri": "u"
+   }
+  }
+ },
+ {
+  "name": "html-nobase",
+  "kind": 10,
+  "page": "nobase.html",
+  "feedName": "N",
+  "attributes": {
+   "xpath": {
+    "item": "//article",
+    "itemTitle": "descendant::h2",
+    "itemContent": "descendant::div[@class='text']",
+    "itemUri": "descendant::h2/a/@href",
+    "itemThumbnail": "descendant::noscript/img/@src"
+   }
+  }
+ },
+ {
+  "name": "html-nobase-children",
+  "kind": 10,
+  "page": "nobase.html",
+  "feedName": "N",
+  "attributes": {
+   "xpath": {
+    "item": "//article",
+    "itemTitle": "descendant::h2",
+    "itemContent": "descendant::div[@class='text']/node()",
+    "itemUri": "descendant::h2/a/@href"
+   }
+  }
+ },
+ {
+  "name": "xml-markup",
+  "kind": 15,
+  "page": "markup.xml",
+  "feedName": "N",
+  "attributes": {
+   "xpath": {
+    "item": "//row",
+    "itemTitle": "t",
+    "itemContent": "c/*",
+    "itemUri": "u"
+   }
+  }
+ },
+ {
+  "name": "json-quoted-literals",
+  "kind": 30,
+  "page": "list.json",
+  "feedName": "N",
+  "attributes": {
+   "json_dotnotation": {
+    "item": "$",
+    "itemTitle": "'it's'",
+    "itemContent": "'a' 'b'",
+    "itemUri": "u",
+    "itemAuthor": "\"say \"hi\"\""
+   }
+  }
+ }
+]

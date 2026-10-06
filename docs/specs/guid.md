@@ -1,13 +1,13 @@
 # Entry GUID and feed parsing
 
-Status: implemented for RSS 0.9x/2.0, RSS 1.0 (RDF) and Atom 0.3/1.0 in `internal/feed` and `internal/sanitize`. The scraped feed kinds (plan step 6) will produce an RSS document and go through the same code.
-Sources: user request of 2026-10-06 and the decisions recorded in `plan.md`; SimplePie as shipped with FreshRSS at commit `219eaf58` (`Item.php`, `SimplePie.php`, `Sanitize.php`, `Parser.php`, `Parse/Date.php`), `FreshRSS_Feed::decideEntryGuid`, `loadGuids` and `loadEntries`; the behaviour of FreshRSS 1.30.1 recorded in `testdata/reference/oracle`.
+Status: implemented for RSS 0.9x/2.0, RSS 1.0 (RDF) and Atom 0.3/1.0 in `internal/feed` and `internal/sanitize`, and for the scraped feed kinds in `internal/scrape`, which produces an RSS document that goes through the same code.
+Sources: user request of 2026-10-06 and the decisions recorded in `plan.md`; SimplePie as shipped with FreshRSS at commit `219eaf58` (`Item.php`, `SimplePie.php`, `Sanitize.php`, `Parser.php`, `Parse/Date.php`), `FreshRSS_Feed::decideEntryGuid`, `loadGuids`, `loadEntries`, `loadHtmlXpath`, `loadJson` and `FreshRSS_dotNotation_Util`; the behaviour of FreshRSS 1.30.1 recorded in `testdata/reference/oracle`.
 
 ## Purpose and scope
 
 How a feed document becomes items, and how the `guid` of an item is derived so that it equals the value FreshRSS stored for the same item. This is what plan requirement R3 rests on: a refresh after import creates no duplicates.
 
-Out of scope: fetching (`internal/fetch`), storing and change detection (plan step 7), JSON and XPath feeds (step 6), full-text retrieval (step 10).
+Out of scope: fetching (`internal/fetch`), storing and change detection (plan step 7), full-text retrieval (step 10).
 
 ## Requirements
 
@@ -27,6 +27,21 @@ Out of scope: fetching (`internal/fetch`), storing and change detection (plan st
 - G14. Items are returned from the end of the document to its beginning, the order in which FreshRSS stores them.
 - G15. The character encoding is taken from the byte order mark, then the HTTP `Content-Type`, then the XML declaration; a document that declares nothing and is not UTF-8 is read as windows-1252.
 
+## Scraped feeds
+
+`scrape.RSS` turns the document of a feed of kind 10 (HTML + XPath), 15 (XML + XPath), 25 (JSON Feed), 30 (JSON + dot notation) or 35 (HTML + XPath + JSON) into RSS 2.0 by the feed's settings (`feed.attributes.xpath`, `json_dotnotation`, `xPathToJson`); `feed.Parse` does the rest.
+
+- X1. XPath kinds: `item` selects the items; `itemTitle`, `itemUri`, `itemAuthor`, `itemTimestamp`, `itemThumbnail`, `itemUid` are evaluated at each item as `normalize-space(<expression>)`. `itemContent` that selects nodes gives their markup, one node per line; a string result is taken as it is, `true` gives `1`, a number nothing. `itemCategories` gives one tag per selected node, or one tag for a string result. The base of every link and of relative URLs in the content is the href of the page's `base` element; an HTML page without one has its own address for a base. `noscript` is read as markup, not as text.
+- X2. JSON kinds: a path is keys joined with dots, `list[0]` for `list.0`; `''`, `.` and `$` are the document; a quoted string is a literal; `&` joins values. A key that exists as written wins over reading it as a path. Values are turned into text as PHP does: `true` is `1`, `false` and `null` are empty, a float has 14 significant digits. The items may be a list or the members of an object, in document order. An item without a link is skipped.
+- X3. JSON Feed uses a fixed set of paths. `content_html` is the content even when absent: `content_text` alone gives an empty content. Authors and attachments are not read — as in FreshRSS, where the code that collects attachments has no effect.
+- X4. For kind 35 `xPathToJson` finds the JSON: a string result is the JSON text; selected nodes give a list of what each holds, those that are not JSON objects or lists left out.
+- X5. An item without `itemUid` (or with one that PHP takes for empty: `0`) gets `urn:sha1:` + `sha1(title . content . link)` over the scraped values. An item with no title, no content and no link is dropped.
+- X6. The date is read by `itemTimeFormat`, a PHP date format, when it fits, else the way PHP `strtotime` would (G9). With the format `U` a value longer than 10 characters loses its last 3: milliseconds. A date of 0 or 1 is no date.
+- X7. An author string is split on semicolons when it has one or has a character that HTML-encoding turns into an entity, else on commas.
+- X8. The thumbnail is also listed as an enclosure of medium `image`.
+- X10. The items of one page may not add up to more than 16 times its size plus 1 MiB: item expressions that select nested elements with themselves for content would otherwise multiply the page.
+- X9. No items found, or settings without the item path, is an error, as it is a failed refresh in FreshRSS. An XPath expression the library cannot compile or evaluate, including one that makes it panic, is an error too.
+
 ## Invariants and compatibility
 
 - `guid` stays in the FreshRSS form: an opaque ASCII key, HTML-encoded, never decoded or shown (`storage.md`).
@@ -39,6 +54,9 @@ Out of scope: fetching (`internal/fetch`), storing and change detection (plan st
 - **HTML is parsed by `golang.org/x/net/html`**, an HTML5 parser, where FreshRSS uses libxml. Known differences in the output: table rows get a `tbody`; `track` and `wbr` are void elements; content after a stray `</div>` is kept.
 - **Atom content of a type that is neither text nor markup is sanitized as HTML.** For `type="text/html"`, `application/xml`, `image/svg+xml` or a base64-encoded media type SimplePie returns the content untouched, and FreshRSS stores it with its scripts. Treated as an upstream security bug. A GUID criteria that hashes the content differs for such items.
 - **PHP `strtotime` is approximated, not reproduced.** The layouts cover every date shape in `oracle/feeds/dates.xml`; a shape outside them reads as "no date" here and may be a date for FreshRSS, which matters only for items keyed by link and date.
+- **XPath is evaluated by `github.com/antchfx/xpath` over an HTML5 tree**, where FreshRSS uses libxml. Expressions that depend on how broken HTML is repaired can select differently: the HTML5 parser puts table rows into a `tbody`, so `//table/tr` matches nothing while `//table//tr` works on both. The library lacks `id()`, `lang()` and the namespace axis. Hypothesis, not checked: XML documents with a default namespace are matched by local name here and not at all by libxml.
+- **The `urn:sha1:` key of a scraped item is hashed over markup written by freshgo**, which follows libxml in what the oracle covers: void elements, quotes in text and in attribute values, comments, XML elements. Where the two still serialize differently (the reviewer's examples: a newline at the start of `pre`, `\r\n`, attribute names in mixed case such as `viewBox`, CDATA sections and processing instructions in XML), an item without `itemUid` whose content is markup gets another key and appears once more after import.
+- **A date format that names no time gives midnight.** PHP fills the fields a format does not name from the current time unless it has `!` or `|`, so a date-only format gives the time of the refresh. A date that does not exist (month 13) is no date here; PHP rolls it over. Formats with zone names, the day of the year or trailing data (`T`, `e`, `z`, `+`) are not applied, and the value is read without the format.
 - **The text of a removed element is not encoded twice.** FreshRSS turns `<font>a & b</font>` into `a &amp;amp; b`; freshgo keeps `a &amp; b`. Treated as an upstream bug.
 - **More tolerant of broken documents than FreshRSS**: text before the first tag and control characters are dropped. FreshRSS rejects such a feed.
 - **Dates relative to now** (`yesterday`), which PHP `strtotime` accepts, are not dates here.
@@ -56,5 +74,8 @@ Out of scope: fetching (`internal/fetch`), storing and change detection (plan st
 - G9: 37 date strings with the values SimplePie returns for them. `TestParseDate`.
 - G11: 46 fragments compared with the FreshRSS sanitizer, the differences listed with their reason; script-carrying inputs. `TestHTMLAgainstFreshRSS`, `TestHTMLIsSafe`, `TestHTMLKeepsAttributeValuesInert`, `TestXHTML`, `TestAbsolutize`, `TestAllowedScheme` in `internal/sanitize`.
 - G9, time zone: `TestParseDatesInLocation`.
+- X1–X9: 28 pages-and-settings cases scraped by freshgo and compared with what FreshRSS 1.30.1 stores for them (`oracle/scrape-cases.json`, `oracle/pages`, `scrape.json`): typed XPath results, attribute nodes, `base` and its absence, `noscript`, markup content hashed into the key, missing fields, dot-notation literals and concatenation, items as object members, number formatting, JSON Feed dates, embedded JSON as nodes and as a string. `TestRSSAgainstFreshRSS` in `internal/scrape`.
+- X1–X8 after a real refresh: the feeds of kinds 10, 15, 25, 30 and 35 of both users of the reference installation → every stored entry is reproduced. `TestRSSAgainstReferenceDatabase`.
+- X2: `TestLookup`, `TestDecodeJSONKeepsOrder`. X6: 33 format-and-value pairs with the values PHP returns, `TestParsePHPDate`; `TestTimestamp`. X7: `TestSplitAuthors`. X10: `TestRSSBoundsNestedItems`. X9: `TestRSSErrors`; 45 odd expressions in every setting, `TestXPathNeverPanics`.
 - G15: `TestParseEncodings`. Tolerance: `TestParseIsLenient`. Not a feed: `TestParseRejectsOtherDocuments`.
 - Content of any Atom type is sanitized: `TestParseSanitizesContentOfAnyType`. Parsing time is linear in the size of the document: `TestParseLargeDocuments`.
