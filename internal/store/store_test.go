@@ -1096,3 +1096,33 @@ func TestAutoReadStatements(t *testing.T) {
 		}
 	})
 }
+
+func TestSystem(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		got, err := s.System(ctx)
+		if err != nil || !reflect.DeepEqual(got, DefaultSystem()) {
+			t.Fatalf("System of a new database = %+v, %v; want the defaults", got, err)
+		}
+		changed := DefaultSystem()
+		changed.Title, changed.DefaultUser, changed.AuthType = "Новости", "alice", AuthNone
+		changed.AllowAnonymous, changed.APIEnabled = true, false
+		changed.Limits.MaxRegistrations = 0
+		if err := s.SetSystem(ctx, changed); err != nil {
+			t.Fatalf("SetSystem: %v", err)
+		}
+		if got, err := s.System(ctx); err != nil || !reflect.DeepEqual(got, changed) {
+			t.Errorf("System = %+v, %v; want %+v", got, err, changed)
+		}
+		// A setting added by a later version is not in what an earlier one
+		// stored: it has its default.
+		if err := s.SetSetting(ctx, SettingSystem, `{"title":"Old"}`); err != nil {
+			t.Fatal(err)
+		}
+		want := DefaultSystem()
+		want.Title = "Old"
+		if got, err := s.System(ctx); err != nil || !reflect.DeepEqual(got, want) {
+			t.Errorf("System over a partial value = %+v, %v; want %+v", got, err, want)
+		}
+	})
+}

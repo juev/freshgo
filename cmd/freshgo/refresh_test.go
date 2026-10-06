@@ -168,7 +168,9 @@ func TestServe(t *testing.T) {
 		"/reader/api/0/token":                     {http.StatusUnauthorized, "Unauthorized!"},
 		"/api/greader.php/reader/api/0/user-info": {http.StatusUnauthorized, "Unauthorized!"},
 		"/favicon/0123456789abcdef":               {http.StatusOK, "<svg"},
-		"/":                                       {http.StatusNotFound, ""},
+		"/about":                                  {http.StatusOK, "<!DOCTYPE html>"},
+		"/static/app.css":                         {http.StatusOK, "/* freshgo"},
+		"/nowhere":                                {http.StatusNotFound, "<!DOCTYPE html>"},
 	} {
 		resp, err := http.Get("http://" + address + path)
 		if err != nil {

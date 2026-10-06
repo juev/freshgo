@@ -1,0 +1,6 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p>{{.T "about.version" .Data.Version}}</p>
+<p>{{.T "about.api"}} <code>{{.Data.API}}</code></p>
+<p>{{.T "about.license"}} <a href="https://github.com/juev/freshgo">{{.T "about.source"}}</a></p>
+{{end}}

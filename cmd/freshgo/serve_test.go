@@ -19,15 +19,19 @@ func TestRoutes(t *testing.T) {
 	}
 	registry := &hooks.Registry{}
 	registry.HandleAPI("Share By Mail", part("extension"))
-	server := httptest.NewServer(routes(part("api"), part("icons"), extensions(registry), part("hubs")))
+	server := httptest.NewServer(routes(part("api"), part("icons"), extensions(registry), part("hubs"), part("pages")))
 	defer server.Close()
 	// Without WebSub its addresses do not exist.
-	off := httptest.NewServer(routes(part("api"), part("icons"), extensions(registry), nil))
+	off := httptest.NewServer(routes(part("api"), part("icons"), extensions(registry), nil, part("pages")))
 	defer off.Close()
-	if resp, err := http.Get(off.URL + "/websub/abc"); err != nil || resp.StatusCode != http.StatusNotFound {
-		t.Errorf("GET /websub/abc with WebSub off: %v, %v; want 404", resp, err)
+	if resp, err := http.Get(off.URL + "/websub/abc"); err != nil {
+		t.Errorf("GET /websub/abc with WebSub off: %v", err)
 	} else {
+		body, _ := io.ReadAll(resp.Body)
 		_ = resp.Body.Close()
+		if string(body) != "pages /websub/abc" {
+			t.Errorf("GET /websub/abc with WebSub off: %q, want it left to the web interface", body)
+		}
 	}
 
 	for path, want := range map[string]struct {
@@ -46,10 +50,11 @@ func TestRoutes(t *testing.T) {
 		"/api/misc.php/Unknown":                                                 {404, "Not Found!"},
 		"/api/misc.php":                                                         {400, "Bad Request!"},
 		"/api/misc.php/":                                                        {400, "Bad Request!"},
-		"/":                                                                     {404, "404 page not found\n"},
-		"/api/greader.phpx":                                                     {404, "404 page not found\n"},
-		"/api/fever.php":                                                        {404, "404 page not found\n"},
-		"/readers":                                                              {404, "404 page not found\n"},
+		"/":                                                                     {200, "pages /"},
+		"/api/greader.phpx":                                                     {200, "pages /api/greader.phpx"},
+		"/api/fever.php":                                                        {200, "pages /api/fever.php"},
+		"/readers":                                                              {200, "pages /readers"},
+		"/static/app.css":                                                       {200, "pages /static/app.css"},
 	} {
 		resp, err := http.Get(server.URL + path)
 		if err != nil {

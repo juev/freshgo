@@ -1,0 +1,19 @@
+{
+  "about.api": "Feed reader apps that speak the Google Reader API connect to this address:",
+  "about.heading": "About",
+  "about.license": "freshgo is free software under the GNU Affero General Public License, version 3.",
+  "about.source": "Source code",
+  "about.version": "Version %s",
+  "error.403.heading": "Not allowed",
+  "error.403.text": "You do not have access to this page.",
+  "error.404.heading": "Page not found",
+  "error.404.text": "There is nothing at this address.",
+  "error.405.heading": "Not possible here",
+  "error.405.text": "This address does not take this kind of request.",
+  "error.500.heading": "Something went wrong",
+  "error.500.text": "The server could not finish the request. The details are in its log.",
+  "error.home": "Back to the start page",
+  "nav.about": "About",
+  "nav.main": "Main menu",
+  "nav.skip": "Skip to content"
+}

@@ -1,0 +1,193 @@
+/* freshgo: one stylesheet, light and dark. Colours and sizes are variables;
+   nothing below the :root blocks names a colour. */
+
+:root {
+	color-scheme: light dark;
+	--bg: #ffffff;
+	--bg-raised: #f4f4f2;
+	--text: #1c1c1a;
+	--text-muted: #5c5c57;
+	--border: #d3d3ce;
+	--accent: #0b57c2;
+	--accent-text: #ffffff;
+	--danger: #b3261e;
+	--focus: #0b57c2;
+	--unread: #1c1c1a;
+	--read: #6b6b66;
+	--font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	--reading-width: 44rem;
+	--space: 0.5rem;
+	--radius: 0.375rem;
+}
+
+/* The dark palette: by the system's preference unless the user chose light,
+   and whenever the user chose dark. */
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) {
+		--bg: #161615;
+		--bg-raised: #222220;
+		--text: #e8e8e3;
+		--text-muted: #a3a39c;
+		--border: #3b3b37;
+		--accent: #8ab4f8;
+		--accent-text: #10100f;
+		--danger: #f2b8b5;
+		--focus: #8ab4f8;
+		--unread: #e8e8e3;
+		--read: #8f8f88;
+	}
+}
+
+:root[data-theme="dark"] {
+	color-scheme: dark;
+	--bg: #161615;
+	--bg-raised: #222220;
+	--text: #e8e8e3;
+	--text-muted: #a3a39c;
+	--border: #3b3b37;
+	--accent: #8ab4f8;
+	--accent-text: #10100f;
+	--danger: #f2b8b5;
+	--focus: #8ab4f8;
+	--unread: #e8e8e3;
+	--read: #8f8f88;
+}
+
+:root[data-theme="light"] {
+	color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+html {
+	font-family: var(--font);
+	font-size: 100%;
+	line-height: 1.5;
+	background: var(--bg);
+	color: var(--text);
+	/* An element scrolled to by the keyboard does not hide under the header. */
+	scroll-padding-top: 4rem;
+}
+
+body {
+	margin: 0;
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+}
+
+/* Focus is always visible, and the same everywhere. */
+:focus-visible {
+	outline: 0.1875rem solid var(--focus);
+	outline-offset: 0.125rem;
+	border-radius: var(--radius);
+}
+
+/* The content area takes focus from the skip link and after navigation;
+   it is not a control and gets no ring. */
+main:focus {
+	outline: none;
+}
+
+a {
+	color: var(--accent);
+	text-underline-offset: 0.15em;
+}
+
+h1,
+h2,
+h3 {
+	line-height: 1.25;
+	margin: calc(var(--space) * 3) 0 var(--space);
+}
+
+h1 {
+	font-size: 1.5rem;
+}
+
+p {
+	margin: var(--space) 0 calc(var(--space) * 2);
+}
+
+code {
+	font-family: var(--font-mono);
+	font-size: 0.9375em;
+	background: var(--bg-raised);
+	padding: 0.1em 0.3em;
+	border-radius: 0.25rem;
+	overflow-wrap: anywhere;
+}
+
+/* The first thing Tab reaches: a link past the menus. Off screen until focused. */
+.skip {
+	position: absolute;
+	left: var(--space);
+	top: -10rem;
+	z-index: 10;
+	padding: var(--space) calc(var(--space) * 2);
+	background: var(--accent);
+	color: var(--accent-text);
+	border-radius: var(--radius);
+}
+
+.skip:focus {
+	top: var(--space);
+}
+
+.site-header {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--space) * 2);
+	padding: var(--space) calc(var(--space) * 2);
+	border-bottom: 1px solid var(--border);
+	background: var(--bg-raised);
+}
+
+.site-title {
+	font-weight: 700;
+	font-size: 1.125rem;
+	color: var(--text);
+	text-decoration: none;
+}
+
+.site-nav ul {
+	display: flex;
+	gap: calc(var(--space) * 2);
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.site-nav a[aria-current="page"] {
+	color: var(--text);
+	font-weight: 600;
+}
+
+.page {
+	flex: 1;
+	width: 100%;
+	max-width: var(--reading-width);
+	margin: 0 auto;
+	padding: var(--space) calc(var(--space) * 2) calc(var(--space) * 6);
+}
+
+.messages {
+	max-width: var(--reading-width);
+	margin: 0 auto;
+	padding: 0 calc(var(--space) * 2);
+}
+
+.muted {
+	color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+	html {
+		scroll-behavior: smooth;
+	}
+}

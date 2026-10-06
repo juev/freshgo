@@ -1,0 +1,26 @@
+{{define "layout"}}<!DOCTYPE html>
+<html lang="{{.Lang}}" data-theme="{{.Theme}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="same-origin">
+<title>{{if .Heading}}{{.Heading}} · {{end}}{{.Site}}</title>
+<link rel="stylesheet" href="{{.Asset "app.css"}}">
+</head>
+<body>
+<a class="skip" href="#content">{{.T "nav.skip"}}</a>
+<header class="site-header">
+<a class="site-title" href="{{.URL "/"}}">{{.Site}}</a>
+<nav class="site-nav" aria-label="{{.T "nav.main"}}">
+<ul>
+<li><a href="{{.URL "/about"}}"{{if eq .Section "about"}} aria-current="page"{{end}}>{{.T "nav.about"}}</a></li>
+</ul>
+</nav>
+</header>
+<div class="messages" id="messages" role="status" aria-live="polite"></div>
+<main class="page" id="content" tabindex="-1">
+{{template "content" .}}
+</main>
+</body>
+</html>
+{{end}}

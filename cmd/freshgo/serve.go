@@ -12,6 +12,7 @@ import (
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/greader"
 	"github.com/juev/freshgo/internal/hooks"
+	"github.com/juev/freshgo/internal/web"
 	"github.com/juev/freshgo/internal/websub"
 )
 
@@ -51,10 +52,11 @@ func extensions(registry *hooks.Registry) http.Handler {
 
 // routes sends a request to the part of the server its path belongs to. The
 // Google Reader API lives at the root, as in the original service, and under
-// the path FreshRSS serves it at.
+// the path FreshRSS serves it at. What belongs to no other part is a page of
+// the web interface.
 //
 // hubs is nil when WebSub is off.
-func routes(api, icons, misc, hubs http.Handler) http.Handler {
+func routes(api, icons, misc, hubs, pages http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		switch {
@@ -68,7 +70,7 @@ func routes(api, icons, misc, hubs http.Handler) http.Handler {
 			strings.HasPrefix(path, "/accounts/"), strings.HasPrefix(path, "/reader/"):
 			api.ServeHTTP(w, r)
 		default:
-			http.NotFound(w, r)
+			pages.ServeHTTP(w, r)
 		}
 	})
 }
@@ -94,12 +96,16 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	if s.webSub != nil {
 		hubs = s.webSub
 	}
+	pages, err := web.New(web.Options{DB: db, Log: s.log, BaseURL: conf.BaseURL, Version: buildVersion()})
+	if err != nil {
+		return err
+	}
 	listener, err := net.Listen("tcp", conf.Listen)
 	if err != nil {
 		return err
 	}
 	server := &http.Server{
-		Handler:           routes(api, s.icons, extensions(s.registry), hubs),
+		Handler:           routes(api, s.icons, extensions(s.registry), hubs, pages),
 		ReadHeaderTimeout: 10 * time.Second,
 		// A request ends with the server, not with the signal: Shutdown
 		// gives it time first.

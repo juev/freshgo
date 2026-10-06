@@ -83,6 +83,9 @@ func Run(ctx context.Context, dst *store.Store, opts Options) (*Report, error) {
 	for _, name := range skipped {
 		report.warnf("users/%s has no config.php and was not imported", name)
 	}
+	for _, key := range system.unreadable {
+		report.warnf("the system setting %s has a value freshgo cannot read and keeps its default", key)
+	}
 	err = dst.InTx(ctx, func(tx *store.Store) error {
 		existing, err := tx.Users(ctx)
 		if err != nil {
@@ -92,6 +95,9 @@ func Run(ctx context.Context, dst *store.Store, opts Options) (*Report, error) {
 			return ErrNotEmpty
 		}
 		if err := tx.SetSetting(ctx, store.SettingSalt, system.salt); err != nil {
+			return err
+		}
+		if err := tx.SetSystem(ctx, system.settings); err != nil {
 			return err
 		}
 		domains, err := readForceHTTPS(opts.DataDir)
@@ -126,6 +132,44 @@ func Run(ctx context.Context, dst *store.Store, opts Options) (*Report, error) {
 type systemConfig struct {
 	salt string
 	db   map[string]any
+	// settings is what the administrator has set, over the defaults of
+	// FreshRSS; unreadable names the settings that could not be taken over.
+	settings   store.System
+	unreadable []string
+}
+
+// systemKeys are the settings of the system config.php freshgo has a use for.
+var systemKeys = []string{
+	"title", "language", "default_user", "auth_type", "allow_anonymous", "allow_anonymous_refresh",
+	"api_enabled", "force_email_validation", "http_auth_auto_register", "reauth_time",
+	"closed_registration_message", "limits",
+}
+
+// readSystemSettings takes the settings of an installation from its
+// config.php. A file written by FreshRSS holds only what differs from the
+// defaults, so those come first.
+func readSystemSettings(conf map[string]any) (settings store.System, unreadable []string) {
+	settings = store.DefaultSystem()
+	settings.Title = "FreshRSS"
+	settings.DefaultUser = "_"
+	settings.APIEnabled = false
+	for _, key := range systemKeys {
+		value, set := conf[key]
+		if !set {
+			continue
+		}
+		// Each on its own: one value of the wrong type costs one setting.
+		raw, err := json.Marshal(map[string]any{key: value})
+		if err == nil {
+			merged := settings
+			if err = json.Unmarshal(raw, &merged); err == nil {
+				settings = merged
+				continue
+			}
+		}
+		unreadable = append(unreadable, key)
+	}
+	return settings, unreadable
 }
 
 func readSystemConfig(dataDir string) (*systemConfig, error) {
@@ -139,6 +183,7 @@ func readSystemConfig(dataDir string) (*systemConfig, error) {
 		return nil, fmt.Errorf("importer: %s: no salt; is it the data directory of an installed FreshRSS?", filepath.Join(dataDir, "config.php"))
 	}
 	c.db, _ = conf["db"].(map[string]any)
+	c.settings, c.unreadable = readSystemSettings(conf)
 	return c, nil
 }
 
