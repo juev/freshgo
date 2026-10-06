@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/juev/freshgo/internal/feed"
 	"github.com/juev/freshgo/internal/fetch"
@@ -57,7 +59,7 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 	}
 
 	if resp.NotModified {
-		return result{}, r.storeUnchanged(ctx, f, resp, now)
+		return result{}, r.storeUnchanged(ctx, j, f, resp, now)
 	}
 
 	doc, err := parse(j, f, resp)
@@ -103,6 +105,22 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 	if !ok {
 		markUnread = j.conf.markUpdatedUnread
 	}
+	uponReception, ok := get[bool](attrs, "read_upon_reception")
+	if !ok {
+		uponReception = j.conf.readUponReception
+	}
+	// The titles and identifiers that make a new entry read are looked up
+	// only when there is a new entry to compare.
+	var known repeats
+	if slices.ContainsFunc(guids, func(guid string) bool { _, exists := states[guid]; return !exists }) {
+		var lock *sync.Mutex
+		if known, lock, err = r.loadRepeats(ctx, j, f, attrs); err != nil {
+			return result{}, err
+		}
+		if lock != nil {
+			defer lock.Unlock()
+		}
+	}
 	var (
 		added   []*store.Entry
 		updates []update
@@ -116,6 +134,8 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 			if e, ok = r.hooks.EntryBeforeInsert.Call(ctx, e); !ok {
 				continue
 			}
+			r.autoRead(ctx, e, uponReception, known)
+			known.add(e)
 			if e, ok = r.hooks.EntryBeforeAdd.Call(ctx, e); !ok {
 				continue
 			}
@@ -134,6 +154,10 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 			if e, ok = r.hooks.EntryBeforeInsert.Call(ctx, e); !ok {
 				continue
 			}
+			// A changed entry is not compared by title: the repeat may be
+			// the entry itself.
+			r.autoRead(ctx, e, uponReception, repeats{})
+			known.add(e)
 			if e, ok = r.hooks.EntryBeforeUpdate.Call(ctx, e); !ok {
 				continue
 			}
@@ -201,6 +225,9 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 		if err := tx.MarkEntriesSeen(ctx, f.UserID, f.ID, guids, now); err != nil {
 			return err
 		}
+		if err := r.tidy(ctx, tx, j, fresh, now, res.added+res.updated > 0); err != nil {
+			return err
+		}
 
 		succeeded(fresh, f.URL, resp, now)
 		if used != criteria {
@@ -227,7 +254,7 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 
 // storeUnchanged records a refresh that found the feed as it was: the
 // entries listed last time are still listed.
-func (r *Refresher) storeUnchanged(ctx context.Context, f *store.Feed, resp *fetch.Response, now int64) error {
+func (r *Refresher) storeUnchanged(ctx context.Context, j *job, f *store.Feed, resp *fetch.Response, now int64) error {
 	return r.db.InTx(ctx, func(tx *store.Store) error {
 		fresh, err := tx.LockFeed(ctx, f.UserID, f.ID)
 		if errors.Is(err, store.ErrNotFound) {
@@ -237,6 +264,9 @@ func (r *Refresher) storeUnchanged(ctx context.Context, f *store.Feed, resp *fet
 			return err
 		}
 		if err := tx.MarkEntriesSeenSince(ctx, f.UserID, f.ID, fresh.LastUpdate, now); err != nil {
+			return err
+		}
+		if err := r.tidy(ctx, tx, j, fresh, now, false); err != nil {
 			return err
 		}
 		succeeded(fresh, f.URL, resp, now)

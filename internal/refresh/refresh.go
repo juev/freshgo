@@ -88,7 +88,11 @@ func (r *Refresher) Run(ctx context.Context, o Options) ([]Stats, error) {
 			continue
 		}
 		r.hooks.UserMaintenance.Call(ctx, u)
-		st, err := r.refreshUser(ctx, &job{user: u, conf: conf, https: https}, o)
+		categories, err := r.categories(ctx, u.ID)
+		if err != nil {
+			return all, fmt.Errorf("refresh: user %s: %w", u.Name, err)
+		}
+		st, err := r.refreshUser(ctx, &job{user: u, conf: conf, https: https, categories: categories}, o)
 		all = append(all, st)
 		if err != nil {
 			return all, fmt.Errorf("refresh: user %s: %w", u.Name, err)
@@ -129,6 +133,9 @@ type job struct {
 	user  *store.User
 	conf  userSettings
 	https *feed.HTTPSDomains
+	// categories are the user's, by identifier, as they were when the run
+	// reached the user.
+	categories map[int64]*category
 }
 
 func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options) (Stats, error) {

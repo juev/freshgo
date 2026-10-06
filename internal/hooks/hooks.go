@@ -75,7 +75,10 @@ type Parsed struct {
 
 // Reasons given with EntryAutoRead and EntryAutoUnread.
 const (
-	WhyUpdatedArticle = "updated_article"
+	WhyUpdatedArticle     = "updated_article"
+	WhyUponReception      = "upon_reception"
+	WhySameTitleInFeed    = "same_title_in_feed"
+	WhySameGUIDInCategory = "same_guid_in_category"
 )
 
 // EntryAuto is the argument of EntryAutoRead and EntryAutoUnread.

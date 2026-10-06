@@ -60,6 +60,28 @@ func runRefresh(ctx context.Context, e env, args []string) (err error) {
 	return err
 }
 
+// runPurge deletes the entries the retention settings give up, without
+// waiting for the feeds to be refreshed.
+func runPurge(ctx context.Context, e env, args []string) (err error) {
+	fs, conf := newFlagSet(e, "purge")
+	db, err := openStore(ctx, fs, conf, args)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, db.Close()) }()
+	r, err := newRefresher(ctx, e, conf, db)
+	if err != nil {
+		return err
+	}
+	stats, err := r.Purge(ctx)
+	for _, st := range stats {
+		if _, werr := fmt.Fprintf(e.stdout, "%s: %d entries deleted\n", st.User, st.Deleted); werr != nil {
+			return errors.Join(err, werr)
+		}
+	}
+	return err
+}
+
 // runServe runs the refresh scheduler until the process is told to stop.
 func runServe(ctx context.Context, e env, args []string) (err error) {
 	fs, conf := newFlagSet(e, "serve")

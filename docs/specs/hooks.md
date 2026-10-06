@@ -33,7 +33,7 @@ Out of scope: a runtime for extensions. Handlers are Go functions compiled into 
 | `EntryBeforeAdd` | chain | entry | for a new entry, after `EntryBeforeInsert` |
 | `EntryBeforeUpdate` | chain | entry | for a changed entry, after `EntryBeforeInsert` |
 | `EntryBeforeDisplay` | chain | entry | when the API returns an entry (step 11) |
-| `EntryAutoRead` | event | entry and reason | when a rule marks an entry read (steps 8, 9) |
+| `EntryAutoRead` | event | entry and reason | when a rule marks an arriving entry read, once per rule that applies: `upon_reception`, `same_title_in_feed` (also for a title repeated in the category), `same_guid_in_category`; filters come with step 9 |
 | `EntryAutoUnread` | event | entry and reason | when a changed entry is made unread, reason `updated_article` |
 | `EntriesRead`, `EntriesFavorite` | event | user, entry ids, new state | after the user changes the state through the API (step 11) |
 | `Init` | signal | none | when a command that refreshes or serves starts |
@@ -51,5 +51,6 @@ Out of scope: a runtime for extensions. Handlers are Go functions compiled into 
 
 - H1, H3: three handlers added out of priority order → called by priority, each sees the previous result; a dropping handler stops the chain. `TestChainPassesResultOnInPriorityOrder`, `TestChainDropStopsTheRest`.
 - H2: `TestEmptyRegistryChangesNothing`; every other test of `internal/refresh` runs with an empty registry.
+- `EntryAutoRead`: `TestReadUponReception`, `TestReadWhenSameTitleInFeed`, `TestReadWhenSameInCategory` in `internal/refresh`.
 - H4: `TestEventStopsAtTheHandlerThatDealtWithIt`, `TestEventHandlerMayChangeTheEntry`. H5: `TestSignalCallsEveryHandler`. H6: `TestEntitiesSurviveJSON`.
 - In the pipeline (`internal/refresh`): an entry dropped by `EntryBeforeInsert` or `EntryBeforeAdd` is not stored; a title changed by one handler reaches the next and the database; a feed dropped by `FeedBeforeActualize` is not requested; a header set in `FetchBefore` reaches the server; tags added in `ParseAfter` are stored; a changed entry passes `EntryBeforeUpdate`. `TestHooksInThePipeline`. `EntryAutoUnread`: `TestChangedEntryBecomesUnreadWhenAsked`. `UserMaintenance` and `FeedsListBeforeActualize`: `TestWhichFeedsAreRefreshed`. `ParseAfter` on failures: `TestFailedFeed`.

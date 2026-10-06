@@ -1,0 +1,113 @@
+{
+	"categories": [
+		{"name": "Weekly", "archiving": {"keep_period": "P1W", "keep_max": false, "keep_min": 3, "keep_favourites": false, "keep_labels": false, "keep_unreads": false}}
+	],
+	"feeds": [
+		{
+			"name": "user defaults",
+			"groups": [
+				{"count": 60, "age": 0},
+				{"count": 100, "age": 864000, "read": true},
+				{"count": 60, "age": 2592000},
+				{"count": 40, "age": 6912000, "read": true},
+				{"count": 30, "age": 8640000},
+				{"count": 5, "age": 8640000, "favorite": true},
+				{"count": 5, "age": 8640000, "labelled": true}
+			]
+		},
+		{
+			"name": "fewer entries than keep_min",
+			"groups": [
+				{"count": 10, "age": 0},
+				{"count": 30, "age": 17280000}
+			]
+		},
+		{
+			"name": "everything seen at the last refresh",
+			"groups": [
+				{"count": 260, "age": 0}
+			]
+		},
+		{
+			"name": "period only, below keep_max",
+			"groups": [
+				{"count": 55, "age": 0},
+				{"count": 5, "age": 6912000},
+				{"count": 5, "age": 8640000}
+			]
+		},
+		{
+			"name": "settings of the feed",
+			"archiving": {"keep_period": false, "keep_max": 10, "keep_min": 0, "keep_favourites": false, "keep_labels": false, "keep_unreads": true},
+			"groups": [
+				{"count": 5, "age": 0},
+				{"count": 4, "age": 86400, "read": true},
+				{"count": 4, "age": 172800, "read": true},
+				{"count": 3, "age": 259200},
+				{"count": 2, "age": 345600, "read": true, "favorite": true},
+				{"count": 1, "age": 345600, "read": true, "labelled": true}
+			]
+		},
+		{
+			"name": "settings of the category",
+			"category": "Weekly",
+			"groups": [
+				{"count": 2, "age": 0},
+				{"count": 2, "age": 259200},
+				{"count": 3, "age": 864000},
+				{"count": 1, "age": 864000, "favorite": true}
+			]
+		},
+		{
+			"name": "feed over category",
+			"category": "Weekly",
+			"archiving": {"keep_period": "PT12H", "keep_max": false, "keep_min": false, "keep_favourites": true, "keep_labels": true, "keep_unreads": false},
+			"groups": [
+				{"count": 1, "age": 0},
+				{"count": 2, "age": 21600},
+				{"count": 2, "age": 86400},
+				{"count": 1, "age": 86400, "favorite": true}
+			]
+		},
+		{
+			"name": "neither period nor maximum",
+			"archiving": {"keep_period": false, "keep_max": false, "keep_min": 0, "keep_favourites": false, "keep_labels": false, "keep_unreads": false},
+			"groups": [
+				{"count": 3, "age": 0},
+				{"count": 300, "age": 34560000, "read": true}
+			]
+		},
+		{
+			"name": "a year",
+			"archiving": {"keep_period": "P1Y", "keep_max": false, "keep_min": 0, "keep_favourites": false, "keep_labels": false, "keep_unreads": false},
+			"groups": [
+				{"count": 1, "age": 0},
+				{"count": 2, "age": 25920000},
+				{"count": 2, "age": 34560000}
+			]
+		},
+		{
+			"name": "more than keep_max, all listed at once",
+			"archiving": {"keep_period": false, "keep_max": 2, "keep_min": 0, "keep_favourites": false, "keep_labels": false, "keep_unreads": false},
+			"groups": [
+				{"count": 5, "age": 0, "read": true}
+			]
+		},
+		{
+			"name": "not refreshed for longer than the period",
+			"archiving": {"keep_period": "P3M", "keep_max": false, "keep_min": 0, "keep_favourites": false, "keep_labels": false, "keep_unreads": false},
+			"groups": [
+				{"count": 3, "age": 34560000, "read": true},
+				{"count": 2, "age": 43200000, "read": true}
+			]
+		},
+		{
+			"name": "empty settings of the feed",
+			"archiving": [],
+			"groups": [
+				{"count": 1, "age": 0},
+				{"count": 300, "age": 34560000, "read": true}
+			]
+		}
+	]
+}

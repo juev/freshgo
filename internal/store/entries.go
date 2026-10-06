@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 )
 
 const entryColumns = `id, feed_id, guid, title, authors, content, link, published, last_seen,
@@ -245,4 +246,144 @@ func (s *Store) CountEntries(ctx context.Context, userID int64) (int, error) {
 		return 0, fmt.Errorf("store: count entries: %w", err)
 	}
 	return n, nil
+}
+
+// Retention says which entries of a feed DeleteOldEntries removes. An entry
+// goes when one of the two rules, SeenBefore and KeepMax, asks for it and
+// none of the Keep fields protects it. Entries the feed listed at its last
+// refresh, those with the greatest last-seen time, always stay.
+type Retention struct {
+	// SeenBefore removes the entries the feed last listed before this time;
+	// zero turns the rule off.
+	SeenBefore int64
+	// KeepMax removes the entries beyond the KeepMax listed most recently;
+	// zero turns the rule off. Entries listed at the same time as the first
+	// one beyond go with it.
+	KeepMax int
+	// KeepMin keeps at least this many of the entries listed most recently.
+	KeepMin       int
+	KeepFavorites bool
+	// KeepLabeled keeps the entries that carry a user label.
+	KeepLabeled bool
+	KeepUnread  bool
+}
+
+// DeleteOldEntries removes the entries of a feed the retention rules give up
+// and returns their number. The rules are those of
+// FreshRSS_EntryDAO::cleanOldEntries.
+func (s *Store) DeleteOldEntries(ctx context.Context, userID, feedID int64, keep Retention) (int, error) {
+	if keep.SeenBefore == 0 && keep.KeepMax <= 0 {
+		return 0, nil
+	}
+	// The last-seen time of the entry that n others were listed after.
+	const nth = `(SELECT e.last_seen FROM entries e WHERE e.user_id = ? AND e.feed_id = ?
+		ORDER BY e.last_seen DESC LIMIT 1 OFFSET ?)`
+	query := `DELETE FROM entries WHERE user_id = ? AND feed_id = ?`
+	args := []any{userID, feedID}
+	if keep.KeepFavorites {
+		query += ` AND NOT is_favorite`
+	}
+	if keep.KeepUnread {
+		query += ` AND is_read`
+	}
+	if keep.KeepLabeled {
+		query += ` AND NOT EXISTS (
+			SELECT 1 FROM entry_tags t WHERE t.user_id = entries.user_id AND t.entry_id = entries.id)`
+	}
+	if keep.KeepMin > 0 {
+		query += ` AND last_seen < ` + nth
+		args = append(args, userID, feedID, keep.KeepMin)
+	}
+	query += ` AND last_seen < (SELECT MAX(e.last_seen) FROM entries e WHERE e.user_id = ? AND e.feed_id = ?)`
+	args = append(args, userID, feedID)
+	var rules []string
+	if keep.SeenBefore != 0 {
+		rules = append(rules, `last_seen < ?`)
+		args = append(args, keep.SeenBefore)
+	}
+	if keep.KeepMax > 0 {
+		rules = append(rules, `last_seen <= `+nth)
+		args = append(args, userID, feedID, keep.KeepMax)
+	}
+	query += ` AND (` + strings.Join(rules, ` OR `) + `)`
+
+	n, err := s.affected(ctx, query, args...)
+	if err != nil {
+		return 0, fmt.Errorf("store: delete old entries of feed %d: %w", feedID, err)
+	}
+	return n, nil
+}
+
+// MarkUnseenEntriesRead marks read the unread entries of a feed that it last
+// listed before the given time, and returns their number.
+func (s *Store) MarkUnseenEntriesRead(ctx context.Context, userID, feedID, before int64) (int, error) {
+	n, err := s.affected(ctx, `
+		UPDATE entries SET is_read = ? WHERE user_id = ? AND feed_id = ? AND NOT is_read AND last_seen < ?`,
+		true, userID, feedID, before)
+	if err != nil {
+		return 0, fmt.Errorf("store: unseen entries of feed %d: %w", feedID, err)
+	}
+	return n, nil
+}
+
+// KeepNewestUnread marks read every unread entry of a feed except the keep
+// newest, by identifier, and returns the number of entries it marked.
+func (s *Store) KeepNewestUnread(ctx context.Context, userID, feedID int64, keep int) (int, error) {
+	n, err := s.affected(ctx, `
+		UPDATE entries SET is_read = ? WHERE user_id = ? AND feed_id = ? AND NOT is_read AND id <= (
+			SELECT e.id FROM entries e WHERE e.user_id = ? AND e.feed_id = ? AND NOT e.is_read
+			ORDER BY e.id DESC LIMIT 1 OFFSET ?)`,
+		true, userID, feedID, userID, feedID, keep)
+	if err != nil {
+		return 0, fmt.Errorf("store: unread entries of feed %d: %w", feedID, err)
+	}
+	return n, nil
+}
+
+// affected runs a statement and returns the number of rows it changed.
+func (s *Store) affected(ctx context.Context, query string, args ...any) (int, error) {
+	res, err := s.exec(ctx, query, args...)
+	if err != nil {
+		return 0, err
+	}
+	n, err := res.RowsAffected()
+	return int(n), err
+}
+
+// LatestFeedEntries returns the guid and title of the newest entries of a
+// feed, by identifier, at most limit of them; a limit of zero means all.
+func (s *Store) LatestFeedEntries(ctx context.Context, userID, feedID int64, limit int) ([]EntryKey, error) {
+	keys, err := s.entryKeys(ctx, `
+		SELECT guid, title FROM entries WHERE user_id = ? AND feed_id = ? ORDER BY id DESC`, limit, userID, feedID)
+	if err != nil {
+		return nil, fmt.Errorf("store: latest entries of feed %d: %w", feedID, err)
+	}
+	return keys, nil
+}
+
+// LatestCategoryEntries is LatestFeedEntries over all feeds of a category.
+func (s *Store) LatestCategoryEntries(ctx context.Context, userID, categoryID int64, limit int) ([]EntryKey, error) {
+	keys, err := s.entryKeys(ctx, `
+		SELECT e.guid, e.title FROM entries e
+		JOIN feeds f ON f.user_id = e.user_id AND f.id = e.feed_id
+		WHERE e.user_id = ? AND f.category_id = ? ORDER BY e.id DESC`, limit, userID, categoryID)
+	if err != nil {
+		return nil, fmt.Errorf("store: latest entries of category %d: %w", categoryID, err)
+	}
+	return keys, nil
+}
+
+func (s *Store) entryKeys(ctx context.Context, query string, limit int, args ...any) ([]EntryKey, error) {
+	if limit > 0 {
+		query += ` LIMIT ?`
+		args = append(args, limit)
+	}
+	rows, err := s.query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	return collect(rows, func(sc scanner) (EntryKey, error) {
+		var k EntryKey
+		return k, sc.Scan(&k.GUID, &k.Title)
+	})
 }

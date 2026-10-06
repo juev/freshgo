@@ -62,11 +62,24 @@ type userSettings struct {
 	markUpdatedUnread bool
 	// location is the time zone of feed dates written without one.
 	location *time.Location
+	// archiving is the retention of entries for feeds and categories that
+	// set none.
+	archiving archiving
+	// The rest are the keys of mark_when. readUponGone makes entries read
+	// once their feed no longer lists them, readUponReception as they arrive.
+	readUponGone      bool
+	readUponReception bool
+	// maxUnread is the number of unread entries a feed may hold, the oldest
+	// beyond it become read; negative is no limit.
+	maxUnread int
+	// sameTitleInFeed is the number of latest entries of a feed among which
+	// a repeated title makes a new entry read; zero is off.
+	sameTitleInFeed int
 }
 
 func readUserSettings(raw json.RawMessage) userSettings {
 	a := readAttributes(raw)
-	s := userSettings{enabled: true, ttlDefault: defaultTTL, location: time.Local}
+	s := userSettings{enabled: true, ttlDefault: defaultTTL, location: time.Local, archiving: defaultArchiving, maxUnread: -1}
 	if v, ok := get[bool](a, "enabled"); ok {
 		s.enabled = v
 	}
@@ -78,6 +91,21 @@ func readUserSettings(raw json.RawMessage) userSettings {
 		if loc, err := time.LoadLocation(name); err == nil {
 			s.location = loc
 		}
+	}
+	if v, ok := readArchiving(a["archiving"]); ok {
+		s.archiving = v
+	}
+	when := readAttributes(a["mark_when"])
+	s.readUponGone, _ = get[bool](when, "gone")
+	s.readUponReception, _ = get[bool](when, "reception")
+	if v, ok := get[int](when, "max_n_unread"); ok {
+		s.maxUnread = v
+	}
+	// FreshRSS casts this one to a number: true stands for 1.
+	if v, ok := get[int](when, "same_title_in_feed"); ok {
+		s.sameTitleInFeed = max(v, 0)
+	} else if v, _ := get[bool](when, "same_title_in_feed"); v {
+		s.sameTitleInFeed = 1
 	}
 	return s
 }

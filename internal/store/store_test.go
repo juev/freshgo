@@ -897,3 +897,170 @@ func TestEntryStatesAndLastSeen(t *testing.T) {
 		}
 	})
 }
+
+// The rules themselves are compared with FreshRSS in internal/refresh; here
+// it is the reach of the statements: one feed of one user.
+func TestCleanupTouchesOneFeed(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		alice, bob := mustUser(t, s, "alice"), mustUser(t, s, "bob")
+		feed := mustFeed(t, s, alice.ID, "https://example.org/feed")
+		other := mustFeed(t, s, alice.ID, "https://example.org/other")
+		foreign := mustFeed(t, s, bob.ID, "https://example.org/feed")
+		tag := &Tag{UserID: alice.ID, Name: "later"}
+		if err := s.CreateTag(ctx, tag); err != nil {
+			t.Fatal(err)
+		}
+
+		// In every feed: one entry listed now, the rest listed long ago.
+		fill := func(f *Feed) []*Entry {
+			t.Helper()
+			entries := []*Entry{
+				{FeedID: f.ID, GUID: "old-unread", LastSeen: 100},
+				{FeedID: f.ID, GUID: "old-read", LastSeen: 100, IsRead: true},
+				{FeedID: f.ID, GUID: "old-starred", LastSeen: 100, IsRead: true, IsFavorite: true},
+				{FeedID: f.ID, GUID: "old-labelled", LastSeen: 100, IsRead: true},
+				{FeedID: f.ID, GUID: "older", LastSeen: 50, IsRead: true},
+				{FeedID: f.ID, GUID: "listed", LastSeen: 1000},
+			}
+			if err := s.InsertEntries(ctx, f.UserID, entries); err != nil {
+				t.Fatal(err)
+			}
+			return entries
+		}
+		mine := fill(feed)
+		fill(other)
+		fill(foreign)
+		if err := s.TagEntry(ctx, alice.ID, tag.ID, mine[3].ID); err != nil {
+			t.Fatal(err)
+		}
+		guids := func(f *Feed) []string {
+			t.Helper()
+			entries, err := s.EntriesByFeed(ctx, f.UserID, f.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var out []string
+			for _, e := range entries {
+				out = append(out, e.GUID)
+			}
+			return out
+		}
+		all := guids(feed)
+
+		if n, err := s.DeleteOldEntries(ctx, alice.ID, feed.ID, Retention{KeepMin: 3}); err != nil || n != 0 {
+			t.Errorf("DeleteOldEntries without a rule = %d, %v; want nothing deleted", n, err)
+		}
+		n, err := s.DeleteOldEntries(ctx, alice.ID, feed.ID, Retention{
+			SeenBefore: 500, KeepFavorites: true, KeepLabeled: true, KeepUnread: true,
+		})
+		if err != nil || n != 2 {
+			t.Fatalf("DeleteOldEntries = %d, %v; want 2", n, err)
+		}
+		if got, want := guids(feed), []string{"old-unread", "old-starred", "old-labelled", "listed"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("entries left: %v, want %v", got, want)
+		}
+		// The entry at the offset shares its time with others: all of them go,
+		// except what was listed at the last refresh.
+		if n, err := s.DeleteOldEntries(ctx, alice.ID, feed.ID, Retention{KeepMax: 2}); err != nil || n != 3 {
+			t.Errorf("DeleteOldEntries by number = %d, %v; want 3", n, err)
+		}
+		if got, want := guids(feed), []string{"listed"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("entries left: %v, want %v", got, want)
+		}
+		if got := guids(other); !reflect.DeepEqual(got, all) {
+			t.Errorf("another feed of the user lost entries: %v", got)
+		}
+		if got := guids(foreign); !reflect.DeepEqual(got, all) {
+			t.Errorf("a feed of another user lost entries: %v", got)
+		}
+	})
+}
+
+func TestAutoReadStatements(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		alice, bob := mustUser(t, s, "alice"), mustUser(t, s, "bob")
+		news := &Category{UserID: alice.ID, Name: "News"}
+		if err := s.CreateCategory(ctx, news); err != nil {
+			t.Fatal(err)
+		}
+		feed := mustFeed(t, s, alice.ID, "https://example.org/feed")
+		other := &Feed{UserID: alice.ID, URL: "https://example.org/other", Name: "other", CategoryID: news.ID}
+		if err := s.CreateFeed(ctx, other); err != nil {
+			t.Fatal(err)
+		}
+		foreign := mustFeed(t, s, bob.ID, "https://example.org/feed")
+		var mine []*Entry
+		for i := range 6 {
+			mine = append(mine, &Entry{FeedID: feed.ID, GUID: fmt.Sprintf("g%d", i), Title: fmt.Sprintf("Title %d", i), LastSeen: int64(100 * (i + 1))})
+		}
+		mine[4].IsRead = true
+		rest := []*Entry{
+			{FeedID: other.ID, GUID: "o0", Title: "Other 0", LastSeen: 100},
+			{FeedID: other.ID, GUID: "o1", Title: "Other 1", LastSeen: 100},
+		}
+		theirs := []*Entry{{FeedID: foreign.ID, GUID: "b0", Title: "Bob 0", LastSeen: 100}}
+		if err := s.InsertEntries(ctx, alice.ID, append(mine, rest...)); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.InsertEntries(ctx, bob.ID, theirs); err != nil {
+			t.Fatal(err)
+		}
+		unread := func(userID int64, f *Feed) []string {
+			t.Helper()
+			entries, err := s.EntriesByFeed(ctx, userID, f.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var out []string
+			for _, e := range entries {
+				if !e.IsRead {
+					out = append(out, e.GUID)
+				}
+			}
+			return out
+		}
+
+		keys, err := s.LatestFeedEntries(ctx, alice.ID, feed.ID, 2)
+		if want := []EntryKey{{"g5", "Title 5"}, {"g4", "Title 4"}}; err != nil || !reflect.DeepEqual(keys, want) {
+			t.Errorf("LatestFeedEntries(2) = %v, %v; want %v", keys, err, want)
+		}
+		if keys, err := s.LatestFeedEntries(ctx, alice.ID, feed.ID, 0); err != nil || len(keys) != 6 {
+			t.Errorf("LatestFeedEntries(0) = %d entries, %v; want all 6", len(keys), err)
+		}
+		keys, err = s.LatestCategoryEntries(ctx, alice.ID, news.ID, 0)
+		if want := []EntryKey{{"o1", "Other 1"}, {"o0", "Other 0"}}; err != nil || !reflect.DeepEqual(keys, want) {
+			t.Errorf("LatestCategoryEntries = %v, %v; want %v", keys, err, want)
+		}
+		if keys, err := s.LatestCategoryEntries(ctx, alice.ID, DefaultCategoryID, 3); err != nil || len(keys) != 3 || keys[0].GUID != "g5" {
+			t.Errorf("LatestCategoryEntries of the default category = %v, %v", keys, err)
+		}
+
+		// g0 and g1 were last listed before 250.
+		if n, err := s.MarkUnseenEntriesRead(ctx, alice.ID, feed.ID, 250); err != nil || n != 2 {
+			t.Errorf("MarkUnseenEntriesRead = %d, %v; want 2", n, err)
+		}
+		if got, want := unread(alice.ID, feed), []string{"g2", "g3", "g5"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("unread: %v, want %v", got, want)
+		}
+		if n, err := s.KeepNewestUnread(ctx, alice.ID, feed.ID, 3); err != nil || n != 0 {
+			t.Errorf("KeepNewestUnread within the limit = %d, %v; want 0", n, err)
+		}
+		if n, err := s.KeepNewestUnread(ctx, alice.ID, feed.ID, 1); err != nil || n != 2 {
+			t.Errorf("KeepNewestUnread = %d, %v; want 2", n, err)
+		}
+		if got, want := unread(alice.ID, feed), []string{"g5"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("unread: %v, want %v", got, want)
+		}
+		if n, err := s.KeepNewestUnread(ctx, alice.ID, feed.ID, 0); err != nil || n != 1 {
+			t.Errorf("KeepNewestUnread(0) = %d, %v; want 1", n, err)
+		}
+		if got := unread(alice.ID, other); len(got) != 2 {
+			t.Errorf("another feed of the user: unread %v", got)
+		}
+		if got := unread(bob.ID, foreign); len(got) != 1 {
+			t.Errorf("a feed of another user: unread %v", got)
+		}
+	})
+}

@@ -136,3 +136,44 @@ func TestServeRefreshesUntilStopped(t *testing.T) {
 		t.Fatal("serve did not stop")
 	}
 }
+
+func TestPurge(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "freshgo.sqlite")
+	db, err := store.Open(ctx, config.DriverSQLite, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Keep the two entries listed most recently, whatever their state.
+	alice := &store.User{Name: "alice", Settings: []byte(`{"archiving":{"keep_period":false,"keep_max":2,"keep_min":0}}`)}
+	bob := &store.User{Name: "bob"}
+	for _, u := range []*store.User{alice, bob} {
+		if err := db.CreateUser(ctx, u); err != nil {
+			t.Fatal(err)
+		}
+		f := &store.Feed{UserID: u.ID, URL: "https://example.org/feed", Name: "Blog"}
+		if err := db.CreateFeed(ctx, f); err != nil {
+			t.Fatal(err)
+		}
+		var entries []*store.Entry
+		for i, guid := range []string{"a", "b", "c", "d", "e"} {
+			entries = append(entries, &store.Entry{FeedID: f.ID, GUID: guid, LastSeen: int64(1000 + i)})
+		}
+		if err := db.InsertEntries(ctx, u.ID, entries); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// bob has the default settings, which keep a feed this small whole.
+	code, stdout, stderr := runCLI(t, "purge", "-database-url", "sqlite://"+path)
+	if code != 0 || stdout != "alice: 3 entries deleted\nbob: 0 entries deleted\n" {
+		t.Errorf("purge: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	code, stdout, _ = runCLI(t, "purge", "-database-url", "sqlite://"+path)
+	if code != 0 || stdout != "alice: 0 entries deleted\nbob: 0 entries deleted\n" {
+		t.Errorf("second purge: code %d, stdout %q", code, stdout)
+	}
+}

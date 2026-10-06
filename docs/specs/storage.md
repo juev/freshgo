@@ -30,6 +30,8 @@ Out of scope: MySQL/MariaDB, going back to FreshRSS with a freshgo database, sea
 - S14. A feed keeps the HTTP validators of its last fetched copy (`http_etag`, `http_last_modified`). A negative `ttl` is a muted feed whose period is the absolute value.
 - S15. A feed and an entry can be replaced as a whole, except their identifiers and, for an entry, its feed and guid; a missing row is `ErrNotFound`. `LockFeed` inside a transaction makes other transactions that lock or update the same feed wait until it ends.
 - S16. The state of entries (identifier, hash, read, starred, time of the user's last change) is read by guid for a feed, and `last_seen` is set by guid or for all entries seen since a given time; both work for any number of guids.
+- S17. Old entries of a feed are deleted by the rules of `FreshRSS_EntryDAO::cleanOldEntries` (`DeleteOldEntries`): an entry goes when the feed last listed it before a given time, or when at least a given number of entries were listed after it, entries listed at the same moment as the first one over that number included. Starred, labelled and unread entries and the given number of most recently listed ones stay when asked; the entries with the greatest `last_seen` of the feed always stay.
+- S18. Unread entries of a feed become read in bulk: those last listed before a given time (`MarkUnseenEntriesRead`), and all but the given number of newest by identifier (`KeepNewestUnread`). Guid and title of the newest entries of a feed or of a category are listed with an optional limit (`LatestFeedEntries`, `LatestCategoryEntries`).
 - S13. The counters of S3 can be raised explicitly and never move back, so that import carries over counters that are ahead of the largest identifier still in use.
 
 ## Invariants and compatibility
@@ -83,6 +85,7 @@ All in `internal/store/store_test.go`, each run on SQLite and, under `make test-
 - S8: unknown user, feed, entry → `ErrNotFound`. `TestUsers`, `TestFeedRoundTrip`, `TestEntryRoundTrip`.
 - S9: reopening a database keeps its data and schema version; a database with a newer schema version is refused. `TestOpenTwiceKeepsData`, `TestOpenRefusesNewerSchema`.
 - S14, S15: `TestFeedRoundTrip`, `TestUpdateFeed`, `TestUpdateEntry`, `TestLockFeedSerializes`. S16: `TestEntryStatesAndLastSeen`.
+- S17: `TestCleanupTouchesOneFeed`; the rules are compared with FreshRSS by `TestPurgeMatchesFreshRSS` in `internal/refresh`. S18: `TestAutoReadStatements`.
 - S11: `TestSettings`. S12: `TestCustomIcon`. S13: counters raised to 5 and 9 → next category 6, next feed 10; lowering has no effect. `TestRaiseCounters`.
 - Field fidelity: every column of a feed, category, entry and label survives a write and a read, including non-ASCII text, markup characters and a NULL hash. `TestFeedRoundTrip`, `TestEntryRoundTrip`, `TestTags`.
 - I1: a second import → `ErrNotEmpty`, content unchanged. `TestImportRefusesNonEmptyDatabase`; `TestImport` in `cmd/freshgo`.

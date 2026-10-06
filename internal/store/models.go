@@ -104,6 +104,13 @@ type EntryState struct {
 	LastUserModified int64
 }
 
+// EntryKey is what tells entries apart for a reader: the identifier within
+// the feed and the title.
+type EntryKey struct {
+	GUID  string
+	Title string
+}
+
 // Tag is a user label that can be attached to entries.
 type Tag struct {
 	UserID     int64

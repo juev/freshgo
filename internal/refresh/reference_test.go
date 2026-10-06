@@ -242,7 +242,7 @@ func TestSettingsOfImportedUser(t *testing.T) {
 		if err := json.Unmarshal(alice.Settings, &raw); err != nil {
 			t.Fatal(err)
 		}
-		for _, key := range []string{"enabled", "ttl_default", "mark_updated_article_unread", "timezone"} {
+		for _, key := range []string{"enabled", "ttl_default", "mark_updated_article_unread", "timezone", "archiving", "mark_when"} {
 			if _, ok := raw[key]; !ok {
 				t.Errorf("imported settings have no %q", key)
 			}
@@ -250,6 +250,14 @@ func TestSettingsOfImportedUser(t *testing.T) {
 		conf := readUserSettings(alice.Settings)
 		if !conf.enabled || conf.ttlDefault != 3600 || conf.markUpdatedUnread || conf.location != time.Local {
 			t.Errorf("settings of alice: %+v", conf)
+		}
+		// What FreshRSS wrote down for a new user is what freshgo assumes for one.
+		if conf.archiving != defaultArchiving || conf.readUponGone || conf.readUponReception || conf.maxUnread != -1 || conf.sameTitleInFeed != 0 {
+			t.Errorf("retention and auto-read settings of alice: %+v", conf)
+		}
+		var kept map[string]json.RawMessage
+		if err := json.Unmarshal(raw["archiving"], &kept); err != nil || len(kept) != 6 {
+			t.Errorf("archiving of alice: %s, %v; want the six keys freshgo reads", raw["archiving"], err)
 		}
 	})
 }

@@ -1,0 +1,63 @@
+{
+    "user defaults": [
+        60,
+        100,
+        0,
+        0,
+        0,
+        5,
+        5
+    ],
+    "fewer entries than keep_min": [
+        10,
+        30
+    ],
+    "everything seen at the last refresh": [
+        260
+    ],
+    "period only, below keep_max": [
+        55,
+        5,
+        0
+    ],
+    "settings of the feed": [
+        5,
+        4,
+        0,
+        3,
+        0,
+        0
+    ],
+    "settings of the category": [
+        2,
+        2,
+        0,
+        0
+    ],
+    "feed over category": [
+        1,
+        2,
+        0,
+        1
+    ],
+    "neither period nor maximum": [
+        3,
+        300
+    ],
+    "a year": [
+        1,
+        2,
+        0
+    ],
+    "more than keep_max, all listed at once": [
+        5
+    ],
+    "not refreshed for longer than the period": [
+        3,
+        0
+    ],
+    "empty settings of the feed": [
+        1,
+        300
+    ]
+}
