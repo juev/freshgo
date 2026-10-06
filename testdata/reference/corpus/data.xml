@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<catalog>
+  <record uid="xml-1">
+    <name>First XML record</name>
+    <url>http://feeds.freshgo.test/data/1</url>
+    <by>Fay Catalog</by>
+    <when>2026-09-01 11:00:00</when>
+    <text>Text of the first record</text>
+    <topic>one</topic>
+    <topic>two</topic>
+  </record>
+  <record uid="xml-2">
+    <name>Second XML record &amp; more</name>
+    <url>http://feeds.freshgo.test/data/2</url>
+    <by>Gus Catalog</by>
+    <when>2026-09-02 11:00:00</when>
+    <text>Text of the second record</text>
+    <topic>three</topic>
+  </record>
+</catalog>

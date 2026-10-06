@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>RSS corpus</title>
+    <link>http://feeds.freshgo.test/rss/</link>
+    <description>RSS 2.0 feed with guid elements</description>
+    <language>en</language>
+    <item>
+      <title>Permalink guid</title>
+      <link>http://feeds.freshgo.test/rss/permalink</link>
+      <guid isPermaLink="true">http://feeds.freshgo.test/rss/permalink</guid>
+      <pubDate>Tue, 01 Sep 2026 12:00:00 GMT</pubDate>
+      <dc:creator>Bob Writer</dc:creator>
+      <category>news</category>
+      <category>tech &amp; science</category>
+      <description>Short description.</description>
+      <content:encoded><![CDATA[<p>Full <b>content</b> with <img src="http://feeds.freshgo.test/rss/img.png"> and a <a href="relative/page">link</a>.</p>]]></content:encoded>
+    </item>
+    <item>
+      <title>Opaque guid</title>
+      <link>http://feeds.freshgo.test/rss/opaque</link>
+      <guid isPermaLink="false">post-42</guid>
+      <pubDate>Wed, 02 Sep 2026 12:00:00 +0200</pubDate>
+      <author>carol@example.org (Carol)</author>
+      <description>&lt;p&gt;Escaped HTML description&lt;/p&gt;</description>
+      <enclosure url="http://feeds.freshgo.test/rss/audio.mp3" length="12345" type="audio/mpeg"/>
+    </item>
+    <item>
+      <title>Guid with markup characters</title>
+      <link>http://feeds.freshgo.test/rss/markup</link>
+      <guid isPermaLink="false">id &lt;3&gt; "quoted" 'single' &amp; done</guid>
+      <pubDate>Thu, 03 Sep 2026 12:00:00 GMT</pubDate>
+      <description>Guid with characters that are HTML-encoded.</description>
+      <media:thumbnail url="http://feeds.freshgo.test/rss/thumb.jpg"/>
+    </item>
+    <item>
+      <title>Guid on a force-https subdomain</title>
+      <link>http://blog.wordpress.com/post</link>
+      <guid>http://blog.wordpress.com/?p=7</guid>
+      <pubDate>Fri, 04 Sep 2026 12:00:00 GMT</pubDate>
+      <description>Subdomain of a domain from the force-https list.</description>
+    </item>
+    <item>
+      <title>Guid on a domain from the custom force-https list</title>
+      <link>http://www.example.net/custom</link>
+      <guid>http://www.example.net/custom?id=9</guid>
+      <pubDate>Sat, 05 Sep 2026 12:00:00 GMT</pubDate>
+      <description>The domain is listed in data/force-https.txt of the reference installation.</description>
+    </item>
+  </channel>
+</rss>

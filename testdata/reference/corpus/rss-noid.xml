@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>RSS without identifiers</title>
+    <link>http://feeds.freshgo.test/noid/</link>
+    <description>Items have no guid: the key falls back to link and date</description>
+    <item>
+      <title>First without guid</title>
+      <link>http://feeds.freshgo.test/noid/first?x=1&amp;y=2</link>
+      <pubDate>Tue, 01 Sep 2026 06:00:00 GMT</pubDate>
+      <description>First.</description>
+    </item>
+    <item>
+      <title>Second without guid</title>
+      <link>http://feeds.freshgo.test/noid/second</link>
+      <pubDate>Wed, 02 Sep 2026 06:00:00 GMT</pubDate>
+      <description>Second.</description>
+    </item>
+    <item>
+      <title>Third on a force-https domain</title>
+      <link>http://youtube.com/watch?v=abc</link>
+      <pubDate>Thu, 03 Sep 2026 06:00:00 GMT</pubDate>
+      <description>Third.</description>
+    </item>
+  </channel>
+</rss>

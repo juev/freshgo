@@ -2,13 +2,9 @@ package store
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
-	"os"
-	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -16,67 +12,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/juev/freshgo/internal/config"
+	"github.com/juev/freshgo/internal/storetest"
 )
-
-// envPostgresURL points the tests at a PostgreSQL server; `make
-// test-integration` starts one and sets it. Without it only SQLite is tested.
-const envPostgresURL = "FRESHGO_TEST_POSTGRES_URL"
-
-type engine struct {
-	name string
-	open func(t *testing.T) (driver config.Driver, dsn string)
-}
-
-func engines() []engine {
-	return []engine{
-		{"sqlite", func(t *testing.T) (config.Driver, string) {
-			return config.DriverSQLite, filepath.Join(t.TempDir(), "freshgo.sqlite")
-		}},
-		{"postgres", func(t *testing.T) (config.Driver, string) {
-			base := os.Getenv(envPostgresURL)
-			if base == "" {
-				t.Skip(envPostgresURL + " is not set; run `make test-integration`")
-			}
-			return config.DriverPostgres, postgresSchema(t, base)
-		}},
-	}
-}
-
-// postgresSchema creates a schema of its own for the test and returns a
-// connection URL that makes it the search path.
-func postgresSchema(t *testing.T, base string) string {
-	t.Helper()
-	admin, err := sql.Open("pgx", base)
-	if err != nil {
-		t.Fatalf("open %s: %v", envPostgresURL, err)
-	}
-	schema := fmt.Sprintf("t%d", time.Now().UnixNano())
-	if _, err := admin.Exec("CREATE SCHEMA " + schema); err != nil {
-		t.Fatalf("create schema: %v", err)
-	}
-	t.Cleanup(func() {
-		if _, err := admin.Exec("DROP SCHEMA " + schema + " CASCADE"); err != nil {
-			t.Errorf("drop schema: %v", err)
-		}
-		_ = admin.Close()
-	})
-	u, err := url.Parse(base)
-	if err != nil {
-		t.Fatalf("parse %s: %v", envPostgresURL, err)
-	}
-	q := u.Query()
-	q.Set("search_path", schema)
-	u.RawQuery = q.Encode()
-	return u.String()
-}
 
 // eachEngine runs the test against every available engine with an empty database.
 func eachEngine(t *testing.T, test func(t *testing.T, s *Store)) {
 	t.Helper()
-	for _, e := range engines() {
-		t.Run(e.name, func(t *testing.T) {
-			driver, dsn := e.open(t)
+	for _, e := range storetest.Engines() {
+		t.Run(e.Name, func(t *testing.T) {
+			driver, dsn := e.New(t)
 			s, err := Open(context.Background(), driver, dsn)
 			if err != nil {
 				t.Fatalf("Open: %v", err)
@@ -107,9 +51,9 @@ func mustFeed(t *testing.T, s *Store, userID int64, feedURL string) *Feed {
 
 func TestOpenTwiceKeepsData(t *testing.T) {
 	ctx := context.Background()
-	for _, e := range engines() {
-		t.Run(e.name, func(t *testing.T) {
-			driver, dsn := e.open(t)
+	for _, e := range storetest.Engines() {
+		t.Run(e.Name, func(t *testing.T) {
+			driver, dsn := e.New(t)
 			first, err := Open(ctx, driver, dsn)
 			if err != nil {
 				t.Fatalf("first Open: %v", err)
@@ -144,9 +88,9 @@ func TestOpenTwiceKeepsData(t *testing.T) {
 
 func TestOpenRefusesNewerSchema(t *testing.T) {
 	ctx := context.Background()
-	for _, e := range engines() {
-		t.Run(e.name, func(t *testing.T) {
-			driver, dsn := e.open(t)
+	for _, e := range storetest.Engines() {
+		t.Run(e.Name, func(t *testing.T) {
+			driver, dsn := e.New(t)
 			s, err := Open(ctx, driver, dsn)
 			if err != nil {
 				t.Fatalf("Open: %v", err)
@@ -378,6 +322,19 @@ func TestEntryRoundTrip(t *testing.T) {
 
 		if _, err := s.EntryByID(ctx, u.ID, 1); !errors.Is(err, ErrNotFound) {
 			t.Errorf("EntryByID(unknown) error = %v, want ErrNotFound", err)
+		}
+
+		other := mustFeed(t, s, u.ID, "https://example.org/other")
+		elsewhere := &Entry{FeedID: other.ID, GUID: "elsewhere"}
+		if err := s.InsertEntries(ctx, u.ID, []*Entry{elsewhere}); err != nil {
+			t.Fatal(err)
+		}
+		byFeed, err := s.EntriesByFeed(ctx, u.ID, feed.ID)
+		if err != nil {
+			t.Fatalf("EntriesByFeed: %v", err)
+		}
+		if len(byFeed) != 2 || !reflect.DeepEqual(byFeed[0], full) || byFeed[1].ID != bare.ID {
+			t.Errorf("EntriesByFeed = %d entries, want the two of the feed in id order", len(byFeed))
 		}
 	})
 }

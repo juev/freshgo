@@ -80,20 +80,41 @@ func (s *Store) insertEntry(ctx context.Context, e *Entry) error {
 
 // EntryByID returns an entry or ErrNotFound.
 func (s *Store) EntryByID(ctx context.Context, userID, id int64) (*Entry, error) {
-	e := &Entry{UserID: userID}
-	var authors, tags, attributes string
-	err := s.queryRow(ctx, `
-		SELECT `+entryColumns+` FROM entries WHERE user_id = ? AND id = ?`, userID, id).
-		Scan(&e.ID, &e.FeedID, &e.GUID, &e.Title, &authors, &e.Content, &e.Link, &e.Published, &e.LastSeen,
-			&e.LastModified, &e.LastUserModified, &e.Hash, &e.IsRead, &e.IsFavorite, &tags, &attributes)
+	e, err := scanEntry(userID, s.queryRow(ctx, `
+		SELECT `+entryColumns+` FROM entries WHERE user_id = ? AND id = ?`, userID, id))
 	if err != nil {
 		return nil, fmt.Errorf("store: entry %d: %w", id, err)
 	}
+	return e, nil
+}
+
+// EntriesByFeed returns the entries of a feed ordered by identifier.
+func (s *Store) EntriesByFeed(ctx context.Context, userID, feedID int64) ([]*Entry, error) {
+	rows, err := s.query(ctx, `
+		SELECT `+entryColumns+` FROM entries WHERE user_id = ? AND feed_id = ? ORDER BY id`, userID, feedID)
+	if err != nil {
+		return nil, fmt.Errorf("store: entries of feed %d: %w", feedID, err)
+	}
+	entries, err := collect(rows, func(sc scanner) (*Entry, error) { return scanEntry(userID, sc) })
+	if err != nil {
+		return nil, fmt.Errorf("store: entries of feed %d: %w", feedID, err)
+	}
+	return entries, nil
+}
+
+func scanEntry(userID int64, sc scanner) (*Entry, error) {
+	e := &Entry{UserID: userID}
+	var authors, tags, attributes string
+	err := sc.Scan(&e.ID, &e.FeedID, &e.GUID, &e.Title, &authors, &e.Content, &e.Link, &e.Published, &e.LastSeen,
+		&e.LastModified, &e.LastUserModified, &e.Hash, &e.IsRead, &e.IsFavorite, &tags, &attributes)
+	if err != nil {
+		return nil, err
+	}
 	if e.Authors, err = parseStrings(authors); err != nil {
-		return nil, fmt.Errorf("store: entry %d: authors: %w", id, err)
+		return nil, fmt.Errorf("authors: %w", err)
 	}
 	if e.Tags, err = parseStrings(tags); err != nil {
-		return nil, fmt.Errorf("store: entry %d: tags: %w", id, err)
+		return nil, fmt.Errorf("tags: %w", err)
 	}
 	e.Attributes = []byte(attributes)
 	return e, nil

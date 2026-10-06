@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0" xmlns:frss="https://freshrss.org/opml">
+  <head><title>bob</title></head>
+  <body>
+    <outline text="News">
+      <outline text="RSS corpus (bob)" type="rss" xmlUrl="http://feeds.freshgo.test/rss.xml" htmlUrl="http://feeds.freshgo.test/rss/"/>
+      <outline text="JSON Feed (bob)" type="JSONFeed" xmlUrl="http://feeds.freshgo.test/feed.json" htmlUrl="http://feeds.freshgo.test/jsonfeed/" frss:priority="category"/>
+      <outline text="Atom corpus (bob)" type="rss" xmlUrl="http://feeds.freshgo.test/atom.xml" htmlUrl="http://feeds.freshgo.test/atom/"/>
+    </outline>
+  </body>
+</opml>

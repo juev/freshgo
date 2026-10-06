@@ -38,7 +38,7 @@ func commands() []command {
 		{"serve", "run the HTTP server and the refresh scheduler", stub},
 		{"refresh", "refresh feeds once and exit", stub},
 		{"purge", "delete old entries according to the archiving settings", stub},
-		{"import", "import a FreshRSS installation into an empty database", stub},
+		{"import", "import a FreshRSS installation into an empty database", runImport},
 		{"user", "manage users: create, passwd, list, delete", stub},
 		{"feed", "manage feeds: add", stub},
 		{"opml", "import or export subscriptions as OPML", stub},

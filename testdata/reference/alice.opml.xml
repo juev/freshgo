@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0" xmlns:frss="https://freshrss.org/opml">
+  <head><title>alice</title></head>
+  <body>
+    <outline text="Blogs">
+      <outline text="Atom corpus" type="rss" xmlUrl="http://feeds.freshgo.test/atom.xml" htmlUrl="http://feeds.freshgo.test/atom/" description="Atom feed with stable identifiers" frss:priority="important"/>
+      <outline text="RSS corpus" type="rss" xmlUrl="http://feeds.freshgo.test/rss.xml" htmlUrl="http://feeds.freshgo.test/rss/" frss:ttl="7200"/>
+    </outline>
+    <outline text="Scraped &amp; parsed">
+      <outline text="HTML page" type="HTML+XPath" xmlUrl="http://feeds.freshgo.test/page.html" htmlUrl="http://feeds.freshgo.test/page.html"
+        frss:xPathItem="//article"
+        frss:xPathItemTitle="descendant::h2"
+        frss:xPathItemContent="descendant::div[@class=&quot;body&quot;]"
+        frss:xPathItemUri="descendant::h2/a/@href"
+        frss:xPathItemAuthor="descendant::span[@class=&quot;author&quot;]"
+        frss:xPathItemTimestamp="descendant::time/@datetime"
+        frss:xPathItemThumbnail="descendant::img/@src"
+        frss:xPathItemCategories="descendant::ul[@class=&quot;tags&quot;]/li"
+        frss:xPathItemUid="@data-id"/>
+      <outline text="XML catalog" type="XML+XPath" xmlUrl="http://feeds.freshgo.test/data.xml" htmlUrl="http://feeds.freshgo.test/data/"
+        frss:xPathItem="//record"
+        frss:xPathItemTitle="name"
+        frss:xPathItemContent="text"
+        frss:xPathItemUri="url"
+        frss:xPathItemAuthor="by"
+        frss:xPathItemTimestamp="when"
+        frss:xPathItemTimeFormat="Y-m-d H:i:s"
+        frss:xPathItemCategories="topic"
+        frss:xPathItemUid="@uid"/>
+      <outline text="JSON Feed" type="JSONFeed" xmlUrl="http://feeds.freshgo.test/feed.json" htmlUrl="http://feeds.freshgo.test/jsonfeed/"/>
+      <outline text="JSON API" type="JSON+DotNotation" xmlUrl="http://feeds.freshgo.test/api.json" htmlUrl="http://feeds.freshgo.test/api/"
+        frss:jsonItem="data.posts"
+        frss:jsonItemTitle="headline"
+        frss:jsonItemContent="body.html"
+        frss:jsonItemUri="permalink"
+        frss:jsonItemAuthor="writer.display"
+        frss:jsonItemTimestamp="created"
+        frss:jsonItemTimeFormat="U"
+        frss:jsonItemThumbnail="cover"
+        frss:jsonItemCategories="labels"
+        frss:jsonItemUid="key"/>
+      <outline text="Embedded JSON" type="HTML+XPath+JSON+DotNotation" xmlUrl="http://feeds.freshgo.test/embedded.html" htmlUrl="http://feeds.freshgo.test/embedded.html"
+        frss:xPathToJson="//script[@id=&quot;state&quot;]"
+        frss:jsonItem="0.articles"
+        frss:jsonItemTitle="name"
+        frss:jsonItemContent="html"
+        frss:jsonItemUri="href"
+        frss:jsonItemAuthor="by"
+        frss:jsonItemTimestamp="ts"
+        frss:jsonItemUid="slug"/>
+    </outline>
+    <outline text="No identifiers" type="rss" xmlUrl="http://feeds.freshgo.test/rss-noid.xml" htmlUrl="http://feeds.freshgo.test/noid/" frss:priority="feed"/>
+  </body>
+</opml>

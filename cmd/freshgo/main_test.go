@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -53,5 +54,38 @@ func TestHelpListsEveryCommand(t *testing.T) {
 		if !strings.Contains(stdout, "  "+c.name+" ") {
 			t.Errorf("help does not list %q", c.name)
 		}
+	}
+}
+
+func TestImport(t *testing.T) {
+	database := "sqlite://" + filepath.Join(t.TempDir(), "freshgo.sqlite")
+	args := []string{"import", "-database-url", database, "-data", "../../testdata/reference/sqlite/data"}
+
+	code, stdout, stderr := runCLI(t, args...)
+	if code != 0 {
+		t.Fatalf("import: code %d, stderr %q", code, stderr)
+	}
+	want := "alice: 3 categories, 8 feeds, 22 entries, 2 labels on 3 entries, 1 custom icons\n" +
+		"bob: 2 categories, 3 feeds, 11 entries, 1 labels on 1 entries, 0 custom icons\n"
+	if stdout != want || stderr != "" {
+		t.Errorf("import:\nstdout %q\n  want %q\nstderr %q", stdout, want, stderr)
+	}
+
+	code, stdout, stderr = runCLI(t, args...)
+	if code != 1 || stdout != "" || !strings.Contains(stderr, "the database is not empty") {
+		t.Errorf("second import: code %d, stdout %q, stderr %q; want 1 and a refusal", code, stdout, stderr)
+	}
+}
+
+func TestImportUsage(t *testing.T) {
+	database := "sqlite://" + filepath.Join(t.TempDir(), "freshgo.sqlite")
+	if code, _, stderr := runCLI(t, "import", "-database-url", database); code != 1 || !strings.Contains(stderr, "-data is required") {
+		t.Errorf("import without -data: code %d, stderr %q", code, stderr)
+	}
+	if code, _, stderr := runCLI(t, "import", "-database-url", "mysql://x", "-data", "."); code != 1 || !strings.Contains(stderr, "unknown scheme") {
+		t.Errorf("import into MySQL: code %d, stderr %q", code, stderr)
+	}
+	if code, stdout, stderr := runCLI(t, "import", "-h"); code != 0 || stdout != "" || !strings.Contains(stderr, "-source-database-url") {
+		t.Errorf("import -h: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }

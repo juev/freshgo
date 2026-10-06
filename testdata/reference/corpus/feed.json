@@ -1,0 +1,27 @@
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "JSON Feed corpus",
+  "home_page_url": "http://feeds.freshgo.test/jsonfeed/",
+  "feed_url": "http://feeds.freshgo.test/feed.json",
+  "description": "A standard JSON Feed",
+  "items": [
+    {
+      "id": "jsonfeed-1",
+      "url": "http://feeds.freshgo.test/jsonfeed/1",
+      "title": "First JSON Feed item",
+      "content_html": "<p>HTML content of the <em>first</em> item.</p>",
+      "date_published": "2026-09-01T13:00:00Z",
+      "authors": [{"name": "Hana Json"}],
+      "tags": ["json", "feed"],
+      "image": "http://feeds.freshgo.test/jsonfeed/1.png"
+    },
+    {
+      "id": "http://feeds.freshgo.test/jsonfeed/2?a=1&b=2",
+      "url": "http://feeds.freshgo.test/jsonfeed/2?a=1&b=2",
+      "title": "Second item with text content & an ampersand",
+      "content_text": "Plain text of the second item.",
+      "date_published": "2026-09-02T13:00:00+02:00",
+      "author": {"name": "Ivo Legacy"}
+    }
+  ]
+}

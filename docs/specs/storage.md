@@ -50,6 +50,23 @@ Out of scope: MySQL/MariaDB, going back to FreshRSS with a freshgo database, sea
 - **A feed keeps a mandatory category**: deleting a category that still has feeds is refused by the foreign key; the caller moves the feeds to category 1 first.
 - **SQLite runs with** `foreign_keys`, WAL and immediate transactions, so that a writer waits for the lock at `BEGIN` instead of failing midway.
 
+## Import from FreshRSS
+
+`freshgo import -data <FreshRSS data directory>` (`internal/importer`) fills an empty database from a FreshRSS installation on SQLite or PostgreSQL. FreshRSS 1.29 or later is expected: older schemas lack columns the import reads.
+
+- I1. The destination must have no users; otherwise the import fails with `ErrNotEmpty` and changes nothing.
+- I2. The import is one transaction: a failure on any user leaves the destination as it was.
+- I3. Users are the directories in `users/` that have a `config.php`, symbolic links to directories included, except the template `_`. A directory without `config.php` is reported and skipped. The user's `config.php` becomes `users.settings` as JSON, except `apiPasswordHash`, which goes to its own column. `salt` of the system `config.php` and the domains of `force-https.txt` go to `settings`. Together with I4 this keeps issued API tokens valid.
+- I4. Categories, feeds, labels, entries and label links keep their identifiers. The identifier counters of FreshRSS are carried over, so identifiers of objects deleted before the import are not reused either.
+- I5. `category.name`, `feed.url`, `feed.name`, `feed.website`, `feed.description`, `feed.pathEntries`, `entry.title`, `entry.link`, `entry.author`, `entry.tags` and `tag.name` are decoded from the `htmlspecialchars` form once: `&amp;`, `&lt;`, `&gt;`, `&quot;` and the encodings of `'`. Other entities are left alone, as `htmlspecialchars_decode` leaves them. `entry.content` is HTML and `entry.guid` is a key; neither is touched.
+- I6. `entry.author` and `entry.tags` are split the way `FreshRSS_Entry::_authors` and `::_tags` read them. `feed.httpAuth` is decoded from base64. An `attributes` value of `[]`, an empty string or NULL becomes `{}`.
+- I7. Read and favorite states, dates, `lastSeen`, `lastModified` and `lastUserModified` are copied. `entry.hash` is not.
+- I8. A feed with the `customFavicon` attribute gets its icon from `favicons/<crc32b(salt . feed id . user name)>.ico`. Icons fetched from sites and the `PubSubHubbub/` directory are not imported.
+- I9. The import reports, without failing: a user without an API password; a feed whose `unicityCriteria` hashes the content (freshgo sanitizes content differently, so the first refresh may add each current entry once more); a missing custom icon file; attributes that are not a JSON object (dropped); entries left in `entrytmp` by an interrupted refresh (not imported).
+- I10. MySQL/MariaDB installations are refused.
+
+For PostgreSQL the connection comes from the `db` section of `config.php`; `-source-database-url` replaces it when the database is reachable under another address.
+
 ## Verification scenarios
 
 All in `internal/store/store_test.go`, each run on SQLite and, under `make test-integration`, on PostgreSQL (S10).
@@ -64,3 +81,7 @@ All in `internal/store/store_test.go`, each run on SQLite and, under `make test-
 - S9: reopening a database keeps its data and schema version; a database with a newer schema version is refused. `TestOpenTwiceKeepsData`, `TestOpenRefusesNewerSchema`.
 - S11: `TestSettings`. S12: `TestCustomIcon`. S13: counters raised to 5 and 9 → next category 6, next feed 10; lowering has no effect. `TestRaiseCounters`.
 - Field fidelity: every column of a feed, category, entry and label survives a write and a read, including non-ASCII text, markup characters and a NULL hash. `TestFeedRoundTrip`, `TestEntryRoundTrip`, `TestTags`.
+- I1: a second import → `ErrNotEmpty`, content unchanged. `TestImportRefusesNonEmptyDatabase`; `TestImport` in `cmd/freshgo`.
+- I2: second user's database damaged → error naming the user, no users and no salt in the destination, which then accepts a good installation. `TestImportIsAllOrNothing`.
+- I3–I8: the reference installations in `testdata/reference` (two users, every feed kind, read, starred and labelled entries, a custom icon) imported from SQLite and from PostgreSQL into SQLite and PostgreSQL → every row compared with the source tables, plus values known from the corpus. `TestImportFromSQLite`, `TestImportFromPostgres`, `TestSplitAuthors`, `TestSplitTags`, `TestDecodeText`.
+- I3: `TestImportFollowsSymlinkedUser`. I9: `TestImportWarnings`. I10: `TestImportRejectsUnsupportedSources`.

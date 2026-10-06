@@ -1,0 +1,26 @@
+{
+  "meta": {"name": "JSON API corpus", "count": 2},
+  "data": {
+    "posts": [
+      {
+        "key": "api-1",
+        "headline": "First API post",
+        "body": {"html": "<p>Body of the first API post.</p>"},
+        "permalink": "http://feeds.freshgo.test/api/1",
+        "writer": {"display": "Jo Api"},
+        "created": 1788343200,
+        "cover": "http://feeds.freshgo.test/api/1.jpg",
+        "labels": ["x", "y"]
+      },
+      {
+        "key": "api-2",
+        "headline": "Second API post",
+        "body": {"html": "<p>Body of the second API post.</p>"},
+        "permalink": "http://feeds.freshgo.test/api/2",
+        "writer": {"display": "Kit Api"},
+        "created": 1788429600,
+        "labels": ["z"]
+      }
+    ]
+  }
+}
