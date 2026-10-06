@@ -569,7 +569,7 @@ func TestImportWarnings(t *testing.T) {
 	dir := brokenCopy(t)
 	sourceExec(t, dir, "alice", `UPDATE feed SET attributes = '{"unicityCriteria":"sha1:link_published_title_content"}' WHERE id = 1`)
 	sourceExec(t, dir, "alice", `UPDATE feed SET attributes = 'not json' WHERE id = 3`)
-	sourceExec(t, dir, "alice", `UPDATE feed SET httpAuth = '`+"dXNlcjpwQHNz"+`' WHERE id = 4`)
+	sourceExec(t, dir, "alice", `UPDATE feed SET httpAuth = 'dXNlcjpwQCZhbXA7cyZsdDsmcXVvdDs=' WHERE id = 4`)
 	sourceExec(t, dir, "alice", `UPDATE feed SET httpAuth = 'dXNlcjpwYXNz!!!' WHERE id = 5`)
 	if err := os.Mkdir(filepath.Join(dir, "users", "leftover"), 0o700); err != nil {
 		t.Fatal(err)
@@ -637,8 +637,8 @@ func TestImportWarnings(t *testing.T) {
 	if f, err := dst.FeedByID(ctx, alice.ID, 3); err != nil || string(f.Attributes) != "{}" {
 		t.Errorf("feed with broken attributes = %s (err %v), want empty attributes", dump(f), err)
 	}
-	if f, err := dst.FeedByID(ctx, alice.ID, 4); err != nil || f.HTTPAuth != "user:p@ss" {
-		t.Errorf("HTTP credentials = %q (err %v), want them decoded from base64", f.HTTPAuth, err)
+	if f, err := dst.FeedByID(ctx, alice.ID, 4); err != nil || f.HTTPAuth != `user:p@&s<"` {
+		t.Errorf("HTTP credentials = %q (err %v), want them decoded from base64 and from HTML entities", f.HTTPAuth, err)
 	}
 	if f, err := dst.FeedByID(ctx, alice.ID, 5); err != nil || f.HTTPAuth != "" {
 		t.Errorf("broken HTTP credentials = %q (err %v), want none", f.HTTPAuth, err)

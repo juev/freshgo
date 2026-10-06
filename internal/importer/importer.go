@@ -323,7 +323,8 @@ func (u *userImport) feeds() error {
 				u.warnf("feed %d (%s): HTTP credentials are not valid base64 and were dropped", f.ID, f.URL)
 				auth = nil
 			}
-			f.HTTPAuth = string(auth)
+			// FreshRSS encodes the form input before the base64 and decodes it on use.
+		f.HTTPAuth = decodeText(string(auth))
 		}
 		f.Attributes = u.attributes(attributes.String, "feed %d", f.ID)
 		if err := u.dst.CreateFeed(u.ctx, f); err != nil {
