@@ -1,6 +1,6 @@
 # Storage
 
-Status: implemented for users, categories, feeds, entries, labels, installation-wide settings and feed icons. The table of WebSub subscriptions is added by the plan step that needs it (12) and is not described here yet.
+Status: implemented for users, categories, feeds, entries, labels, installation-wide settings and feed icons and WebSub subscriptions.
 Sources: user request of 2026-10-06 and the decisions recorded in `plan.md`; FreshRSS schema in `app/SQL/install.sql.sqlite.php` and `app/SQL/install.sql.pgsql.php` at commit `219eaf58` for the data that import has to carry over.
 
 ## Purpose and scope
@@ -39,6 +39,7 @@ Out of scope: MySQL/MariaDB, going back to FreshRSS with a freshgo database, sea
 - S23. Deleting a category moves its feeds to the default one; the default category itself is not deleted. Deleting a feed removes its entries, their label links and its custom icon; a missing feed is `ErrNotFound`.
 - S24. An icon found at a site is kept by the hash of the place it was looked for (`icons`): the place, the image and its media type, when the image last changed and when the place was last asked. A row without an image records an attempt that found nothing.
 - S25. `Salt` returns the installation's secret and creates a random one on first use; an imported salt is returned as it is.
+- S26. A subscription to a WebSub hub is kept per topic (`websub_subscriptions`): hub, callback key, secret, the times the lease was asked for and ends, and whether the hub is failing. It is read by topic and by key, replaced as a whole, listed and deleted; a key belongs to one subscription (`ErrConflict`). A feed carries the topic it announces (`websub_topic`), and `FeedsByTopic` returns the feeds of all users that announce a topic. See `websub.md`.
 - S13. The counters of S3 can be raised explicitly and never move back, so that import carries over counters that are ahead of the largest identifier still in use.
 
 ## Invariants and compatibility
@@ -96,6 +97,7 @@ In `internal/store`, each run on SQLite and, under `make test-integration`, on P
 - S9: reopening a database keeps its data and schema version; a database with a newer schema version is refused. `TestOpenTwiceKeepsData`, `TestOpenRefusesNewerSchema`.
 - S14, S15: `TestFeedRoundTrip`, `TestUpdateFeed`, `TestUpdateEntry`, `TestLockFeedSerializes`. S16: `TestEntryStatesAndLastSeen`.
 - S17: `TestCleanupTouchesOneFeed`; the rules are compared with FreshRSS by `TestPurgeMatchesFreshRSS` in `internal/refresh`. S18: `TestAutoReadStatements`.
+- S26: `TestWebSubSubscriptions`.
 - S11: `TestSettings`. S12: `TestCustomIcon`. S24: `TestIcons`. S25: `TestSalt`. S13: counters raised to 5 and 9 → next category 6, next feed 10; lowering has no effect. `TestRaiseCounters`.
 - Field fidelity: every column of a feed, category, entry and label survives a write and a read, including non-ASCII text, markup characters and a NULL hash. `TestFeedRoundTrip`, `TestEntryRoundTrip`, `TestTags`.
 - I1: a second import → `ErrNotEmpty`, content unchanged. `TestImportRefusesNonEmptyDatabase`; `TestImport` in `cmd/freshgo`.

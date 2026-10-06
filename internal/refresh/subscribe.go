@@ -101,7 +101,7 @@ func (r *Refresher) AddFeed(ctx context.Context, u *store.User, f *store.Feed) e
 
 	now := r.now().Unix()
 	if resp != nil {
-		_, err = r.storeFetched(ctx, j, f, params, resp, now)
+		_, err = r.storeFetched(ctx, j, f, params, resp, now, false)
 		r.refreshIcon(ctx, f, err)
 	} else if _, err = r.refreshFeed(ctx, j, f); err != nil && ctx.Err() == nil {
 		// The feed stays, marked as failing, like any feed that fails later.

@@ -19,8 +19,16 @@ func TestRoutes(t *testing.T) {
 	}
 	registry := &hooks.Registry{}
 	registry.HandleAPI("Share By Mail", part("extension"))
-	server := httptest.NewServer(routes(part("api"), part("icons"), extensions(registry)))
+	server := httptest.NewServer(routes(part("api"), part("icons"), extensions(registry), part("hubs")))
 	defer server.Close()
+	// Without WebSub its addresses do not exist.
+	off := httptest.NewServer(routes(part("api"), part("icons"), extensions(registry), nil))
+	defer off.Close()
+	if resp, err := http.Get(off.URL + "/websub/abc"); err != nil || resp.StatusCode != http.StatusNotFound {
+		t.Errorf("GET /websub/abc with WebSub off: %v, %v; want 404", resp, err)
+	} else {
+		_ = resp.Body.Close()
+	}
 
 	for path, want := range map[string]struct {
 		status int
@@ -31,16 +39,17 @@ func TestRoutes(t *testing.T) {
 		"/api/greader.php":                        {200, "api /api/greader.php"},
 		"/api/greader.php/reader/api/0/token?x=1": {200, "api /api/greader.php/reader/api/0/token?x=1"},
 		"/reader/api/0/stream/contents/feed/http%3A%2F%2Fexample.org%2F%2Ffeed": {200, "api /reader/api/0/stream/contents/feed/http%3A%2F%2Fexample.org%2F%2Ffeed"},
-		"/favicon/0123": {200, "icons /favicon/0123"},
-		"/api/misc.php/Share%20By%20Mail/send?to=x": {200, "extension /api/misc.php/Share%20By%20Mail/send?to=x"},
-		"/api/misc.php?ext=Share+By+Mail":           {200, "extension /api/misc.php?ext=Share+By+Mail"},
-		"/api/misc.php/Unknown":                     {404, "Not Found!"},
-		"/api/misc.php":                             {400, "Bad Request!"},
-		"/api/misc.php/":                            {400, "Bad Request!"},
-		"/":                                         {404, "404 page not found\n"},
-		"/api/greader.phpx":                         {404, "404 page not found\n"},
-		"/api/fever.php":                            {404, "404 page not found\n"},
-		"/readers":                                  {404, "404 page not found\n"},
+		"/websub/abc?hub.mode=subscribe":                                        {200, "hubs /websub/abc?hub.mode=subscribe"},
+		"/favicon/0123":                                                         {200, "icons /favicon/0123"},
+		"/api/misc.php/Share%20By%20Mail/send?to=x":                             {200, "extension /api/misc.php/Share%20By%20Mail/send?to=x"},
+		"/api/misc.php?ext=Share+By+Mail":                                       {200, "extension /api/misc.php?ext=Share+By+Mail"},
+		"/api/misc.php/Unknown":                                                 {404, "Not Found!"},
+		"/api/misc.php":                                                         {400, "Bad Request!"},
+		"/api/misc.php/":                                                        {400, "Bad Request!"},
+		"/":                                                                     {404, "404 page not found\n"},
+		"/api/greader.phpx":                                                     {404, "404 page not found\n"},
+		"/api/fever.php":                                                        {404, "404 page not found\n"},
+		"/readers":                                                              {404, "404 page not found\n"},
 	} {
 		resp, err := http.Get(server.URL + path)
 		if err != nil {

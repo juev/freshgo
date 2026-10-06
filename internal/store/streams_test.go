@@ -422,3 +422,77 @@ func TestSalt(t *testing.T) {
 		}
 	})
 }
+
+func TestWebSubSubscriptions(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		if _, err := s.WebSubByTopic(ctx, "https://example.org/feed"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("WebSubByTopic(unset) error = %v, want ErrNotFound", err)
+		}
+		if _, err := s.WebSubByKey(ctx, "k1"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("WebSubByKey(unset) error = %v, want ErrNotFound", err)
+		}
+		for _, want := range []*WebSub{
+			{Topic: "https://example.org/feed", Hub: "https://hub.example/", Key: "k1", Secret: "s1", LeaseStart: 5, Error: true},
+			{Topic: "https://example.org/feed", Hub: "https://hub2.example/", Key: "k1", Secret: "s1", LeaseStart: 6, LeaseEnd: 99},
+		} {
+			if err := s.PutWebSub(ctx, want); err != nil {
+				t.Fatalf("PutWebSub: %v", err)
+			}
+			for name, get := range map[string]func() (*WebSub, error){
+				"topic": func() (*WebSub, error) { return s.WebSubByTopic(ctx, want.Topic) },
+				"key":   func() (*WebSub, error) { return s.WebSubByKey(ctx, want.Key) },
+			} {
+				if got, err := get(); err != nil || !reflect.DeepEqual(got, want) {
+					t.Errorf("by %s = %+v, %v; want %+v", name, got, err, want)
+				}
+			}
+		}
+		other := &WebSub{Topic: "https://example.org/a", Hub: "https://hub.example/", Key: "k0", Secret: "s0"}
+		if err := s.PutWebSub(ctx, other); err != nil {
+			t.Fatal(err)
+		}
+		// A key leads to one subscription.
+		if err := s.PutWebSub(ctx, &WebSub{Topic: "https://example.org/b", Hub: "h", Key: "k0", Secret: "s"}); !errors.Is(err, ErrConflict) {
+			t.Errorf("PutWebSub with a taken key: error = %v, want ErrConflict", err)
+		}
+		all, err := s.WebSubs(ctx)
+		if err != nil || len(all) != 2 || all[0].Topic != other.Topic {
+			t.Errorf("WebSubs = %+v, %v; want the two by topic", all, err)
+		}
+		if err := s.DeleteWebSub(ctx, other.Topic); err != nil {
+			t.Fatal(err)
+		}
+		if all, err := s.WebSubs(ctx); err != nil || len(all) != 1 {
+			t.Errorf("WebSubs after a deletion = %+v, %v; want one", all, err)
+		}
+
+		// Feeds of every user that announce a topic.
+		alice, bob := mustUser(t, s, "alice"), mustUser(t, s, "bob")
+		for _, f := range []*Feed{
+			{UserID: bob.ID, URL: "https://example.org/1", WebSubTopic: "https://example.org/feed"},
+			{UserID: alice.ID, URL: "https://example.org/1", WebSubTopic: "https://example.org/feed"},
+			{UserID: alice.ID, URL: "https://example.org/2", WebSubTopic: "https://example.org/other"},
+			{UserID: alice.ID, URL: "https://example.org/3"},
+		} {
+			if err := s.CreateFeed(ctx, f); err != nil {
+				t.Fatal(err)
+			}
+		}
+		feeds, err := s.FeedsByTopic(ctx, "https://example.org/feed")
+		if err != nil || len(feeds) != 2 || feeds[0].UserID != alice.ID || feeds[1].UserID != bob.ID ||
+			feeds[0].URL != "https://example.org/1" || feeds[0].WebSubTopic != "https://example.org/feed" {
+			t.Errorf("FeedsByTopic = %+v, %v; want the feed of each user, whole", feeds, err)
+		}
+		if feeds, err := s.FeedsByTopic(ctx, ""); err != nil || len(feeds) != 1 {
+			t.Errorf("FeedsByTopic(no topic) = %d feeds, %v", len(feeds), err)
+		}
+		feeds[0].WebSubTopic = ""
+		if err := s.UpdateFeed(ctx, feeds[0]); err != nil {
+			t.Fatal(err)
+		}
+		if feeds, err := s.FeedsByTopic(ctx, "https://example.org/feed"); err != nil || len(feeds) != 1 {
+			t.Errorf("FeedsByTopic after a feed dropped the topic = %d feeds, %v; want 1", len(feeds), err)
+		}
+	})
+}

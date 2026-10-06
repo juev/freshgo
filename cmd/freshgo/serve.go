@@ -12,6 +12,7 @@ import (
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/greader"
 	"github.com/juev/freshgo/internal/hooks"
+	"github.com/juev/freshgo/internal/websub"
 )
 
 // shutdownTimeout is how long requests in flight get to finish when the
@@ -51,7 +52,9 @@ func extensions(registry *hooks.Registry) http.Handler {
 // routes sends a request to the part of the server its path belongs to. The
 // Google Reader API lives at the root, as in the original service, and under
 // the path FreshRSS serves it at.
-func routes(api, icons, misc http.Handler) http.Handler {
+//
+// hubs is nil when WebSub is off.
+func routes(api, icons, misc, hubs http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		switch {
@@ -59,6 +62,8 @@ func routes(api, icons, misc http.Handler) http.Handler {
 			icons.ServeHTTP(w, r)
 		case path == extensionsPath, strings.HasPrefix(path, extensionsPath+"/"):
 			misc.ServeHTTP(w, r)
+		case hubs != nil && strings.HasPrefix(path, websub.Path):
+			hubs.ServeHTTP(w, r)
 		case path == greader.Alias, strings.HasPrefix(path, greader.Alias+"/"),
 			strings.HasPrefix(path, "/accounts/"), strings.HasPrefix(path, "/reader/"):
 			api.ServeHTTP(w, r)
@@ -84,12 +89,17 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	api := greader.New(greader.Options{
 		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL,
 	})
+	// A nil service must not become a handler that is not nil.
+	var hubs http.Handler
+	if s.webSub != nil {
+		hubs = s.webSub
+	}
 	listener, err := net.Listen("tcp", conf.Listen)
 	if err != nil {
 		return err
 	}
 	server := &http.Server{
-		Handler:           routes(api, s.icons, extensions(s.registry)),
+		Handler:           routes(api, s.icons, extensions(s.registry), hubs),
 		ReadHeaderTimeout: 10 * time.Second,
 		// A request ends with the server, not with the signal: Shutdown
 		// gives it time first.

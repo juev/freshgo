@@ -12,6 +12,7 @@ import (
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/store"
+	"github.com/juev/freshgo/internal/websub"
 )
 
 // newHooks returns the extension points with their handlers. freshgo ships
@@ -31,6 +32,8 @@ type services struct {
 	log       *slog.Logger
 	refresher *refresh.Refresher
 	icons     *favicon.Service
+	// webSub is nil when WebSub is off.
+	webSub *websub.Service
 }
 
 func newServices(ctx context.Context, e env, conf *config.Config, db *store.Store) (*services, error) {
@@ -43,6 +46,20 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 	s.icons = favicon.New(db, client, s.log)
 	s.refresher = refresh.New(db, client, s.registry, s.log)
 	s.refresher.Icons = s.icons
+	if conf.WebSub {
+		s.webSub, err = websub.New(db, client, s.log, conf.BaseURL)
+		switch {
+		case errors.Is(err, websub.ErrNotPublic):
+			// Not fatal: the feeds are polled as without WebSub.
+			s.log.Warn("WebSub is off: hubs cannot reach the public URL of the server", "base-url", conf.BaseURL)
+			s.webSub = nil
+		case err != nil:
+			return nil, err
+		default:
+			s.webSub.Pusher = s.refresher
+			s.refresher.WebSub = s.webSub
+		}
+	}
 	return s, nil
 }
 

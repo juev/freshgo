@@ -1,6 +1,6 @@
 # Feed refresh
 
-Status: implemented for selecting, fetching, reading and storing, for cleanup, for auto-read, for filter actions, for the full text of articles, for adding a feed and for the upkeep of icons. WebSub (plan step 12) attaches to this pipeline later and is not described here.
+Status: implemented for selecting, fetching, reading and storing, for cleanup, for auto-read, for filter actions, for the full text of articles, for adding a feed, for the upkeep of icons and for WebSub.
 Sources: user request of 2026-10-06 and the decisions recorded in `plan.md`; `FreshRSS_feed_Controller::actualizeFeeds`, `keepMaxUnreads`, `FreshRSS_Feed::load`, `loadEntries`, `cleanOldEntries`, `markAsReadUponGone`, `markAsReadMaxUnread`, `FreshRSS_Entry::applyFilterActions`, `FreshRSS_EntryDAO::addEntry`, `updateEntry`, `updateLastSeen`, `commitNewEntries`, `cleanOldEntries`, `app/actualize_script.php` and `cli/purge.php` of FreshRSS at commit `219eaf58`.
 
 ## Purpose and scope
@@ -41,6 +41,7 @@ Auto-read and cleanup. Settings are read under the names FreshRSS gives them: `m
 - F28. `Refresher.AddFeed` subscribes a user to an address: the address is trimmed, shown to `CheckURLBeforeAdd`, given `https://` when it names no scheme, and refused when it is not an http(s) URL. A feed read as RSS or Atom is fetched and read first: a document that is not a feed is searched for the first feed it announces with `<link rel="alternate">` of a feed media type or `rel="feed"`, which is then fetched in its place, once; an address that has moved for good is replaced by where it moved. Name, site and description the caller left empty come from the feed. An address the user already has is `ErrAlreadySubscribed`; a feed `FeedBeforeInsert` drops is `ErrRefused`. The feed is stored and its entries are stored from the document already fetched. Feeds of other kinds are stored unchecked and refreshed at once; a failure marks them as failing and is not an error of the call.
 - F29. `Refresher.RefreshFeed` refreshes one feed of a user at once, whatever its period and whether or not it is muted.
 - F30. After a refresh of a feed that succeeded, a 304 included, the icon of the feed is looked after when the Refresher was given an icon service: `greader-api.md`, A33 and A34. The feed is read again first, for the refresh may have learnt its site.
+- F31. With WebSub on, a feed whose hub is trusted is due once in 24 hours or by its own period, whichever is longer; after a poll the topic of the feed is recorded and its hub is asked to push; `Refresher.Push` stores a pushed document through the same steps as F8–F21 and F26–F27, without F22, F23 and without counting as a poll: `websub.md`, W2, W3 and W7–W9.
 - F25. `freshgo purge` applies F22 to every feed of every user without fetching anything and prints the number of deleted entries per user.
 
 ## Decisions
@@ -70,6 +71,7 @@ Auto-read and cleanup. Settings are read under the names FreshRSS gives them: `m
 
 `internal/refresh`, each on SQLite and, under `make test-integration`, on PostgreSQL.
 
+- F31: the tests of `websub_test.go`, listed in `websub.md`.
 - F28: `TestAddFeed` (one request for the document; what the caller chose stands; a second subscription is refused, another user's is not), `TestAddFeedFollowsThePage`, `TestAddFeedOfAnotherKind`, `TestAddFeedRefusals`. F29: `TestRefreshFeed`. F30: `TestRefreshKeepsIcons`.
 
 - R3, F8, F10, F11: the reference installation imported and refreshed from its own corpus through a proxy that keeps the feed addresses → no new and no updated entries, every entry equal to what it was except hash and `last_seen`; a second refresh, now comparing hashes → the same; one item added to `rss.xml` → one new entry for each of the two subscribers, with an identifier above all earlier ones. Covers every feed kind, `atom:id`, RSS `guid`, items without an identifier, non-ASCII and `&` in identifiers, force-https domains. `TestRefreshOfImportedInstallation`.

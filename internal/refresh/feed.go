@@ -63,7 +63,7 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 		r.refreshIcon(ctx, f, err)
 		return result{}, err
 	}
-	res, err := r.storeFetched(ctx, j, f, params, resp, now)
+	res, err := r.storeFetched(ctx, j, f, params, resp, now, false)
 	r.refreshIcon(ctx, f, err)
 	return res, err
 }
@@ -82,10 +82,23 @@ func (r *Refresher) refreshIcon(ctx context.Context, f *store.Feed, err error) {
 // storeFetched reads the document a feed answered with and stores what it
 // brought. An error means the feed is now marked as failing, unless the
 // context was cancelled.
-func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, params fetch.Params, resp *fetch.Response, now int64) (result, error) {
+//
+// pushed says the document came from a WebSub hub instead: it lists only
+// what is new, so nothing is concluded about the entries it leaves out, the
+// feed does not count as polled, and a document that cannot be read is an
+// error of the push, not of the feed.
+func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, params fetch.Params, resp *fetch.Response, now int64, pushed bool) (result, error) {
 	doc, err := parse(j, f, resp)
 	if err != nil {
+		if pushed {
+			return result{}, err
+		}
 		return result{}, r.fail(ctx, j, f, now, err)
+	}
+	// The topic to be pushed about, when the feed names a hub and itself.
+	topic := ""
+	if r.WebSub != nil && doc.HubURL != "" && doc.SelfURL != "" {
+		topic = doc.SelfURL
 	}
 	attrs := readAttributes(f.Attributes)
 	criteria, _ := get[string](attrs, "unicityCriteria")
@@ -274,11 +287,16 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 		if err := tx.MarkEntriesSeen(ctx, f.UserID, f.ID, guids, now); err != nil {
 			return err
 		}
-		if err := r.tidy(ctx, tx, j, fresh, now, res.added+res.updated > 0); err != nil {
+		if err := r.tidy(ctx, tx, j, fresh, now, res.added+res.updated > 0, pushed); err != nil {
 			return err
 		}
 
-		succeeded(fresh, f.URL, resp, now)
+		if pushed {
+			fresh.Error = 0
+		} else {
+			succeeded(fresh, f.URL, resp, now)
+			fresh.WebSubTopic = topic
+		}
 		if used != criteria {
 			freshAttrs := readAttributes(fresh.Attributes)
 			delete(freshAttrs, "hasBadGuids")
@@ -298,6 +316,13 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 		}
 		return tx.UpdateFeed(ctx, fresh)
 	})
+	if err == nil && !pushed && topic != "" {
+		// A hub that is trusted pushes every entry before a poll finds it.
+		if res.added > 0 && j.pushing[topic] {
+			r.WebSub.Distrust(ctx, topic)
+		}
+		r.WebSub.Ensure(ctx, topic, doc.HubURL)
+	}
 	return res, err
 }
 
@@ -315,7 +340,7 @@ func (r *Refresher) storeUnchanged(ctx context.Context, j *job, f *store.Feed, r
 		if err := tx.MarkEntriesSeenSince(ctx, f.UserID, f.ID, fresh.LastUpdate, now); err != nil {
 			return err
 		}
-		if err := r.tidy(ctx, tx, j, fresh, now, false); err != nil {
+		if err := r.tidy(ctx, tx, j, fresh, now, false, false); err != nil {
 			return err
 		}
 		succeeded(fresh, f.URL, resp, now)

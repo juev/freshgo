@@ -104,3 +104,18 @@ func TestRefreshSettings(t *testing.T) {
 		t.Error("Validate accepted a zero refresh interval")
 	}
 }
+
+func TestWebSubSetting(t *testing.T) {
+	if parse(t, nil).WebSub {
+		t.Error("WebSub is on by default")
+	}
+	if !parse(t, map[string]string{EnvWebSub: "true"}).WebSub || !parse(t, nil, "-websub").WebSub {
+		t.Error("WebSub is not switched on by the environment or by the flag")
+	}
+	if parse(t, map[string]string{EnvWebSub: "1"}, "-websub=false").WebSub {
+		t.Error("the flag does not win over the environment")
+	}
+	if err := parse(t, map[string]string{EnvWebSub: "maybe"}).Validate(); err == nil {
+		t.Error("Validate accepted a WebSub value that is not a boolean")
+	}
+}

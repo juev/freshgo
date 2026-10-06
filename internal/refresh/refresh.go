@@ -22,6 +22,7 @@ import (
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
+	"github.com/juev/freshgo/internal/websub"
 )
 
 // feedConcurrency is the number of feeds of one user refreshed at a time.
@@ -39,6 +40,9 @@ type Refresher struct {
 
 	// Icons, when set, keeps the icons of refreshed feeds up to date.
 	Icons *favicon.Service
+	// WebSub, when set, subscribes to the hubs feeds announce. A feed whose
+	// hub delivers is then polled once a day only.
+	WebSub *websub.Service
 
 	// running keeps one run at a time: a second one would find the same
 	// feeds due and fetch them again.
@@ -146,6 +150,8 @@ type job struct {
 	search search.Options
 	rules  []search.Rule
 	labels []labelRules
+	// pushing are the WebSub topics whose hub can be relied on.
+	pushing map[string]bool
 }
 
 // newJob reads what the feeds of the user have in common.
@@ -157,6 +163,11 @@ func (r *Refresher) newJob(ctx context.Context, u *store.User, conf userSettings
 	j := &job{user: u, conf: conf, https: https, categories: categories}
 	if err := r.loadRules(ctx, j); err != nil {
 		return nil, err
+	}
+	if r.WebSub != nil {
+		if j.pushing, err = r.WebSub.Working(ctx); err != nil {
+			return nil, err
+		}
 	}
 	return j, nil
 }
@@ -180,7 +191,7 @@ func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options) (Stats, 
 	)
 	for _, f := range feeds {
 		f, ok := r.hooks.FeedBeforeActualize.Call(ctx, f)
-		if !ok || !due(f, j.conf, now, o.Force) {
+		if !ok || !due(f, j.conf, now, o.Force, j.pushing[f.WebSubTopic]) {
 			continue
 		}
 		select {
@@ -217,8 +228,12 @@ func lastAttempt(f *store.Feed) int64 {
 	return max(f.LastUpdate, f.Error)
 }
 
-// due reports whether the feed is to be refreshed at the time now.
-func due(f *store.Feed, conf userSettings, now int64, force bool) bool {
+// pushedPeriod is how often a feed is polled while its hub delivers.
+const pushedPeriod = 24 * 3600
+
+// due reports whether the feed is to be refreshed at the time now. pushed
+// says a WebSub hub delivers its entries.
+func due(f *store.Feed, conf userSettings, now int64, force, pushed bool) bool {
 	if f.TTL < 0 {
 		return false
 	}
@@ -228,6 +243,9 @@ func due(f *store.Feed, conf userSettings, now int64, force bool) bool {
 	ttl := f.TTL
 	if ttl == 0 {
 		ttl = conf.ttlDefault
+	}
+	if pushed {
+		ttl = max(ttl, pushedPeriod)
 	}
 	return now > f.LastUpdate+int64(ttl)
 }

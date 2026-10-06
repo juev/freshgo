@@ -62,6 +62,9 @@ type Feed struct {
 	// last, sent back so that an unchanged feed is answered with 304.
 	HTTPETag         string
 	HTTPLastModified string
+	// WebSubTopic is the address the feed gave as its own the last time it
+	// also named a WebSub hub; empty when it names none.
+	WebSubTopic string
 }
 
 // Entry is an article of a feed.

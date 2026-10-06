@@ -113,11 +113,18 @@ func (r *Refresher) clean(ctx context.Context, tx *store.Store, j *job, f *store
 // tidy applies, inside the transaction of a refresh, what follows the entries
 // of the feed being brought up to date: old entries are deleted, entries gone
 // from the feed and unread entries beyond the allowed number become read.
-// changed says whether the refresh added or rewrote entries.
-func (r *Refresher) tidy(ctx context.Context, tx *store.Store, j *job, f *store.Feed, now int64, changed bool) error {
-	deleted, err := r.clean(ctx, tx, j, f, now)
-	if err != nil {
-		return err
+// changed says whether the refresh added or rewrote entries. After a push,
+// which does not say what the feed still lists, only the number of unread
+// entries is looked at.
+func (r *Refresher) tidy(ctx context.Context, tx *store.Store, j *job, f *store.Feed, now int64, changed, pushed bool) error {
+	var (
+		deleted int
+		err     error
+	)
+	if !pushed {
+		if deleted, err = r.clean(ctx, tx, j, f, now); err != nil {
+			return err
+		}
 	}
 	attrs := readAttributes(f.Attributes)
 	gone := 0
@@ -125,7 +132,7 @@ func (r *Refresher) tidy(ctx context.Context, tx *store.Store, j *job, f *store.
 	if !ok {
 		uponGone = j.conf.readUponGone
 	}
-	if uponGone {
+	if uponGone && !pushed {
 		if gone, err = tx.MarkUnseenEntriesRead(ctx, f.UserID, f.ID, now-goneGrace); err != nil {
 			return err
 		}

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -20,6 +21,8 @@ const (
 	// refresh feeds.
 	EnvFetchAllowlist  = "FRESHGO_FETCH_ALLOWLIST"
 	EnvRefreshInterval = "FRESHGO_REFRESH_INTERVAL"
+	// EnvWebSub switches WebSub on with a value strconv.ParseBool takes for true.
+	EnvWebSub = "FRESHGO_WEBSUB"
 )
 
 const (
@@ -54,6 +57,9 @@ type Config struct {
 	FetchAllowlist string
 	// RefreshInterval is how often the server looks for feeds that are due.
 	RefreshInterval time.Duration
+	// WebSub makes the server subscribe to the hubs feeds announce, so that
+	// new entries are pushed to it. It needs a BaseURL hubs can reach.
+	WebSub bool
 
 	// invalid is what was wrong with the environment, reported by Validate.
 	invalid error
@@ -82,6 +88,16 @@ func Bind(fs *flag.FlagSet, getenv func(string) string) *Config {
 	}
 	fs.DurationVar(&c.RefreshInterval, "refresh-interval", interval,
 		"how often the server looks for feeds to refresh ($"+EnvRefreshInterval+")")
+	webSub := false
+	if v := getenv(EnvWebSub); v != "" {
+		on, err := strconv.ParseBool(v)
+		if err != nil {
+			c.invalid = errors.Join(c.invalid, fmt.Errorf("$%s: %w", EnvWebSub, err))
+		}
+		webSub = on
+	}
+	fs.BoolVar(&c.WebSub, "websub", webSub,
+		"subscribe to the WebSub hubs of feeds; needs a public -base-url ($"+EnvWebSub+")")
 	return c
 }
 
