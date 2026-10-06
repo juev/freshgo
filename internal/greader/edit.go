@@ -267,7 +267,8 @@ func (h *Handler) disableTag(ctx context.Context, q *request) error {
 // feed is added: the API has no way to say which it is.
 var jsonInAddress = regexp.MustCompile(`(?i)(?:\b|_)json(?:\b|_)`)
 
-func kindOf(address string) int {
+// KindOf returns the kind a feed added by its address alone is taken for.
+func KindOf(address string) int {
 	if jsonInAddress.MatchString(address) {
 		return scrape.KindJSONFeed
 	}
@@ -346,7 +347,7 @@ func (h *Handler) subscriptionEdit(ctx context.Context, q *request) error {
 				return errBadRequest
 			}
 			added := &store.Feed{
-				URL: address, Name: phpTrim(title), CategoryID: categoryID, Kind: kindOf(address), Priority: priorityMain,
+				URL: address, Name: phpTrim(title), CategoryID: categoryID, Kind: KindOf(address), Priority: priorityMain,
 			}
 			if err := h.refresher.AddFeed(ctx, q.user, added); err != nil {
 				if ctx.Err() != nil {
@@ -408,7 +409,7 @@ func (h *Handler) editFeed(ctx context.Context, edited *store.Feed) error {
 // quickAdd subscribes to the feed at the address of "quickadd".
 func (h *Handler) quickAdd(ctx context.Context, q *request) error {
 	address := strings.TrimPrefix(q.either("quickadd"), feedPrefix)
-	feed := &store.Feed{URL: address, Kind: kindOf(address), Priority: priorityMain}
+	feed := &store.Feed{URL: address, Kind: KindOf(address), Priority: priorityMain}
 	if err := h.refresher.AddFeed(ctx, q.user, feed); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()

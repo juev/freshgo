@@ -19,7 +19,7 @@ import (
 // Feed priorities: where the entries of a feed are shown.
 const (
 	priorityImportant = 20
-	priorityMain      = 10
+	priorityMain      = store.PriorityMain
 	priorityCategory  = 0
 	priorityFeed      = -5
 	priorityHidden    = -10

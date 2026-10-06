@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -495,4 +496,79 @@ func TestWebSubSubscriptions(t *testing.T) {
 			t.Errorf("FeedsByTopic after a feed dropped the topic = %d feeds, %v; want 1", len(feeds), err)
 		}
 	})
+}
+
+func TestDeleteUser(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		lib := newLibrary(t, s)
+		alice, bob := lib.alice.ID, lib.bob.ID
+		if err := s.SetCustomIcon(ctx, alice, 1, CustomIcon{Hash: "a1", Content: []byte("icon")}); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := s.DeleteUser(ctx, alice); err != nil {
+			t.Fatalf("DeleteUser: %v", err)
+		}
+		if err := s.DeleteUser(ctx, alice); !errors.Is(err, ErrNotFound) {
+			t.Errorf("DeleteUser twice: error = %v, want ErrNotFound", err)
+		}
+		if _, err := s.UserByName(ctx, "alice"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("UserByName after DeleteUser: error = %v, want ErrNotFound", err)
+		}
+		if icon, err := s.CustomIconByHash(ctx, "a1"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("custom icon after DeleteUser = %+v, %v; want ErrNotFound", icon, err)
+		}
+		// Nothing of the user is left for a namesake to inherit.
+		again := mustUser(t, s, "alice")
+		if n, err := s.CountEntries(ctx, again.ID); err != nil || n != 0 {
+			t.Errorf("entries of a new user with the name = %d, %v; want 0", n, err)
+		}
+		if feeds, err := s.Feeds(ctx, again.ID); err != nil || len(feeds) != 0 {
+			t.Errorf("feeds of a new user with the name = %d, %v; want 0", len(feeds), err)
+		}
+		if tags, err := s.Tags(ctx, again.ID); err != nil || len(tags) != 0 {
+			t.Errorf("labels of a new user with the name = %d, %v; want 0", len(tags), err)
+		}
+
+		if n, err := s.CountEntries(ctx, bob); err != nil || n != 7 {
+			t.Errorf("entries of the other user = %d, %v; want 7", n, err)
+		}
+		if feeds, err := s.Feeds(ctx, bob); err != nil || len(feeds) != 4 {
+			t.Errorf("feeds of the other user = %d, %v; want 4", len(feeds), err)
+		}
+		if labels, err := s.EntryLabels(ctx, bob, []int64{e2, e3}); err != nil || len(labels) != 2 {
+			t.Errorf("labels of the other user = %v, %v; want those of two entries", labels, err)
+		}
+	})
+}
+
+func TestSetAPIPasswordHash(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		alice, bob := mustUser(t, s, "alice"), mustUser(t, s, "bob")
+		if err := s.SetAPIPasswordHash(ctx, alice.ID, "$2a$10$hash"); err != nil {
+			t.Fatalf("SetAPIPasswordHash: %v", err)
+		}
+		if got, err := s.UserByName(ctx, "alice"); err != nil || got.APIPasswordHash != "$2a$10$hash" {
+			t.Errorf("alice = %+v, %v; want the new hash", got, err)
+		}
+		if got, err := s.UserByName(ctx, "bob"); err != nil || got.APIPasswordHash != "" {
+			t.Errorf("bob = %+v, %v; want no hash", got, err)
+		}
+		if err := s.SetAPIPasswordHash(ctx, bob.ID+100, "x"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("SetAPIPasswordHash(unknown user) error = %v, want ErrNotFound", err)
+		}
+	})
+}
+
+func TestValidUserName(t *testing.T) {
+	for name, want := range map[string]bool{
+		"alice": true, "a": true, "_x": true, "a.b@c-d": true, strings.Repeat("a", 39): true,
+		"": false, "_": false, ".a": false, "a/b": false, "a b": false, "алиса": false, strings.Repeat("a", 40): false,
+	} {
+		if got := ValidUserName(name); got != want {
+			t.Errorf("ValidUserName(%q) = %v, want %v", name, got, want)
+		}
+	}
 }

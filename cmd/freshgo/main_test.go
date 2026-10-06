@@ -10,8 +10,15 @@ import (
 
 func runCLI(t *testing.T, args ...string) (code int, stdout, stderr string) {
 	t.Helper()
+	return runCLIInput(t, "", args...)
+}
+
+// runCLIInput runs a command with input on its standard input.
+func runCLIInput(t *testing.T, input string, args ...string) (code int, stdout, stderr string) {
+	t.Helper()
 	var out, errOut bytes.Buffer
-	code = run(context.Background(), env{stdout: &out, stderr: &errOut, getenv: func(string) string { return "" }}, args)
+	e := env{stdin: strings.NewReader(input), stdout: &out, stderr: &errOut, getenv: func(string) string { return "" }}
+	code = run(context.Background(), e, args)
 	return code, out.String(), errOut.String()
 }
 

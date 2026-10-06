@@ -16,7 +16,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -348,9 +347,6 @@ func encode(w io.Writer, v any) error {
 	return enc.Encode(v)
 }
 
-// usernamePattern is FreshRSS_user_Controller::USERNAME_PATTERN.
-var usernamePattern = regexp.MustCompile(`^([0-9a-zA-Z_][0-9a-zA-Z_.@\-]{1,38}|[0-9a-zA-Z])$`)
-
 // credentials returns the value of "GoogleLogin auth=" in the Authorization
 // header, read the way PHP reads a query string, or "".
 func credentials(r *http.Request) string {
@@ -381,7 +377,7 @@ func (h *Handler) authenticate(ctx context.Context, r *http.Request) (user *stor
 	if !ok {
 		return nil, 0, nil
 	}
-	if !usernamePattern.MatchString(name) {
+	if !store.ValidUserName(name) {
 		return nil, http.StatusBadRequest, nil
 	}
 	user, err = h.db.UserByName(ctx, name)
@@ -443,7 +439,7 @@ func (h *Handler) validToken(want, sent string) bool {
 
 func (h *Handler) clientLogin(ctx context.Context, q *request) {
 	name, password := q.either("Email"), q.either("Passwd")
-	if !usernamePattern.MatchString(name) {
+	if !store.ValidUserName(name) {
 		badRequest(q.w)
 		return
 	}

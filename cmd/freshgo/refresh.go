@@ -67,7 +67,7 @@ func runRefresh(ctx context.Context, e env, args []string) (err error) {
 	fs, conf := newFlagSet(e, "refresh")
 	var opts refresh.Options
 	fs.BoolVar(&opts.Force, "force", false, "also refresh the feeds whose refresh period has not passed yet")
-	db, err := openStore(ctx, fs, conf, args)
+	db, err := openStore(ctx, fs, conf, args, 0)
 	if err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func runRefresh(ctx context.Context, e env, args []string) (err error) {
 // waiting for the feeds to be refreshed.
 func runPurge(ctx context.Context, e env, args []string) (err error) {
 	fs, conf := newFlagSet(e, "purge")
-	db, err := openStore(ctx, fs, conf, args)
+	db, err := openStore(ctx, fs, conf, args, 0)
 	if err != nil {
 		return err
 	}

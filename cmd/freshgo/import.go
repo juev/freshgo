@@ -18,13 +18,15 @@ func newFlagSet(e env, name string) (*flag.FlagSet, *config.Config) {
 	return fs, config.Bind(fs, e.getenv)
 }
 
-// openStore parses the flags of a subcommand and opens the database they name.
-func openStore(ctx context.Context, fs *flag.FlagSet, conf *config.Config, args []string) (*store.Store, error) {
+// openStore parses the flags of a subcommand and opens the database they
+// name. operands is how many arguments the subcommand takes after its flags;
+// they are left in fs.Args.
+func openStore(ctx context.Context, fs *flag.FlagSet, conf *config.Config, args []string, operands int) (*store.Store, error) {
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
-	if fs.NArg() > 0 {
-		return nil, fmt.Errorf("unexpected argument %q", fs.Arg(0))
+	if fs.NArg() > operands {
+		return nil, fmt.Errorf("unexpected argument %q", fs.Arg(operands))
 	}
 	if err := conf.Validate(); err != nil {
 		return nil, err
@@ -42,7 +44,7 @@ func runImport(ctx context.Context, e env, args []string) (err error) {
 	fs.StringVar(&opts.DataDir, "data", "", "FreshRSS data directory, the one with config.php and users/ (required)")
 	fs.StringVar(&opts.SourceDatabaseURL, "source-database-url", "",
 		"PostgreSQL URL of the FreshRSS database, when it differs from what its config.php says")
-	db, err := openStore(ctx, fs, conf, args)
+	db, err := openStore(ctx, fs, conf, args, 0)
 	if err != nil {
 		return err
 	}

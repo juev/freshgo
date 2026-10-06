@@ -49,8 +49,6 @@ var kindTypes = map[int]string{
 // Values of frss:priority; the main stream is the default and is not written.
 var priorityNames = map[int]string{20: "important", 0: "category", -5: "feed", -10: "hidden"}
 
-const priorityMain = 10
-
 // scrapeFields are the settings of scraped feeds: the key in the attributes
 // of the feed, which is also the end of the attribute name after frss:xPath
 // or frss:json, with the first letter in upper case.
@@ -433,7 +431,7 @@ func feedOf(n *node, userID, categoryID int64) (*store.Feed, error) {
 		Name:        cmp.Or(n.attrs["text"], n.attrs["title"]),
 		Website:     n.attrs["htmlUrl"],
 		Description: n.attrs["description"],
-		Priority:    priorityMain,
+		Priority:    store.PriorityMain,
 		PathEntries: n.attrs["frss:cssFullContent"],
 	}
 	kind := strings.ToLower(n.attrs["type"])

@@ -1,6 +1,6 @@
 # Storage
 
-Status: implemented for users, categories, feeds, entries, labels, installation-wide settings and feed icons and WebSub subscriptions.
+Status: implemented for users, categories, feeds, entries, labels, installation-wide settings, feed icons and WebSub subscriptions.
 Sources: user request of 2026-10-06 and the decisions recorded in `plan.md`; FreshRSS schema in `app/SQL/install.sql.sqlite.php` and `app/SQL/install.sql.pgsql.php` at commit `219eaf58` for the data that import has to carry over.
 
 ## Purpose and scope
@@ -27,6 +27,8 @@ Out of scope: MySQL/MariaDB, going back to FreshRSS with a freshgo database, sea
 - S10. Behaviour is the same on SQLite and PostgreSQL.
 - S11. Installation-wide values (`settings`: the token salt, the extra force-https domains) are read and replaced by name; an unset name is `ErrNotFound`.
 - S12. A feed can have one custom icon, replaced on the next write and removed with the feed. It is stored with the hash it is served by and the time it was set, and is read by that hash; an empty hash matches nothing.
+- S27. A user name is what FreshRSS accepts (`ValidUserName`): up to 39 characters of `0-9 a-z A-Z _ . @ -`, not starting with `.`, `@` or `-`, a lone `_` excluded. API tokens start with the name. The store does not enforce it: callers that take a name from outside check it.
+- S28. `SetAPIPasswordHash` replaces the API password hash of a user, `DeleteUser` removes a user with their categories, feeds, entries, labels, label links, custom icons and identifier counters; both give `ErrNotFound` for an unknown user. Other users are untouched, and a new user of the same name starts empty.
 - S14. A feed keeps the HTTP validators of its last fetched copy (`http_etag`, `http_last_modified`). A negative `ttl` is a muted feed whose period is the absolute value.
 - S15. A feed and an entry can be replaced as a whole, except their identifiers and, for an entry, its feed and guid; a missing row is `ErrNotFound`. `LockFeed` inside a transaction makes other transactions that lock or update the same feed wait until it ends.
 - S16. The state of entries (identifier, hash, read, starred, time of the user's last change) is read by guid for a feed, and `last_seen` is set by guid or for all entries seen since a given time; both work for any number of guids.
@@ -98,6 +100,7 @@ In `internal/store`, each run on SQLite and, under `make test-integration`, on P
 - S14, S15: `TestFeedRoundTrip`, `TestUpdateFeed`, `TestUpdateEntry`, `TestLockFeedSerializes`. S16: `TestEntryStatesAndLastSeen`.
 - S17: `TestCleanupTouchesOneFeed`; the rules are compared with FreshRSS by `TestPurgeMatchesFreshRSS` in `internal/refresh`. S18: `TestAutoReadStatements`.
 - S26: `TestWebSubSubscriptions`.
+- S27: `TestValidUserName`. S28: `TestSetAPIPasswordHash`, `TestDeleteUser`; from the command line to an API client, `TestUsersFromTheCommandLine` in `cmd/freshgo`.
 - S11: `TestSettings`. S12: `TestCustomIcon`. S24: `TestIcons`. S25: `TestSalt`. S13: counters raised to 5 and 9 → next category 6, next feed 10; lowering has no effect. `TestRaiseCounters`.
 - Field fidelity: every column of a feed, category, entry and label survives a write and a read, including non-ASCII text, markup characters and a NULL hash. `TestFeedRoundTrip`, `TestEntryRoundTrip`, `TestTags`.
 - I1: a second import → `ErrNotEmpty`, content unchanged. `TestImportRefusesNonEmptyDatabase`; `TestImport` in `cmd/freshgo`.

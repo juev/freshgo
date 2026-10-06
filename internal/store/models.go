@@ -9,6 +9,11 @@ const DefaultCategoryID = 1
 // DefaultCategoryName is the name the default category gets on creation.
 const DefaultCategoryName = "Uncategorized"
 
+// PriorityMain is the Feed.Priority of a feed shown in the main stream, which
+// is what a subscription starts with. The zero value shows a feed in its
+// category only.
+const PriorityMain = 10
+
 // Times are Unix seconds, zero means "never" or "unknown".
 // Attributes and Settings are JSON objects; nil is stored as {}.
 

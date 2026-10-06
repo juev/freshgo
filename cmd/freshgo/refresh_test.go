@@ -110,36 +110,56 @@ func (s *syncBuffer) String() string {
 	return s.b.String()
 }
 
-// serve refreshes the feeds and answers API clients until it is stopped.
-func TestServe(t *testing.T) {
-	database, host, hits := subscribed(t)
-
+// serving runs "freshgo serve" with the arguments on a port of its own until
+// the test ends, waits until its log shows what ready looks for and returns
+// the address it listens on.
+func serving(t *testing.T, ready string, args ...string) (address string) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 	var stderr syncBuffer
 	done := make(chan int, 1)
 	go func() {
-		done <- run(ctx, env{stdout: io.Discard, stderr: &stderr, getenv: func(string) string { return "" }},
-			[]string{"serve", "-database-url", database, "-fetch-allowlist", host, "-refresh-interval", "10ms",
-				"-listen", "127.0.0.1:0"})
+		e := env{stdin: strings.NewReader(""), stdout: io.Discard, stderr: &stderr, getenv: func(string) string { return "" }}
+		done <- run(ctx, e, append([]string{"serve", "-listen", "127.0.0.1:0"}, args...))
 	}()
-
-	deadline := time.After(10 * time.Second)
-	for hits.Load() == 0 || !strings.Contains(stderr.String(), "new=2") {
+	t.Cleanup(func() {
+		cancel()
 		select {
 		case code := <-done:
-			t.Fatalf("serve exited with code %d: %s", code, stderr.String())
+			if code != 0 {
+				t.Errorf("serve exited with code %d after the stop signal: %s", code, stderr.String())
+			}
+		case <-time.After(10 * time.Second):
+			t.Error("serve did not stop")
+		}
+	})
+
+	listening := regexp.MustCompile(`msg=listening address=(\S+)`)
+	deadline := time.After(10 * time.Second)
+	for {
+		log := stderr.String()
+		if found := listening.FindStringSubmatch(log); found != nil && strings.Contains(log, ready) {
+			return found[1]
+		}
+		select {
+		case code := <-done:
+			done <- code
+			t.Fatalf("serve exited with code %d: %s", code, log)
 		case <-deadline:
-			t.Fatalf("serve did not refresh the feed in 10 s: %s", stderr.String())
+			t.Fatalf("serve did not get to %q in 10 s: %s", ready, log)
 		case <-time.After(5 * time.Millisecond):
 		}
 	}
+}
 
-	// The server answers on the address it reports.
-	address := regexp.MustCompile(`msg=listening address=(\S+)`).FindStringSubmatch(stderr.String())
-	if address == nil {
-		t.Fatalf("serve did not report its address: %s", stderr.String())
+// serve refreshes the feeds and answers API clients until it is stopped.
+func TestServe(t *testing.T) {
+	database, host, hits := subscribed(t)
+	address := serving(t, "new=2", "-database-url", database, "-fetch-allowlist", host, "-refresh-interval", "10ms")
+	if hits.Load() == 0 {
+		t.Error("serve logged new entries without asking for the feed")
 	}
+
 	for path, want := range map[string]struct {
 		status int
 		body   string
@@ -150,7 +170,7 @@ func TestServe(t *testing.T) {
 		"/favicon/0123456789abcdef":               {http.StatusOK, "<svg"},
 		"/":                                       {http.StatusNotFound, ""},
 	} {
-		resp, err := http.Get("http://" + address[1] + path)
+		resp, err := http.Get("http://" + address + path)
 		if err != nil {
 			t.Fatalf("GET %s: %v", path, err)
 		}
@@ -162,16 +182,6 @@ func TestServe(t *testing.T) {
 		if resp.StatusCode != want.status || !strings.HasPrefix(string(body), want.body) {
 			t.Errorf("GET %s: status %d, body %q; want %d and a body starting with %q", path, resp.StatusCode, body, want.status, want.body)
 		}
-	}
-
-	cancel()
-	select {
-	case code := <-done:
-		if code != 0 {
-			t.Errorf("serve exited with code %d after the stop signal: %s", code, stderr.String())
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("serve did not stop")
 	}
 }
 

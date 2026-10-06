@@ -77,7 +77,7 @@ func routes(api, icons, misc, hubs http.Handler) http.Handler {
 // told to stop.
 func runServe(ctx context.Context, e env, args []string) (err error) {
 	fs, conf := newFlagSet(e, "serve")
-	db, err := openStore(ctx, fs, conf, args)
+	db, err := openStore(ctx, fs, conf, args, 0)
 	if err != nil {
 		return err
 	}
