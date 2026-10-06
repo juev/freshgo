@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/storetest"
 )
@@ -383,10 +384,15 @@ func checkAlice(t *testing.T, dst *store.Store, alice *store.User) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if icon, err := dst.CustomIcon(ctx, alice.ID, rss.ID); err != nil || !bytes.Equal(icon, wantIcon) {
-		t.Errorf("custom icon of feed 2: %d bytes, err %v; want the %d bytes of custom-icon.png", len(icon), err, len(wantIcon))
+	salt, err := dst.Setting(ctx, store.SettingSalt)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := dst.CustomIcon(ctx, alice.ID, feeds[0].ID); !errors.Is(err, store.ErrNotFound) {
+	icon, err := dst.CustomIconByHash(ctx, favicon.CustomHash(salt, alice.ID, rss.ID))
+	if err != nil || !bytes.Equal(icon.Content, wantIcon) || icon.Modified == 0 {
+		t.Errorf("custom icon of feed 2: %+v, err %v; want the %d bytes of custom-icon.png and the time of the file", icon, err, len(wantIcon))
+	}
+	if _, err := dst.CustomIconByHash(ctx, favicon.CustomHash(salt, alice.ID, feeds[0].ID)); !errors.Is(err, store.ErrNotFound) {
 		t.Errorf("custom icon of feed 1: err %v, want ErrNotFound: icons fetched from sites are not imported", err)
 	}
 
@@ -811,4 +817,55 @@ func TestImportUntitledEntry(t *testing.T) {
 			t.Errorf("titled entry: title %q", last.Title)
 		}
 	})
+}
+
+// FreshRSS shows the default category, and names it to API clients, in the
+// language of the user whatever name is stored; the import stores that name.
+func TestImportNamesDefaultCategoryInTheLanguageOfTheUser(t *testing.T) {
+	ctx := context.Background()
+	dir := brokenCopy(t)
+	for user, language := range map[string]string{"alice": "ru", "bob": "fr"} {
+		file := filepath.Join(dir, "users", user, "config.php")
+		conf, err := os.ReadFile(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		changed := bytes.Replace(conf, []byte(`'language' => 'en'`), []byte(`'language' => '`+language+`'`), 1)
+		if bytes.Equal(changed, conf) {
+			t.Fatalf("%s: no language to replace", file)
+		}
+		if err := os.WriteFile(file, changed, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// bob already has a category called the way French names the default one.
+	sourceExec(t, dir, "bob", `UPDATE category SET name = 'Sans catégorie' WHERE id = 2`)
+
+	driver, dsn := storetest.Engines()[0].New(t)
+	dst, err := store.Open(ctx, driver, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dst.Close() })
+	report, err := Run(ctx, dst, Options{DataDir: dir})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	for user, want := range map[string]string{"alice": "Без категории", "bob": "Uncategorized"} {
+		u, err := dst.UserByName(ctx, user)
+		if err != nil {
+			t.Fatal(err)
+		}
+		categories, err := dst.Categories(ctx, u.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if categories[0].ID != store.DefaultCategoryID || categories[0].Name != want {
+			t.Errorf("default category of %s = %s, want the name %q", user, dump(categories[0]), want)
+		}
+	}
+	want := `user bob: the default category keeps the name "Uncategorized": another category is called "Sans catégorie"`
+	if len(report.Warnings) != 1 || !strings.HasPrefix(report.Warnings[0], want) {
+		t.Errorf("warnings = %q, want one starting with %q", report.Warnings, want)
+	}
 }

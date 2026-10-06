@@ -11,6 +11,7 @@ What a real FreshRSS produces from a fixed set of feeds. Tests compare freshgo a
 | `sqlite/data/` | Data directory of the FreshRSS that ran on SQLite. |
 | `pgsql/data/`, `pgsql/dump.sql` | Data directory and database dump of the FreshRSS that ran on PostgreSQL. |
 | `oracle/` | What FreshRSS code makes of single inputs, without an installation: see below. |
+| `api/` | Requests to the Google Reader API and what the FreshRSS of `sqlite/` answered to them: see below. |
 
 `sqlite/` and `pgsql/` are generated and committed, so tests need no Docker to read them.
 
@@ -24,6 +25,18 @@ testdata/reference/generate.sh sqlite   # one of them
 Needs Docker and Go. The script starts `freshrss/freshrss:1.30.1`, a web server with the corpus and, for `pgsql`, PostgreSQL; installs FreshRSS, creates alice and bob, imports their OPML, refreshes the feeds, runs the scenario and copies the result out.
 
 Entry identifiers, salts and password hashes change on every run. Tests therefore read expected values from the generated files or find entries by title; after regenerating, only counts written into tests (`internal/importer/importer_test.go`, `cmd/freshgo/main_test.go`) need a look, and only if the corpus or the scenario changed.
+
+## The API answers
+
+`api/cases.json` is a list of requests, run in order against one installation: a case sees what the cases before it have changed. `api/responses.json` holds status and body of every answer of FreshRSS. `TestReferenceAPI` in `internal/greader` imports `sqlite/data` into freshgo, sends the same requests and compares.
+
+```sh
+testdata/reference/api/generate.sh
+```
+
+starts the FreshRSS image on a copy of `sqlite/data`, with the corpus served next to it, and runs the same test in recording mode (`FRESHGO_RECORD_API`), which rewrites `responses.json`. Needs Docker and Go. Run it after changing `cases.json`, and after regenerating `sqlite/`, because the answers carry the identifiers and tokens of that installation.
+
+A case names entries and feeds by title through placeholders (`{id:Plain entry}`, `{feed:RSS corpus}`, the full list is at `expand` in `internal/greader/reference_test.go`), so `cases.json` itself does not depend on the identifiers. `ignore` lists the JSON keys, or OPML attributes, a case leaves out of the comparison: identifiers and times of entries fetched during the run differ between two installations by design.
 
 ## The oracle
 

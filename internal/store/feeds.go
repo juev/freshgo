@@ -107,3 +107,15 @@ func scanFeed(userID int64, sc scanner) (*Feed, error) {
 	f.Attributes = []byte(attributes)
 	return f, nil
 }
+
+// DeleteFeed removes a feed with its entries and its custom icon.
+func (s *Store) DeleteFeed(ctx context.Context, userID, id int64) error {
+	n, err := s.affected(ctx, `DELETE FROM feeds WHERE user_id = ? AND id = ?`, userID, id)
+	if err != nil {
+		return fmt.Errorf("store: delete feed %d: %w", id, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("store: delete feed %d: %w", id, ErrNotFound)
+	}
+	return nil
+}

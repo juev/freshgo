@@ -59,9 +59,30 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 	}
 
 	if resp.NotModified {
-		return result{}, r.storeUnchanged(ctx, j, f, resp, now)
+		err := r.storeUnchanged(ctx, j, f, resp, now)
+		r.refreshIcon(ctx, f, err)
+		return result{}, err
 	}
+	res, err := r.storeFetched(ctx, j, f, params, resp, now)
+	r.refreshIcon(ctx, f, err)
+	return res, err
+}
 
+// refreshIcon looks after the icon of a feed whose refresh ended with err.
+func (r *Refresher) refreshIcon(ctx context.Context, f *store.Feed, err error) {
+	if r.Icons == nil || err != nil {
+		return
+	}
+	// The refresh may have learnt the site of the feed, where the icon is.
+	if fresh, err := r.db.FeedByID(ctx, f.UserID, f.ID); err == nil {
+		r.Icons.Refresh(ctx, fresh)
+	}
+}
+
+// storeFetched reads the document a feed answered with and stores what it
+// brought. An error means the feed is now marked as failing, unless the
+// context was cancelled.
+func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, params fetch.Params, resp *fetch.Response, now int64) (result, error) {
 	doc, err := parse(j, f, resp)
 	if err != nil {
 		return result{}, r.fail(ctx, j, f, now, err)

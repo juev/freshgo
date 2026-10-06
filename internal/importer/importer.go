@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
 )
@@ -217,6 +218,8 @@ type userImport struct {
 
 	user  *store.User
 	stats UserReport
+	// language is the language of the user's interface.
+	language string
 	// queries are the saved searches of the user, which filters may refer to.
 	queries []search.SavedQuery
 }
@@ -245,6 +248,7 @@ func (u *userImport) createUser() error {
 	if err != nil {
 		return err
 	}
+	u.language, _ = conf["language"].(string)
 	hash, _ := conf["apiPasswordHash"].(string)
 	if hash == "" {
 		u.warnf("no API password is set; API clients cannot log in until one is")
@@ -289,12 +293,28 @@ func (u *userImport) checkAttributeFilters(attributes json.RawMessage, owner str
 	}
 }
 
+// defaultCategoryNames is what FreshRSS calls the default category in each
+// language of its interface (gen.short.default_category).
+var defaultCategoryNames = map[string]string{
+	"az": "Kateqoriyasız", "be": "Без катэгорыі", "cs": "Nezařazeno", "de": "Unkategorisiert",
+	"el": "Μη κατηγοριοποιημένα", "en": "Uncategorized", "en-US": "Uncategorized", "es": "Sin categorizar",
+	"fa": "دسته\u200cبندی\u200cنشده", "fi": "Luokittelematon", "fr": "Sans catégorie", "he": "ללא קטגוריה",
+	"hu": "Kategória nélküli", "id": "Tidak ada kategori", "it": "Senza categoria", "ja": "未分類",
+	"ko": "분류 없음", "lt": "Be kategorijos", "lv": "Neklasificēts", "nl": "Niet ingedeeld", "oc": "Pas triat",
+	"pl": "Brak kategorii", "pt-BR": "Sem categoria", "pt-PT": "Sem categoria", "ru": "Без категории",
+	"sk": "Bez kategórie", "tr": "Kategorisiz", "uk": "Без категорії", "zh-CN": "未分类", "zh-TW": "未分類",
+}
+
 func (u *userImport) categories() error {
 	rows, err := u.src.query(u.ctx, `SELECT "id", "name", "kind", "lastUpdate", "error", "attributes" FROM `+u.src.table("category")+` ORDER BY "id"`)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = rows.Close() }()
+	var (
+		categories []*store.Category
+		names      = map[string]bool{}
+	)
 	for rows.Next() {
 		var (
 			c                        = &store.Category{UserID: u.user.ID}
@@ -308,8 +328,28 @@ func (u *userImport) categories() error {
 		c.Kind, c.LastUpdate, c.Error = int(kind.Int64), lastUpdate.Int64, failed.Int64
 		c.Attributes = u.attributes(attributes.String, "category %d", c.ID)
 		u.checkAttributeFilters(c.Attributes, fmt.Sprintf("category %d", c.ID))
+		categories = append(categories, c)
+		if c.ID != store.DefaultCategoryID {
+			names[c.Name] = true
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	for _, c := range categories {
 		// The default category was created together with the user.
 		if c.ID == store.DefaultCategoryID {
+			// FreshRSS shows it, and names it to API clients, in the language
+			// of the user, whatever name is stored.
+			shown, known := defaultCategoryNames[u.language]
+			if !known {
+				shown = store.DefaultCategoryName
+			}
+			if names[shown] {
+				u.warnf("the default category keeps the name %q: another category is called %q, as FreshRSS shows the default one", c.Name, shown)
+			} else {
+				c.Name = shown
+			}
 			err = u.dst.UpdateCategory(u.ctx, c)
 		} else {
 			err = u.dst.CreateCategory(u.ctx, c)
@@ -319,7 +359,7 @@ func (u *userImport) categories() error {
 		}
 		u.stats.Categories++
 	}
-	return rows.Err()
+	return nil
 }
 
 func (u *userImport) feeds() error {
@@ -401,7 +441,14 @@ func (u *userImport) feedExtras(f *store.Feed) error {
 	if err != nil {
 		return err
 	}
-	if err := u.dst.SetCustomIcon(u.ctx, u.user.ID, f.ID, content); err != nil {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	icon := store.CustomIcon{
+		Hash: favicon.CustomHash(u.salt, u.user.ID, f.ID), Content: content, Modified: info.ModTime().Unix(),
+	}
+	if err := u.dst.SetCustomIcon(u.ctx, u.user.ID, f.ID, icon); err != nil {
 		return err
 	}
 	u.stats.CustomIcons++

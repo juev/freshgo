@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/feed"
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/hooks"
@@ -35,6 +36,9 @@ type Refresher struct {
 	hooks  *hooks.Registry
 	log    *slog.Logger
 	now    func() time.Time
+
+	// Icons, when set, keeps the icons of refreshed feeds up to date.
+	Icons *favicon.Service
 
 	// running keeps one run at a time: a second one would find the same
 	// feeds due and fetch them again.
@@ -89,12 +93,8 @@ func (r *Refresher) Run(ctx context.Context, o Options) ([]Stats, error) {
 			continue
 		}
 		r.hooks.UserMaintenance.Call(ctx, u)
-		categories, err := r.categories(ctx, u.ID)
+		j, err := r.newJob(ctx, u, conf, https)
 		if err != nil {
-			return all, fmt.Errorf("refresh: user %s: %w", u.Name, err)
-		}
-		j := &job{user: u, conf: conf, https: https, categories: categories}
-		if err := r.loadRules(ctx, j); err != nil {
 			return all, fmt.Errorf("refresh: user %s: %w", u.Name, err)
 		}
 		st, err := r.refreshUser(ctx, j, o)
@@ -146,6 +146,19 @@ type job struct {
 	search search.Options
 	rules  []search.Rule
 	labels []labelRules
+}
+
+// newJob reads what the feeds of the user have in common.
+func (r *Refresher) newJob(ctx context.Context, u *store.User, conf userSettings, https *feed.HTTPSDomains) (*job, error) {
+	categories, err := r.categories(ctx, u.ID)
+	if err != nil {
+		return nil, err
+	}
+	j := &job{user: u, conf: conf, https: https, categories: categories}
+	if err := r.loadRules(ctx, j); err != nil {
+		return nil, err
+	}
+	return j, nil
 }
 
 func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options) (Stats, error) {

@@ -1,0 +1,1653 @@
+[
+	{
+		"name": "root",
+		"path": "",
+		"aliasOnly": true
+	},
+	{
+		"name": "options",
+		"method": "OPTIONS",
+		"path": "/reader/api/0/token"
+	},
+	{
+		"name": "short path",
+		"path": "/reader"
+	},
+	{
+		"name": "unknown endpoint",
+		"path": "/reader/api/0/nothing"
+	},
+	{
+		"name": "unknown top",
+		"path": "/elsewhere/api/0/token"
+	},
+	{
+		"name": "compatibility",
+		"path": "/check/compatibility"
+	},
+	{
+		"name": "compatibility without header",
+		"path": "/check/compatibility",
+		"auth": "none"
+	},
+	{
+		"name": "login",
+		"method": "POST",
+		"path": "/accounts/ClientLogin",
+		"body": "Email=alice&Passwd=alice-api-password"
+	},
+	{
+		"name": "login by GET",
+		"path": "/accounts/ClientLogin",
+		"query": "Email=alice&Passwd=alice-api-password"
+	},
+	{
+		"name": "login wrong password",
+		"method": "POST",
+		"path": "/accounts/ClientLogin",
+		"body": "Email=alice&Passwd=wrong"
+	},
+	{
+		"name": "login unknown user",
+		"method": "POST",
+		"path": "/accounts/ClientLogin",
+		"body": "Email=carol&Passwd=x"
+	},
+	{
+		"name": "login bad user name",
+		"method": "POST",
+		"path": "/accounts/ClientLogin",
+		"body": "Email=a%2Fb&Passwd=x"
+	},
+	{
+		"name": "login without password",
+		"method": "POST",
+		"path": "/accounts/ClientLogin",
+		"body": "Email=alice"
+	},
+	{
+		"name": "accounts other",
+		"path": "/accounts/Logout"
+	},
+	{
+		"name": "token",
+		"path": "/reader/api/0/token"
+	},
+	{
+		"name": "token of bob",
+		"user": "bob",
+		"path": "/reader/api/0/token"
+	},
+	{
+		"name": "no authorization",
+		"path": "/reader/api/0/token",
+		"auth": "none"
+	},
+	{
+		"name": "wrong authorization",
+		"path": "/reader/api/0/token",
+		"auth": "bad"
+	},
+	{
+		"name": "unknown user in authorization",
+		"path": "/reader/api/0/token",
+		"auth": "raw:GoogleLogin auth=carol/abc"
+	},
+	{
+		"name": "bad user name in authorization",
+		"path": "/reader/api/0/token",
+		"auth": "raw:GoogleLogin auth=a b/abc"
+	},
+	{
+		"name": "authorization without slash",
+		"path": "/reader/api/0/token",
+		"auth": "raw:GoogleLogin auth=alice"
+	},
+	{
+		"name": "other authorization scheme",
+		"path": "/reader/api/0/token",
+		"auth": "raw:Bearer abc"
+	},
+	{
+		"name": "user info",
+		"path": "/reader/api/0/user-info"
+	},
+	{
+		"name": "tag list",
+		"path": "/reader/api/0/tag/list",
+		"query": "output=json"
+	},
+	{
+		"name": "tag list without output",
+		"path": "/reader/api/0/tag/list"
+	},
+	{
+		"name": "tag list as xml",
+		"path": "/reader/api/0/tag/list",
+		"query": "output=xml"
+	},
+	{
+		"name": "tag other",
+		"path": "/reader/api/0/tag/other",
+		"query": "output=json"
+	},
+	{
+		"name": "subscription list",
+		"path": "/reader/api/0/subscription/list",
+		"query": "output=json"
+	},
+	{
+		"name": "subscription list without output",
+		"path": "/reader/api/0/subscription/list"
+	},
+	{
+		"name": "unread count",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json"
+	},
+	{
+		"name": "unread count without output",
+		"path": "/reader/api/0/unread-count"
+	},
+	{
+		"name": "tag list of bob",
+		"user": "bob",
+		"path": "/reader/api/0/tag/list",
+		"query": "output=json"
+	},
+	{
+		"name": "subscription list of bob",
+		"user": "bob",
+		"path": "/reader/api/0/subscription/list",
+		"query": "output=json"
+	},
+	{
+		"name": "unread count of bob",
+		"user": "bob",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json"
+	},
+	{
+		"name": "reading list",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000"
+	},
+	{
+		"name": "reading list first page",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=5"
+	},
+	{
+		"name": "reading list second page",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=5&c={cont:reading list first page}"
+	},
+	{
+		"name": "reading list third page",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=5&c={cont:reading list second page}"
+	},
+	{
+		"name": "reading list default size",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list"
+	},
+	{
+		"name": "reading list oldest first",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=4&r=o"
+	},
+	{
+		"name": "reading list oldest first second page",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=4&r=o&c={cont:reading list oldest first}"
+	},
+	{
+		"name": "reading list exact size",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=18"
+	},
+	{
+		"name": "reading list no limit",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=0"
+	},
+	{
+		"name": "reading list bad continuation",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=2&c=abc"
+	},
+	{
+		"name": "reading list continuation past the end",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=2&c=1"
+	},
+	{
+		"name": "starred",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/starred",
+		"query": "n=1000"
+	},
+	{
+		"name": "main stream",
+		"path": "/reader/api/0/stream/contents/user/-/state/org.freshrss/main",
+		"query": "n=1000"
+	},
+	{
+		"name": "important stream",
+		"path": "/reader/api/0/stream/contents/user/-/state/org.freshrss/important",
+		"query": "n=1000"
+	},
+	{
+		"name": "reading list under org.freshrss",
+		"path": "/reader/api/0/stream/contents/user/-/state/org.freshrss/reading-list",
+		"query": "n=3"
+	},
+	{
+		"name": "read state is no stream",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/read",
+		"query": "n=3"
+	},
+	{
+		"name": "state of another vendor",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.example/starred",
+		"query": "n=3"
+	},
+	{
+		"name": "state without name",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google"
+	},
+	{
+		"name": "feed by number",
+		"path": "/reader/api/0/stream/contents/feed/{feed:RSS corpus}",
+		"query": "n=1000"
+	},
+	{
+		"name": "feed outside the reading list",
+		"path": "/reader/api/0/stream/contents/feed/{feed:No identifiers}",
+		"query": "n=1000"
+	},
+	{
+		"name": "feed by address",
+		"path": "/reader/api/0/stream/contents/feed/http%3A%2F%2Ffeeds.freshgo.test%2Fatom.xml",
+		"query": "n=1000"
+	},
+	{
+		"name": "feed by address not encoded",
+		"path": "/reader/api/0/stream/contents/feed/http://feeds.freshgo.test/atom.xml",
+		"query": "n=1000"
+	},
+	{
+		"name": "feed by unknown address",
+		"path": "/reader/api/0/stream/contents/feed/http%3A%2F%2Ffeeds.freshgo.test%2Fnone.xml",
+		"query": "n=1000"
+	},
+	{
+		"name": "feed unknown number",
+		"path": "/reader/api/0/stream/contents/feed/999",
+		"query": "n=1000"
+	},
+	{
+		"name": "feed without name",
+		"path": "/reader/api/0/stream/contents/feed"
+	},
+	{
+		"name": "category",
+		"path": "/reader/api/0/stream/contents/user/-/label/Blogs",
+		"query": "n=1000"
+	},
+	{
+		"name": "category with an ampersand",
+		"path": "/reader/api/0/stream/contents/user/-/label/Scraped%20%26%20parsed",
+		"query": "n=1000"
+	},
+	{
+		"name": "default category",
+		"path": "/reader/api/0/stream/contents/user/-/label/Uncategorized",
+		"query": "n=1000"
+	},
+	{
+		"name": "label",
+		"path": "/reader/api/0/stream/contents/user/-/label/later",
+		"query": "n=1000"
+	},
+	{
+		"name": "label with an ampersand",
+		"path": "/reader/api/0/stream/contents/user/-/label/work%20%26%20play",
+		"query": "n=1000"
+	},
+	{
+		"name": "unknown label",
+		"path": "/reader/api/0/stream/contents/user/-/label/nothing",
+		"query": "n=1000"
+	},
+	{
+		"name": "other stream",
+		"path": "/reader/api/0/stream/contents/pages/1",
+		"query": "n=3"
+	},
+	{
+		"name": "no stream",
+		"path": "/reader/api/0/stream/contents",
+		"query": "n=3"
+	},
+	{
+		"name": "stream in a parameter",
+		"path": "/reader/api/0/stream/contents",
+		"query": "n=3&s=user/-/state/com.google/starred"
+	},
+	{
+		"name": "feed in a parameter",
+		"path": "/reader/api/0/stream/contents",
+		"query": "n=3&s=feed/{feed:RSS corpus}"
+	},
+	{
+		"name": "label in a parameter",
+		"path": "/reader/api/0/stream/contents",
+		"query": "n=3&s=user/-/label/later"
+	},
+	{
+		"name": "exclude read",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&xt=user/-/state/com.google/read"
+	},
+	{
+		"name": "exclude unread",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&xt=user/-/state/com.google/unread"
+	},
+	{
+		"name": "exclude starred",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&xt=user/-/state/com.google/starred"
+	},
+	{
+		"name": "include unread",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&it=user/-/state/com.google/unread"
+	},
+	{
+		"name": "include read",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&it=user/-/state/com.google/read"
+	},
+	{
+		"name": "include starred",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&it=user/-/state/com.google/starred"
+	},
+	{
+		"name": "include starred exclude read",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&it=user/-/state/com.google/starred&xt=user/-/state/com.google/read"
+	},
+	{
+		"name": "include unread exclude read",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&it=user/-/state/com.google/unread&xt=user/-/state/com.google/read"
+	},
+	{
+		"name": "include read exclude read",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&it=user/-/state/com.google/read&xt=user/-/state/com.google/read"
+	},
+	{
+		"name": "starred exclude read",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/starred",
+		"query": "n=1000&xt=user/-/state/com.google/read"
+	},
+	{
+		"name": "category exclude read",
+		"path": "/reader/api/0/stream/contents/user/-/label/Blogs",
+		"query": "n=1000&xt=user/-/state/com.google/read"
+	},
+	{
+		"name": "since the second of the entries",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&ot={sec:Plain entry}"
+	},
+	{
+		"name": "since the second after",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&ot={sec+1:Plain entry}"
+	},
+	{
+		"name": "until the second of the entries",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&nt={sec:Plain entry}"
+	},
+	{
+		"name": "until the second after",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&nt={sec+1:Plain entry}"
+	},
+	{
+		"name": "until the second before",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&nt={sec-1:Plain entry}"
+	},
+	{
+		"name": "since after and until before",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&ot={sec+1:Plain entry}&nt={sec-1:Plain entry}"
+	},
+	{
+		"name": "since after and until after",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000&ot={sec+1:Plain entry}&nt={sec+1:Plain entry}"
+	},
+	{
+		"name": "stream of bob",
+		"user": "bob",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000"
+	},
+	{
+		"name": "ids of the reading list",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&n=1000"
+	},
+	{
+		"name": "ids first page",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&n=7"
+	},
+	{
+		"name": "ids second page",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&n=7&c={cont:ids first page}"
+	},
+	{
+		"name": "ids third page",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&n=7&c={cont:ids second page}"
+	},
+	{
+		"name": "ids default size",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list"
+	},
+	{
+		"name": "ids oldest first",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&n=3&r=o"
+	},
+	{
+		"name": "ids oldest first second page",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&n=3&r=o&c={cont:ids oldest first}"
+	},
+	{
+		"name": "ids no limit",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&n=0"
+	},
+	{
+		"name": "ids starred",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/starred&n=1000"
+	},
+	{
+		"name": "ids main",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/org.freshrss/main&n=1000"
+	},
+	{
+		"name": "ids important",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/org.freshrss/important&n=1000"
+	},
+	{
+		"name": "ids read",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "ids unread",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/unread&n=1000"
+	},
+	{
+		"name": "ids read exclude read",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/read&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "ids of a feed",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=feed/{feed:Atom corpus}&n=1000"
+	},
+	{
+		"name": "ids of a feed by address",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=feed/http://feeds.freshgo.test/rss.xml&n=1000"
+	},
+	{
+		"name": "ids of an unknown feed",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=feed/999&n=1000"
+	},
+	{
+		"name": "ids of an unknown feed for News+",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=feed/999&n=1000&client=newsplus"
+	},
+	{
+		"name": "ids of a category",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/label/Blogs&n=1000"
+	},
+	{
+		"name": "ids of a label",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/label/later&n=1000"
+	},
+	{
+		"name": "ids of an unknown label",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/label/nothing&n=1000"
+	},
+	{
+		"name": "ids of an unknown state",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/broadcast&n=1000"
+	},
+	{
+		"name": "ids of the label of the user by name",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/alice/label/later&n=1000"
+	},
+	{
+		"name": "ids unread only",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "ids starred unread",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/starred&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "ids since",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&ot={sec+1:Plain entry}&n=1000"
+	},
+	{
+		"name": "ids without stream",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "n=10"
+	},
+	{
+		"name": "ids of bob",
+		"user": "bob",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&n=1000"
+	},
+	{
+		"name": "items other",
+		"path": "/reader/api/0/stream/items/other",
+		"query": "s=user/-/state/com.google/reading-list"
+	},
+	{
+		"name": "stream other",
+		"path": "/reader/api/0/stream/other"
+	},
+	{
+		"name": "items in three forms",
+		"method": "POST",
+		"path": "/reader/api/0/stream/items/contents",
+		"body": "i={item:Plain entry}&i={id:Opaque guid}&i={hex:Permalink guid}"
+	},
+	{
+		"name": "items oldest first",
+		"method": "POST",
+		"path": "/reader/api/0/stream/items/contents",
+		"query": "r=o",
+		"body": "i={item:Plain entry}&i={id:Opaque guid}&i={hex:Permalink guid}"
+	},
+	{
+		"name": "items with an unknown one",
+		"method": "POST",
+		"path": "/reader/api/0/stream/items/contents",
+		"body": "i={id:First without guid}&i=12345&i=tag:google.com,2005:reader/item/00000000000000ff&i=zzz&i="
+	},
+	{
+		"name": "items twice the same",
+		"method": "POST",
+		"path": "/reader/api/0/stream/items/contents",
+		"body": "i={id:Plain entry}&i={item:Plain entry}"
+	},
+	{
+		"name": "items none",
+		"method": "POST",
+		"path": "/reader/api/0/stream/items/contents",
+		"body": "x=1"
+	},
+	{
+		"name": "items by GET",
+		"path": "/reader/api/0/stream/items/contents",
+		"query": "i={id:Plain entry}"
+	},
+	{
+		"name": "items of another user",
+		"user": "bob",
+		"method": "POST",
+		"path": "/reader/api/0/stream/items/contents",
+		"body": "i={id:Plain entry}"
+	},
+	{
+		"name": "mark read",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&a=user/-/state/com.google/read&i={item:Plain entry}&i={id:Opaque guid}"
+	},
+	{
+		"name": "unread after mark read",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "counts after mark read",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json"
+	},
+	{
+		"name": "mark read again",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&a=user/-/state/com.google/read&i={item:Plain entry}"
+	},
+	{
+		"name": "mark unread",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/-/state/com.google/read&i={hex:Plain entry}&i={id:Permalink guid}"
+	},
+	{
+		"name": "unread after mark unread",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "star",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&a=user/-/state/com.google/starred&i={id:First API post}"
+	},
+	{
+		"name": "unstar",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/-/state/com.google/starred&i={id:Plain entry}"
+	},
+	{
+		"name": "starred after star and unstar",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/starred&n=1000"
+	},
+	{
+		"name": "read and star at once",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&a=user/-/state/com.google/read&a=user/-/state/com.google/starred&i={id:Second API post}"
+	},
+	{
+		"name": "items after read and star",
+		"method": "POST",
+		"path": "/reader/api/0/stream/items/contents",
+		"body": "i={id:Second API post}"
+	},
+	{
+		"name": "add a new label",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&a=user/-/label/to%20do&i={id:First API post}&i={id:Second API post}"
+	},
+	{
+		"name": "add a label by user name",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&a=user/alice/label/mine&i={id:Plain entry}"
+	},
+	{
+		"name": "add a label of another user name",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&a=user/bob/label/theirs&i={id:Plain entry}"
+	},
+	{
+		"name": "add a label named like a category",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&a=user/-/label/Blogs&i={id:Plain entry}"
+	},
+	{
+		"name": "add a label to nothing",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&a=user/-/label/empty"
+	},
+	{
+		"name": "add a label to an unknown entry",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&a=user/-/label/later&i=12345"
+	},
+	{
+		"name": "add an existing label",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&a=user/-/label/later&i={id:Opaque guid}"
+	},
+	{
+		"name": "unsupported state",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&a=user/-/state/com.google/like&i={id:Opaque guid}"
+	},
+	{
+		"name": "tag list after labels",
+		"path": "/reader/api/0/tag/list",
+		"query": "output=json"
+	},
+	{
+		"name": "counts after labels",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json"
+	},
+	{
+		"name": "new label stream",
+		"path": "/reader/api/0/stream/contents/user/-/label/to%20do",
+		"query": "n=1000"
+	},
+	{
+		"name": "items after labels",
+		"method": "POST",
+		"path": "/reader/api/0/stream/items/contents",
+		"body": "i={id:Plain entry}&i={id:Opaque guid}"
+	},
+	{
+		"name": "remove a label",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/-/label/to%20do&i={id:First API post}"
+	},
+	{
+		"name": "remove a label by user name",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/alice/label/mine&i={id:Plain entry}"
+	},
+	{
+		"name": "remove an unknown label",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/-/label/nothing&i={id:Plain entry}"
+	},
+	{
+		"name": "items after removing labels",
+		"method": "POST",
+		"path": "/reader/api/0/stream/items/contents",
+		"body": "i={id:Plain entry}&i={id:First API post}&i={id:Second API post}"
+	},
+	{
+		"name": "edit without token",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "a=user/-/state/com.google/starred&i={id:First scraped article}"
+	},
+	{
+		"name": "edit with the token of Reeder",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T=x&a=user/-/state/com.google/read&i={id:First scraped article}"
+	},
+	{
+		"name": "edit with a wrong token",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T=wrong&a=user/-/state/com.google/starred&i={id:First XML record}"
+	},
+	{
+		"name": "edit by GET",
+		"path": "/reader/api/0/edit-tag",
+		"query": "a=user/-/state/com.google/starred&i={id:First XML record}"
+	},
+	{
+		"name": "edit nothing",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}"
+	},
+	{
+		"name": "edit an unknown entry",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&a=user/-/state/com.google/read&i=12345&i=zzz"
+	},
+	{
+		"name": "reading list after edits",
+		"path": "/reader/api/0/stream/contents/user/-/state/com.google/reading-list",
+		"query": "n=1000"
+	},
+	{
+		"name": "counts after edits",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json"
+	},
+	{
+		"name": "all unread",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/-/state/com.google/read&{all}"
+	},
+	{
+		"name": "unread after reset",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "mark a feed read up to an entry",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=feed/{feed:RSS corpus}&ts={id:Opaque guid}"
+	},
+	{
+		"name": "unread after a feed up to an entry",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "mark a feed read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=feed/{feed:RSS corpus}"
+	},
+	{
+		"name": "unread after a feed",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "mark a feed outside the reading list read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=feed/{feed:No identifiers}"
+	},
+	{
+		"name": "ids unread after the feed outside",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=feed/{feed:No identifiers}&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "all unread 2",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/-/state/com.google/read&{all}"
+	},
+	{
+		"name": "mark a category read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=user/-/label/Blogs"
+	},
+	{
+		"name": "unread after a category",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "counts after a category",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json"
+	},
+	{
+		"name": "all unread 3",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/-/state/com.google/read&{all}"
+	},
+	{
+		"name": "mark a label read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=user/-/label/later"
+	},
+	{
+		"name": "unread after a label",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "all unread 4",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/-/state/com.google/read&{all}"
+	},
+	{
+		"name": "mark starred read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=user/-/state/com.google/starred"
+	},
+	{
+		"name": "unread after starred",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "all unread 5",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/-/state/com.google/read&{all}"
+	},
+	{
+		"name": "mark the main stream read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=user/-/state/org.freshrss/main"
+	},
+	{
+		"name": "unread after main",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "ids unread after main, outside",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=feed/{feed:No identifiers}&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "all unread 6",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/-/state/com.google/read&{all}"
+	},
+	{
+		"name": "mark the important stream read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=user/-/state/org.freshrss/important"
+	},
+	{
+		"name": "unread after important",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "all unread 7",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/-/state/com.google/read&{all}"
+	},
+	{
+		"name": "mark read read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=user/-/state/com.google/read"
+	},
+	{
+		"name": "unread after read",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "mark the reading list read up to an entry",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=user/-/state/com.google/reading-list&ts={id:First JSON Feed item}"
+	},
+	{
+		"name": "unread after the reading list up to an entry",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "mark unread read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=user/-/state/com.google/unread"
+	},
+	{
+		"name": "unread after unread",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "ids unread after unread, outside",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=feed/{feed:No identifiers}&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "all unread 8",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/-/state/com.google/read&{all}"
+	},
+	{
+		"name": "mark the reading list read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=user/-/state/com.google/reading-list&ts=0"
+	},
+	{
+		"name": "unread after the reading list",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"
+	},
+	{
+		"name": "mark an unknown stream read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=user/-/state/com.google/broadcast"
+	},
+	{
+		"name": "mark an unknown label read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=user/-/label/nothing"
+	},
+	{
+		"name": "mark a feed by address read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=feed/http://feeds.freshgo.test/atom.xml"
+	},
+	{
+		"name": "mark an unknown feed read",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=feed/999"
+	},
+	{
+		"name": "mark with a bad time",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=user/-/state/com.google/reading-list&ts=abc"
+	},
+	{
+		"name": "mark with an empty time",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=user/-/state/com.google/reading-list&ts="
+	},
+	{
+		"name": "mark with a huge time",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}&s=feed/{feed:JSON Feed}&ts=99999999999999999999999"
+	},
+	{
+		"name": "mark without stream",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T={token}"
+	},
+	{
+		"name": "mark with a wrong token",
+		"method": "POST",
+		"path": "/reader/api/0/mark-all-as-read",
+		"body": "T=wrong&s=user/-/state/com.google/reading-list"
+	},
+	{
+		"name": "all unread 9",
+		"method": "POST",
+		"path": "/reader/api/0/edit-tag",
+		"body": "T={token}&r=user/-/state/com.google/read&{all}"
+	},
+	{
+		"name": "counts after marking",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json"
+	},
+	{
+		"name": "rename a label",
+		"method": "POST",
+		"path": "/reader/api/0/rename-tag",
+		"body": "T={token}&s=user/-/label/later&dest=user/-/label/read%20later"
+	},
+	{
+		"name": "rename a category",
+		"method": "POST",
+		"path": "/reader/api/0/rename-tag",
+		"body": "T={token}&s=user/-/label/Blogs&dest=user/-/label/Weblogs"
+	},
+	{
+		"name": "rename a label to the name of a category",
+		"method": "POST",
+		"path": "/reader/api/0/rename-tag",
+		"body": "T={token}&s=user/-/label/mine&dest=user/-/label/Weblogs"
+	},
+	{
+		"name": "rename a label to the name of a label",
+		"method": "POST",
+		"path": "/reader/api/0/rename-tag",
+		"body": "T={token}&s=user/-/label/mine&dest=user/-/label/read%20later"
+	},
+	{
+		"name": "rename a category to the name of a label",
+		"method": "POST",
+		"path": "/reader/api/0/rename-tag",
+		"body": "T={token}&s=user/-/label/Weblogs&dest=user/-/label/mine"
+	},
+	{
+		"name": "rename a category to the name of a category",
+		"method": "POST",
+		"path": "/reader/api/0/rename-tag",
+		"body": "T={token}&s=user/-/label/Weblogs&dest=user/-/label/Uncategorized"
+	},
+	{
+		"name": "rename an unknown label",
+		"method": "POST",
+		"path": "/reader/api/0/rename-tag",
+		"body": "T={token}&s=user/-/label/nothing&dest=user/-/label/something"
+	},
+	{
+		"name": "rename without prefix",
+		"method": "POST",
+		"path": "/reader/api/0/rename-tag",
+		"body": "T={token}&s=mine&dest=user/-/label/x"
+	},
+	{
+		"name": "rename without destination",
+		"method": "POST",
+		"path": "/reader/api/0/rename-tag",
+		"body": "T={token}&s=user/-/label/mine"
+	},
+	{
+		"name": "rename with a wrong token",
+		"method": "POST",
+		"path": "/reader/api/0/rename-tag",
+		"body": "T=wrong&s=user/-/label/mine&dest=user/-/label/x"
+	},
+	{
+		"name": "tag list after renames",
+		"path": "/reader/api/0/tag/list",
+		"query": "output=json"
+	},
+	{
+		"name": "subscription list after renames",
+		"path": "/reader/api/0/subscription/list",
+		"query": "output=json"
+	},
+	{
+		"name": "renamed label stream",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=user/-/label/read%20later&n=1000"
+	},
+	{
+		"name": "delete a label",
+		"method": "POST",
+		"path": "/reader/api/0/disable-tag",
+		"body": "T={token}&s=user/-/label/mine"
+	},
+	{
+		"name": "delete a category",
+		"method": "POST",
+		"path": "/reader/api/0/disable-tag",
+		"body": "T={token}&s=user/-/label/Weblogs"
+	},
+	{
+		"name": "delete the default category",
+		"method": "POST",
+		"path": "/reader/api/0/disable-tag",
+		"body": "T={token}&s=user/-/label/Uncategorized"
+	},
+	{
+		"name": "delete an unknown label",
+		"method": "POST",
+		"path": "/reader/api/0/disable-tag",
+		"body": "T={token}&s=user/-/label/nothing"
+	},
+	{
+		"name": "delete without prefix",
+		"method": "POST",
+		"path": "/reader/api/0/disable-tag",
+		"body": "T={token}&s=empty"
+	},
+	{
+		"name": "delete nothing",
+		"method": "POST",
+		"path": "/reader/api/0/disable-tag",
+		"body": "T={token}"
+	},
+	{
+		"name": "delete two labels",
+		"method": "POST",
+		"path": "/reader/api/0/disable-tag",
+		"body": "T={token}&s=user/-/label/empty&s=user/-/label/read%20later"
+	},
+	{
+		"name": "delete with a wrong token",
+		"method": "POST",
+		"path": "/reader/api/0/disable-tag",
+		"body": "T=wrong&s=user/-/label/read%20later"
+	},
+	{
+		"name": "tag list after deletions",
+		"path": "/reader/api/0/tag/list",
+		"query": "output=json"
+	},
+	{
+		"name": "subscription list after deletions",
+		"path": "/reader/api/0/subscription/list",
+		"query": "output=json"
+	},
+	{
+		"name": "counts after deletions",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json"
+	},
+	{
+		"name": "items after deletions",
+		"method": "POST",
+		"path": "/reader/api/0/stream/items/contents",
+		"body": "i={id:Plain entry}&i={id:Opaque guid}"
+	},
+	{
+		"name": "rename a feed",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=edit&s=feed/{feed:JSON API}&t=a%27b%22c%5Ed%3Fe%5Cf%2Fg%2Ch%3Bi%26j%3Ck%3El"
+	},
+	{
+		"name": "rename a feed by address",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=edit&s=feed/http://feeds.freshgo.test/data.xml&t=Catalog"
+	},
+	{
+		"name": "rename a feed by GET",
+		"path": "/reader/api/0/subscription/edit",
+		"query": "ac=edit&s=feed/{feed:JSON Feed}&t=JSON%20Feed%20renamed"
+	},
+	{
+		"name": "move a feed to a category",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=edit&s=feed/{feed:Atom corpus}&a=user/-/label/Scraped%20%26%20parsed"
+	},
+	{
+		"name": "move a feed to a new category",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=edit&s=feed/{feed:RSS corpus}&a=user/-/label/New%20%26%20shiny"
+	},
+	{
+		"name": "move a feed by user name",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=edit&s=feed/{feed:XML catalog}&a=user/alice/label/Mine%20too"
+	},
+	{
+		"name": "take a feed out of its category",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=edit&s=feed/{feed:Embedded JSON}&r=user/-/label/Scraped%20%26%20parsed"
+	},
+	{
+		"name": "move and rename two feeds",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=edit&s=feed/{feed:No identifiers}&t=One&s=feed/{feed:JSON Feed}&t=Two&a=user/-/label/Pair"
+	},
+	{
+		"name": "edit an unknown feed",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=edit&s=feed/999&t=x"
+	},
+	{
+		"name": "edit a stream that is no feed",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=edit&s=user/-/label/Pair&t=x"
+	},
+	{
+		"name": "edit with an unknown action",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=rename&s=feed/{feed:JSON API}&t=x"
+	},
+	{
+		"name": "edit without action",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "s=feed/{feed:JSON API}&t=x"
+	},
+	{
+		"name": "edit without stream",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=edit&t=x"
+	},
+	{
+		"name": "subscription list after edits",
+		"path": "/reader/api/0/subscription/list",
+		"query": "output=json"
+	},
+	{
+		"name": "tag list after edits",
+		"path": "/reader/api/0/tag/list",
+		"query": "output=json"
+	},
+	{
+		"name": "renamed feed stream",
+		"path": "/reader/api/0/stream/contents/feed/{feed:JSON API}",
+		"query": "n=1"
+	},
+	{
+		"name": "counts after edits of feeds",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json"
+	},
+	{
+		"name": "unsubscribe",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=unsubscribe&s=feed/{feed:Embedded JSON}"
+	},
+	{
+		"name": "unsubscribe by address",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=unsubscribe&s=feed/http://feeds.freshgo.test/page.html"
+	},
+	{
+		"name": "unsubscribe an unknown feed",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=unsubscribe&s=feed/999"
+	},
+	{
+		"name": "unsubscribe an unknown address",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=unsubscribe&s=feed/http://feeds.freshgo.test/none.xml"
+	},
+	{
+		"name": "subscription list after unsubscribing",
+		"path": "/reader/api/0/subscription/list",
+		"query": "output=json"
+	},
+	{
+		"name": "counts after unsubscribing",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json"
+	},
+	{
+		"name": "items of a removed feed",
+		"method": "POST",
+		"path": "/reader/api/0/stream/items/contents",
+		"body": "i={id:First embedded article}&i={id:Plain entry}"
+	},
+	{
+		"name": "tag list after unsubscribing",
+		"path": "/reader/api/0/tag/list",
+		"query": "output=json"
+	},
+	{
+		"name": "export",
+		"path": "/reader/api/0/subscription/export"
+	},
+	{
+		"name": "subscribe",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=subscribe&s=feed/http://feeds.freshgo.test/rss.xml?copy=1&t=Copy%20of%20RSS&a=user/-/label/Copies"
+	},
+	{
+		"name": "subscribe twice",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=subscribe&s=feed/http://feeds.freshgo.test/rss.xml?copy=1"
+	},
+	{
+		"name": "subscribe by number",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=subscribe&s=feed/1"
+	},
+	{
+		"name": "subscribe to a missing document",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=subscribe&s=feed/http://feeds.freshgo.test/missing.xml"
+	},
+	{
+		"name": "subscribe to what is no feed",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=subscribe&s=feed/http://feeds.freshgo.test/api.json?copy=1"
+	},
+	{
+		"name": "subscribe without title",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/edit",
+		"body": "ac=subscribe&s=feed/http://feeds.freshgo.test/atom.xml?copy=1"
+	},
+	{
+		"name": "subscription list after subscribing",
+		"path": "/reader/api/0/subscription/list",
+		"query": "output=json"
+	},
+	{
+		"name": "stream of the new feed",
+		"path": "/reader/api/0/stream/contents/feed/http%3A%2F%2Ffeeds.freshgo.test%2Frss.xml%3Fcopy%3D1",
+		"query": "n=1000",
+		"ignore": [
+			"id",
+			"crawlTimeMsec",
+			"timestampUsec",
+			"continuation",
+			"newestItemTimestampUsec"
+		]
+	},
+	{
+		"name": "counts after subscribing",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json",
+		"ignore": [
+			"id",
+			"crawlTimeMsec",
+			"timestampUsec",
+			"continuation",
+			"newestItemTimestampUsec"
+		]
+	},
+	{
+		"name": "quickadd",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/quickadd",
+		"body": "quickadd=http://feeds.freshgo.test/rss-noid.xml?copy=1",
+		"ignore": [
+			"streamName"
+		]
+	},
+	{
+		"name": "quickadd with the feed prefix",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/quickadd",
+		"body": "quickadd=feed/http://feeds.freshgo.test/atom.xml?copy=2",
+		"ignore": [
+			"streamName"
+		]
+	},
+	{
+		"name": "quickadd by GET",
+		"path": "/reader/api/0/subscription/quickadd",
+		"query": "quickadd=http://feeds.freshgo.test/atom.xml?copy=3",
+		"ignore": [
+			"streamName"
+		]
+	},
+	{
+		"name": "quickadd twice",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/quickadd",
+		"body": "quickadd=http://feeds.freshgo.test/rss-noid.xml?copy=1",
+		"ignore": [
+			"error",
+			"streamName"
+		]
+	},
+	{
+		"name": "quickadd a missing document",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/quickadd",
+		"body": "quickadd=http://feeds.freshgo.test/missing.xml",
+		"ignore": [
+			"error",
+			"streamName"
+		]
+	},
+	{
+		"name": "quickadd a JSON feed",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/quickadd",
+		"body": "quickadd=http://feeds.freshgo.test/feed.json?copy=1",
+		"ignore": [
+			"streamName"
+		]
+	},
+	{
+		"name": "quickadd nothing",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/quickadd",
+		"body": "x=1"
+	},
+	{
+		"name": "subscription list after quickadd",
+		"path": "/reader/api/0/subscription/list",
+		"query": "output=json"
+	},
+	{
+		"name": "stream of the quickadded JSON feed",
+		"path": "/reader/api/0/stream/contents/feed/http%3A%2F%2Ffeeds.freshgo.test%2Ffeed.json%3Fcopy%3D1",
+		"query": "n=1000",
+		"ignore": [
+			"id",
+			"crawlTimeMsec",
+			"timestampUsec",
+			"continuation",
+			"newestItemTimestampUsec"
+		]
+	},
+	{
+		"name": "counts after quickadd",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json",
+		"ignore": [
+			"id",
+			"crawlTimeMsec",
+			"timestampUsec",
+			"continuation",
+			"newestItemTimestampUsec"
+		]
+	},
+	{
+		"name": "import",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/import",
+		"body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<opml version=\"2.0\" xmlns:frss=\"https://freshrss.org/opml\">\n  <head><title>import</title></head>\n  <body>\n    <outline text=\"Imported\">\n      <outline text=\"Imported Atom\" type=\"rss\" xmlUrl=\"http://feeds.freshgo.test/atom.xml?import=1\" htmlUrl=\"http://feeds.freshgo.test/atom/\" frss:priority=\"category\" frss:ttl=\"-3600\"/>\n      <outline text=\"Known already\" type=\"rss\" xmlUrl=\"http://feeds.freshgo.test/rss.xml?copy=1\"/>\n      <outline text=\"Nested\">\n        <outline title=\"Imported XML\" type=\"XML+XPath\" xmlUrl=\"http://feeds.freshgo.test/data.xml?import=1\" frss:xPathItem=\"//record\" frss:xPathItemTitle=\"name\" frss:xPathItemContent=\"text\" frss:xPathItemUri=\"url\" frss:xPathItemUid=\"@uid\"/>\n      </outline>\n    </outline>\n    <outline text=\"Loose\" type=\"rss\" xmlUrl=\"http://feeds.freshgo.test/rss-noid.xml?import=1\" frss:priority=\"hidden\"/>\n    <outline text=\"By attribute\" type=\"JSONFeed\" category=\"Attributed\" xmlUrl=\"http://feeds.freshgo.test/feed.json?import=1\"/>\n    <outline text=\"Empty category\"/>\n  </body>\n</opml>\n",
+		"contentType": "application/xml"
+	},
+	{
+		"name": "subscription list after import",
+		"path": "/reader/api/0/subscription/list",
+		"query": "output=json"
+	},
+	{
+		"name": "tag list after import",
+		"path": "/reader/api/0/tag/list",
+		"query": "output=json"
+	},
+	{
+		"name": "counts after import",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json",
+		"ignore": [
+			"id",
+			"crawlTimeMsec",
+			"timestampUsec",
+			"continuation",
+			"newestItemTimestampUsec"
+		]
+	},
+	{
+		"name": "stream of an imported scraped feed",
+		"path": "/reader/api/0/stream/contents/feed/http%3A%2F%2Ffeeds.freshgo.test%2Fdata.xml%3Fimport%3D1",
+		"query": "n=1000",
+		"ignore": [
+			"id",
+			"crawlTimeMsec",
+			"timestampUsec",
+			"continuation",
+			"newestItemTimestampUsec",
+			"published"
+		]
+	},
+	{
+		"name": "ids of a hidden feed",
+		"path": "/reader/api/0/stream/items/ids",
+		"query": "s=feed/http://feeds.freshgo.test/rss-noid.xml?import=1&n=1000",
+		"ignore": [
+			"id",
+			"crawlTimeMsec",
+			"timestampUsec",
+			"continuation",
+			"newestItemTimestampUsec"
+		]
+	},
+	{
+		"name": "stream of a hidden feed",
+		"path": "/reader/api/0/stream/contents/feed/http%3A%2F%2Ffeeds.freshgo.test%2Frss-noid.xml%3Fimport%3D1",
+		"query": "n=1",
+		"ignore": [
+			"id",
+			"crawlTimeMsec",
+			"timestampUsec",
+			"continuation",
+			"newestItemTimestampUsec"
+		]
+	},
+	{
+		"name": "export after import",
+		"path": "/reader/api/0/subscription/export",
+		"ignore": [
+			"description"
+		]
+	},
+	{
+		"name": "import what is no OPML",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/import",
+		"body": "not xml at all",
+		"contentType": "text/plain"
+	},
+	{
+		"name": "import by GET",
+		"path": "/reader/api/0/subscription/import"
+	},
+	{
+		"name": "import an empty body",
+		"method": "POST",
+		"path": "/reader/api/0/subscription/import"
+	},
+	{
+		"name": "subscription list of bob at the end",
+		"user": "bob",
+		"path": "/reader/api/0/subscription/list",
+		"query": "output=json"
+	},
+	{
+		"name": "tag list of bob at the end",
+		"user": "bob",
+		"path": "/reader/api/0/tag/list",
+		"query": "output=json"
+	},
+	{
+		"name": "unread count of bob at the end",
+		"user": "bob",
+		"path": "/reader/api/0/unread-count",
+		"query": "output=json"
+	}
+]

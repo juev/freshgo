@@ -9,6 +9,7 @@ package hooks
 
 import (
 	"context"
+	"net/http"
 	"sort"
 
 	"github.com/juev/freshgo/internal/feed"
@@ -57,6 +58,24 @@ type Registry struct {
 	Init Signal[struct{}]
 	// UserMaintenance runs for a user before each refresh of their feeds.
 	UserMaintenance Signal[*store.User]
+
+	// endpoints are the HTTP endpoints of extensions, see HandleAPI.
+	endpoints map[string]http.Handler
+}
+
+// HandleAPI gives the extension of the given name an HTTP endpoint of its
+// own: the server sends it the requests under /api/misc.php/<name>. This is
+// the api_misc hook of FreshRSS, which has one handler per extension.
+func (r *Registry) HandleAPI(name string, h http.Handler) {
+	if r.endpoints == nil {
+		r.endpoints = map[string]http.Handler{}
+	}
+	r.endpoints[name] = h
+}
+
+// API returns the endpoint of the extension of the given name, or nil.
+func (r *Registry) API(name string) http.Handler {
+	return r.endpoints[name]
 }
 
 // Fetch is the argument of FetchBefore.

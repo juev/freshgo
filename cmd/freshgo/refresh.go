@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/juev/freshgo/internal/config"
+	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/refresh"
@@ -24,14 +25,25 @@ func userAgent() string {
 	return "freshgo/" + buildVersion() + " (+https://github.com/juev/freshgo)"
 }
 
-func newRefresher(ctx context.Context, e env, conf *config.Config, db *store.Store) (*refresh.Refresher, error) {
+// services are the parts of freshgo that work on the database of a command.
+type services struct {
+	registry  *hooks.Registry
+	log       *slog.Logger
+	refresher *refresh.Refresher
+	icons     *favicon.Service
+}
+
+func newServices(ctx context.Context, e env, conf *config.Config, db *store.Store) (*services, error) {
 	client, err := fetch.New(fetch.Options{UserAgent: userAgent(), Allowlist: conf.Allowlist()})
 	if err != nil {
 		return nil, err
 	}
-	registry := newHooks()
-	registry.Init.Call(ctx, struct{}{})
-	return refresh.New(db, client, registry, slog.New(slog.NewTextHandler(e.stderr, nil))), nil
+	s := &services{registry: newHooks(), log: slog.New(slog.NewTextHandler(e.stderr, nil))}
+	s.registry.Init.Call(ctx, struct{}{})
+	s.icons = favicon.New(db, client, s.log)
+	s.refresher = refresh.New(db, client, s.registry, s.log)
+	s.refresher.Icons = s.icons
+	return s, nil
 }
 
 func runRefresh(ctx context.Context, e env, args []string) (err error) {
@@ -43,14 +55,14 @@ func runRefresh(ctx context.Context, e env, args []string) (err error) {
 		return err
 	}
 	defer func() { err = errors.Join(err, db.Close()) }()
-	r, err := newRefresher(ctx, e, conf, db)
+	s, err := newServices(ctx, e, conf, db)
 	if err != nil {
 		return err
 	}
 
 	// A feed that fails is reported and does not fail the command: the next
 	// run tries it again.
-	stats, err := r.Run(ctx, opts)
+	stats, err := s.refresher.Run(ctx, opts)
 	for _, st := range stats {
 		if _, werr := fmt.Fprintf(e.stdout, "%s: %d feeds refreshed, %d failed, %d new and %d updated entries\n",
 			st.User, st.Refreshed, st.Failed, st.NewEntries, st.UpdatedEntries); werr != nil {
@@ -69,31 +81,15 @@ func runPurge(ctx context.Context, e env, args []string) (err error) {
 		return err
 	}
 	defer func() { err = errors.Join(err, db.Close()) }()
-	r, err := newRefresher(ctx, e, conf, db)
+	s, err := newServices(ctx, e, conf, db)
 	if err != nil {
 		return err
 	}
-	stats, err := r.Purge(ctx)
+	stats, err := s.refresher.Purge(ctx)
 	for _, st := range stats {
 		if _, werr := fmt.Fprintf(e.stdout, "%s: %d entries deleted\n", st.User, st.Deleted); werr != nil {
 			return errors.Join(err, werr)
 		}
 	}
 	return err
-}
-
-// runServe runs the refresh scheduler until the process is told to stop.
-func runServe(ctx context.Context, e env, args []string) (err error) {
-	fs, conf := newFlagSet(e, "serve")
-	db, err := openStore(ctx, fs, conf, args)
-	if err != nil {
-		return err
-	}
-	defer func() { err = errors.Join(err, db.Close()) }()
-	r, err := newRefresher(ctx, e, conf, db)
-	if err != nil {
-		return err
-	}
-	r.Schedule(ctx, conf.RefreshInterval)
-	return nil
 }

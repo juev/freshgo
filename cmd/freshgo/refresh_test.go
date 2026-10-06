@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,6 +29,11 @@ func subscribed(t *testing.T) (database, host string, hits *atomic.Int32) {
 	t.Helper()
 	hits = &atomic.Int32{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The site is also asked for its icon; it has none.
+		if r.URL.Path != "/feed" {
+			http.NotFound(w, r)
+			return
+		}
 		hits.Add(1)
 		if !strings.HasPrefix(r.Header.Get("User-Agent"), "freshgo/") {
 			http.Error(w, "unexpected User-Agent", http.StatusForbidden)
@@ -104,7 +110,8 @@ func (s *syncBuffer) String() string {
 	return s.b.String()
 }
 
-func TestServeRefreshesUntilStopped(t *testing.T) {
+// serve refreshes the feeds and answers API clients until it is stopped.
+func TestServe(t *testing.T) {
 	database, host, hits := subscribed(t)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -113,7 +120,8 @@ func TestServeRefreshesUntilStopped(t *testing.T) {
 	done := make(chan int, 1)
 	go func() {
 		done <- run(ctx, env{stdout: io.Discard, stderr: &stderr, getenv: func(string) string { return "" }},
-			[]string{"serve", "-database-url", database, "-fetch-allowlist", host, "-refresh-interval", "10ms"})
+			[]string{"serve", "-database-url", database, "-fetch-allowlist", host, "-refresh-interval", "10ms",
+				"-listen", "127.0.0.1:0"})
 	}()
 
 	deadline := time.After(10 * time.Second)
@@ -126,6 +134,36 @@ func TestServeRefreshesUntilStopped(t *testing.T) {
 		case <-time.After(5 * time.Millisecond):
 		}
 	}
+
+	// The server answers on the address it reports.
+	address := regexp.MustCompile(`msg=listening address=(\S+)`).FindStringSubmatch(stderr.String())
+	if address == nil {
+		t.Fatalf("serve did not report its address: %s", stderr.String())
+	}
+	for path, want := range map[string]struct {
+		status int
+		body   string
+	}{
+		"/api/greader.php":                        {http.StatusOK, "OK"},
+		"/reader/api/0/token":                     {http.StatusUnauthorized, "Unauthorized!"},
+		"/api/greader.php/reader/api/0/user-info": {http.StatusUnauthorized, "Unauthorized!"},
+		"/favicon/0123456789abcdef":               {http.StatusOK, "<svg"},
+		"/":                                       {http.StatusNotFound, ""},
+	} {
+		resp, err := http.Get("http://" + address[1] + path)
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		body, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			t.Fatalf("GET %s: %v", path, err)
+		}
+		if resp.StatusCode != want.status || !strings.HasPrefix(string(body), want.body) {
+			t.Errorf("GET %s: status %d, body %q; want %d and a body starting with %q", path, resp.StatusCode, body, want.status, want.body)
+		}
+	}
+
 	cancel()
 	select {
 	case code := <-done:

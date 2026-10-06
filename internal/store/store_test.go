@@ -625,20 +625,52 @@ func TestCustomIcon(t *testing.T) {
 		ctx := context.Background()
 		u := mustUser(t, s, "alice")
 		feed := mustFeed(t, s, u.ID, "https://example.org/feed")
-		if _, err := s.CustomIcon(ctx, u.ID, feed.ID); !errors.Is(err, ErrNotFound) {
-			t.Errorf("CustomIcon(unset) error = %v, want ErrNotFound", err)
+		if _, err := s.CustomIconByHash(ctx, "0a"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("CustomIconByHash(unset) error = %v, want ErrNotFound", err)
 		}
-		for _, content := range [][]byte{{0x89, 'P', 'N', 'G', 0x00}, {0x00, 0x01}} {
-			if err := s.SetCustomIcon(ctx, u.ID, feed.ID, content); err != nil {
+		for i, content := range [][]byte{{0x89, 'P', 'N', 'G', 0x00}, {0x00, 0x01}} {
+			want := CustomIcon{Hash: "0a", Content: content, Modified: int64(100 + i)}
+			if err := s.SetCustomIcon(ctx, u.ID, feed.ID, want); err != nil {
 				t.Fatalf("SetCustomIcon: %v", err)
 			}
-			got, err := s.CustomIcon(ctx, u.ID, feed.ID)
-			if err != nil || !reflect.DeepEqual(got, content) {
-				t.Errorf("CustomIcon = %x, %v; want %x", got, err, content)
+			got, err := s.CustomIconByHash(ctx, "0a")
+			if err != nil || !reflect.DeepEqual(got, &want) {
+				t.Errorf("CustomIconByHash = %+v, %v; want %+v", got, err, want)
 			}
 		}
-		if err := s.SetCustomIcon(ctx, u.ID, feed.ID+1, []byte{1}); err == nil {
+		if err := s.SetCustomIcon(ctx, u.ID, feed.ID+1, CustomIcon{Hash: "0b", Content: []byte{1}}); err == nil {
 			t.Error("SetCustomIcon for a missing feed: no error")
+		}
+		if _, err := s.CustomIconByHash(ctx, ""); !errors.Is(err, ErrNotFound) {
+			t.Errorf("CustomIconByHash(empty hash) error = %v, want ErrNotFound", err)
+		}
+		if err := s.DeleteFeed(ctx, u.ID, feed.ID); err != nil {
+			t.Fatalf("DeleteFeed: %v", err)
+		}
+		if _, err := s.CustomIconByHash(ctx, "0a"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("CustomIconByHash after the feed is deleted: error = %v, want ErrNotFound", err)
+		}
+	})
+}
+
+func TestIcons(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		if _, err := s.Icon(ctx, "aa"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("Icon(unset) error = %v, want ErrNotFound", err)
+		}
+		for _, want := range []*Icon{
+			{Hash: "aa", Source: "https://example.org/", Checked: 5},
+			{Hash: "aa", Source: "https://example.org/", Content: []byte{0, 1, 2}, ContentType: "image/png", Modified: 7, Checked: 7},
+			{Hash: "aa", Source: "https://example.org/new", Checked: 9},
+		} {
+			if err := s.PutIcon(ctx, want); err != nil {
+				t.Fatalf("PutIcon: %v", err)
+			}
+			got, err := s.Icon(ctx, "aa")
+			if err != nil || !reflect.DeepEqual(got, want) {
+				t.Errorf("Icon = %+v, %v; want %+v", got, err, want)
+			}
 		}
 	})
 }
