@@ -1,11 +1,11 @@
 # Search language and filter actions
 
-Status: implemented for reading a query and matching an entry in memory, which is what filter actions need. Turning a query into SQL, for searching the database, belongs to the plan of the web interface.
+Status: implemented for reading a query, matching an entry in memory, which is what filter actions need, and telling a database which entries cannot match, which is what searching the stored entries needs (`storage.md`, S33).
 Sources: user request of 2026-10-06 and the decisions recorded in `plan.md`; `FreshRSS_BooleanSearch`, `FreshRSS_Search`, `FreshRSS_Entry::matches`, `FreshRSS_FilterAction`, `FreshRSS_FilterActionsTrait`, `FreshRSS_DatabaseDAO::strilike` and `lib/lib_date.php` of FreshRSS at commit `219eaf58`.
 
 ## Purpose and scope
 
-`internal/search` reads the search language of FreshRSS and tells whether an entry matches a query. Filter actions, the rules that mark arriving entries read, star them or label them, are written in it; `internal/refresh` applies them. Covers plan requirement R11.
+`internal/search` reads the search language of FreshRSS and tells whether an entry matches a query. Filter actions, the rules that mark arriving entries read, star them or label them, are written in it; `internal/refresh` applies them. The search of the web interface is the same matching run over the stored entries. Covers requirement R11 of the plan of the core and, with `storage.md`, R6 of the plan of the web interface.
 
 ## Requirements
 
@@ -16,7 +16,9 @@ Sources: user request of 2026-10-06 and the decisions recorded in `plan.md`; `Fr
 - Q5. An entry matches a query as `FreshRSS_Entry::matches` decides. An alternative matches when all its demands hold; alternatives are tried in turn, parenthesized parts are combined left to right by their operators. A query without demands matches every entry.
 - Q6. Plain strings are looked for without regard to case, for letters of every alphabet; accents count. `intitle:` looks in the title, `author:` in the authors, `intext:` in the content, `inurl:` in the link, a free word in the title and the content. `#tag` asks for a tag of the feed's that equals the word; `+` in it stands for a space. The content is HTML: a string is looked for in its HTML-encoded form (`<` as `&lt;`).
 - Q7. `date:` compares with the time the entry was added, taken from its identifier; `pubdate:` with the date of the entry; `mdate:` with the time the feed last changed it; `userdate:` with the time the user last changed it. `e:`, `f:` and `c:` compare identifiers of the entry, its feed and its category.
-- Q8. `L:` and `labels:` are read and do not count in matching, as in FreshRSS: filters run before an entry has labels.
+- Q8. `L:` and `labels:` are read and, for a filter, do not count in matching, as in FreshRSS: filters run before an entry has labels.
+- Q15. A query read with `Options.Labels` asks for labels the way FreshRSS searches its database (`sqlBooleanSearch`): `L:1,2` wants a label with one of the identifiers, `L:*` any label, `labels:a,b` a label with one of the names, compared exactly; every such operator of an alternative has to hold, so `L:1 L:2` wants both labels. Negated, the entry must have none of the labels of the list, and `-L:*` no label at all.
+- Q16. `Query.Condition` gives a test on what a database keeps apart from the texts of an entry — identifiers of the entry, its feed and its category, labels, the four times — that every entry the query matches passes. It is as narrow as the query allows: an alternative contributes its operators `e:`, `f:`, `c:`, `L:`, `labels:` and dates and nothing for its texts; parts are joined by their operators. A negated part counts only when it has no texts, since then the test is exact; a negated part with texts, which the test would only over-approximate, is left out (`AND NOT`) or makes the test pass everything (`OR NOT`). A query whose test would have more than 500 conditions gets one that passes everything: SQLite refuses an expression nested deeper than 1000, and `Match` decides anyway. `Query.UsesLabels` tells whether matching needs the labels of the entries.
 - Q9. A rule is an entry of a `filters` list: `{"search": …, "actions": […]}`. `ParseRules` returns the rules it could read and a problem for each it could not; entries of another shape are passed over.
 - Q10. A regular expression Go's `regexp` does not accept, such as one with a backreference or a lookahead, makes the whole query unusable (`ErrRegexp`). The refresh reports the rule in its log and goes on without it; the import lists such rules as warnings.
 
@@ -33,6 +35,7 @@ Filter actions in the refresh (`internal/refresh`, see `refresh.md`):
 - **Case is ignored the way PostgreSQL's `ILIKE` does it, on both engines.** FreshRSS matches filters the way its database compares strings: ASCII letters only on SQLite, every letter on PostgreSQL, and without accents on MySQL. freshgo behaves the same on SQLite and PostgreSQL (storage S10), and a rule such as `intitle:реклама` has to find «Реклама».
 - **Regular expressions are Go's `regexp` (RE2)**: matching time is linear in the text, which matters for expressions run over every arriving entry. Expressions it lacks are refused rather than approximated.
 - **Title, authors, tags and link are matched as plain text.** FreshRSS matches them in their HTML-encoded stored form.
+- **A search of the database is not a second implementation of the language.** FreshRSS turns the whole query into SQL (`sqlBooleanSearch`), per engine. freshgo hands the database only the test of Q16 and lets `Match` decide over the rows that pass: filters and searches then agree by construction, on both engines, on case, on regular expressions and on every quirk of the parser. The price is reading the texts of the entries the test lets through; `storage.md` has the measurements.
 - **A query is not written back.** FreshRSS can print a parsed query in a canonical form (`__toString`); freshgo keeps rules as they are stored, and nothing in this step needs the rewriting.
 
 ## Known differences from FreshRSS
@@ -48,5 +51,6 @@ Filter actions in the refresh (`internal/refresh`, see `refresh.md`):
 
 - Q1–Q8: `TestAgainstFreshRSS` reads the 457 queries of `testdata/reference/oracle/search-cases.json`, those of `tests/app/Models/SearchTest.php` and `BooleanSearchTest.php` of FreshRSS and more for dates, negations, parentheses, saved searches and malformed input, and compares the structure and the matching entries, of seven, with what FreshRSS 1.30.1 gave (`search.json`). The differences above are listed in the test and checked to stay differences.
 - Q3: `TestLimits`. Q9, Q10: `TestParseRules`.
+- Q8, Q15: `TestMatchLabels`. Q16: `TestCondition` for the shape of the test; that it never rules out an entry the query matches is checked against the database by `TestSearchListsWhatMatches` in `internal/store`.
 - R11, Q11–Q13: `TestFilterActions` in `internal/refresh`: rules of the user, the category, the feed and a label, a saved search, an unusable rule reported and skipped, changed entries. Q14 and the user's time zone: `TestFilterByDate`.
 - Q10 in the import: `TestImportWarnings` in `internal/importer`.

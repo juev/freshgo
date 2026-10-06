@@ -24,16 +24,16 @@ type Engine struct {
 	Name string
 	// New prepares an empty database and returns what store.Open takes. It
 	// skips the test when the engine is not available.
-	New func(t *testing.T) (driver config.Driver, dsn string)
+	New func(t testing.TB) (driver config.Driver, dsn string)
 }
 
 // Engines lists the supported engines.
 func Engines() []Engine {
 	return []Engine{
-		{"sqlite", func(t *testing.T) (config.Driver, string) {
+		{"sqlite", func(t testing.TB) (config.Driver, string) {
 			return config.DriverSQLite, filepath.Join(t.TempDir(), "freshgo.sqlite")
 		}},
-		{"postgres", func(t *testing.T) (config.Driver, string) {
+		{"postgres", func(t testing.TB) (config.Driver, string) {
 			return config.DriverPostgres, PostgresSchema(t)
 		}},
 	}
@@ -41,7 +41,7 @@ func Engines() []Engine {
 
 // PostgresSchema creates a schema of its own for the test and returns a
 // connection URL that makes it the search path.
-func PostgresSchema(t *testing.T) string {
+func PostgresSchema(t testing.TB) string {
 	t.Helper()
 	admin, base := postgresAdmin(t)
 	schema := uniqueName()
@@ -61,7 +61,7 @@ func PostgresSchema(t *testing.T) string {
 
 // PostgresDatabase creates a database of its own for the test and returns its
 // connection URL. For data that names the public schema, such as a dump.
-func PostgresDatabase(t *testing.T) string {
+func PostgresDatabase(t testing.TB) string {
 	t.Helper()
 	admin, base := postgresAdmin(t)
 	name := uniqueName()
@@ -77,7 +77,7 @@ func PostgresDatabase(t *testing.T) string {
 	return base.String()
 }
 
-func postgresAdmin(t *testing.T) (*sql.DB, *url.URL) {
+func postgresAdmin(t testing.TB) (*sql.DB, *url.URL) {
 	t.Helper()
 	raw := os.Getenv(EnvPostgresURL)
 	if raw == "" {

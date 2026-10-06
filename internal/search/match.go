@@ -20,6 +20,9 @@ type Entry struct {
 	Published        int64
 	LastModified     int64
 	LastUserModified int64
+	// Labels are the labels the user put on the entry. Only a query read
+	// with Options.Labels looks at them.
+	Labels []Label
 
 	// Forms of the texts that matching needs, computed when first asked
 	// for: the entry must not change after it was first matched.
@@ -29,6 +32,12 @@ type Entry struct {
 	authors       *string
 	authorsByLine *string
 	tags          []string
+}
+
+// Label is a label of the user.
+type Label struct {
+	ID   int64
+	Name string
 }
 
 // fold makes text comparable without regard to case. Accents stay: FreshRSS
@@ -133,6 +142,9 @@ func (t *term) match(s *Entry) bool {
 		t.notCategoryIDs != nil && containsID(t.notCategoryIDs, s.CategoryID):
 		return false
 	}
+	if t.byLabel && !t.matchLabels(s) {
+		return false
+	}
 
 	// Each demand is a function of one needle; all needles of a list have to
 	// pass for a positive demand, none for a negated one.
@@ -173,6 +185,57 @@ func (t *term) match(s *Entry) bool {
 		demand(t.tags, t.notTags, hasTag, tagMatches) &&
 		demand(t.inurl, t.notInurl, inLink, matches(s.Link)) &&
 		demand(t.search, t.notSearch, anywhere, anywhereMatches)
+}
+
+// matchLabels checks the demands on the labels the way FreshRSS searches its
+// database: the entry needs one label of every list asked for, and none of
+// any list ruled out.
+func (t *term) matchLabels(s *Entry) bool {
+	for _, list := range t.labelIDs {
+		if !hasLabel(s, list) {
+			return false
+		}
+	}
+	for _, list := range t.notLabelIDs {
+		if hasLabel(s, list) {
+			return false
+		}
+	}
+	for _, names := range t.labelNames {
+		if !hasLabelNamed(s, names) {
+			return false
+		}
+	}
+	for _, names := range t.notLabelNames {
+		if hasLabelNamed(s, names) {
+			return false
+		}
+	}
+	return true
+}
+
+// hasLabel tells whether the entry has one of the labels of a list, which is
+// []int64 or "*" for any label.
+func hasLabel(s *Entry, list any) bool {
+	ids, ok := list.([]int64)
+	if !ok {
+		return len(s.Labels) > 0
+	}
+	for _, l := range s.Labels {
+		if containsID(ids, l.ID) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasLabelNamed(s *Entry, names []string) bool {
+	for _, l := range s.Labels {
+		if containsString(names, l.Name) {
+			return true
+		}
+	}
+	return false
 }
 
 // demand checks the positive and the negated demands on one text.

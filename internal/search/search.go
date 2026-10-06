@@ -46,6 +46,10 @@ type Options struct {
 	// Now is the moment relative dates such as date:P1W count from, and its
 	// location the time zone of dates written without one.
 	Now time.Time
+	// Labels makes L: and labels: demands on the labels of an entry, as a
+	// search of the database of FreshRSS does. Filters leave it off: they run
+	// before an entry has labels, and FreshRSS passes the operators over there.
+	Labels bool
 }
 
 // Operators that join a parenthesized part to what precedes it.

@@ -33,8 +33,10 @@ type term struct {
 	entryIDs, notEntryIDs       []string
 	feedIDs, notFeedIDs         []int64
 	categoryIDs, notCategoryIDs []int64
-	// Labels are read so that they are not taken for words; matching an
-	// entry against a filter does not look at them, as in FreshRSS.
+	// Labels are always read, so that they are not taken for words, and
+	// count when byLabel is set. A list of identifiers is []int64, or "*"
+	// for any label; the entry needs a label of every list.
+	byLabel                   bool
 	labelIDs, notLabelIDs     []any
 	labelNames, notLabelNames [][]string
 
@@ -308,7 +310,7 @@ func (p *parser) term(input string) *term {
 	input = clean(input)
 	input = strings.NewReplacer(`\(`, "(", `\)`, ")").Replace(input)
 	input = unescapeLiterals(input)
-	t := &term{}
+	t := &term{byLabel: p.opts.Labels}
 
 	t.notEntryIDs = cutStrings(&input, notEntryIDs)
 	t.notFeedIDs = cutNumbers(&input, notFeedIDs)
