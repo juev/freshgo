@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -22,8 +23,8 @@ const minPasswordLength = 7
 
 func userCommands() []command {
 	return []command{
-		{"create", "add a user; the API password is read from standard input", runUserCreate},
-		{"passwd", "change the API password of a user, read from standard input", runUserPasswd},
+		{"create", "add a user; the password is read from standard input", runUserCreate},
+		{"passwd", "change the password of a user, read from standard input", runUserPasswd},
 		{"list", "list the users", runUserList},
 		{"delete", "delete a user with all their feeds and entries", runUserDelete},
 	}
@@ -70,7 +71,7 @@ func readPassword(e env) (string, error) {
 			_, _ = io.WriteString(e.stderr, "\n")
 			return string(typed), err
 		}
-		first, err := ask("API password: ")
+		first, err := ask("Password: ")
 		if err != nil {
 			return "", err
 		}
@@ -102,6 +103,7 @@ func readPassword(e env) (string, error) {
 func runUserCreate(ctx context.Context, e env, args []string) (err error) {
 	fs, conf := newFlagSet(e, "user create")
 	synopsis(fs, e, "user create [flags] <name>")
+	admin := fs.Bool("admin", false, "make the user an administrator; the first user of an installation is one anyway")
 	db, err := openStore(ctx, fs, conf, args, 1)
 	if err != nil {
 		return err
@@ -125,7 +127,17 @@ func runUserCreate(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	if err := db.CreateUser(ctx, &store.User{Name: name, APIPasswordHash: hash}); err != nil {
+	// One password for the web interface and for API clients; each can be
+	// changed on its own in the interface.
+	settings := map[string]any{"passwordHash": hash}
+	if *admin {
+		settings["is_admin"] = true
+	}
+	raw, err := json.Marshal(settings)
+	if err != nil {
+		return err
+	}
+	if err := db.CreateUser(ctx, &store.User{Name: name, APIPasswordHash: hash, Settings: raw}); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(e.stdout, "user %s created\n", name)
@@ -152,10 +164,25 @@ func runUserPasswd(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	if err := db.SetAPIPasswordHash(ctx, u.ID, hash); err != nil {
+	err = db.InTx(ctx, func(tx *store.Store) error {
+		err := tx.UpdateUserSettings(ctx, u.ID, func(settings map[string]json.RawMessage) error {
+			raw, err := json.Marshal(hash)
+			settings["passwordHash"] = raw
+			return err
+		})
+		if err != nil {
+			return err
+		}
+		if err := tx.SetAPIPasswordHash(ctx, u.ID, hash); err != nil {
+			return err
+		}
+		// Whoever is logged in with the old password is logged out.
+		return tx.DeleteUserSessions(ctx, u.ID, "")
+	})
+	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(e.stdout, "password of %s changed; clients have to log in again\n", name)
+	_, err = fmt.Fprintf(e.stdout, "password of %s changed; browsers and clients have to log in again\n", name)
 	return err
 }
 

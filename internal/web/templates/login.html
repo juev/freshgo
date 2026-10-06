@@ -1,0 +1,20 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{if .Data.Error}}<p class="alert" role="alert">{{.Data.Error}}</p>{{end}}
+<form method="post" action="{{.URL "/login"}}" class="form">
+<input type="hidden" name="next" value="{{.Data.Next}}">
+<p>
+<label for="username">{{.T "login.username"}}</label>
+<input type="text" id="username" name="username" value="{{.Data.Name}}" required autocomplete="username" autocapitalize="none" spellcheck="false"{{if not .Data.Name}} autofocus{{end}}>
+</p>
+<p>
+<label for="password">{{.T "login.password"}}</label>
+<input type="password" id="password" name="password" required autocomplete="current-password"{{if .Data.Name}} autofocus{{end}}>
+</p>
+<p class="check">
+<input type="checkbox" id="remember" name="remember" value="1">
+<label for="remember">{{.T "login.remember"}}</label>
+</p>
+<p><button type="submit">{{.T "login.submit"}}</button></p>
+</form>
+{{end}}

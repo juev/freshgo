@@ -16,6 +16,11 @@
 <li><a href="{{.URL "/about"}}"{{if eq .Section "about"}} aria-current="page"{{end}}>{{.T "nav.about"}}</a></li>
 </ul>
 </nav>
+<div class="account">
+{{if .User}}<span class="account-name">{{.User}}</span>{{end}}
+{{if .CanLogout}}<form method="post" action="{{.URL "/logout"}}"><button type="submit" class="link">{{.T "nav.logout"}}</button></form>{{end}}
+{{if .CanLogin}}<a href="{{.URL "/login"}}"{{if eq .Section "login"}} aria-current="page"{{end}}>{{.T "nav.login"}}</a>{{end}}
+</div>
 </header>
 <div class="messages" id="messages" role="status" aria-live="polite"></div>
 <main class="page" id="content" tabindex="-1">

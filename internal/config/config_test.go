@@ -119,3 +119,31 @@ func TestWebSubSetting(t *testing.T) {
 		t.Error("Validate accepted a WebSub value that is not a boolean")
 	}
 }
+
+func TestTrustedProxies(t *testing.T) {
+	prefixes := func(c *Config) []string {
+		t.Helper()
+		ranges, err := c.Proxies()
+		if err != nil {
+			t.Fatalf("Proxies of %q: %v", c.TrustedProxies, err)
+		}
+		var out []string
+		for _, r := range ranges {
+			out = append(out, r.String())
+		}
+		return out
+	}
+	if got := prefixes(parse(t, nil)); !reflect.DeepEqual(got, []string{"127.0.0.0/8", "::1/128"}) {
+		t.Errorf("default proxies = %v, want this machine", got)
+	}
+	c := parse(t, map[string]string{EnvTrustedProxies: "10.1.2.3, 192.168.5.9/16,fd00::1,"})
+	if got := prefixes(c); !reflect.DeepEqual(got, []string{"10.1.2.3/32", "192.168.0.0/16", "fd00::1/128"}) {
+		t.Errorf("proxies from the environment = %v", got)
+	}
+	if got := prefixes(parse(t, nil, "-trusted-proxies", "")); got != nil {
+		t.Errorf("no proxies = %v, want none", got)
+	}
+	if err := parse(t, nil, "-trusted-proxies", "proxy.lan").Validate(); err == nil {
+		t.Error("Validate accepted a proxy given by name")
+	}
+}

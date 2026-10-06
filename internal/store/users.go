@@ -2,12 +2,14 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 )
 
 // CreateUser adds a user together with the default category and sets u.ID.
-// A taken name gives ErrConflict.
+// A taken name gives ErrConflict. In an installation that has no default
+// user yet, the user becomes it.
 func (s *Store) CreateUser(ctx context.Context, u *User) error {
 	return s.InTx(ctx, func(tx *Store) error {
 		err := tx.queryRow(ctx, `
@@ -15,6 +17,16 @@ func (s *Store) CreateUser(ctx context.Context, u *User) error {
 			RETURNING id`, u.Name, u.APIPasswordHash, jsonObject(u.Settings)).Scan(&u.ID)
 		if err != nil {
 			return fmt.Errorf("store: create user %q: %w", u.Name, err)
+		}
+		system, err := tx.System(ctx)
+		if err != nil {
+			return err
+		}
+		if system.DefaultUser == "" {
+			system.DefaultUser = u.Name
+			if err := tx.SetSystem(ctx, system); err != nil {
+				return err
+			}
 		}
 		return tx.CreateCategory(ctx, &Category{UserID: u.ID, ID: DefaultCategoryID, Name: DefaultCategoryName})
 	})
@@ -86,4 +98,50 @@ func (s *Store) DeleteUser(ctx context.Context, userID int64) error {
 		return fmt.Errorf("store: delete user %d: %w", userID, ErrNotFound)
 	}
 	return nil
+}
+
+// UserByID returns the user with the identifier or ErrNotFound.
+func (s *Store) UserByID(ctx context.Context, id int64) (*User, error) {
+	u, err := scanUser(s.queryRow(ctx, `
+		SELECT id, name, api_password_hash, settings FROM users WHERE id = ?`, id))
+	if err != nil {
+		return nil, fmt.Errorf("store: user %d: %w", id, err)
+	}
+	return u, nil
+}
+
+// UpdateUserSettings lets change rewrite the settings of a user, given as
+// the members of the JSON object, and stores the result. Changes of the same
+// user made at once are applied one after another, none is lost.
+func (s *Store) UpdateUserSettings(ctx context.Context, userID int64, change func(settings map[string]json.RawMessage) error) error {
+	return s.InTx(ctx, func(tx *Store) error {
+		// A write that changes nothing makes other writers of the row wait
+		// on PostgreSQL; SQLite has a single writer anyway.
+		n, err := tx.affected(ctx, `UPDATE users SET settings = settings WHERE id = ?`, userID)
+		if err != nil {
+			return fmt.Errorf("store: update settings of user %d: %w", userID, err)
+		}
+		if n == 0 {
+			return fmt.Errorf("store: update settings of user %d: %w", userID, ErrNotFound)
+		}
+		var stored string
+		if err := tx.queryRow(ctx, `SELECT settings FROM users WHERE id = ?`, userID).Scan(&stored); err != nil {
+			return fmt.Errorf("store: update settings of user %d: %w", userID, err)
+		}
+		settings := map[string]json.RawMessage{}
+		if err := json.Unmarshal([]byte(stored), &settings); err != nil {
+			return fmt.Errorf("store: settings of user %d: %w", userID, err)
+		}
+		if err := change(settings); err != nil {
+			return err
+		}
+		updated, err := json.Marshal(settings)
+		if err != nil {
+			return fmt.Errorf("store: update settings of user %d: %w", userID, err)
+		}
+		if _, err := tx.exec(ctx, `UPDATE users SET settings = ? WHERE id = ?`, string(updated), userID); err != nil {
+			return fmt.Errorf("store: update settings of user %d: %w", userID, err)
+		}
+		return nil
+	})
 }

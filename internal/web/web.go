@@ -4,15 +4,19 @@
 package web
 
 import (
+	"context"
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"errors"
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/web/i18n"
@@ -34,6 +38,9 @@ type Options struct {
 	BaseURL string
 	// Version is shown on the about page.
 	Version string
+	// TrustedProxies are the reverse proxies whose word is taken for who
+	// the user is, when the installation tells users apart that way.
+	TrustedProxies []netip.Prefix
 }
 
 // Handler serves the interface.
@@ -48,21 +55,39 @@ type Handler struct {
 	pages   pages
 	// assets maps the name of a static file to what its address ends with
 	// to tell its versions apart.
-	assets map[string]string
-	mux    *http.ServeMux
+	assets  map[string]string
+	mux     *http.ServeMux
+	proxies []netip.Prefix
+	// crossOrigin turns down requests that change something and come from
+	// another site.
+	crossOrigin *http.CrossOriginProtection
+	guard       guard
+	decoys      decoys
+	now         func() time.Time
 }
 
 // New returns the interface, or an error when what is built into the binary
 // does not hold together.
 func New(o Options) (*Handler, error) {
-	h := &Handler{db: o.DB, log: o.Log, baseURL: o.BaseURL, version: o.Version, assets: map[string]string{}}
+	h := &Handler{
+		db: o.DB, log: o.Log, baseURL: o.BaseURL, version: o.Version, assets: map[string]string{},
+		proxies: o.TrustedProxies, crossOrigin: http.NewCrossOriginProtection(), now: time.Now,
+	}
 	if o.BaseURL != "" {
 		public, err := url.Parse(o.BaseURL)
 		if err != nil {
 			return nil, err
 		}
 		h.prefix = strings.TrimSuffix(public.Path, "/")
+		// Behind a reverse proxy the Host of a request need not be the
+		// one the browser sees; the public address is.
+		if err := h.crossOrigin.AddTrustedOrigin(public.Scheme + "://" + public.Host); err != nil {
+			return nil, err
+		}
 	}
+	h.crossOrigin.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.fail(w, r, http.StatusForbidden)
+	}))
 	var err error
 	if h.texts, err = i18n.Load(); err != nil {
 		return nil, err
@@ -103,10 +128,13 @@ func New(o Options) (*Handler, error) {
 		}
 		files.ServeHTTP(w, r)
 	})
-	h.mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+	h.mux.HandleFunc("GET /{$}", h.protect(readers, func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, h.url("/about"), http.StatusSeeOther)
-	})
+	}))
 	h.mux.HandleFunc("GET /about", h.about)
+	h.mux.HandleFunc("GET /login", h.loginPage)
+	h.mux.HandleFunc("POST /login", h.login)
+	h.mux.HandleFunc("POST /logout", h.logout)
 	return h, nil
 }
 
@@ -122,6 +150,25 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	header.Set("X-Content-Type-Options", "nosniff")
 	header.Set("Referrer-Policy", "same-origin")
 
+	// Static files are the same for everybody.
+	if !strings.HasPrefix(r.URL.Path, StaticPath) {
+		system, err := h.db.System(r.Context())
+		if err != nil {
+			h.broken(w, r, err)
+			return
+		}
+		who, err := h.identify(r, system)
+		if err != nil {
+			h.broken(w, r, err)
+			return
+		}
+		r = r.WithContext(context.WithValue(r.Context(), requestKey{}, &request{system: system, who: who}))
+	}
+	h.crossOrigin.Handler(http.HandlerFunc(h.route)).ServeHTTP(w, r)
+}
+
+// route hands a request to its page.
+func (h *Handler) route(w http.ResponseWriter, r *http.Request) {
 	// The mux answers what it has no page for in plain text; ask it first
 	// who would handle the request.
 	if _, pattern := h.mux.Handler(r); pattern == "" {
@@ -190,4 +237,15 @@ func (h *Handler) fail(w http.ResponseWriter, r *http.Request, status int) {
 	v := h.view(r, "", key+".heading")
 	v.Data = struct{ Text string }{v.T(key + ".text")}
 	h.render(w, r, status, "error", v)
+}
+
+// broken logs what went wrong on the server and answers with the page that
+// says so.
+func (h *Handler) broken(w http.ResponseWriter, r *http.Request, err error) {
+	// The reader went away: nobody is left to answer.
+	if r.Context().Err() != nil && errors.Is(err, r.Context().Err()) {
+		return
+	}
+	h.log.Error("request failed", "method", r.Method, "path", r.URL.Path, "error", err)
+	h.fail(w, r, http.StatusInternalServerError)
 }

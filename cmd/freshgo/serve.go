@@ -96,7 +96,13 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	if s.webSub != nil {
 		hubs = s.webSub
 	}
-	pages, err := web.New(web.Options{DB: db, Log: s.log, BaseURL: conf.BaseURL, Version: buildVersion()})
+	proxies, err := conf.Proxies()
+	if err != nil {
+		return err
+	}
+	pages, err := web.New(web.Options{
+		DB: db, Log: s.log, BaseURL: conf.BaseURL, Version: buildVersion(), TrustedProxies: proxies,
+	})
 	if err != nil {
 		return err
 	}

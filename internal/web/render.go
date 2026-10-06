@@ -57,6 +57,11 @@ type view struct {
 	Section string
 	// Theme is "auto", "light" or "dark".
 	Theme string
+	// User is the name of the user who is logged in, empty for a visitor.
+	User string
+	// CanLogin and CanLogout say whether the page offers to log in or out:
+	// neither makes sense when users are told apart without a login.
+	CanLogin, CanLogout bool
 	// Data is what the page itself shows.
 	Data any
 }
@@ -68,17 +73,23 @@ func (v *view) Asset(name string) string { return v.h.asset(name) }
 // view prepares a page in the language of the reader. heading is the key of
 // the text that names the page.
 func (h *Handler) view(r *http.Request, section, heading string) *view {
-	system, err := h.db.System(r.Context())
-	if err != nil {
-		// A page can be shown without them, an error page above all.
-		h.log.Error("system settings cannot be read", "error", err)
-		system = store.DefaultSystem()
+	s := state(r)
+	v := &view{h: h, Site: s.system.Title, Section: section, Theme: "auto"}
+	language := ""
+	if s.who != nil {
+		// A visitor reads the entries of the default user, not the
+		// interface in that user's language.
+		if !s.who.anonymous {
+			language = s.who.prefs.Language
+			v.User = s.who.user.Name
+			v.CanLogout = s.who.session != nil
+		}
+		v.Theme = s.who.prefs.theme()
 	}
-	texts := h.texts.Match(r.Header.Get("Accept-Language"), system.Language)
-	return &view{
-		Localizer: texts, h: h,
-		Site: system.Title, Heading: texts.T(heading), Section: section, Theme: "auto",
-	}
+	v.CanLogin = v.User == "" && s.system.AuthType == store.AuthForm
+	v.Localizer = h.texts.Match(language, r.Header.Get("Accept-Language"), s.system.Language)
+	v.Heading = v.T(heading)
+	return v
 }
 
 // render writes a page. It is rendered in full first, so that a template

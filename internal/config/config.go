@@ -5,6 +5,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
@@ -23,6 +24,8 @@ const (
 	EnvRefreshInterval = "FRESHGO_REFRESH_INTERVAL"
 	// EnvWebSub switches WebSub on with a value strconv.ParseBool takes for true.
 	EnvWebSub = "FRESHGO_WEBSUB"
+	// EnvTrustedProxies is read by the web interface.
+	EnvTrustedProxies = "FRESHGO_TRUSTED_PROXIES"
 )
 
 const (
@@ -31,6 +34,9 @@ const (
 	// defaultRefreshInterval is on the order of the cron period FreshRSS is
 	// usually run with.
 	defaultRefreshInterval = 10 * time.Minute
+	// defaultTrustedProxies is a reverse proxy on the same machine, as in
+	// FreshRSS.
+	defaultTrustedProxies = "127.0.0.0/8,::1/128"
 )
 
 // Driver identifies a database engine.
@@ -60,6 +66,10 @@ type Config struct {
 	// WebSub makes the server subscribe to the hubs feeds announce, so that
 	// new entries are pushed to it. It needs a BaseURL hubs can reach.
 	WebSub bool
+	// TrustedProxies names, separated by commas, the addresses and CIDR
+	// ranges of the reverse proxies whose word is taken for who the user
+	// is, when users are told apart by the proxy.
+	TrustedProxies string
 
 	// invalid is what was wrong with the environment, reported by Validate.
 	invalid error
@@ -98,7 +108,30 @@ func Bind(fs *flag.FlagSet, getenv func(string) string) *Config {
 	}
 	fs.BoolVar(&c.WebSub, "websub", webSub,
 		"subscribe to the WebSub hubs of feeds; needs a public -base-url ($"+EnvWebSub+")")
+	fs.StringVar(&c.TrustedProxies, "trusted-proxies", envOr(getenv, EnvTrustedProxies, defaultTrustedProxies),
+		"reverse proxies that may name the user, comma-separated addresses or CIDR ranges ($"+EnvTrustedProxies+")")
 	return c
+}
+
+// Proxies returns the entries of TrustedProxies as address ranges.
+func (c *Config) Proxies() ([]netip.Prefix, error) {
+	var ranges []netip.Prefix
+	for _, entry := range strings.Split(c.TrustedProxies, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if prefix, err := netip.ParsePrefix(entry); err == nil {
+			ranges = append(ranges, prefix.Masked())
+			continue
+		}
+		addr, err := netip.ParseAddr(entry)
+		if err != nil {
+			return nil, fmt.Errorf("trusted proxy %q: want an address or a CIDR range", entry)
+		}
+		ranges = append(ranges, netip.PrefixFrom(addr.Unmap(), addr.Unmap().BitLen()))
+	}
+	return ranges, nil
 }
 
 // Allowlist returns the entries of FetchAllowlist.
@@ -122,6 +155,9 @@ func (c *Config) Validate() error {
 	}
 	if c.RefreshInterval <= 0 {
 		return fmt.Errorf("refresh interval %s: want a positive duration", c.RefreshInterval)
+	}
+	if _, err := c.Proxies(); err != nil {
+		return err
 	}
 	if c.BaseURL != "" {
 		u, err := url.Parse(c.BaseURL)

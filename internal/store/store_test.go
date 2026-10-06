@@ -1126,3 +1126,173 @@ func TestSystem(t *testing.T) {
 		}
 	})
 }
+
+func TestSessions(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		alice, bob := mustUser(t, s, "alice"), mustUser(t, s, "bob")
+		for _, session := range []*Session{
+			{TokenHash: "a1", UserID: alice.ID, Created: 100, Used: 100, Expires: 200, Persistent: true, Authenticated: 100},
+			{TokenHash: "a2", UserID: alice.ID, Created: 110, Used: 110, Expires: 300},
+			{TokenHash: "b1", UserID: bob.ID, Created: 120, Used: 120, Expires: 150},
+		} {
+			if err := s.CreateSession(ctx, session); err != nil {
+				t.Fatalf("CreateSession: %v", err)
+			}
+		}
+		want := &Session{TokenHash: "a1", UserID: alice.ID, Created: 100, Used: 100, Expires: 200, Persistent: true, Authenticated: 100}
+		if got, err := s.Session(ctx, "a1", 199); err != nil || !reflect.DeepEqual(got, want) {
+			t.Errorf("Session = %+v, %v; want %+v", got, err, want)
+		}
+		// A session ends at the second it expires, and an unknown one never began.
+		if _, err := s.Session(ctx, "a1", 200); !errors.Is(err, ErrNotFound) {
+			t.Errorf("Session at its expiry: error = %v, want ErrNotFound", err)
+		}
+		if _, err := s.Session(ctx, "zz", 100); !errors.Is(err, ErrNotFound) {
+			t.Errorf("Session(unknown): error = %v, want ErrNotFound", err)
+		}
+		if err := s.CreateSession(ctx, &Session{TokenHash: "a1", UserID: bob.ID}); err == nil {
+			t.Error("CreateSession with a token hash in use: no error")
+		}
+
+		if err := s.TouchSession(ctx, "a1", 190, 500); err != nil {
+			t.Fatalf("TouchSession: %v", err)
+		}
+		if got, err := s.Session(ctx, "a1", 400); err != nil || got.Used != 190 || got.Expires != 500 {
+			t.Errorf("Session after TouchSession = %+v, %v", got, err)
+		}
+
+		if err := s.DeleteExpiredSessions(ctx, 150); err != nil {
+			t.Fatalf("DeleteExpiredSessions: %v", err)
+		}
+		if _, err := s.Session(ctx, "b1", 0); !errors.Is(err, ErrNotFound) {
+			t.Errorf("an expired session survived DeleteExpiredSessions: %v", err)
+		}
+		if _, err := s.Session(ctx, "a2", 0); err != nil {
+			t.Errorf("a live session did not survive DeleteExpiredSessions: %v", err)
+		}
+
+		if err := s.CreateSession(ctx, &Session{TokenHash: "b2", UserID: bob.ID, Expires: 900}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.DeleteUserSessions(ctx, alice.ID, "a2"); err != nil {
+			t.Fatalf("DeleteUserSessions: %v", err)
+		}
+		for hash, alive := range map[string]bool{"a1": false, "a2": true, "b2": true} {
+			if _, err := s.Session(ctx, hash, 0); (err == nil) != alive {
+				t.Errorf("after DeleteUserSessions session %s: error %v, want alive = %v", hash, err, alive)
+			}
+		}
+		if err := s.DeleteSession(ctx, "a2"); err != nil {
+			t.Fatalf("DeleteSession: %v", err)
+		}
+		if err := s.DeleteSession(ctx, "a2"); err != nil {
+			t.Errorf("DeleteSession twice: %v", err)
+		}
+		// The sessions of a user go with the user.
+		if err := s.DeleteUser(ctx, bob.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.Session(ctx, "b2", 0); !errors.Is(err, ErrNotFound) {
+			t.Errorf("a session outlived its user: %v", err)
+		}
+	})
+}
+
+func TestUpdateUserSettings(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		alice := &User{Name: "alice", Settings: json.RawMessage(`{"language":"ru","queries":[{"name":"a"}]}`)}
+		if err := s.CreateUser(ctx, alice); err != nil {
+			t.Fatal(err)
+		}
+		bob := mustUser(t, s, "bob")
+		err := s.UpdateUserSettings(ctx, alice.ID, func(settings map[string]json.RawMessage) error {
+			if string(settings["language"]) != `"ru"` {
+				t.Errorf("settings handed to the change = %s", settings)
+			}
+			settings["language"] = json.RawMessage(`"en"`)
+			settings["darkMode"] = json.RawMessage(`"dark"`)
+			return nil
+		})
+		if err != nil {
+			t.Fatalf("UpdateUserSettings: %v", err)
+		}
+		got, err := s.UserByID(ctx, alice.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var settings map[string]any
+		if err := json.Unmarshal(got.Settings, &settings); err != nil {
+			t.Fatal(err)
+		}
+		want := map[string]any{"language": "en", "darkMode": "dark", "queries": []any{map[string]any{"name": "a"}}}
+		if !reflect.DeepEqual(settings, want) {
+			t.Errorf("settings = %v, want %v", settings, want)
+		}
+		if other, err := s.UserByID(ctx, bob.ID); err != nil || string(other.Settings) != "{}" {
+			t.Errorf("settings of the other user = %s, %v", other.Settings, err)
+		}
+
+		// A change that fails changes nothing.
+		failure := errors.New("no")
+		err = s.UpdateUserSettings(ctx, alice.ID, func(settings map[string]json.RawMessage) error {
+			settings["language"] = json.RawMessage(`"de"`)
+			return failure
+		})
+		if !errors.Is(err, failure) {
+			t.Errorf("UpdateUserSettings with a failing change: error = %v", err)
+		}
+		if again, _ := s.UserByID(ctx, alice.ID); !reflect.DeepEqual(again.Settings, got.Settings) {
+			t.Errorf("settings after a failed change = %s", again.Settings)
+		}
+		if err := s.UpdateUserSettings(ctx, bob.ID+100, func(map[string]json.RawMessage) error { return nil }); !errors.Is(err, ErrNotFound) {
+			t.Errorf("UpdateUserSettings(unknown user) error = %v, want ErrNotFound", err)
+		}
+		if _, err := s.UserByID(ctx, bob.ID+100); !errors.Is(err, ErrNotFound) {
+			t.Errorf("UserByID(unknown) error = %v, want ErrNotFound", err)
+		}
+
+		// Changes made at once are all kept.
+		var wg sync.WaitGroup
+		for i := range 8 {
+			wg.Go(func() {
+				err := s.UpdateUserSettings(ctx, bob.ID, func(settings map[string]json.RawMessage) error {
+					settings[fmt.Sprintf("key%d", i)] = json.RawMessage("true")
+					return nil
+				})
+				if err != nil {
+					t.Errorf("concurrent UpdateUserSettings: %v", err)
+				}
+			})
+		}
+		wg.Wait()
+		final, err := s.UserByID(ctx, bob.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var keys map[string]bool
+		if err := json.Unmarshal(final.Settings, &keys); err != nil || len(keys) != 8 {
+			t.Errorf("settings after 8 concurrent changes = %s, %v; want 8 keys", final.Settings, err)
+		}
+	})
+}
+
+// The first user of an installation is its default user; later ones change
+// nothing about that.
+func TestFirstUserIsTheDefault(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		mustUser(t, s, "alice")
+		mustUser(t, s, "bob")
+		if system, err := s.System(ctx); err != nil || system.DefaultUser != "alice" {
+			t.Errorf("System = %+v, %v; want alice as the default user", system, err)
+		}
+		// The rest of the settings is what it was.
+		want := DefaultSystem()
+		want.DefaultUser = "alice"
+		if system, _ := s.System(ctx); !reflect.DeepEqual(system, want) {
+			t.Errorf("System = %+v, want %+v", system, want)
+		}
+	})
+}

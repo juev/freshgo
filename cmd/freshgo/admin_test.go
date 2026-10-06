@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -11,6 +12,9 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/juev/freshgo/internal/config"
+	"github.com/juev/freshgo/internal/store"
 )
 
 // site serves a feed at /feed and at /news.xml, and a page at / that
@@ -165,6 +169,44 @@ func TestUsersFromTheCommandLine(t *testing.T) {
 		t.Errorf("main stream: status %d, body %q; want the 2 entries of the feed", status, body)
 	}
 
+	// The same password opens the web interface, and the first user of the
+	// installation administers it.
+	browser := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	webLogin := func(password string) *http.Cookie {
+		t.Helper()
+		resp, err := browser.PostForm("http://"+address+"/login", url.Values{"username": {"alice"}, "password": {password}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		for _, c := range resp.Cookies() {
+			return c
+		}
+		return nil
+	}
+	welcomed := func(c *http.Cookie) bool {
+		t.Helper()
+		req, err := http.NewRequest(http.MethodGet, "http://"+address+"/about", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.AddCookie(c)
+		resp, err := browser.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+		page, _ := io.ReadAll(resp.Body)
+		return strings.Contains(string(page), `<span class="account-name">alice</span>`)
+	}
+	session := webLogin("correct horse")
+	if session == nil || !welcomed(session) {
+		t.Fatal("the password given to user create does not open the web interface")
+	}
+	if webLogin("battery staple") != nil {
+		t.Error("the web interface took a password that is not the one of alice")
+	}
+
 	code, stdout, stderr = runCLIInput(t, "tr0ub4dor&3\n", append([]string{"user", "passwd"}, append(db, "alice")...)...)
 	if code != 0 || !strings.HasPrefix(stdout, "password of alice changed") {
 		t.Fatalf("user passwd: code %d, stdout %q, stderr %q", code, stdout, stderr)
@@ -174,6 +216,12 @@ func TestUsersFromTheCommandLine(t *testing.T) {
 	}
 	if login(t, address, "alice", "correct horse") != "" || login(t, address, "alice", "tr0ub4dor&3") == "" {
 		t.Error("after user passwd the old password works or the new one does not")
+	}
+	if welcomed(session) {
+		t.Error("a browser logged in with the old password is still logged in after user passwd")
+	}
+	if webLogin("correct horse") != nil || webLogin("tr0ub4dor&3") == nil {
+		t.Error("after user passwd the web interface takes the old password or not the new one")
 	}
 	if code, _, stderr := runCLIInput(t, "short\n", append([]string{"user", "passwd"}, append(db, "alice")...)...); code != 1 || !strings.Contains(stderr, "at least 7") {
 		t.Errorf("user passwd with a short password: code %d, stderr %q", code, stderr)
@@ -290,5 +338,45 @@ func TestCommandGroups(t *testing.T) {
 	if code, stdout, stderr := runCLI(t, "feed", "add", "-h"); code != 0 || stdout != "" ||
 		!strings.Contains(stderr, "Usage: freshgo feed add [flags] <address>") || !strings.Contains(stderr, "-category") {
 		t.Errorf("feed add -h: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}
+
+// Who administers the installation: its first user, and whoever is created
+// as an administrator.
+func TestUserCreateAdmin(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "freshgo.sqlite")
+	db := []string{"-database-url", "sqlite://" + path}
+	for name, flags := range map[string][]string{"alice": nil, "bob": nil, "carol": {"-admin"}} {
+		args := append(append([]string{"user", "create"}, db...), append(flags, name)...)
+		if code, _, stderr := runCLIInput(t, "long enough\n", args...); code != 0 {
+			t.Fatalf("user create %s: code %d, stderr %q", name, code, stderr)
+		}
+	}
+	ctx := context.Background()
+	s, err := store.Open(ctx, config.DriverSQLite, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = s.Close() }()
+	system, err := s.System(ctx)
+	if err != nil || system.DefaultUser == "" {
+		t.Fatalf("System = %+v, %v; want a default user", system, err)
+	}
+	for name, want := range map[string]bool{"alice": false, "bob": false, "carol": true} {
+		u, err := s.UserByName(ctx, name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var settings struct {
+			IsAdmin      bool   `json:"is_admin"`
+			PasswordHash string `json:"passwordHash"`
+		}
+		if err := json.Unmarshal(u.Settings, &settings); err != nil {
+			t.Fatal(err)
+		}
+		if settings.IsAdmin != want || settings.PasswordHash == "" || settings.PasswordHash != u.APIPasswordHash {
+			t.Errorf("%s: administrator %v, web hash %q, API hash %q; want administrator %v and one hash for both",
+				name, settings.IsAdmin, settings.PasswordHash, u.APIPasswordHash, want)
+		}
 	}
 }

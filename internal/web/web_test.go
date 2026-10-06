@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
@@ -21,6 +22,8 @@ type site struct {
 	t  *testing.T
 	db *store.Store
 	h  *Handler
+	// cookies are what the browser of the test holds.
+	cookies map[string]*http.Cookie
 }
 
 // eachEngine runs a test against the interface on every database engine.
@@ -57,13 +60,38 @@ type answer struct {
 
 func (s *site) do(method, target string, header map[string]string) answer {
 	s.t.Helper()
-	r := httptest.NewRequest(method, target, nil)
+	return s.send(httptest.NewRequest(method, target, nil), header)
+}
+
+// send passes a request through the interface, as a browser that keeps the
+// cookies it was given.
+func (s *site) send(r *http.Request, header map[string]string) answer {
+	s.t.Helper()
 	for name, value := range header {
 		r.Header.Set(name, value)
 	}
+	for _, c := range s.cookies {
+		r.AddCookie(c)
+	}
 	w := httptest.NewRecorder()
 	s.h.ServeHTTP(w, r)
+	for _, c := range w.Result().Cookies() {
+		delete(s.cookies, c.Name)
+		if c.MaxAge >= 0 {
+			if s.cookies == nil {
+				s.cookies = map[string]*http.Cookie{}
+			}
+			s.cookies[c.Name] = c
+		}
+	}
 	return answer{w.Code, w.Header(), w.Body.String()}
+}
+
+// post sends a form the way a browser does from a page of the interface.
+func (s *site) post(target string, form url.Values) answer {
+	s.t.Helper()
+	r := httptest.NewRequest(http.MethodPost, target, strings.NewReader(form.Encode()))
+	return s.send(r, map[string]string{"Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Site": "same-origin"})
 }
 
 func (s *site) get(target string) answer { return s.do(http.MethodGet, target, nil) }
@@ -100,9 +128,6 @@ func TestAboutPage(t *testing.T) {
 			t.Errorf("Content-Security-Policy = %q", csp)
 		}
 
-		if a := s.get("/"); a.status != http.StatusSeeOther || a.header.Get("Location") != "/about" {
-			t.Errorf("GET /: status %d, Location %q; want a redirect to /about", a.status, a.header.Get("Location"))
-		}
 	})
 }
 
@@ -200,8 +225,8 @@ func TestPublicPath(t *testing.T) {
 				t.Errorf("GET /about: no %q in\n%s", want, a.body)
 			}
 		}
-		if a := s.get("/"); a.header.Get("Location") != "/reader/about" {
-			t.Errorf("GET /: Location %q, want /reader/about", a.header.Get("Location"))
+		if a := s.get("/"); a.header.Get("Location") != "/reader/login?next=%2F" {
+			t.Errorf("GET /: Location %q, want the login page under the public path", a.header.Get("Location"))
 		}
 	})
 }
