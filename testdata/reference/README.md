@@ -34,9 +34,10 @@ Entry identifiers, salts and password hashes change on every run. Tests therefor
 - `scrape.php` scrapes the pages of `oracle/pages/` with the settings of `scrape-cases.json`, fetching them from a web server inside the container as a refresh does → `scrape.json`.
 - `purge.php` fills the database of a throwaway installation with the feeds of `purge-cases.json`, `cli/purge.php` cleans it up → `purge.json`: how many entries of every group are left. A group is entries alike in everything the cleanup looks at; `age` is how long ago, in seconds, the feed last listed them.
 - `search.php` reads the queries of `search-cases.json` as filters are read and matches them against the entries listed there → `search.json`: the structure FreshRSS built from each query and the entries it matches. Bounds of dates relative to the current time are left out (`volatile`).
+- `fulltext.php` gets the text of the articles of `oracle/articles/` with the selectors and filters of `fulltext-cases.json`, fetching the pages from a web server inside the container → `fulltext.json`.
 - `force-https.txt` is the installation's own force-https list for these runs.
 
-A new case is a file in `oracle/feeds/` or an entry in `sanitize-cases.json`, `scrape-cases.json`, `purge-cases.json` or `search-cases.json`, then `oracle/generate.sh`. Unlike the installations above, the output is stable from run to run, so `git diff` after regenerating shows exactly what the new case added.
+A new case is a file in `oracle/feeds/` or an entry in `sanitize-cases.json`, `scrape-cases.json`, `purge-cases.json`, `search-cases.json` or `fulltext-cases.json`, then `oracle/generate.sh`. Unlike the installations above, the output is stable from run to run, so `git diff` after regenerating shows exactly what the new case added.
 
 The documents are parsed without an address, so relative links stay unresolved against the feed URL here; the installations cover that.
 

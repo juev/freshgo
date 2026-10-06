@@ -105,6 +105,18 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 	if !ok {
 		markUnread = j.conf.markUpdatedUnread
 	}
+	// The text of new and changed entries is completed first: it may take a
+	// request per entry, and what follows looks at the completed text.
+	if completion := r.completion(j, f, attrs, params); !completion.off() {
+		for _, e := range entries {
+			if st, exists := states[e.GUID]; !exists || (st.Hash != nil && !bytes.Equal(st.Hash, e.Hash)) {
+				r.complete(ctx, j, f, completion, e, now)
+			}
+		}
+		if ctx.Err() != nil {
+			return result{}, ctx.Err()
+		}
+	}
 	uponReception, ok := get[bool](attrs, "read_upon_reception")
 	if !ok {
 		uponReception = j.conf.readUponReception

@@ -3,6 +3,8 @@ module github.com/juev/freshgo
 go 1.27
 
 require (
+	github.com/PuerkitoBio/goquery v1.13.0
+	github.com/andybalholm/cascadia v1.3.4
 	github.com/antchfx/htmlquery v1.3.7
 	github.com/antchfx/xmlquery v1.5.2
 	github.com/antchfx/xpath v1.3.9

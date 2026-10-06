@@ -1,8 +1,9 @@
 #!/bin/sh
-# Regenerates sanitize.json, feeds.json, scrape.json, purge.json and
-# search.json: what FreshRSS itself makes of sanitize-cases.json, of the
-# corpus and feeds/, of the pages of scrape-cases.json, of the entries of
-# purge-cases.json and of the queries of search-cases.json. Needs Docker.
+# Regenerates sanitize.json, feeds.json, scrape.json, purge.json, search.json
+# and fulltext.json: what FreshRSS itself makes of sanitize-cases.json, of
+# the corpus and feeds/, of the pages of scrape-cases.json, of the entries of
+# purge-cases.json, of the queries of search-cases.json and of the articles
+# of fulltext-cases.json. Needs Docker.
 set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -36,3 +37,6 @@ run sh -c 'cd /var/www/FreshRSS && {
 		--base-url http://freshrss.freshgo.test --language en --title FreshRSS --db-type sqlite &&
 	./cli/create-user.php --user search --language en --no-default-feeds
 } >&2 && php /oracle/search.php search' < "$here/search-cases.json" > "$here/search.json"
+# Article pages are fetched over HTTP as well.
+run sh -c 'php -S 127.0.0.1:8080 -t /oracle/articles >/dev/null 2>&1 & sleep 1; php /oracle/fulltext.php' \
+	< "$here/fulltext-cases.json" > "$here/fulltext.json"
