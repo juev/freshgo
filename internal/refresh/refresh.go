@@ -19,6 +19,7 @@ import (
 	"github.com/juev/freshgo/internal/feed"
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/hooks"
+	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -92,7 +93,11 @@ func (r *Refresher) Run(ctx context.Context, o Options) ([]Stats, error) {
 		if err != nil {
 			return all, fmt.Errorf("refresh: user %s: %w", u.Name, err)
 		}
-		st, err := r.refreshUser(ctx, &job{user: u, conf: conf, https: https, categories: categories}, o)
+		j := &job{user: u, conf: conf, https: https, categories: categories}
+		if err := r.loadRules(ctx, j); err != nil {
+			return all, fmt.Errorf("refresh: user %s: %w", u.Name, err)
+		}
+		st, err := r.refreshUser(ctx, j, o)
 		all = append(all, st)
 		if err != nil {
 			return all, fmt.Errorf("refresh: user %s: %w", u.Name, err)
@@ -136,6 +141,11 @@ type job struct {
 	// categories are the user's, by identifier, as they were when the run
 	// reached the user.
 	categories map[int64]*category
+	// search is what the queries of filters are read against; rules are the
+	// user's own filters, labels the rules of the labels that have any.
+	search search.Options
+	rules  []search.Rule
+	labels []labelRules
 }
 
 func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options) (Stats, error) {

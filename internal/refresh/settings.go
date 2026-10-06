@@ -3,6 +3,8 @@ package refresh
 import (
 	"encoding/json"
 	"time"
+
+	"github.com/juev/freshgo/internal/search"
 )
 
 // defaultTTL is the refresh period of a user who has not set one: the
@@ -75,6 +77,10 @@ type userSettings struct {
 	// sameTitleInFeed is the number of latest entries of a feed among which
 	// a repeated title makes a new entry read; zero is off.
 	sameTitleInFeed int
+	// filters are the user's filter actions, queries the saved searches the
+	// filters may refer to.
+	filters json.RawMessage
+	queries []search.SavedQuery
 }
 
 func readUserSettings(raw json.RawMessage) userSettings {
@@ -107,5 +113,7 @@ func readUserSettings(raw json.RawMessage) userSettings {
 	} else if v, _ := get[bool](when, "same_title_in_feed"); v {
 		s.sameTitleInFeed = 1
 	}
+	s.filters = a["filters"]
+	s.queries = search.ParseSavedQueries(a["queries"])
 	return s
 }

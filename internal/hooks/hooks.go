@@ -79,6 +79,7 @@ const (
 	WhyUponReception      = "upon_reception"
 	WhySameTitleInFeed    = "same_title_in_feed"
 	WhySameGUIDInCategory = "same_guid_in_category"
+	WhyFilter             = "filter"
 )
 
 // EntryAuto is the argument of EntryAutoRead and EntryAutoUnread.

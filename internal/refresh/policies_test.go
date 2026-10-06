@@ -269,35 +269,6 @@ func TestRetentionIsInherited(t *testing.T) {
 	}
 }
 
-func TestPeriodBefore(t *testing.T) {
-	paris, err := time.LoadLocation("Europe/Paris")
-	if err != nil {
-		t.Fatal(err)
-	}
-	now := time.Date(2026, 5, 31, 12, 0, 0, 0, paris)
-	cases := []struct {
-		period string
-		want   time.Time
-	}{
-		{"P3M", time.Date(2026, 3, 3, 12, 0, 0, 0, paris)}, // 31 February, as PHP counts it
-		{"P1Y", time.Date(2025, 5, 31, 12, 0, 0, 0, paris)},
-		{"P2W", time.Date(2026, 5, 17, 12, 0, 0, 0, paris)},
-		{"P10D", time.Date(2026, 5, 21, 12, 0, 0, 0, paris)},
-		{"PT36H", time.Date(2026, 5, 30, 0, 0, 0, 0, paris)},
-		{"P1Y2M3DT4H5M6S", time.Date(2025, 3, 28, 7, 54, 54, 0, paris)},
-	}
-	for _, c := range cases {
-		if got, err := periodBefore(now, c.period); err != nil || !got.Equal(c.want) {
-			t.Errorf("periodBefore(%q) = %v, %v; want %v", c.period, got, err, c.want)
-		}
-	}
-	for _, period := range []string{"", "P", "PT", "3M", "P1.5M", "P-1D", "P1H"} {
-		if got, err := periodBefore(now, period); err == nil {
-			t.Errorf("periodBefore(%q) = %v, want an error", period, got)
-		}
-	}
-}
-
 // R10: entries the feed no longer lists become read when asked.
 func TestReadUponGone(t *testing.T) {
 	cases := []struct {

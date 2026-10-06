@@ -1,8 +1,8 @@
 #!/bin/sh
-# Regenerates sanitize.json, feeds.json, scrape.json and purge.json: what
-# FreshRSS itself makes of sanitize-cases.json, of the corpus and feeds/, of
-# the pages of scrape-cases.json and of the entries of purge-cases.json.
-# Needs Docker.
+# Regenerates sanitize.json, feeds.json, scrape.json, purge.json and
+# search.json: what FreshRSS itself makes of sanitize-cases.json, of the
+# corpus and feeds/, of the pages of scrape-cases.json, of the entries of
+# purge-cases.json and of the queries of search-cases.json. Needs Docker.
 set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -30,3 +30,9 @@ run sh -c 'cd /var/www/FreshRSS && {
 	php /oracle/purge.php fill purge &&
 	./cli/purge.php --user purge
 } >&2 && php /oracle/purge.php kept purge' > "$here/purge.json"
+# The search language needs a user as well: saved queries and feed categories.
+run sh -c 'cd /var/www/FreshRSS && {
+	./cli/do-install.php --default-user search --auth-type none --environment production \
+		--base-url http://freshrss.freshgo.test --language en --title FreshRSS --db-type sqlite &&
+	./cli/create-user.php --user search --language en --no-default-feeds
+} >&2 && php /oracle/search.php search' < "$here/search-cases.json" > "$here/search.json"

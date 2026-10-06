@@ -6,12 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
-	"strconv"
 	"sync"
 	"time"
 
+	"github.com/juev/freshgo/internal/feed"
 	"github.com/juev/freshgo/internal/hooks"
+	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -53,39 +53,11 @@ func readArchiving(raw json.RawMessage) (a archiving, ok bool) {
 	return a, true
 }
 
-var periodPattern = regexp.MustCompile(
-	`^P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$`)
-
-// periodBefore returns the moment an ISO 8601 duration before now, counting
-// years, months and days by the calendar of now's time zone as PHP does.
-func periodBefore(now time.Time, period string) (time.Time, error) {
-	m := periodPattern.FindStringSubmatch(period)
-	if m == nil {
-		return time.Time{}, fmt.Errorf("period %q is not an ISO 8601 duration", period)
-	}
-	var n [8]int
-	parts := 0
-	for i := 1; i < len(m); i++ {
-		if m[i] == "" {
-			continue
-		}
-		v, err := strconv.Atoi(m[i])
-		if err != nil {
-			return time.Time{}, fmt.Errorf("period %q: %w", period, err)
-		}
-		n[i] = v
-		parts++
-	}
-	if parts == 0 {
-		return time.Time{}, fmt.Errorf("period %q is empty", period)
-	}
-	clock := time.Duration(n[5])*time.Hour + time.Duration(n[6])*time.Minute + time.Duration(n[7])*time.Second
-	return now.AddDate(-n[1], -n[2], -7*n[3]-n[4]).Add(-clock), nil
-}
-
 // category is what the feeds of one category share during a run.
 type category struct {
 	attrs attributes
+	// rules are the filter actions of the category.
+	rules []search.Rule
 	// mu orders the refreshes of the feeds of a category that marks repeated
 	// titles or identifiers read: each has to see the entries of the others.
 	mu sync.Mutex
@@ -120,12 +92,12 @@ func (r *Refresher) clean(ctx context.Context, tx *store.Store, j *job, f *store
 		KeepFavorites: a.keepFavorites, KeepLabeled: a.keepLabels, KeepUnread: a.keepUnreads,
 	}
 	if a.period != "" {
-		before, err := periodBefore(time.Unix(now, 0).In(j.conf.location), a.period)
+		period, err := feed.ParsePeriod(a.period)
 		if err != nil {
 			r.log.Warn("retention period is not usable, entries are not deleted by age", "user", j.user.Name,
 				"feed", f.ID, "url", withoutCredentials(f.URL), "error", err)
 		} else {
-			keep.SeenBefore = before.Unix()
+			keep.SeenBefore = period.Before(time.Unix(now, 0).In(j.conf.location)).Unix()
 		}
 	}
 	n, err := tx.DeleteOldEntries(ctx, f.UserID, f.ID, keep)

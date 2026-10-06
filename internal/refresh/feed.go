@@ -121,11 +121,14 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 			defer lock.Unlock()
 		}
 	}
+	feedRules := r.rules(j, attrs["filters"], "feed", f.ID)
 	var (
 		added   []*store.Entry
 		updates []update
 		// hashes are for the entries that have none yet, by entry id.
 		hashes = map[int64][]byte{}
+		// labels are the labels the rules give to new entries.
+		labels = map[*store.Entry][]int64{}
 	)
 	for _, e := range entries {
 		st, exists := states[e.GUID]
@@ -135,9 +138,14 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 				continue
 			}
 			r.autoRead(ctx, e, uponReception, known)
+			r.applyRules(ctx, j, f, feedRules, e, false, now)
 			known.add(e)
 			if e, ok = r.hooks.EntryBeforeAdd.Call(ctx, e); !ok {
 				continue
+			}
+			// Labels look at the entry as it is stored.
+			if tagIDs := labelsFor(j, f, e, now); len(tagIDs) > 0 {
+				labels[e] = tagIDs
 			}
 			added = append(added, e)
 		case st.Hash == nil:
@@ -157,6 +165,7 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 			// A changed entry is not compared by title: the repeat may be
 			// the entry itself.
 			r.autoRead(ctx, e, uponReception, repeats{})
+			r.applyRules(ctx, j, f, feedRules, e, true, now)
 			known.add(e)
 			if e, ok = r.hooks.EntryBeforeUpdate.Call(ctx, e); !ok {
 				continue
@@ -195,6 +204,13 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 			return err
 		}
 		res.added = len(insert)
+		for _, e := range insert {
+			for _, tagID := range labels[e] {
+				if err := tx.TagEntry(ctx, f.UserID, tagID, e.ID); err != nil {
+					return err
+				}
+			}
+		}
 		for _, u := range updates {
 			st, exists := states[u.entry.GUID]
 			if !exists {

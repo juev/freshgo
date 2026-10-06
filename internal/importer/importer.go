@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -216,6 +217,8 @@ type userImport struct {
 
 	user  *store.User
 	stats UserReport
+	// queries are the saved searches of the user, which filters may refer to.
+	queries []search.SavedQuery
 }
 
 func (u *userImport) run() error {
@@ -253,7 +256,37 @@ func (u *userImport) createUser() error {
 		return fmt.Errorf("settings: %w", err)
 	}
 	u.user = &store.User{Name: u.name, APIPasswordHash: hash, Settings: settings}
-	return u.dst.CreateUser(u.ctx, u.user)
+	if err := u.dst.CreateUser(u.ctx, u.user); err != nil {
+		return err
+	}
+	var kept struct {
+		Queries json.RawMessage `json:"queries"`
+		Filters json.RawMessage `json:"filters"`
+	}
+	if err := json.Unmarshal(settings, &kept); err == nil {
+		u.queries = search.ParseSavedQueries(kept.Queries)
+		u.checkFilters(kept.Filters, "settings")
+	}
+	return nil
+}
+
+// checkFilters warns about the filter actions freshgo will not apply: those
+// whose query it cannot read. owner says whose filters they are.
+func (u *userImport) checkFilters(filters json.RawMessage, owner string) {
+	_, problems := search.ParseRules(filters, search.Options{Queries: u.queries})
+	for _, problem := range problems {
+		u.warnf("%s: %v; the filter will be skipped", owner, problem)
+	}
+}
+
+// checkAttributeFilters is checkFilters for the "filters" of an attributes value.
+func (u *userImport) checkAttributeFilters(attributes json.RawMessage, owner string) {
+	var kept struct {
+		Filters json.RawMessage `json:"filters"`
+	}
+	if json.Unmarshal(attributes, &kept) == nil {
+		u.checkFilters(kept.Filters, owner)
+	}
 }
 
 func (u *userImport) categories() error {
@@ -274,6 +307,7 @@ func (u *userImport) categories() error {
 		c.Name = decodeText(c.Name)
 		c.Kind, c.LastUpdate, c.Error = int(kind.Int64), lastUpdate.Int64, failed.Int64
 		c.Attributes = u.attributes(attributes.String, "category %d", c.ID)
+		u.checkAttributeFilters(c.Attributes, fmt.Sprintf("category %d", c.ID))
 		// The default category was created together with the user.
 		if c.ID == store.DefaultCategoryID {
 			err = u.dst.UpdateCategory(u.ctx, c)
@@ -327,6 +361,7 @@ func (u *userImport) feeds() error {
 			f.HTTPAuth = decodeText(string(auth))
 		}
 		f.Attributes = u.attributes(attributes.String, "feed %d", f.ID)
+		u.checkAttributeFilters(f.Attributes, fmt.Sprintf("feed %d (%s)", f.ID, f.URL))
 		if err := u.dst.CreateFeed(u.ctx, f); err != nil {
 			return err
 		}
@@ -458,6 +493,7 @@ func (u *userImport) tags() error {
 		}
 		t.Name = decodeText(t.Name)
 		t.Attributes = u.attributes(attributes.String, "tag %d", t.ID)
+		u.checkAttributeFilters(t.Attributes, fmt.Sprintf("label %d", t.ID))
 		if err := u.dst.CreateTag(u.ctx, t); err != nil {
 			return err
 		}

@@ -1,6 +1,6 @@
 # Extension points
 
-Status: the registry and the hooks of the refresh pipeline are implemented. The hooks called from the API and from feed management are declared and get their call sites in plan steps 9, 11 and 13.
+Status: the registry and the hooks of the refresh pipeline are implemented. The hooks called from the API and from feed management are declared and get their call sites in plan steps 11 and 13.
 Sources: user request of 2026-10-06 and the decisions recorded in `plan.md`; `lib/Minz/HookType.php` and `Minz_ExtensionManager::callHook` of FreshRSS at commit `219eaf58`.
 
 ## Purpose and scope
@@ -33,7 +33,7 @@ Out of scope: a runtime for extensions. Handlers are Go functions compiled into 
 | `EntryBeforeAdd` | chain | entry | for a new entry, after `EntryBeforeInsert` |
 | `EntryBeforeUpdate` | chain | entry | for a changed entry, after `EntryBeforeInsert` |
 | `EntryBeforeDisplay` | chain | entry | when the API returns an entry (step 11) |
-| `EntryAutoRead` | event | entry and reason | when a rule marks an arriving entry read, once per rule that applies: `upon_reception`, `same_title_in_feed` (also for a title repeated in the category), `same_guid_in_category`; filters come with step 9 |
+| `EntryAutoRead` | event | entry and reason | when a rule marks an arriving entry read, once per rule that applies: `upon_reception`, `same_title_in_feed` (also for a title repeated in the category), `same_guid_in_category`, and `filter` for a filter action |
 | `EntryAutoUnread` | event | entry and reason | when a changed entry is made unread, reason `updated_article` |
 | `EntriesRead`, `EntriesFavorite` | event | user, entry ids, new state | after the user changes the state through the API (step 11) |
 | `Init` | signal | none | when a command that refreshes or serves starts |

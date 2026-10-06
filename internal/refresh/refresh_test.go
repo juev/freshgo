@@ -34,10 +34,31 @@ type world struct {
 	r        *Refresher
 	clock    time.Time
 
+	// logs is what the Refresher reported.
+	logs *syncBuffer
+
 	server *httptest.Server
 	mu     sync.Mutex
 	pages  map[string]http.HandlerFunc
 	hits   map[string]int
+}
+
+// syncBuffer is a buffer several goroutines may write to.
+type syncBuffer struct {
+	mu sync.Mutex
+	b  strings.Builder
+}
+
+func (s *syncBuffer) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *syncBuffer) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
 }
 
 // eachEngine runs the test against every available database engine.
@@ -58,7 +79,7 @@ func eachEngine(t *testing.T, test func(t *testing.T, w *world)) {
 
 func newWorld(t *testing.T, db *store.Store) *world {
 	t.Helper()
-	w := &world{t: t, db: db, registry: &hooks.Registry{}, clock: start,
+	w := &world{t: t, db: db, registry: &hooks.Registry{}, clock: start, logs: &syncBuffer{},
 		pages: map[string]http.HandlerFunc{}, hits: map[string]int{}}
 	w.server = httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		w.mu.Lock()
@@ -85,7 +106,7 @@ func (w *world) refresher() *Refresher {
 	if err != nil {
 		w.t.Fatal(err)
 	}
-	r := New(w.db, client, w.registry, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	r := New(w.db, client, w.registry, slog.New(slog.NewTextHandler(w.logs, nil)))
 	r.now = func() time.Time { return w.clock }
 	return r
 }
