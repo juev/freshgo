@@ -3,3 +3,6 @@
 *.sqlite-wal
 *.sqlite-shm
 !/testdata/reference/**/db.sqlite
+
+# Ignored globally on some machines, tracked here.
+!/AGENTS.md
