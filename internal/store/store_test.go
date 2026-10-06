@@ -236,6 +236,7 @@ func TestFeedRoundTrip(t *testing.T) {
 			LastUpdate: 1700000100, Priority: -5, PathEntries: "article .body", HTTPAuth: "user:p@ss",
 			Error: 1700000200, TTL: -3600,
 			Attributes: json.RawMessage(`{"xpath":{"item":"//article"},"curl_params":{"10004":"proxy:8080"}}`),
+			HTTPETag:   `W/"abc"`, HTTPLastModified: "Tue, 06 Oct 2026 10:00:00 GMT",
 		}
 		if err := s.CreateFeed(ctx, want); err != nil {
 			t.Fatalf("CreateFeed: %v", err)
@@ -694,6 +695,205 @@ func TestRaiseCounters(t *testing.T) {
 		}
 		if f := mustFeed(t, s, u.ID, "https://example.org/b"); f.ID != 11 {
 			t.Errorf("feed id after lowering the counter = %d, want 11", f.ID)
+		}
+	})
+}
+
+func TestUpdateFeed(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		u := mustUser(t, s, "alice")
+		category := &Category{UserID: u.ID, Name: "News"}
+		if err := s.CreateCategory(ctx, category); err != nil {
+			t.Fatal(err)
+		}
+		f := mustFeed(t, s, u.ID, "https://example.org/feed")
+		untouched := mustFeed(t, s, u.ID, "https://example.org/other")
+
+		want := &Feed{
+			UserID: u.ID, ID: f.ID, URL: "https://example.org/moved", Kind: 15, CategoryID: category.ID,
+			Name: "Новое имя", Website: "https://example.org/", Description: "d", LastUpdate: 1700000100,
+			Priority: 20, PathEntries: "article", HTTPAuth: "u:p", Error: 1700000200, TTL: -900,
+			Attributes: json.RawMessage(`{"unicityCriteria":"sha1:link_published"}`),
+			HTTPETag:   `"v2"`, HTTPLastModified: "Tue, 06 Oct 2026 11:00:00 GMT",
+		}
+		if err := s.UpdateFeed(ctx, want); err != nil {
+			t.Fatalf("UpdateFeed: %v", err)
+		}
+		got, err := s.FeedByID(ctx, u.ID, f.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("after UpdateFeed:\n got %+v\nwant %+v", got, want)
+		}
+		if other, err := s.FeedByID(ctx, u.ID, untouched.ID); err != nil || other.URL != untouched.URL || other.Name != untouched.Name {
+			t.Errorf("another feed changed: %+v, %v", other, err)
+		}
+
+		locked, err := s.LockFeed(ctx, u.ID, f.ID)
+		if err != nil || !reflect.DeepEqual(locked, want) {
+			t.Errorf("LockFeed = %+v, %v; want the stored feed", locked, err)
+		}
+		if _, err := s.LockFeed(ctx, u.ID, 999); !errors.Is(err, ErrNotFound) {
+			t.Errorf("LockFeed(unknown) error = %v, want ErrNotFound", err)
+		}
+		missing := *want
+		missing.ID = 999
+		if err := s.UpdateFeed(ctx, &missing); !errors.Is(err, ErrNotFound) {
+			t.Errorf("UpdateFeed(unknown) error = %v, want ErrNotFound", err)
+		}
+	})
+}
+
+// Two transactions that lock the same feed run one after the other: the
+// second sees what the first wrote.
+func TestLockFeedSerializes(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		u := mustUser(t, s, "alice")
+		f := mustFeed(t, s, u.ID, "https://example.org/feed")
+
+		const writers = 8
+		var wg sync.WaitGroup
+		errs := make(chan error, writers)
+		for range writers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				errs <- s.InTx(ctx, func(tx *Store) error {
+					locked, err := tx.LockFeed(ctx, u.ID, f.ID)
+					if err != nil {
+						return err
+					}
+					locked.LastUpdate++
+					return tx.UpdateFeed(ctx, locked)
+				})
+			}()
+		}
+		wg.Wait()
+		close(errs)
+		for err := range errs {
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		got, err := s.FeedByID(ctx, u.ID, f.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got.LastUpdate != writers {
+			t.Errorf("LastUpdate = %d after %d locked increments", got.LastUpdate, writers)
+		}
+	})
+}
+
+func TestUpdateEntry(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		u := mustUser(t, s, "alice")
+		feed := mustFeed(t, s, u.ID, "https://example.org/feed")
+		e := &Entry{FeedID: feed.ID, GUID: "one", Title: "old", IsFavorite: true, LastSeen: 100}
+		neighbour := &Entry{FeedID: feed.ID, GUID: "two", Title: "neighbour"}
+		if err := s.InsertEntries(ctx, u.ID, []*Entry{e, neighbour}); err != nil {
+			t.Fatal(err)
+		}
+
+		want := &Entry{
+			UserID: u.ID, ID: e.ID, FeedID: feed.ID, GUID: "one", Title: "new <title>", Authors: []string{"A", "B"},
+			Content: "<p>новый</p>", Link: "https://example.org/1", Published: 1700000000, LastSeen: 200,
+			LastModified: 200, LastUserModified: 150, Hash: []byte{1, 2, 3}, IsRead: true, IsFavorite: false,
+			Tags: []string{"t"}, Attributes: json.RawMessage(`{"enclosures":[]}`),
+		}
+		if err := s.UpdateEntry(ctx, want); err != nil {
+			t.Fatalf("UpdateEntry: %v", err)
+		}
+		got, err := s.EntryByID(ctx, u.ID, e.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("after UpdateEntry:\n got %+v\nwant %+v", got, want)
+		}
+		if other, err := s.EntryByID(ctx, u.ID, neighbour.ID); err != nil || other.Title != "neighbour" {
+			t.Errorf("another entry changed: %+v, %v", other, err)
+		}
+
+		missing := *want
+		missing.ID = 1
+		if err := s.UpdateEntry(ctx, &missing); !errors.Is(err, ErrNotFound) {
+			t.Errorf("UpdateEntry(unknown) error = %v, want ErrNotFound", err)
+		}
+
+		if err := s.SetEntryHash(ctx, u.ID, neighbour.ID, []byte{9}); err != nil {
+			t.Fatal(err)
+		}
+		if other, _ := s.EntryByID(ctx, u.ID, neighbour.ID); !reflect.DeepEqual(other.Hash, []byte{9}) || other.Title != "neighbour" {
+			t.Errorf("after SetEntryHash: %+v", other)
+		}
+	})
+}
+
+func TestEntryStatesAndLastSeen(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		u := mustUser(t, s, "alice")
+		feed := mustFeed(t, s, u.ID, "https://example.org/feed")
+		other := mustFeed(t, s, u.ID, "https://example.org/other")
+
+		// More entries than fit in one query.
+		var entries []*Entry
+		var guids []string
+		for i := range guidChunk + 20 {
+			guid := fmt.Sprintf("guid-%d", i)
+			guids = append(guids, guid)
+			entries = append(entries, &Entry{FeedID: feed.ID, GUID: guid, LastSeen: 100})
+		}
+		entries[0].Hash, entries[0].IsRead, entries[0].LastUserModified = []byte{7}, true, 50
+		entries[1].IsFavorite = true
+		foreign := &Entry{FeedID: other.ID, GUID: "guid-0", LastSeen: 100}
+		if err := s.InsertEntries(ctx, u.ID, append(entries, foreign)); err != nil {
+			t.Fatal(err)
+		}
+
+		states, err := s.EntryStates(ctx, u.ID, feed.ID, append(guids, "absent"))
+		if err != nil {
+			t.Fatalf("EntryStates: %v", err)
+		}
+		if len(states) != len(guids) {
+			t.Fatalf("EntryStates returned %d entries, want %d", len(states), len(guids))
+		}
+		if want := (EntryState{ID: entries[0].ID, Hash: []byte{7}, IsRead: true, LastUserModified: 50}); !reflect.DeepEqual(states["guid-0"], want) {
+			t.Errorf("state of guid-0 = %+v, want %+v", states["guid-0"], want)
+		}
+		if st := states["guid-1"]; st.ID != entries[1].ID || st.Hash != nil || !st.IsFavorite || st.IsRead {
+			t.Errorf("state of guid-1 = %+v", st)
+		}
+
+		seen := guids[10:]
+		if err := s.MarkEntriesSeen(ctx, u.ID, feed.ID, seen, 200); err != nil {
+			t.Fatalf("MarkEntriesSeen: %v", err)
+		}
+		lastSeen := func(id int64) int64 {
+			t.Helper()
+			e, err := s.EntryByID(ctx, u.ID, id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return e.LastSeen
+		}
+		if lastSeen(entries[9].ID) != 100 || lastSeen(entries[10].ID) != 200 || lastSeen(entries[len(entries)-1].ID) != 200 {
+			t.Error("MarkEntriesSeen did not touch exactly the listed entries")
+		}
+		if lastSeen(foreign.ID) != 100 {
+			t.Error("MarkEntriesSeen touched an entry of another feed")
+		}
+
+		if err := s.MarkEntriesSeenSince(ctx, u.ID, feed.ID, 200, 300); err != nil {
+			t.Fatalf("MarkEntriesSeenSince: %v", err)
+		}
+		if lastSeen(entries[9].ID) != 100 || lastSeen(entries[10].ID) != 300 || lastSeen(foreign.ID) != 100 {
+			t.Error("MarkEntriesSeenSince did not touch exactly the entries seen since the given time")
 		}
 	})
 }

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 
@@ -771,4 +772,40 @@ func TestImportFollowsSymlinkedUser(t *testing.T) {
 	if len(report.Users) != 2 || report.Users[1].Name != "bob" || report.Users[1].Entries != 11 {
 		t.Errorf("report = %+v, want bob imported with 11 entries", report.Users)
 	}
+}
+
+// FreshRSS stores an entry without a title under its guid, which stays
+// HTML-encoded while titles are decoded: the import turns it into no title.
+func TestImportUntitledEntry(t *testing.T) {
+	ctx := context.Background()
+	dir := brokenCopy(t)
+	sourceExec(t, dir, "alice", `UPDATE entry SET guid = 'http://example.org/?a=1&amp;b=2', title = 'http://example.org/?a=1&amp;b=2'
+		WHERE id = (SELECT MIN(id) FROM entry)`)
+	sourceExec(t, dir, "alice", `UPDATE entry SET title = 'Tom &amp; Jerry' WHERE id = (SELECT MAX(id) FROM entry)`)
+
+	eachDestination(t, func(t *testing.T, dst *store.Store) {
+		if _, err := Run(ctx, dst, Options{DataDir: dir}); err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+		alice, err := dst.UserByName(ctx, "alice")
+		if err != nil {
+			t.Fatal(err)
+		}
+		var entries []*store.Entry
+		feeds, err := dst.Feeds(ctx, alice.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, f := range feeds {
+			entries = append(entries, entriesOfFeed(t, dst, alice.ID, f.ID)...)
+		}
+		sort.Slice(entries, func(a, b int) bool { return entries[a].ID < entries[b].ID })
+		first, last := entries[0], entries[len(entries)-1]
+		if first.GUID != "http://example.org/?a=1&amp;b=2" || first.Title != "" {
+			t.Errorf("untitled entry: guid %q, title %q; want the guid kept and no title", first.GUID, first.Title)
+		}
+		if last.Title != "Tom & Jerry" {
+			t.Errorf("titled entry: title %q", last.Title)
+		}
+	})
 }

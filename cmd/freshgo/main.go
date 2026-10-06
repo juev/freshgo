@@ -35,8 +35,8 @@ type command struct {
 
 func commands() []command {
 	return []command{
-		{"serve", "run the HTTP server and the refresh scheduler", stub},
-		{"refresh", "refresh feeds once and exit", stub},
+		{"serve", "run the HTTP server and the refresh scheduler", runServe},
+		{"refresh", "refresh feeds once and exit", runRefresh},
 		{"purge", "delete old entries according to the archiving settings", stub},
 		{"import", "import a FreshRSS installation into an empty database", runImport},
 		{"user", "manage users: create, passwd, list, delete", stub},

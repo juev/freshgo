@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 )
 
 // Environment variable names. A flag given on the command line wins over the
@@ -15,11 +16,18 @@ const (
 	EnvDatabaseURL = "FRESHGO_DATABASE_URL"
 	EnvListen      = "FRESHGO_LISTEN"
 	EnvBaseURL     = "FRESHGO_BASE_URL"
+	// EnvFetchAllowlist and EnvRefreshInterval are read by the commands that
+	// refresh feeds.
+	EnvFetchAllowlist  = "FRESHGO_FETCH_ALLOWLIST"
+	EnvRefreshInterval = "FRESHGO_REFRESH_INTERVAL"
 )
 
 const (
 	defaultDatabaseURL = "sqlite://freshgo.sqlite"
 	defaultListen      = "127.0.0.1:8080"
+	// defaultRefreshInterval is on the order of the cron period FreshRSS is
+	// usually run with.
+	defaultRefreshInterval = 10 * time.Minute
 )
 
 // Driver identifies a database engine.
@@ -39,6 +47,16 @@ type Config struct {
 	// BaseURL is the public address of the server, without a trailing slash.
 	// Empty means it is unknown: links are built from the request, WebSub is off.
 	BaseURL string
+	// FetchAllowlist names, separated by commas, the internal destinations
+	// feeds may be fetched from: "host:port", "ip:port", a CIDR range, or
+	// "*" for all of them. Without it requests to private and loopback
+	// addresses are refused.
+	FetchAllowlist string
+	// RefreshInterval is how often the server looks for feeds that are due.
+	RefreshInterval time.Duration
+
+	// invalid is what was wrong with the environment, reported by Validate.
+	invalid error
 }
 
 // Bind registers the shared flags on fs. Defaults come from getenv, so the
@@ -51,13 +69,43 @@ func Bind(fs *flag.FlagSet, getenv func(string) string) *Config {
 		"HTTP listen address ($"+EnvListen+")")
 	fs.StringVar(&c.BaseURL, "base-url", getenv(EnvBaseURL),
 		"public URL of the server ($"+EnvBaseURL+")")
+	fs.StringVar(&c.FetchAllowlist, "fetch-allowlist", getenv(EnvFetchAllowlist),
+		"internal addresses feeds may be fetched from, comma-separated: host:port, CIDR or * ($"+EnvFetchAllowlist+")")
+	interval := defaultRefreshInterval
+	if v := getenv(EnvRefreshInterval); v != "" {
+		d, err := time.ParseDuration(v)
+		if err != nil {
+			c.invalid = fmt.Errorf("$%s: %w", EnvRefreshInterval, err)
+		} else {
+			interval = d
+		}
+	}
+	fs.DurationVar(&c.RefreshInterval, "refresh-interval", interval,
+		"how often the server looks for feeds to refresh ($"+EnvRefreshInterval+")")
 	return c
+}
+
+// Allowlist returns the entries of FetchAllowlist.
+func (c *Config) Allowlist() []string {
+	var list []string
+	for _, entry := range strings.Split(c.FetchAllowlist, ",") {
+		if entry = strings.TrimSpace(entry); entry != "" {
+			list = append(list, entry)
+		}
+	}
+	return list
 }
 
 // Validate checks the values after flag parsing and normalizes BaseURL.
 func (c *Config) Validate() error {
+	if c.invalid != nil {
+		return c.invalid
+	}
 	if _, _, err := c.Database(); err != nil {
 		return err
+	}
+	if c.RefreshInterval <= 0 {
+		return fmt.Errorf("refresh interval %s: want a positive duration", c.RefreshInterval)
 	}
 	if c.BaseURL != "" {
 		u, err := url.Parse(c.BaseURL)

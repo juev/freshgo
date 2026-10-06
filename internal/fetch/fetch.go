@@ -164,8 +164,7 @@ type Response struct {
 	URL string
 	// PermanentURL is where the requested URL has moved for good: the end of
 	// the unbroken chain of 301 and 308 redirects starting at the requested
-	// URL. It equals the requested URL when the first response was not such a
-	// redirect.
+	// URL. It is empty when the first response was not such a redirect.
 	PermanentURL string
 	// NotModified reports a 304: the caller's copy is current and Body is empty.
 	NotModified bool
@@ -218,7 +217,7 @@ func (c *Client) Fetch(ctx context.Context, req Request) (*Response, error) {
 		limit = p.MaxRedirects
 	}
 
-	res := &Response{PermanentURL: u.String()}
+	res := &Response{}
 	permanent := true
 	for redirects := 0; ; redirects++ {
 		status, header, body, err := c.do(ctx, u, &h)

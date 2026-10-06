@@ -27,6 +27,9 @@ Out of scope: MySQL/MariaDB, going back to FreshRSS with a freshgo database, sea
 - S10. Behaviour is the same on SQLite and PostgreSQL.
 - S11. Installation-wide values (`settings`: the token salt, the extra force-https domains) are read and replaced by name; an unset name is `ErrNotFound`.
 - S12. A feed can have one custom icon, replaced on the next write and removed with the feed.
+- S14. A feed keeps the HTTP validators of its last fetched copy (`http_etag`, `http_last_modified`). A negative `ttl` is a muted feed whose period is the absolute value.
+- S15. A feed and an entry can be replaced as a whole, except their identifiers and, for an entry, its feed and guid; a missing row is `ErrNotFound`. `LockFeed` inside a transaction makes other transactions that lock or update the same feed wait until it ends.
+- S16. The state of entries (identifier, hash, read, starred, time of the user's last change) is read by guid for a feed, and `last_seen` is set by guid or for all entries seen since a given time; both work for any number of guids.
 - S13. The counters of S3 can be raised explicitly and never move back, so that import carries over counters that are ahead of the largest identifier still in use.
 
 ## Invariants and compatibility
@@ -58,7 +61,7 @@ Out of scope: MySQL/MariaDB, going back to FreshRSS with a freshgo database, sea
 - I2. The import is one transaction: a failure on any user leaves the destination as it was.
 - I3. Users are the directories in `users/` that have a `config.php`, symbolic links to directories included, except the template `_`. A directory without `config.php` is reported and skipped. The user's `config.php` becomes `users.settings` as JSON, except `apiPasswordHash`, which goes to its own column. `salt` of the system `config.php` and the domains of `force-https.txt` go to `settings`. Together with I4 this keeps issued API tokens valid.
 - I4. Categories, feeds, labels, entries and label links keep their identifiers. The identifier counters of FreshRSS are carried over, so identifiers of objects deleted before the import are not reused either.
-- I5. `category.name`, `feed.url`, `feed.name`, `feed.website`, `feed.description`, `feed.pathEntries`, `entry.title`, `entry.link`, `entry.author`, `entry.tags` and `tag.name` are decoded from the `htmlspecialchars` form once: `&amp;`, `&lt;`, `&gt;`, `&quot;` and the encodings of `'`. Other entities are left alone, as `htmlspecialchars_decode` leaves them. `entry.content` is HTML and `entry.guid` is a key; neither is touched.
+- I5. `category.name`, `feed.url`, `feed.name`, `feed.website`, `feed.description`, `feed.pathEntries`, `entry.title`, `entry.link`, `entry.author`, `entry.tags` and `tag.name` are decoded from the `htmlspecialchars` form once: `&amp;`, `&lt;`, `&gt;`, `&quot;` and the encodings of `'`. Other entities are left alone, as `htmlspecialchars_decode` leaves them. `entry.content` is HTML and `entry.guid` is a key; neither is touched. A title equal to the guid is how FreshRSS stores an entry without a title; it is imported as an empty title.
 - I6. `entry.author` and `entry.tags` are split the way `FreshRSS_Entry::_authors` and `::_tags` read them. `feed.httpAuth` is decoded from base64 and then from the `htmlspecialchars` form, which is the order FreshRSS applies when it uses the credentials. An `attributes` value of `[]`, an empty string or NULL becomes `{}`.
 - I7. Read and favorite states, dates, `lastSeen`, `lastModified` and `lastUserModified` are copied. `entry.hash` is not.
 - I8. A feed with the `customFavicon` attribute gets its icon from `favicons/<crc32b(salt . feed id . user name)>.ico`. Icons fetched from sites and the `PubSubHubbub/` directory are not imported.
@@ -79,9 +82,11 @@ All in `internal/store/store_test.go`, each run on SQLite and, under `make test-
 - S7: a label named like an existing label or category → `ErrConflict`. `TestTags`.
 - S8: unknown user, feed, entry → `ErrNotFound`. `TestUsers`, `TestFeedRoundTrip`, `TestEntryRoundTrip`.
 - S9: reopening a database keeps its data and schema version; a database with a newer schema version is refused. `TestOpenTwiceKeepsData`, `TestOpenRefusesNewerSchema`.
+- S14, S15: `TestFeedRoundTrip`, `TestUpdateFeed`, `TestUpdateEntry`, `TestLockFeedSerializes`. S16: `TestEntryStatesAndLastSeen`.
 - S11: `TestSettings`. S12: `TestCustomIcon`. S13: counters raised to 5 and 9 → next category 6, next feed 10; lowering has no effect. `TestRaiseCounters`.
 - Field fidelity: every column of a feed, category, entry and label survives a write and a read, including non-ASCII text, markup characters and a NULL hash. `TestFeedRoundTrip`, `TestEntryRoundTrip`, `TestTags`.
 - I1: a second import → `ErrNotEmpty`, content unchanged. `TestImportRefusesNonEmptyDatabase`; `TestImport` in `cmd/freshgo`.
 - I2: second user's database damaged → error naming the user, no users and no salt in the destination, which then accepts a good installation. `TestImportIsAllOrNothing`.
 - I3–I8: the reference installations in `testdata/reference` (two users, every feed kind, read, starred and labelled entries, a custom icon) imported from SQLite and from PostgreSQL into SQLite and PostgreSQL → every row compared with the source tables, plus values known from the corpus. `TestImportFromSQLite`, `TestImportFromPostgres`, `TestSplitAuthors`, `TestSplitTags`, `TestDecodeText`.
+- I5, untitled entries: `TestImportUntitledEntry`.
 - I3: `TestImportFollowsSymlinkedUser`. I9: `TestImportWarnings`. I10: `TestImportRejectsUnsupportedSources`.

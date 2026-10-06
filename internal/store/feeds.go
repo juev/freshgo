@@ -6,7 +6,7 @@ import (
 )
 
 const feedColumns = `id, url, kind, category_id, name, website, description, last_update,
-	priority, path_entries, http_auth, error, ttl, attributes`
+	priority, path_entries, http_auth, error, ttl, attributes, http_etag, http_last_modified`
 
 // CreateFeed adds a feed. A zero f.ID is replaced with a new identifier, a
 // zero f.CategoryID with the default category.
@@ -20,9 +20,9 @@ func (s *Store) CreateFeed(ctx context.Context, f *Feed) error {
 		}
 		_, err := tx.exec(ctx, `
 			INSERT INTO feeds (user_id, `+feedColumns+`)
-			VALUES (`+placeholders(15)+`)`,
+			VALUES (`+placeholders(17)+`)`,
 			f.UserID, f.ID, f.URL, f.Kind, f.CategoryID, f.Name, f.Website, f.Description, f.LastUpdate,
-			f.Priority, f.PathEntries, f.HTTPAuth, f.Error, f.TTL, jsonObject(f.Attributes))
+			f.Priority, f.PathEntries, f.HTTPAuth, f.Error, f.TTL, jsonObject(f.Attributes), f.HTTPETag, f.HTTPLastModified)
 		if err != nil {
 			return fmt.Errorf("store: create feed %q: %w", f.URL, err)
 		}
@@ -38,6 +38,48 @@ func (s *Store) FeedByID(ctx context.Context, userID, id int64) (*Feed, error) {
 		return nil, fmt.Errorf("store: feed %d: %w", id, err)
 	}
 	return f, nil
+}
+
+// LockFeed returns the feed as it is stored now. Inside InTx it also makes
+// other transactions that lock or update the same feed wait until this one
+// ends, which is how refreshes of one feed are kept from overlapping.
+func (s *Store) LockFeed(ctx context.Context, userID, id int64) (*Feed, error) {
+	// A write that changes nothing takes the row lock on PostgreSQL; SQLite
+	// has a single writer anyway.
+	res, err := s.exec(ctx, `UPDATE feeds SET url = url WHERE user_id = ? AND id = ?`, userID, id)
+	if err != nil {
+		return nil, fmt.Errorf("store: lock feed %d: %w", id, err)
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return nil, fmt.Errorf("store: lock feed %d: %w", id, err)
+	} else if n == 0 {
+		return nil, fmt.Errorf("store: lock feed %d: %w", id, ErrNotFound)
+	}
+	return s.FeedByID(ctx, userID, id)
+}
+
+// UpdateFeed replaces every field of a feed except its identifier. A missing
+// feed gives ErrNotFound.
+func (s *Store) UpdateFeed(ctx context.Context, f *Feed) error {
+	res, err := s.exec(ctx, `
+		UPDATE feeds SET url = ?, kind = ?, category_id = ?, name = ?, website = ?, description = ?,
+			last_update = ?, priority = ?, path_entries = ?, http_auth = ?, error = ?, ttl = ?,
+			attributes = ?, http_etag = ?, http_last_modified = ?
+		WHERE user_id = ? AND id = ?`,
+		f.URL, f.Kind, f.CategoryID, f.Name, f.Website, f.Description, f.LastUpdate, f.Priority,
+		f.PathEntries, f.HTTPAuth, f.Error, f.TTL, jsonObject(f.Attributes), f.HTTPETag, f.HTTPLastModified,
+		f.UserID, f.ID)
+	if err != nil {
+		return fmt.Errorf("store: update feed %d: %w", f.ID, err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("store: update feed %d: %w", f.ID, err)
+	}
+	if n == 0 {
+		return fmt.Errorf("store: update feed %d: %w", f.ID, ErrNotFound)
+	}
+	return nil
 }
 
 // Feeds returns the feeds of a user ordered by identifier.
@@ -58,7 +100,7 @@ func scanFeed(userID int64, sc scanner) (*Feed, error) {
 	f := &Feed{UserID: userID}
 	var attributes string
 	err := sc.Scan(&f.ID, &f.URL, &f.Kind, &f.CategoryID, &f.Name, &f.Website, &f.Description, &f.LastUpdate,
-		&f.Priority, &f.PathEntries, &f.HTTPAuth, &f.Error, &f.TTL, &attributes)
+		&f.Priority, &f.PathEntries, &f.HTTPAuth, &f.Error, &f.TTL, &attributes, &f.HTTPETag, &f.HTTPLastModified)
 	if err != nil {
 		return nil, err
 	}

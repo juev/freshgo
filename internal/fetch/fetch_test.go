@@ -63,7 +63,7 @@ func TestFetchSendsDefaults(t *testing.T) {
 	if string(res.Body) != "<feed/>" || res.NotModified {
 		t.Errorf("body %q, not modified %v", res.Body, res.NotModified)
 	}
-	if res.URL != s.URL+"/atom.xml" || res.PermanentURL != res.URL {
+	if res.URL != s.URL+"/atom.xml" || res.PermanentURL != "" {
 		t.Errorf("URL %q, permanent %q", res.URL, res.PermanentURL)
 	}
 	if ct := res.Header.Get("Content-Type"); ct != "application/atom+xml; charset=utf-8" {
@@ -137,15 +137,15 @@ func TestRedirectPermanentURL(t *testing.T) {
 		statuses  []int
 		permanent string
 	}{
-		{"none", nil, "/0"},
+		{"none", nil, ""},
 		{"single 301", []int{301}, "/1"},
 		{"single 308", []int{308}, "/1"},
 		{"chain of permanent", []int{301, 308, 301}, "/3"},
-		{"single 302", []int{302}, "/0"},
-		{"single 307", []int{307}, "/0"},
-		{"single 303", []int{303}, "/0"},
+		{"single 302", []int{302}, ""},
+		{"single 307", []int{307}, ""},
+		{"single 303", []int{303}, ""},
 		{"permanent then temporary", []int{301, 302}, "/1"},
-		{"temporary then permanent", []int{302, 301}, "/0"},
+		{"temporary then permanent", []int{302, 301}, ""},
 		{"permanent, temporary, permanent", []int{301, 302, 301}, "/1"},
 	}
 	for _, tt := range tests {
@@ -159,7 +159,11 @@ func TestRedirectPermanentURL(t *testing.T) {
 			if want := fmt.Sprintf("%s/%d", s.URL, len(tt.statuses)); res.URL != want {
 				t.Errorf("URL %q, want %q", res.URL, want)
 			}
-			if want := s.URL + tt.permanent; res.PermanentURL != want {
+			want := ""
+			if tt.permanent != "" {
+				want = s.URL + tt.permanent
+			}
+			if res.PermanentURL != want {
 				t.Errorf("PermanentURL %q, want %q", res.PermanentURL, want)
 			}
 			if string(res.Body) != "end" {

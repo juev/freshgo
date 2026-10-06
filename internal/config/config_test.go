@@ -3,7 +3,9 @@ package config
 import (
 	"flag"
 	"io"
+	"reflect"
 	"testing"
+	"time"
 )
 
 func parse(t *testing.T, env map[string]string, args ...string) *Config {
@@ -60,7 +62,7 @@ func TestDatabase(t *testing.T) {
 }
 
 func TestValidateBaseURL(t *testing.T) {
-	c := &Config{DatabaseURL: defaultDatabaseURL, BaseURL: "https://rss.example.org/reader/"}
+	c := &Config{DatabaseURL: defaultDatabaseURL, BaseURL: "https://rss.example.org/reader/", RefreshInterval: time.Minute}
 	if err := c.Validate(); err != nil {
 		t.Fatalf("Validate: %v", err)
 	}
@@ -69,9 +71,36 @@ func TestValidateBaseURL(t *testing.T) {
 	}
 
 	for _, bad := range []string{"rss.example.org", "ftp://rss.example.org", "https://"} {
-		c := &Config{DatabaseURL: defaultDatabaseURL, BaseURL: bad}
+		c := &Config{DatabaseURL: defaultDatabaseURL, BaseURL: bad, RefreshInterval: time.Minute}
 		if err := c.Validate(); err == nil {
 			t.Errorf("Validate with BaseURL %q: no error", bad)
 		}
+	}
+}
+
+func TestRefreshSettings(t *testing.T) {
+	c := parse(t, nil)
+	if c.RefreshInterval != defaultRefreshInterval || c.Allowlist() != nil {
+		t.Errorf("defaults: interval %s, allowlist %q", c.RefreshInterval, c.Allowlist())
+	}
+	if err := c.Validate(); err != nil {
+		t.Errorf("Validate of the defaults: %v", err)
+	}
+
+	env := map[string]string{EnvRefreshInterval: "30m", EnvFetchAllowlist: "feeds.lan:8080, 10.0.0.0/8,"}
+	c = parse(t, env)
+	if c.RefreshInterval != 30*time.Minute || !reflect.DeepEqual(c.Allowlist(), []string{"feeds.lan:8080", "10.0.0.0/8"}) {
+		t.Errorf("from environment: interval %s, allowlist %q", c.RefreshInterval, c.Allowlist())
+	}
+	c = parse(t, env, "-refresh-interval", "5m", "-fetch-allowlist", "*")
+	if c.RefreshInterval != 5*time.Minute || !reflect.DeepEqual(c.Allowlist(), []string{"*"}) {
+		t.Errorf("flags over environment: interval %s, allowlist %q", c.RefreshInterval, c.Allowlist())
+	}
+
+	if err := parse(t, map[string]string{EnvRefreshInterval: "soon"}).Validate(); err == nil {
+		t.Error("Validate accepted a refresh interval that is not a duration")
+	}
+	if err := parse(t, nil, "-refresh-interval", "0s").Validate(); err == nil {
+		t.Error("Validate accepted a zero refresh interval")
 	}
 }

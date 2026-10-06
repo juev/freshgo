@@ -52,9 +52,16 @@ type Feed struct {
 	// HTTPAuth is "user:password" for HTTP basic authentication.
 	HTTPAuth string
 	// Error is the time of the last failed refresh, zero if the last one succeeded.
-	Error      int64
+	Error int64
+	// TTL is the refresh period in seconds; zero stands for the user's
+	// default. A negative value is a muted feed: it is not refreshed, and
+	// the period it had is the absolute value.
 	TTL        int
 	Attributes json.RawMessage
+	// HTTPETag and HTTPLastModified are the validators of the copy fetched
+	// last, sent back so that an unchanged feed is answered with 304.
+	HTTPETag         string
+	HTTPLastModified string
 }
 
 // Entry is an article of a feed.
@@ -84,6 +91,17 @@ type Entry struct {
 	// Tags are the categories the feed assigned to the entry, not user labels.
 	Tags       []string
 	Attributes json.RawMessage
+}
+
+// EntryState is what a refresh needs to know about a stored entry to decide
+// whether the feed has changed it.
+type EntryState struct {
+	ID int64
+	// Hash is nil while it has not been computed, see Entry.Hash.
+	Hash             []byte
+	IsRead           bool
+	IsFavorite       bool
+	LastUserModified int64
 }
 
 // Tag is a user label that can be attached to entries.

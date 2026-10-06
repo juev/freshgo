@@ -417,6 +417,11 @@ func (u *userImport) entries() error {
 		// guid stays as stored: it is a key, not text. The FreshRSS hash is not
 		// carried over, see docs/specs/storage.md.
 		e.FeedID = feedID.Int64
+		// FreshRSS stores an entry without a title under its guid and takes
+		// the two being equal for "no title"; here that is an empty title.
+		if strings.TrimSpace(e.Title) == e.GUID {
+			e.Title = ""
+		}
 		e.Title = decodeText(e.Title)
 		e.Authors = splitAuthors(author.String)
 		e.Content = content.String
