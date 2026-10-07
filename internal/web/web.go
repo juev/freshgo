@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/juev/freshgo/internal/hooks"
+	"github.com/juev/freshgo/internal/mediaproxy"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/web/i18n"
@@ -53,6 +54,9 @@ type Options struct {
 	// TrustedProxies are the reverse proxies whose word is taken for who
 	// the user is, when the installation tells users apart that way.
 	TrustedProxies []netip.Prefix
+	// Images fetches the images of entries the server hands out from its
+	// own address; nil, and it hands out none.
+	Images ImageFetcher
 	// OIDCClientSecret is the secret of the client the settings name at an
 	// OpenID Connect provider; empty when the server was given none, and
 	// then nobody signs in through a provider.
@@ -86,6 +90,7 @@ type Handler struct {
 	letters guard
 	decoys  decoys
 	now     func() time.Time
+	images  ImageFetcher
 	// oidcSecret and oidc are what signing in through a provider takes.
 	oidcSecret string
 	oidc       oidcProviders
@@ -101,6 +106,7 @@ func New(o Options) (*Handler, error) {
 	if h.hooks == nil {
 		h.hooks = &hooks.Registry{}
 	}
+	h.images = o.Images
 	h.oidcSecret, h.oidc.client = o.OIDCClientSecret, &http.Client{Timeout: oidcTimeout}
 	if o.BaseURL != "" {
 		public, err := url.Parse(o.BaseURL)
@@ -224,6 +230,7 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /settings/profile/delete", h.protect(members, h.deleteAccount))
 	h.mux.HandleFunc("GET /log", h.protect(members, h.journal))
 	h.mux.HandleFunc("POST /log/clear", h.protect(members, h.clearJournal))
+	h.mux.HandleFunc("GET "+mediaproxy.Path+"{digest}/{address}", h.media)
 	h.mux.HandleFunc("GET /oidc/login", h.oidcLogin)
 	h.mux.HandleFunc("GET "+oidcCallbackPath, h.oidcCallback)
 	h.mux.HandleFunc("GET /reauth", h.protect(members, h.reauthPage))
@@ -262,8 +269,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	header.Set("X-Content-Type-Options", "nosniff")
 	header.Set("Referrer-Policy", "same-origin")
 
-	// Static files are the same for everybody.
-	if !strings.HasPrefix(r.URL.Path, StaticPath) {
+	// Static files and the images of entries are the same for everybody.
+	if !strings.HasPrefix(r.URL.Path, StaticPath) && !strings.HasPrefix(r.URL.Path, mediaproxy.Path) {
 		system, err := h.db.System(r.Context())
 		if err != nil {
 			h.broken(w, r, err)

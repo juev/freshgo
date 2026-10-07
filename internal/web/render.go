@@ -54,6 +54,8 @@ func loadPages() (pages, error) {
 type view struct {
 	*i18n.Localizer
 	h *Handler
+	// mediaProxy says which images of entries go through the server.
+	mediaProxy string
 	// Site is the name of the installation, Heading the name of the page.
 	Site    string
 	Heading string
@@ -97,7 +99,7 @@ func (v *view) Asset(name string) string { return v.h.asset(name) }
 // the text that names the page.
 func (h *Handler) view(r *http.Request, section, heading string) *view {
 	s := state(r)
-	v := &view{h: h, Site: s.system.Title, Section: section, Theme: "auto", Look: looks[0]}
+	v := &view{h: h, mediaProxy: s.system.MediaProxy, Site: s.system.Title, Section: section, Theme: "auto", Look: looks[0]}
 	language := ""
 	if s.who != nil {
 		// A visitor reads the entries of the default user, not the

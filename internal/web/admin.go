@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/juev/freshgo/internal/fetch"
+	"github.com/juev/freshgo/internal/mediaproxy"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -336,6 +337,8 @@ type systemPage struct {
 	System    store.System
 	Languages []option
 	AuthTypes []option
+	// MediaModes are the ways the images of entries are handed out.
+	MediaModes []option
 	// CookieDays and ReauthMinutes spell two periods in the units of their fields.
 	CookieDays    int
 	ReauthMinutes int
@@ -360,6 +363,9 @@ func (h *Handler) showSystem(w http.ResponseWriter, r *http.Request, status int,
 	}
 	for _, code := range h.texts.Languages() {
 		page.Languages = append(page.Languages, option{code, v.T("language." + code), code == system.Language})
+	}
+	for _, mode := range mediaproxy.Modes {
+		page.MediaModes = append(page.MediaModes, option{mode, v.T("admin.system.media." + mode), mode == system.MediaProxy})
 	}
 	for _, kind := range []string{store.AuthForm, store.AuthHTTP, store.AuthNone} {
 		page.AuthTypes = append(page.AuthTypes, option{kind, v.T("admin.auth." + kind), kind == system.AuthType})
@@ -432,6 +438,9 @@ func (h *Handler) saveSystem(w http.ResponseWriter, r *http.Request) {
 		number("max_registrations", &system.Limits.MaxRegistrations, 1)
 		number("cookie_days", &system.Limits.CookieDuration, 86400)
 		number("reauth_minutes", &system.ReauthTime, 60)
+		if mode := form.Get("media_proxy"); slices.Contains(mediaproxy.Modes, mode) {
+			system.MediaProxy = mode
+		}
 		if proxy, err := fetch.ParseProxy(form.Get("proxy")); err != nil {
 			problem = "admin.problem.proxy"
 		} else if proxy == nil {

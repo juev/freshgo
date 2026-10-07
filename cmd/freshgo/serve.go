@@ -91,7 +91,7 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	}
 	defer s.close()
 	api := greader.New(greader.Options{
-		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL,
+		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL, MediaProxy: true,
 	})
 	// A nil service must not become a handler that is not nil.
 	var hubs http.Handler
@@ -113,7 +113,7 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	}
 	pages, err := web.New(web.Options{
 		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL, Version: buildVersion(),
-		TrustedProxies: proxies, FetchAllowlist: conf.Allowlist(), Mailer: mailer, OIDCClientSecret: conf.OIDCClientSecret,
+		TrustedProxies: proxies, FetchAllowlist: conf.Allowlist(), Mailer: mailer, OIDCClientSecret: conf.OIDCClientSecret, Images: s.client,
 	})
 	if err != nil {
 		return err

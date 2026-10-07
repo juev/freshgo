@@ -261,6 +261,16 @@ Next to the login by password, users can sign in through an OpenID Connect provi
 
 The login page then has a link to the provider. The user is the one the provider names in the claim `preferred_username`, which has to be a user name here. A name nobody has gets a user when "Create a user for a name the reverse proxy or the provider vouches for" is on, and is refused otherwise. Administrators are made in freshgo, not at the provider. The API passwords of apps are not touched.
 
+### Images of articles
+
+The server can hand out the images of articles from its own address, so that the sites they lie on see the server and not the reader. The setting is on the page "System" of the administration:
+
+- "those served over http" (the default): only the images a page served over `https` would not show at all;
+- "all": every image;
+- "none": the addresses stay as the feeds have them.
+
+It holds for the web interface and for apps that read through the Google Reader API; for apps, start the server with `-base-url` so that the addresses lead to where the apps reach it. The addresses are signed: the server fetches only what it has put into an article itself. Images are passed through, not stored, and the browser is told to keep them for three days. Audio and video are not handed out.
+
 ### Proxy
 
 An administrator sets one proxy for all feeds on the page "System" of the administration: `http://`, `https://`, `socks5://` or `socks5h://`, with `user:password@` when it asks for them. Feeds, the pages of their articles and icons are then fetched through it, from the next request on. A feed keeps a proxy of its own, and can be set to go through none. The proxy of the environment (`HTTP_PROXY`) is not used.
