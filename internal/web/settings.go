@@ -506,6 +506,13 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 	if who.prefs.PasswordHash != "" && !h.confirmed(w, r, refuse) {
 		return
 	}
+	// Who has no password to type came through the provider: a first
+	// password, which then opens the administration, takes a login as
+	// recent as the administration does.
+	if who.prefs.PasswordHash == "" && h.stale(state(r)) {
+		http.Redirect(w, r, h.url("/reauth")+"?next="+url.QueryEscape("/settings/profile"), http.StatusSeeOther)
+		return
+	}
 	password := r.PostForm.Get("new")
 	if problem := passwordProblem(password, r.PostForm.Get("again")); problem != "" {
 		refuse(http.StatusBadRequest, problem)
