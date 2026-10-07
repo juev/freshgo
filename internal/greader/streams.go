@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/juev/freshgo/internal/mediaproxy"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -250,7 +251,7 @@ func (h *Handler) streamContents(ctx context.Context, q *request, s stream) erro
 			return err
 		}
 	}
-	items, err := h.items(ctx, q.user, entries)
+	items, err := h.items(q, entries)
 	if err != nil {
 		return err
 	}
@@ -265,9 +266,14 @@ func (h *Handler) streamContents(ctx context.Context, q *request, s stream) erro
 }
 
 // items shows entries, leaving out those an extension holds back.
-func (h *Handler) items(ctx context.Context, u *store.User, entries []*store.Entry) ([]item, error) {
+func (h *Handler) items(q *request, entries []*store.Entry) ([]item, error) {
+	ctx, u := q.r.Context(), q.user
 	if len(entries) == 0 {
 		return nil, nil
+	}
+	throughServer, err := h.throughServer(q)
+	if err != nil {
+		return nil, err
 	}
 	lib, err := h.library(ctx, u)
 	if err != nil {
@@ -291,9 +297,33 @@ func (h *Handler) items(ctx context.Context, u *store.User, entries []*store.Ent
 		if f == nil {
 			continue
 		}
-		items = append(items, newItem(e, f, lib.category[f.CategoryID].Name, labels[e.ID]))
+		it := newItem(e, f, lib.category[f.CategoryID].Name, labels[e.ID])
+		it.Summary.Content = throughServer(it.Summary.Content)
+		items = append(items, it)
 	}
 	return items, nil
+}
+
+// throughServer returns what puts the images of an entry behind the public
+// address of the server, as the installation is set.
+func (h *Handler) throughServer(q *request) (func(content string) string, error) {
+	ctx := q.r.Context()
+	asIs := func(content string) string { return content }
+	if !h.media {
+		return asIs, nil
+	}
+	system, err := h.db.System(ctx)
+	if err != nil || (system.MediaProxy != mediaproxy.ModeHTTPOnly && system.MediaProxy != mediaproxy.ModeAll) {
+		return asIs, err
+	}
+	salt, err := h.db.Salt(ctx)
+	if err != nil {
+		return nil, err
+	}
+	key, base := mediaproxy.Key(salt), h.base(q.r)
+	return func(content string) string {
+		return mediaproxy.Rewrite(content, system.MediaProxy, func(target string) string { return mediaproxy.Address(key, base, target) })
+	}, nil
 }
 
 // writeItems answers with a list of items in the layout of FreshRSS: one
@@ -379,7 +409,7 @@ func (h *Handler) streamItems(ctx context.Context, q *request) error {
 	if err != nil {
 		return err
 	}
-	items, err := h.items(ctx, q.user, entries)
+	items, err := h.items(q, entries)
 	if err != nil {
 		return err
 	}

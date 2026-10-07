@@ -358,7 +358,7 @@ func TestAdministration(t *testing.T) {
 		for key, value := range map[string]string{
 			"title": "News desk", "language": "ru", "max_feeds": "50", "max_categories": "5", "max_registrations": "3",
 			"cookie_days": "10", "reauth_minutes": "5", "closed_registration_message": " Ask the administrator. ",
-			"proxy": " socks5h://bob:secret@127.0.0.1:1080 ",
+			"proxy": " socks5h://bob:secret@127.0.0.1:1080 ", "media_proxy": "all",
 		} {
 			form.Set(key, value)
 		}
@@ -366,9 +366,15 @@ func TestAdministration(t *testing.T) {
 		system, _ := s.db.System(ctx)
 		if system.Title != "News desk" || system.Language != "ru" || system.Limits != (store.Limits{CookieDuration: 864000, MaxFeeds: 50, MaxCategories: 5, MaxRegistrations: 3}) ||
 			system.ReauthTime != 300 || system.ClosedRegistrationMessage != "Ask the administrator." || system.DefaultUser != "alice" ||
-			system.Proxy != "socks5h://bob:secret@127.0.0.1:1080" {
+			system.Proxy != "socks5h://bob:secret@127.0.0.1:1080" || system.MediaProxy != "all" {
 			t.Errorf("system after the form = %+v", system)
 		}
+		form.Set("media_proxy", "everything")
+		s.follow("/admin/system", form)
+		if system, _ := s.db.System(ctx); system.MediaProxy != "all" {
+			t.Errorf("the images behind the server after a value there is not = %q", system.MediaProxy)
+		}
+		form.Set("media_proxy", "none")
 		if body := s.page("/admin/system"); !strings.Contains(body, `name="proxy" value="socks5h://bob:secret@127.0.0.1:1080"`) {
 			t.Errorf("the page of the installation does not show its proxy:\n%s", body)
 		}

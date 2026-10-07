@@ -44,6 +44,9 @@ type Options struct {
 	// BaseURL is the public address of the server, without a trailing
 	// slash. When empty, links are built from the request.
 	BaseURL string
+	// MediaProxy says the server hands out the images of entries from its
+	// own address, so that their addresses in the answers may lead there.
+	MediaProxy bool
 }
 
 // Handler answers the requests of the Google Reader API.
@@ -53,12 +56,13 @@ type Handler struct {
 	hooks     *hooks.Registry
 	log       *slog.Logger
 	baseURL   string
+	media     bool
 	now       func() time.Time
 }
 
 // New returns a Handler.
 func New(o Options) *Handler {
-	return &Handler{db: o.DB, refresher: o.Refresher, hooks: o.Hooks, log: o.Log, baseURL: o.BaseURL, now: time.Now}
+	return &Handler{db: o.DB, refresher: o.Refresher, hooks: o.Hooks, log: o.Log, baseURL: o.BaseURL, media: o.MediaProxy, now: time.Now}
 }
 
 // request is one API call: what was asked and by whom.

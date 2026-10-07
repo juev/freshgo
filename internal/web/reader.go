@@ -604,6 +604,10 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 	if err != nil {
 		return nil, err
 	}
+	throughServer, err := h.throughServer(ctx, v.mediaProxy, h.prefix)
+	if err != nil {
+		return nil, err
+	}
 	out := make([]article, 0, len(entries))
 	for _, e := range entries {
 		e, ok := h.hooks.EntryBeforeDisplay.Call(ctx, e)
@@ -620,7 +624,7 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 			Authors: strings.Join(e.Authors, ", "), Date: date.Format("2006-01-02 15:04"), DateTime: date.Format(time.RFC3339),
 			// What is stored was cleaned when it was fetched, but not all of it by
 			// freshgo: an import brings what FreshRSS let through.
-			Content:     template.HTML(withReferrers(sanitize.HTML(e.Content, e.Link, nil), prefs.Referrers)), //nolint:gosec // cleaned on this line
+			Content:     template.HTML(throughServer(withReferrers(sanitize.HTML(e.Content, e.Link, nil), prefs.Referrers))), //nolint:gosec // cleaned on this line
 			Attachments: attachments(e), Tags: e.Tags, Labels: labels[e.ID], Read: e.IsRead, Starred: e.IsFavorite,
 			ShowFeed: prefs.ToplineWebsite != "none", ShowDate: prefs.ToplineDate == nil || *prefs.ToplineDate,
 		}

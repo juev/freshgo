@@ -20,6 +20,7 @@ import (
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/hooks"
+	"github.com/juev/freshgo/internal/mediaproxy"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/storetest"
@@ -540,6 +541,68 @@ func TestIconAddresses(t *testing.T) {
 		configured.ServeHTTP(rec, req)
 		if !strings.Contains(rec.Body.String(), `"iconUrl":"https://rss.example.net/sub/favicon/`) {
 			t.Errorf("with a public address configured: %s", rec.Body.String())
+		}
+	})
+}
+
+// A39: where the server hands out images, the text of an entry names them
+// at the public address of the server.
+func TestImagesThroughTheServer(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		f := w.feed(w.alice, &store.Feed{Name: "Feed", Priority: priorityMain})
+		const text = `<p><img src="http://images.example/a.png" alt="a"/><img src="https://secure.example/b.png" alt="b"/></p>`
+		w.entries(w.alice, &store.Entry{ID: 1 * second, FeedID: f.ID, Title: "entry", Content: text})
+		salt, err := w.db.Salt(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		key := mediaproxy.Key(salt)
+
+		contents := func(h http.Handler) string {
+			t.Helper()
+			req := httptest.NewRequest(http.MethodGet, "/reader/api/0/stream/contents/reading-list?output=json", nil)
+			req.Header.Set("Authorization", w.auth)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			var list struct {
+				Items []struct {
+					Summary struct {
+						Content string `json:"content"`
+					} `json:"summary"`
+				} `json:"items"`
+			}
+			if err := json.Unmarshal(rec.Body.Bytes(), &list); err != nil || len(list.Items) != 1 {
+				t.Fatalf("stream contents: status %d, %v\n%s", rec.Code, err, rec.Body.String())
+			}
+			return list.Items[0].Summary.Content
+		}
+		log := slog.New(slog.NewTextHandler(io.Discard, nil))
+		handing := New(Options{DB: w.db, Hooks: w.registry, Log: log, BaseURL: "https://rss.example.net/sub", MediaProxy: true})
+		behind := func(target string) string { return mediaproxy.Address(key, "https://rss.example.net/sub", target) }
+
+		// Out of the box: the images served over http.
+		if got, want := contents(handing), `<p><img src="`+behind("http://images.example/a.png")+`" alt="a"/><img src="https://secure.example/b.png" alt="b"/></p>`; got != want {
+			t.Errorf("the text by default:\n got %s\nwant %s", got, want)
+		}
+		system, _ := w.db.System(ctx)
+		system.MediaProxy = mediaproxy.ModeAll
+		if err := w.db.SetSystem(ctx, system); err != nil {
+			t.Fatal(err)
+		}
+		if got := contents(handing); !strings.Contains(got, behind("https://secure.example/b.png")) || strings.Contains(got, "images.example") {
+			t.Errorf("the text with every image behind the server: %s", got)
+		}
+		// A server that hands out no images leaves the text as it is stored.
+		if got := contents(New(Options{DB: w.db, Hooks: w.registry, Log: log})); got != text {
+			t.Errorf("the text from a server that hands out no images: %s", got)
+		}
+		system.MediaProxy = mediaproxy.ModeNone
+		if err := w.db.SetSystem(ctx, system); err != nil {
+			t.Fatal(err)
+		}
+		if got := contents(handing); got != text {
+			t.Errorf("the text with the setting off: %s", got)
 		}
 	})
 }

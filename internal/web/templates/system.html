@@ -55,6 +55,12 @@
 <input type="text" id="proxy" name="proxy" value="{{.Data.System.Proxy}}" autocapitalize="off" spellcheck="false" aria-describedby="proxy-hint">
 <span class="hint" id="proxy-hint">{{.T "admin.system.proxy.hint"}}</span>
 </p>
+<p>
+<label for="media_proxy">{{.T "admin.system.media"}}</label>
+<select id="media_proxy" name="media_proxy" aria-describedby="media-hint">
+{{template "options" .Data.MediaModes}}</select>
+<span class="hint" id="media-hint">{{.T "admin.system.media.hint"}}</span>
+</p>
 </fieldset>
 <p><button type="submit">{{.T "keys.save"}}</button></p>
 </form>

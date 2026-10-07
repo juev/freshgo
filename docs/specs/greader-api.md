@@ -66,6 +66,7 @@ Out of scope: the Fever API, the web interface, uploading a custom icon (importe
 - A36. Extensions answer under `/api/misc.php/<name>` (or `?ext=<name>`): 400 without a name, 404 for a name no extension registered.
 - A37. While `api_enabled` of the system settings is off, every request of the API, `ClientLogin` included, is answered with 503 and `Service Unavailable!`, as in FreshRSS. A category a client names beyond `limits.max_categories` is not created: the feed goes to the default one. `limits.max_feeds` bounds subscriptions (`refresh.md`, F32) and both limits bound an OPML import. Verified by `TestSwitchAndLimits`.
 - A38. Where `force_email_validation` of the system settings is on, a user who has yet to confirm their e-mail address (`email_validation_token` of their settings) is answered with 401, at `ClientLogin` and with a token issued before; the default user and users with `is_admin` are not held up. See `web.md`, U80. Verified by `TestSwitchAndLimits`.
+- A39. Where the server hands out the images of entries (`web.md`, U88), the text of an item names the images the setting `media_proxy` takes at the public address of the server (`-base-url`, else the address the request came to), under `/proxy/`: an app loads them from the server without logging in. A text none of whose images is taken is sent as it is stored, byte for byte; one that has such an image is written out anew by the HTML parser. With `media_proxy` `none` nothing changes.
 
 ## Invariants and compatibility
 
@@ -104,6 +105,7 @@ Not reproduced from FreshRSS, and why:
 - A28: `TestAddFeed`, `TestAddFeedFollowsThePage`, `TestAddFeedOfAnotherKind`, `TestAddFeedRefusals` in `internal/refresh`.
 - A30, A31 for the settings the reference feeds do not have: `TestExportAndImportKeepSettings`, `TestImport`, `TestImportRefusesWhatIsNotOPML` in `internal/opml`.
 - R13, A32: `TestIconAddresses`, `TestHashes`. A33: `TestIconSearch`. A34: `TestIconIsKept`, `TestRefreshKeepsIcons` in `internal/refresh`. A35: `TestIconOfSite`, `TestCustomIcon`.
+- A39: `TestImagesThroughTheServer`. `TestReferenceAPI` runs on a server that hands out no images, so its answers stay those of FreshRSS.
 - A1, A36: `TestRoutes` and `TestServe` in `cmd/freshgo`.
 - The departures: `TestDepartures`.
 

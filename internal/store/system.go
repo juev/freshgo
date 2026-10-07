@@ -61,6 +61,9 @@ type System struct {
 	// OIDC names the OpenID Connect provider visitors can sign in through,
 	// next to the login by password.
 	OIDC OIDC `json:"oidc"`
+	// MediaProxy says which images of entries the server hands out from
+	// its own address: "none", "http-only" or "all" (internal/mediaproxy).
+	MediaProxy string `json:"media_proxy"`
 	// Proxy is the address of the proxy feeds are fetched through unless
 	// they have their own or are set to go through none: a URL with the
 	// scheme http, https, socks5 or socks5h. Empty for none.
@@ -99,6 +102,7 @@ func DefaultSystem() System {
 		APIEnabled:           true,
 		HTTPAuthAutoRegister: true,
 		ReauthTime:           1200,
+		MediaProxy:           "http-only",
 		Limits: Limits{
 			CookieDuration:   7_776_000,
 			MaxFeeds:         131072,

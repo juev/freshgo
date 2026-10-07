@@ -33,7 +33,9 @@ type services struct {
 	registry  *hooks.Registry
 	log       *slog.Logger
 	refresher *refresh.Refresher
-	icons     *favicon.Service
+	// client is what the services fetch with.
+	client *fetch.Client
+	icons  *favicon.Service
 	// webSub is nil when WebSub is off.
 	webSub *websub.Service
 	// close lets go of what the services hold; it comes before the
@@ -59,7 +61,7 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 	}
 	// What goes wrong for a user is kept for the user to read as well.
 	kept := journal.New(slog.NewTextHandler(e.stderr, nil), db)
-	s := &services{registry: newHooks(), log: slog.New(kept), close: kept.Close}
+	s := &services{registry: newHooks(), log: slog.New(kept), close: kept.Close, client: client}
 	s.registry.Init.Call(ctx, struct{}{})
 	s.icons = favicon.New(db, client, s.log)
 	s.refresher = refresh.New(db, client, s.registry, s.log)
