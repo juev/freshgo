@@ -34,8 +34,9 @@ const (
 
 // Kinds of streams of entries the reading screen shows.
 const (
-	streamMain     = "main"
-	streamAll      = "all"
+	streamMain = "main"
+	// streamStarred is what a saved query of the starred entries lists; it
+	// has no page of its own.
 	streamStarred  = "starred"
 	streamFeed     = "feed"
 	streamCategory = "category"
@@ -214,10 +215,6 @@ type stream struct {
 // path is the address of the stream.
 func (s stream) path() string {
 	switch s.kind {
-	case streamAll:
-		return "/all"
-	case streamStarred:
-		return "/starred"
 	case streamFeed:
 		return "/feeds/" + strconv.FormatInt(s.id, 10)
 	case streamCategory:
@@ -235,7 +232,7 @@ func (s stream) path() string {
 func (lib *library) stream(kind string, id int64) (s stream, ok bool) {
 	s = stream{kind: kind, id: id}
 	switch kind {
-	case streamMain, streamAll:
+	case streamMain:
 		minPriority := priorityMain
 		s.set.MinPriority = &minPriority
 		s.unread = lib.unreadFrom(0, priorityMain)
@@ -295,13 +292,8 @@ func (lib *library) streamAt(path string) (stream, bool) {
 			return lib.stream(kind, id)
 		}
 	}
-	switch path {
-	case "/":
+	if path == "/" {
 		return lib.stream(streamMain, 0)
-	case "/all":
-		return lib.stream(streamAll, 0)
-	case "/starred":
-		return lib.stream(streamStarred, 0)
 	}
 	return stream{}, false
 }
@@ -339,7 +331,7 @@ func show(params url.Values, prefs reading, s stream) showing {
 			if v.state = stateOfBits(s.state); v.state == "" {
 				v.state = stateAll
 			}
-		case s.kind == streamAll, prefs.ShowFavUnread && (s.kind == streamStarred || s.kind == streamLabel):
+		case prefs.ShowFavUnread && s.kind == streamLabel:
 			v.state = stateAll
 		case prefs.DefaultView == "all":
 			v.state = stateAll
@@ -481,7 +473,6 @@ type branch struct {
 
 // tree is what the reading screen offers to read.
 type tree struct {
-	Streams    []branch
 	Categories []branch
 	Labels     []branch
 	Queries    []branch
@@ -498,16 +489,6 @@ func (h *Handler) tree(v *view, lib *library, current stream, state showing, hid
 		}
 	}
 	var t tree
-	for _, s := range []struct{ kind, name string }{
-		{streamMain, "stream.main"}, {streamAll, "stream.all"}, {streamStarred, "stream.starred"},
-	} {
-		one, _ := lib.stream(s.kind, 0)
-		b := at(one, v.T(s.name))
-		// Each of the three is known by the state it lists by itself: with
-		// the state of the page carried along they would all list the same.
-		b.URL = state.link(h, one.path(), "q", "", "state", "")
-		t.Streams = append(t.Streams, b)
-	}
 	for _, c := range lib.categories {
 		one, _ := lib.stream(streamCategory, c.ID)
 		category := at(one, "")
@@ -817,9 +798,10 @@ func (h *Handler) reader(kind string) http.HandlerFunc {
 		hideRead := showing.state == stateUnread && (prefs.HideReadFeeds == nil || *prefs.HideReadFeeds)
 		page.Tree = h.tree(v, lib, s, showing, hideRead)
 		if r.Header.Get(fragmentHeader) == "tree" {
-			// The script asks for the tree alone to bring its counts up to date.
+			// The script asks for the tree alone, and the count of the
+			// stream, to bring the counts up to date.
 			v.Data = page
-			h.fragment(w, r, "tree", v)
+			h.fragment(w, r, "tree-fresh", v)
 			return
 		}
 

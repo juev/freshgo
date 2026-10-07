@@ -179,7 +179,7 @@ func TestSavedQueries(t *testing.T) {
 		if a := s.get("/queries/0"); a.status != http.StatusNotFound {
 			t.Errorf("a query whose feed is gone: status %d", a.status)
 		}
-		if body := s.shown("/settings/queries"); !strings.Contains(body, "its feed, category or label is gone") || strings.Contains(s.page("/all"), "Saved queries") {
+		if body := s.shown("/settings/queries"); !strings.Contains(body, "its feed, category or label is gone") || strings.Contains(s.page("/?state=all"), "Saved queries") {
 			t.Error("a query whose feed is gone is not marked, or is still in the tree")
 		}
 	})

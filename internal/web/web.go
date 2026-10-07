@@ -150,8 +150,6 @@ func New(o Options) (*Handler, error) {
 		files.ServeHTTP(w, r)
 	})
 	h.mux.HandleFunc("GET /{$}", h.protect(readers, h.reader(streamMain)))
-	h.mux.HandleFunc("GET /all", h.protect(readers, h.reader(streamAll)))
-	h.mux.HandleFunc("GET /starred", h.protect(readers, h.reader(streamStarred)))
 	h.mux.HandleFunc("GET /feeds/{id}", h.protect(readers, h.reader(streamFeed)))
 	h.mux.HandleFunc("GET /categories/{id}", h.protect(readers, h.reader(streamCategory)))
 	h.mux.HandleFunc("GET /labels/{id}", h.protect(readers, h.reader(streamLabel)))

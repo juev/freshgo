@@ -533,6 +533,12 @@ button.link {
 	font-size: 1.15rem;
 }
 
+/* How many of the stream are unread, on the bar next to its name. */
+.stream-head .count {
+	color: var(--text);
+	font-size: 1rem;
+}
+
 /* How the entries are listed is said on the bar, away from which of them. */
 .stream-head .views {
 	margin-left: auto;

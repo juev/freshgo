@@ -226,9 +226,9 @@ func TestE2EReadingWithKeys(t *testing.T) {
 		b := browse(t, s)
 		b.login("alice")
 		b.accessible("the reading screen")
-		count := `document.querySelector('#tree a[aria-current="page"] + .count').textContent`
+		count := `document.getElementById('stream-unread').textContent`
 		if got := b.text(count); got != "18" {
-			t.Fatalf("the tree counts %s unread entries, want 18", got)
+			t.Fatalf("the stream counts %s unread entries, want 18", got)
 		}
 
 		// j opens the next entry and makes it read; the tree follows.
@@ -370,17 +370,17 @@ func TestE2EDialogs(t *testing.T) {
 
 		// g and a letter go to a section; J and K walk the tree.
 		b.press("g", "a")
-		b.until("all entries", `location.pathname === '/all'`)
+		b.until("all entries", `location.pathname === '/' && location.search === '?state=all' && document.querySelector('.entries')`)
 		b.press("g", "s")
-		b.until("starred entries", `location.pathname === '/starred'`)
+		b.until("starred entries", `location.search === '?state=starred' && document.querySelector('.entries')`)
 		b.press("g", "u")
-		b.until("unread entries", `location.pathname === '/' && document.querySelector('.entries')`)
+		b.until("unread entries", `location.pathname === '/' && location.search === '' && document.querySelector('.entries')`)
 		b.press("J")
-		b.until("the next stream of the tree", `location.pathname === '/all'`)
+		b.until("the first stream of the tree", `location.pathname === '/categories/2' && document.querySelector('.entries')`)
 		b.press("K")
-		b.until("the stream before", `location.pathname === '/' && document.querySelector('.entries')`)
+		b.until("back above the tree, where everything is", `location.pathname === '/' && document.querySelector('.entries')`)
 		b.press("U")
-		b.until("the next stream with unread entries", `location.pathname === '/all'`)
+		b.until("the next stream with unread entries", `location.pathname === '/categories/2'`)
 	})
 }
 
@@ -534,7 +534,7 @@ func TestE2EKeysPage(t *testing.T) {
 		b.key("g", "KeyG")
 		b.key("Shift", "ShiftLeft")
 		b.press("A")
-		b.until("all entries by g and A", `location.pathname === '/all'`)
+		b.until("all entries by g and A", `location.search === '?state=all'`)
 		s.setting("alice", "keys", map[string]string{})
 
 		// Keys pressed alone are turned off; Ctrl+K stays.
@@ -563,7 +563,7 @@ func TestE2EListGoesOn(t *testing.T) {
 		ids := s.stored("alice", store.Listing{Set: mainStream()})
 		b := browse(t, s)
 		b.login("alice")
-		b.open("/all")
+		b.open("/?state=all")
 		for i, id := range ids {
 			if i%2 == 0 {
 				b.press("j")
@@ -894,7 +894,7 @@ func TestE2EToolbar(t *testing.T) {
 		b.tabTo("#tree details.branch summary")
 		b.press(kb.Enter)
 		b.until("the category folded", `!document.querySelector('#tree details.branch').open`)
-		b.open("/all")
+		b.open("/?state=all")
 		b.until("the category still folded", `!document.querySelector('#tree details.branch').open && document.querySelectorAll('#tree details.branch')[1].open`)
 		b.accessible("the tree with a category folded")
 		b.open("/categories/2")

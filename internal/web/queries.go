@@ -125,8 +125,6 @@ func (lib *library) queryStream(n int, q savedQuery) (s stream, ok bool) {
 // getOf spells a stream the way FreshRSS names it in a saved query.
 func getOf(s stream) string {
 	switch s.kind {
-	case streamStarred:
-		return "s"
 	case streamFeed:
 		return "f_" + strconv.FormatInt(s.id, 10)
 	case streamCategory:

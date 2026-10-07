@@ -246,7 +246,7 @@ func (h *Handler) config(v *view, who *identity) string {
 	c := scriptConfig{
 		Keys: map[string]string{}, SingleKeys: true, Texts: map[string]string{}, MarkOnOpen: true, AutoLoad: true,
 		URLs: map[string]string{
-			"palette": h.url("/palette"), "unread": h.url("/"), "all": h.url("/all"), "starred": h.url("/starred"),
+			"palette": h.url("/palette"), "unread": h.url("/"), "all": h.url("/?state=all"), "starred": h.url("/?state=starred"),
 			"keys": h.url("/settings/keys"), "subscriptions": h.url("/subscriptions"), "add": h.url("/subscriptions/add"),
 		},
 	}
@@ -386,8 +386,6 @@ func (h *Handler) palette(w http.ResponseWriter, r *http.Request) {
 	v := h.view(r, "", "palette.page")
 	places := []place{
 		{v.T("stream.main"), h.url("/"), v.T("palette.stream")},
-		{v.T("stream.all"), h.url("/all"), v.T("palette.stream")},
-		{v.T("stream.starred"), h.url("/starred"), v.T("palette.stream")},
 	}
 	for _, c := range lib.categories {
 		places = append(places, place{c.Name, h.url("/categories/" + strconv.FormatInt(c.ID, 10)), v.T("stream.category")})

@@ -583,8 +583,8 @@ func TestBehindProxy(t *testing.T) {
 		}
 		// The reading screen spells its links and forms with the public path.
 		a = s.get("/")
-		if a.status != http.StatusOK || !strings.Contains(a.body, `href="/reader/starred"`) ||
-			!strings.Contains(a.body, `action="/reader/read-all"`) || strings.Contains(a.body, `href="/starred"`) {
+		if a.status != http.StatusOK || !strings.Contains(a.body, `href="/reader/?state=starred"`) ||
+			!strings.Contains(a.body, `action="/reader/read-all"`) || strings.Contains(a.body, `href="/?state=starred"`) {
 			t.Errorf("GET / when logged in: status %d, body\n%s", a.status, a.body)
 		}
 	})

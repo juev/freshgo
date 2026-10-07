@@ -266,7 +266,7 @@ func TestPartsForTheScript(t *testing.T) {
 			t.Fatal(err)
 		}
 		for _, want := range []place{
-			{"Unread", "/", "Stream"}, {"Starred", "/starred", "Stream"}, {"Blogs", "/categories/2", "Category"},
+			{"All items", "/", "Stream"}, {"Blogs", "/categories/2", "Category"},
 			{"No identifiers", "/feeds/8", "Feed"}, {"work & play", "/labels/2", "Label"}, {"Keys", "/settings/keys", "Settings"}, {"Users", "/admin/users", "Administration"},
 		} {
 			if !slices.Contains(places, want) {

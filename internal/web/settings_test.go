@@ -68,7 +68,7 @@ func TestUserSettings(t *testing.T) {
 		if got["passwordHash"] != before["passwordHash"] || !reflect.DeepEqual(got["shortcuts"], before["shortcuts"]) {
 			t.Error("saving the display changed settings it does not show")
 		}
-		if list := s.page("/all"); strings.Contains(list, `<time datetime=`) && strings.Contains(list[strings.Index(list, `<summary>`):strings.Index(list, `</summary>`)], "<time") {
+		if list := s.page("/?state=all"); strings.Contains(list, `<time datetime=`) && strings.Contains(list[strings.Index(list, `<summary>`):strings.Index(list, `</summary>`)], "<time") {
 			t.Error("the row of an entry shows the date the reader turned off")
 		}
 		form.Set("timezone", "Mars/Olympus")

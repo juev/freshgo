@@ -953,7 +953,7 @@ func TestRefreshNow(t *testing.T) {
 		}
 		// Any other stream refreshes the feeds that are due.
 		remote.serve("/feed.xml", "application/rss+xml", rssOf(remote.URL, "The Blog", "one", "two", "three", "four"))
-		if _, body := s.follow("/refresh", url.Values{"stream": {"/"}, "next": {"/all"}}); notice(body) != "Feeds refreshed: 0 new entries." {
+		if _, body := s.follow("/refresh", url.Values{"stream": {"/"}, "next": {"/?state=all"}}); notice(body) != "Feeds refreshed: 0 new entries." {
 			t.Errorf("refreshing before anything is due: notice %q", notice(body))
 		}
 		f := s.feed("alice", 9)

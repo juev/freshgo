@@ -56,9 +56,6 @@
 {{define "tree"}}
 <details open>
 <summary>{{.T "tree.label"}}</summary>
-<ul>
-{{range .Data.Tree.Streams}}<li>{{template "branch" .}}{{if .Unread}} <span class="count" title="{{$.N "tree.unread" .Unread}}">{{.Unread}}</span>{{end}}</li>
-{{end}}</ul>
 <h2>{{.T "tree.categories"}}</h2>
 <ul>
 {{range .Data.Tree.Categories}}<li>{{template "branch" .}}{{if .Unread}} <span class="count" title="{{$.N "tree.unread" .Unread}}">{{.Unread}}</span>{{end}}
@@ -84,6 +81,10 @@
 {{end}}
 </details>
 {{end}}
+
+{{define "stream-unread"}}<span class="count" id="stream-unread" title="{{.N "tree.unread" .Data.Unread}}"{{if not .Data.Unread}} hidden{{end}}>{{.Data.Unread}}</span>{{end}}
+
+{{define "tree-fresh"}}{{template "tree" .}}{{template "stream-unread" .}}{{end}}
 
 {{define "article"}}
 <article class="entry{{if .Entry.Read}} read{{end}}" id="e{{.Entry.ID}}" aria-labelledby="t{{.Entry.ID}}" tabindex="-1">

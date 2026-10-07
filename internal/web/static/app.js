@@ -389,10 +389,16 @@
 			} catch {
 				return;
 			}
-			const fresh = response.ok ? parse(await response.text()).querySelector('details') : null;
+			const answer = response.ok ? parse(await response.text()) : null;
+			const fresh = answer && answer.querySelector('details');
 			const old = tree.querySelector('details');
 			if (!fresh || !old) {
 				return;
+			}
+			const count = document.getElementById('stream-unread');
+			const counted = answer.getElementById('stream-unread');
+			if (count && counted) {
+				count.replaceWith(document.adoptNode(counted));
 			}
 			const focused = tree.contains(document.activeElement) ? document.activeElement.getAttribute('href') : null;
 			fresh.open = old.open;
@@ -462,6 +468,11 @@
 		const links = Array.from(tree.querySelectorAll('li a'))
 			.filter((a) => !a.closest('details.branch:not([open]) > ul'));
 		let at = links.findIndex((a) => a.getAttribute('aria-current') === 'page');
+		if (at === 0 && step < 0) {
+			// Above the first stream of the tree is the stream of everything.
+			location.href = urls.unread;
+			return;
+		}
 		for (at += step; at >= 0 && at < links.length; at += step) {
 			if (!unreadOnly || links[at].parentElement.querySelector(':scope > .count')) {
 				location.href = links[at].href;

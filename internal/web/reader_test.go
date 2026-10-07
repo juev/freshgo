@@ -104,14 +104,12 @@ func TestReadingScreen(t *testing.T) {
 		body := s.page("/")
 		for _, want := range []string{
 			`<a href="/" aria-current="page">Reading</a>`,
-			`<a href="/" aria-current="page">Unread</a> <span class="count" title="18 unread entries">18</span>`,
-			`<a href="/all">All entries</a> <span class="count" title="18 unread entries">18</span>`,
-			`<a href="/starred">Starred</a> <span class="count" title="2 unread entries">2</span>`,
+			`<span class="count" id="stream-unread" title="18 unread entries">18</span>`,
 			`<a href="/categories/2">Blogs</a> <span class="count" title="8 unread entries">8</span>`,
 			`<a href="/categories/3">Scraped &amp; parsed</a> <span class="count" title="10 unread entries">10</span>`,
 			`<a href="/feeds/1">Atom corpus</a> <span class="count" title="4 unread entries">4</span>`,
 			`<a href="/labels/2">work &amp; play</a> <span class="count" title="1 unread entry">1</span>`,
-			`<h1 id="stream-heading">Unread</h1>`, `<input type="search" id="q" name="q" value="" placeholder="Search">`,
+			`<h1 id="stream-heading">All items</h1>`, `<input type="search" id="q" name="q" value="" placeholder="Search">`,
 			`<a href="/?state=unread" aria-current="true">Unread</a>`, `<a href="/?state=all">All</a>`,
 			`<option value="added" selected>Time received</option>`, `<option value="desc" selected>`,
 			`action="/read-all"`, `>Mark as read</button>`, `aria-label="Star" title="Star" aria-pressed="false">☆</button>`,
@@ -121,16 +119,20 @@ func TestReadingScreen(t *testing.T) {
 				t.Errorf("GET /: no %q in\n%s", want, body)
 			}
 		}
-		// The three streams are known by what each lists by itself: the
-		// state of the page does not follow the reader there, its order does.
-		chosen := s.page("/feeds/1?state=starred&sort=title")
-		for _, want := range []string{`<a href="/?sort=title">Unread</a>`, `<a href="/all?sort=title">All entries</a>`, `<a href="/starred?sort=title">Starred</a>`, `<a href="/categories/2?sort=title&amp;state=starred">Blogs</a>`} {
-			if !strings.Contains(chosen, want) {
-				t.Errorf("GET /feeds/1?state=starred&sort=title: no %q in the tree\n%s", want, chosen)
+		// The tree lists what there is to read, not the states: those are
+		// above the list alone, and the pages they had are gone.
+		for _, unwanted := range []string{`href="/all"`, `href="/starred"`, `>All entries<`} {
+			if strings.Contains(body, unwanted) {
+				t.Errorf("GET /: the page has %q", unwanted)
 			}
 		}
-		if all := s.page("/all"); !strings.Contains(all, `<a href="/all?state=all" aria-current="true">All</a>`) {
-			t.Errorf("GET /all: the states above the list do not say all\n%s", all)
+		for _, gone := range []string{"/all", "/starred"} {
+			if a := s.get(gone); a.status != http.StatusNotFound {
+				t.Errorf("GET %s: status %d, want 404", gone, a.status)
+			}
+		}
+		if read := s.page("/feeds/8?state=unread"); !strings.Contains(read, `id="stream-unread" title="0 unread entries" hidden>0</span>`) {
+			t.Errorf("a stream with nothing unread shows a count\n%s", read)
 		}
 		// The feed with nothing unread is left out of the tree while unread
 		// entries are listed, and is there otherwise.
@@ -148,21 +150,19 @@ func TestReadingScreen(t *testing.T) {
 
 		unread := false
 		for target, want := range map[string]store.Listing{
-			"/":                           {Set: mainStream(), Read: &unread},
-			"/?state=all":                 {Set: mainStream()},
-			"/all":                        {Set: mainStream()},
-			"/?state=starred":             {Set: mainStream(), Favorite: ptr(true)},
-			"/?state=unread-or-starred":   {Set: mainStream(), UnreadOrFavorite: true},
-			"/starred":                    {Set: store.EntrySet{OnlyFavorite: true}, Read: &unread},
-			"/feeds/2":                    {Set: store.EntrySet{FeedID: 2}, Read: &unread},
-			"/feeds/8":                    {Set: store.EntrySet{FeedID: 8}},
-			"/categories/2?state=all":     {Set: store.EntrySet{CategoryID: 2, MinPriority: ptr(0)}},
-			"/categories/1?state=all":     {Set: store.EntrySet{FeedID: 99}},
-			"/labels/1":                   {Set: store.EntrySet{LabelID: 1}, Read: &unread},
-			"/?sort=published&order=asc":  {Set: mainStream(), Read: &unread, Order: store.OrderPublished, Ascending: true},
-			"/all?sort=title":             {Set: mainStream(), Order: store.OrderTitle},
-			"/all?sort=feed&order=asc":    {Set: mainStream(), Order: store.OrderFeed, Ascending: true},
-			"/all?sort=nonsense&state=no": {Set: mainStream()},
+			"/":                                  {Set: mainStream(), Read: &unread},
+			"/?state=all":                        {Set: mainStream()},
+			"/?state=starred":                    {Set: mainStream(), Favorite: ptr(true)},
+			"/?state=unread-or-starred":          {Set: mainStream(), UnreadOrFavorite: true},
+			"/feeds/2":                           {Set: store.EntrySet{FeedID: 2}, Read: &unread},
+			"/feeds/8":                           {Set: store.EntrySet{FeedID: 8}},
+			"/categories/2?state=all":            {Set: store.EntrySet{CategoryID: 2, MinPriority: ptr(0)}},
+			"/categories/1?state=all":            {Set: store.EntrySet{FeedID: 99}},
+			"/labels/1":                          {Set: store.EntrySet{LabelID: 1}, Read: &unread},
+			"/?sort=published&order=asc":         {Set: mainStream(), Read: &unread, Order: store.OrderPublished, Ascending: true},
+			"/?state=all&sort=title":             {Set: mainStream(), Order: store.OrderTitle},
+			"/?state=all&sort=feed&order=asc":    {Set: mainStream(), Order: store.OrderFeed, Ascending: true},
+			"/?state=all&sort=nonsense&state=no": {Set: mainStream()},
 		} {
 			got, wantIDs := listed(s.page(target)), s.stored("alice", want)
 			if !reflect.DeepEqual(got, wantIDs) {
@@ -172,7 +172,7 @@ func TestReadingScreen(t *testing.T) {
 		if n := len(listed(s.page("/"))); n != 18 {
 			t.Errorf("GET / lists %d entries, want the 18 unread of the main stream", n)
 		}
-		if n := len(listed(s.page("/all?sort=random"))); n != 19 {
+		if n := len(listed(s.page("/?state=all&sort=random"))); n != 19 {
 			t.Errorf("GET /all?sort=random lists %d entries, want 19", n)
 		}
 
@@ -193,7 +193,7 @@ func TestReadingSettings(t *testing.T) {
 		s.setting("alice", "posts_per_page", 5)
 		var got []int64
 		pages := 0
-		for target := "/all?sort=published"; target != ""; pages++ {
+		for target := "/?state=all&sort=published"; target != ""; pages++ {
 			body := s.page(target)
 			got = append(got, listed(body)...)
 			target = ""
@@ -226,7 +226,7 @@ func TestReadingSettings(t *testing.T) {
 		check("adaptive, nothing unread", "/feeds/8", store.Listing{Set: store.EntrySet{FeedID: 8}})
 
 		s.setting("alice", "show_fav_unread", true)
-		check("show_fav_unread", "/starred", store.Listing{Set: store.EntrySet{OnlyFavorite: true}})
+		check("show_fav_unread", "/?state=starred", store.Listing{Set: store.EntrySet{OnlyFavorite: true}})
 		check("show_fav_unread", "/labels/1", store.Listing{Set: store.EntrySet{LabelID: 1}})
 		check("show_fav_unread and a state asked for", "/labels/1?state=unread", store.Listing{Set: store.EntrySet{LabelID: 1}, Read: &unread})
 
@@ -393,22 +393,26 @@ func TestSearchLine(t *testing.T) {
 			l     store.Listing
 			some  bool
 		}{
-			{"intitle:guid", "/all", store.Listing{Set: mainStream()}, true},
+			{"intitle:guid", "/?state=all", store.Listing{Set: mainStream()}, true},
 			{"GUID -intitle:markup", "/", store.Listing{Set: mainStream(), Read: &unread}, true},
-			{"L:1", "/all", store.Listing{Set: mainStream()}, true},
-			{"-L:* f:2", "/all", store.Listing{Set: mainStream()}, true},
-			{`labels:"work & play" OR c:3`, "/all", store.Listing{Set: mainStream()}, true},
+			{"L:1", "/?state=all", store.Listing{Set: mainStream()}, true},
+			{"-L:* f:2", "/?state=all", store.Listing{Set: mainStream()}, true},
+			{`labels:"work & play" OR c:3`, "/?state=all", store.Listing{Set: mainStream()}, true},
 			{"search:guids", "/feeds/2", store.Listing{Set: store.EntrySet{FeedID: 2}, Read: &unread}, true},
 			{"S:0", "/categories/2", store.Listing{Set: store.EntrySet{CategoryID: 2, MinPriority: ptr(0)}, Read: &unread}, true},
-			{"/^guid .* DOMAIN/i", "/all", store.Listing{Set: mainStream()}, true},
-			{"nothing-has-this-word", "/all", store.Listing{Set: mainStream()}, false},
+			{"/^guid .* DOMAIN/i", "/?state=all", store.Listing{Set: mainStream()}, true},
+			{"nothing-has-this-word", "/?state=all", store.Listing{Set: mainStream()}, false},
 		} {
 			q, err := search.Parse(tc.query, opts)
 			if err != nil {
 				t.Fatal(err)
 			}
 			tc.l.Search = q
-			target := tc.path + "?q=" + url.QueryEscape(tc.query)
+			separator := "?"
+			if strings.Contains(tc.path, "?") {
+				separator = "&"
+			}
+			target := tc.path + separator + "q=" + url.QueryEscape(tc.query)
 			body := s.page(target)
 			got, want := listed(body), s.stored("alice", tc.l)
 			if !reflect.DeepEqual(got, want) || tc.some == (len(got) == 0) {
@@ -420,8 +424,8 @@ func TestSearchLine(t *testing.T) {
 		}
 
 		// The state and the order links keep the search; the tree drops it.
-		body := s.page("/all?q=guid&sort=title")
-		for _, want := range []string{`href="/all?q=guid&amp;sort=title&amp;state=unread"`, `<a href="/feeds/1?sort=title">`, `<input type="hidden" name="q" value="guid">`} {
+		body := s.page("/?state=all&q=guid&sort=title")
+		for _, want := range []string{`href="/?q=guid&amp;sort=title&amp;state=unread"`, `<a href="/feeds/1?sort=title&amp;state=all">`, `<input type="hidden" name="q" value="guid">`} {
 			if !strings.Contains(body, want) {
 				t.Errorf("GET /all?q=guid&sort=title: no %q in\n%s", want, body)
 			}
@@ -432,7 +436,7 @@ func TestSearchLine(t *testing.T) {
 			strings.Repeat("(", 40) + "a": "too many nested parentheses",
 			strings.Repeat("word ", 4000): "The search is too long.",
 		} {
-			a := s.get("/all?q=" + url.QueryEscape(query))
+			a := s.get("/?state=all&q=" + url.QueryEscape(query))
 			if a.status != http.StatusBadRequest || !strings.Contains(a.body, `role="alert"`) || !strings.Contains(a.body, problem) || len(listed(a.body)) != 0 {
 				t.Errorf("GET /all?q=%.20s…: status %d, want 400 and %q\n%.600s", query, a.status, problem, a.body)
 			}
@@ -470,9 +474,9 @@ func TestEntryActions(t *testing.T) {
 			return e
 		}
 		path := "/entries/" + strconv.FormatInt(id, 10)
-		back := "/all#e" + strconv.FormatInt(id, 10)
+		back := "/?state=all#e" + strconv.FormatInt(id, 10)
 		form := func(more ...string) url.Values {
-			v := url.Values{"next": {"/all"}}
+			v := url.Values{"next": {"/?state=all"}}
 			for i := 0; i+1 < len(more); i += 2 {
 				v.Set(more[i], more[i+1])
 			}
@@ -485,7 +489,7 @@ func TestEntryActions(t *testing.T) {
 		}
 		// Once more changes nothing and tells nobody.
 		s.post(path+"/read", form("read", "1"))
-		if body := s.page("/all"); !strings.Contains(body, `<article class="entry read" id="e`+strconv.FormatInt(id, 10)+`"`) {
+		if body := s.page("/?state=all"); !strings.Contains(body, `<article class="entry read" id="e`+strconv.FormatInt(id, 10)+`"`) {
 			t.Error("the entry is not shown as read")
 		}
 		s.post(path+"/read", form("read", "0"))
@@ -779,8 +783,8 @@ func TestTreeCountsByPriority(t *testing.T) {
 			t.Helper()
 			body := s.page("/?state=all")
 			var got [3]string
-			for i, link := range []string{`<a href="/" aria-current="page">Unread</a>`, `<a href="/categories/` + strconv.FormatInt(feed.CategoryID, 10) + `?state=all">`, `<a href="/feeds/` + strconv.FormatInt(feed.ID, 10) + `?state=all">`} {
-				m := regexp.MustCompile(regexp.QuoteMeta(link) + `(?:[^<]*</a>)? <span class="count" title="(\d+) `).FindStringSubmatch(body)
+			for i, link := range []string{`<h1 id="stream-heading">All items</h1>` + "\n", `<a href="/categories/` + strconv.FormatInt(feed.CategoryID, 10) + `?state=all">`, `<a href="/feeds/` + strconv.FormatInt(feed.ID, 10) + `?state=all">`} {
+				m := regexp.MustCompile(regexp.QuoteMeta(link) + `(?:[^<]*</a> )?<span class="count"(?: id="stream-unread")? title="(\d+) `).FindStringSubmatch(body)
 				if m != nil {
 					got[i] = m[1]
 				}
@@ -825,7 +829,7 @@ func TestShuffleIsKept(t *testing.T) {
 		s.setting("alice", "posts_per_page", 5)
 		next := regexp.MustCompile(`<input type="hidden" name="next" value="([^"]+)">`)
 		for range 5 {
-			body := s.page("/all?sort=random")
+			body := s.page("/?state=all&sort=random")
 			first := listed(body)
 			m := next.FindStringSubmatch(body)
 			if m == nil {
@@ -860,7 +864,7 @@ func TestShuffleIsKept(t *testing.T) {
 			}
 		}
 		// A shuffle is an order as any other: another seed, another order.
-		if reflect.DeepEqual(listed(s.page("/all?sort=random&seed=123456789")), listed(s.page("/all?sort=random&seed=987654321"))) {
+		if reflect.DeepEqual(listed(s.page("/?state=all&sort=random&seed=123456789")), listed(s.page("/?state=all&sort=random&seed=987654321"))) {
 			t.Error("two seeds shuffle the same way")
 		}
 	})
@@ -875,7 +879,7 @@ func TestUnreadableText(t *testing.T) {
 		id := strconv.FormatInt(listed(s.page("/"))[0], 10)
 		for _, bad := range []string{"a\x00b", "a\xffb"} {
 			for _, target := range []string{
-				"/all?q=" + url.QueryEscape(bad), "/all?q=" + url.QueryEscape(`labels:"`+bad+`"`),
+				"/?state=all&q=" + url.QueryEscape(bad), "/?state=all&q=" + url.QueryEscape(`labels:"`+bad+`"`),
 				"/feeds/1?state=" + url.QueryEscape(bad), "/entries/" + id + "?x=" + url.QueryEscape(bad),
 			} {
 				if a := s.get(target); a.status != http.StatusBadRequest {
@@ -900,7 +904,7 @@ func TestUnreadableText(t *testing.T) {
 		}
 		// A place in a listing with a title no entry has is no place.
 		after := base64.RawURLEncoding.EncodeToString([]byte(`{"i":1,"t":"a\u0000b"}`))
-		if a := s.get("/all?sort=title&after=" + after); a.status != http.StatusNotFound {
+		if a := s.get("/?state=all&sort=title&after=" + after); a.status != http.StatusNotFound {
 			t.Errorf("GET /all?sort=title&after=<a title with a NUL>: status %d, want 404", a.status)
 		}
 	})
@@ -912,7 +916,7 @@ func TestEntryLabelsAtOnce(t *testing.T) {
 		ctx := context.Background()
 		alice := s.user("alice")
 		s.asAlice()
-		ids := listed(s.page("/all"))[:8]
+		ids := listed(s.page("/?state=all"))[:8]
 		var wg sync.WaitGroup
 		answers := make([]*httptest.ResponseRecorder, len(ids))
 		for i, id := range ids {
