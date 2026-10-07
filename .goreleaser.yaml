@@ -19,6 +19,10 @@ builds:
     ldflags:
       - -s -w -X main.version=v{{ .Version }}
 
+release:
+  # A tag such as v1.2.3-rc.1 makes a pre-release.
+  prerelease: auto
+
 changelog:
   groups:
     - title: Features
