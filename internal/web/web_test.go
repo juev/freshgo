@@ -187,6 +187,19 @@ func TestStaticFiles(t *testing.T) {
 			css.header.Get("Cache-Control") != "public, max-age=31536000, immutable" || !strings.Contains(css.body, ":focus-visible") {
 			t.Errorf("GET %s: status %d, headers %v", link[1], css.status, css.header)
 		}
+		// The icon of freshgo, for the tab of a browser and for a phone.
+		for pattern, kind := range map[string]string{
+			`<link rel="icon" type="image/svg\+xml" href="(/static/icon\.svg\?v=[0-9a-f]{12})">`: "image/svg+xml",
+			`<link rel="apple-touch-icon" href="(/static/icon-180\.png\?v=[0-9a-f]{12})">`:       "image/png",
+		} {
+			link := regexp.MustCompile(pattern).FindStringSubmatch(page)
+			if link == nil {
+				t.Fatalf("no link %s in\n%s", pattern, page)
+			}
+			if icon := s.get(link[1]); icon.status != http.StatusOK || !strings.HasPrefix(icon.header.Get("Content-Type"), kind) || len(icon.body) == 0 {
+				t.Errorf("GET %s: status %d, headers %v", link[1], icon.status, icon.header)
+			}
+		}
 		// Asked for without its version, or with another, a file may be
 		// any version: it is not to be kept.
 		for _, target := range []string{"/static/app.css", "/static/app.css?v=000000000000"} {
