@@ -43,7 +43,9 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      # The runner image comes with Chrome.
+      # The runner image comes with Chrome, and with an AppArmor rule that
+      # keeps its sandbox from starting.
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - run: make test-e2e
 
   # The release itself, without publishing: binaries, archives and the images
