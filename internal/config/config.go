@@ -26,6 +26,9 @@ const (
 	EnvWebSub = "FRESHGO_WEBSUB"
 	// EnvSMTPURL names the server letters are sent through.
 	EnvSMTPURL = "FRESHGO_SMTP_URL"
+	// EnvOIDCClientSecret is the secret of the client the installation is
+	// at its OpenID Connect provider.
+	EnvOIDCClientSecret = "FRESHGO_OIDC_CLIENT_SECRET"
 	// EnvTrustedProxies is read by the web interface.
 	EnvTrustedProxies = "FRESHGO_TRUSTED_PROXIES"
 )
@@ -75,6 +78,10 @@ type Config struct {
 	// SMTPURL is the server letters are sent through, empty for none:
 	// smtp://user:password@host:port?from=address, or smtps://.
 	SMTPURL string
+	// OIDCClientSecret is the secret the OpenID Connect provider gave the
+	// client named in the settings of the installation; without it nobody
+	// signs in through a provider.
+	OIDCClientSecret string
 
 	// invalid is what was wrong with the environment, reported by Validate.
 	invalid error
@@ -117,6 +124,8 @@ func Bind(fs *flag.FlagSet, getenv func(string) string) *Config {
 		"reverse proxies that may name the user, comma-separated addresses or CIDR ranges ($"+EnvTrustedProxies+")")
 	fs.StringVar(&c.SMTPURL, "smtp-url", getenv(EnvSMTPURL),
 		"SMTP server for the letters that confirm e-mail addresses: smtp[s]://user:password@host:port?from=address ($"+EnvSMTPURL+")")
+	fs.StringVar(&c.OIDCClientSecret, "oidc-client-secret", getenv(EnvOIDCClientSecret),
+		"secret of the OpenID Connect client set up on the page of authentication ($"+EnvOIDCClientSecret+")")
 	return c
 }
 

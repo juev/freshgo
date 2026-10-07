@@ -70,7 +70,13 @@ func (h *Handler) showReauth(w http.ResponseWriter, r *http.Request, status int,
 	if problem != "" {
 		problem = v.T(problem)
 	}
-	v.Data = loginForm{Next: next, Error: problem}
+	form := loginForm{Next: next, Error: problem}
+	// Signing in again is as good as the password, and all there is for a
+	// user who has none.
+	if s := state(r); h.oidcOn(s.system) {
+		form.Provider, form.ProviderURL = oidcName(s.system), h.oidcStart(next)
+	}
+	v.Data = form
 	h.render(w, r, status, "reauth", v)
 }
 
@@ -338,7 +344,11 @@ type systemPage struct {
 	Allowlist []string
 	// CanMail says the server has an SMTP server to send letters through.
 	CanMail bool
-	Problem string
+	// OIDCCallback is the address a client is registered with at the
+	// provider; OIDCSecret says the server was given the secret of one.
+	OIDCCallback string
+	OIDCSecret   bool
+	Problem      string
 }
 
 func (h *Handler) showSystem(w http.ResponseWriter, r *http.Request, status int, tab string, system store.System, problem string) {
@@ -346,6 +356,7 @@ func (h *Handler) showSystem(w http.ResponseWriter, r *http.Request, status int,
 	page := systemPage{
 		System: system, CookieDays: system.Limits.CookieDuration / 86400, ReauthMinutes: system.ReauthTime / 60,
 		Allowlist: h.allowlist, CanMail: h.mailer != nil,
+		OIDCCallback: h.absolute(r, oidcCallbackPath), OIDCSecret: h.oidcSecret != "",
 	}
 	for _, code := range h.texts.Languages() {
 		page.Languages = append(page.Languages, option{code, v.T("language." + code), code == system.Language})
@@ -451,8 +462,15 @@ func (h *Handler) saveAuthentication(w http.ResponseWriter, r *http.Request) {
 		if system.ForceEmailValidation && h.mailer == nil {
 			return "admin.problem.no-mail"
 		}
-		// A login by password nobody has would lock everybody out.
-		if system.AuthType == store.AuthForm && who.prefs.PasswordHash == "" {
+		issuer, client := strings.TrimSpace(form.Get("oidc_issuer")), strings.TrimSpace(form.Get("oidc_client_id"))
+		if at, err := url.Parse(issuer); (issuer == "") != (client == "") ||
+			(issuer != "" && (err != nil || at.Host == "" || (at.Scheme != "https" && at.Scheme != "http"))) {
+			return "admin.problem.oidc"
+		}
+		system.OIDC = store.OIDC{Issuer: issuer, ClientID: client}
+		// A login by password nobody has would lock everybody out, unless
+		// there is a provider to sign in through.
+		if system.AuthType == store.AuthForm && who.prefs.PasswordHash == "" && !h.oidcOn(*system) {
 			return "admin.problem.no-password"
 		}
 		// So would a way of telling users apart that does not know the

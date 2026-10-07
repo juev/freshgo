@@ -58,10 +58,22 @@ type System struct {
 	// TOS are the terms a visitor has to accept to register, as HTML; empty
 	// for none. FreshRSS keeps them in the file data/tos.html.
 	TOS string `json:"tos"`
+	// OIDC names the OpenID Connect provider visitors can sign in through,
+	// next to the login by password.
+	OIDC OIDC `json:"oidc"`
 	// Proxy is the address of the proxy feeds are fetched through unless
 	// they have their own or are set to go through none: a URL with the
 	// scheme http, https, socks5 or socks5h. Empty for none.
 	Proxy string `json:"proxy"`
+}
+
+// OIDC is the client the installation is at an OpenID Connect provider.
+// The secret of the client is not a setting: the server is started with it.
+type OIDC struct {
+	// Issuer is the address of the provider, the one its discovery
+	// document is found under; empty for no provider.
+	Issuer   string `json:"issuer"`
+	ClientID string `json:"client_id"`
 }
 
 // Limits bound what users may take up.

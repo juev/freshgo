@@ -18,5 +18,6 @@
 {{range .Data.Before}}{{.}}
 {{end}}<p><button type="submit">{{.T "login.submit"}}</button></p>
 </form>
+{{if .Data.Provider}}<p><a href="{{.Data.ProviderURL}}">{{.T "login.oidc" .Data.Provider}}</a></p>{{end}}
 {{if .Data.CanRegister}}<p><a href="{{.URL "/register"}}">{{.T "register.heading"}}</a></p>{{end}}
 {{end}}

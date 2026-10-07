@@ -120,6 +120,18 @@ func TestWebSubSetting(t *testing.T) {
 	}
 }
 
+func TestOIDCClientSecret(t *testing.T) {
+	if got := parse(t, nil).OIDCClientSecret; got != "" {
+		t.Errorf("the secret by default = %q", got)
+	}
+	if got := parse(t, map[string]string{EnvOIDCClientSecret: "from the environment"}).OIDCClientSecret; got != "from the environment" {
+		t.Errorf("the secret of the environment = %q", got)
+	}
+	if got := parse(t, map[string]string{EnvOIDCClientSecret: "from the environment"}, "-oidc-client-secret", "from the flag").OIDCClientSecret; got != "from the flag" {
+		t.Errorf("the secret with a flag = %q, want that of the flag", got)
+	}
+}
+
 func TestTrustedProxies(t *testing.T) {
 	prefixes := func(c *Config) []string {
 		t.Helper()

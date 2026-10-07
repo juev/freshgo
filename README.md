@@ -248,7 +248,18 @@ Every setting is a flag and an environment variable; the flag wins.
 | `-fetch-allowlist` | `FRESHGO_FETCH_ALLOWLIST` | | Internal destinations feeds may be fetched from: `host:port`, a CIDR range, or `*`, separated by commas. Without it, requests to private and loopback addresses are refused. |
 | `-websub` | `FRESHGO_WEBSUB` | off | Subscribe to the WebSub hubs feeds announce. |
 | `-trusted-proxies` | `FRESHGO_TRUSTED_PROXIES` | `127.0.0.0/8,::1/128` | Reverse proxies whose word is taken for who the user is and for the address of the browser: addresses or CIDR ranges, separated by commas. |
+| `-oidc-client-secret` | `FRESHGO_OIDC_CLIENT_SECRET` | | Secret of the client the installation is at its OpenID Connect provider; see "Signing in through a provider". |
 | `-smtp-url` | `FRESHGO_SMTP_URL` | | SMTP server for the letters that confirm e-mail addresses: `smtp[s]://user:password@host:port?from=address`. Without it, confirmation cannot be required. |
+
+### Signing in through a provider
+
+Next to the login by password, users can sign in through an OpenID Connect provider such as [Pocket ID](https://pocket-id.org):
+
+1. At the provider, register a client (a confidential one, with a secret) whose callback address is `<public address of the server>/oidc/callback`, and choose there who may sign in. The page "Authentication" of the administration shows the address.
+2. Start the server with the secret of the client in `FRESHGO_OIDC_CLIENT_SECRET` and with `-base-url`.
+3. On the page "Authentication", enter the address of the provider (the issuer: the address its `/.well-known/openid-configuration` lies under) and the client ID.
+
+The login page then has a link to the provider. The user is the one the provider names in the claim `preferred_username`, which has to be a user name here. A name nobody has gets a user when "Create a user for a name the reverse proxy or the provider vouches for" is on, and is refused otherwise. Administrators are made in freshgo, not at the provider. The API passwords of apps are not touched.
 
 ### Proxy
 

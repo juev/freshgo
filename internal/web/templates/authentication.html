@@ -9,6 +9,19 @@
 <span class="hint" id="auth-hint">{{.T "admin.auth.hint"}}</span>
 </p>
 {{template "check" (dict "Name" "http_auth_auto_register" "Label" (.T "admin.auth.auto-register") "On" .Data.System.HTTPAuthAutoRegister)}}
+<fieldset>
+<legend>{{.T "admin.auth.oidc"}}</legend>
+<p class="hint" id="oidc-hint">{{.T "admin.auth.oidc.hint" .Data.OIDCCallback}}</p>
+{{if not .Data.OIDCSecret}}<p class="hint">{{.T "admin.auth.oidc.no-secret"}}</p>{{end}}
+<p>
+<label for="oidc_issuer">{{.T "admin.auth.oidc.issuer"}}</label>
+<input type="url" id="oidc_issuer" name="oidc_issuer" value="{{.Data.System.OIDC.Issuer}}" autocapitalize="off" spellcheck="false" aria-describedby="oidc-hint">
+</p>
+<p>
+<label for="oidc_client_id">{{.T "admin.auth.oidc.client-id"}}</label>
+<input type="text" id="oidc_client_id" name="oidc_client_id" value="{{.Data.System.OIDC.ClientID}}" autocapitalize="off" spellcheck="false">
+</p>
+</fieldset>
 {{template "check" (dict "Name" "force_email_validation" "Label" (.T "admin.auth.force-email") "On" .Data.System.ForceEmailValidation)}}
 {{if not .Data.CanMail}}<p class="hint">{{.T "admin.auth.no-mail"}}</p>{{end}}
 {{template "check" (dict "Name" "allow_anonymous" "Label" (.T "admin.auth.anonymous" .Data.System.DefaultUser) "On" .Data.System.AllowAnonymous)}}
