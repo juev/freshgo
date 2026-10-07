@@ -78,10 +78,15 @@ func read[T any](b *browser, expression string, options ...chromedp.EvaluateOpti
 	return value
 }
 
-// open types an address into the browser.
+// loaded is true of a page whose script has run: the script is deferred,
+// and a key pressed before it has run is a key nothing listens for.
+const loaded = `document.readyState === 'complete'`
+
+// open types an address into the browser and waits for the page.
 func (b *browser) open(path string) {
 	b.t.Helper()
 	b.run(chromedp.Navigate(b.base+path), chromedp.WaitReady("body"))
+	b.until("the page "+path, "true")
 }
 
 // press presses keys one after the other; a string of several characters
@@ -121,11 +126,13 @@ func (b *browser) focus() string {
 	return b.text(`(e => e ? (e.id ? '#' + e.id : e.tagName.toLowerCase() + (e.className ? '.' + e.className : '')) : '')(document.activeElement)`)
 }
 
-// until waits for an expression of the page to become true.
+// until waits for an expression to become true of a page that has loaded:
+// what follows a wait is a key, as a rule, and the page a key has led to
+// has to listen for the next one.
 func (b *browser) until(what, expression string) {
 	b.t.Helper()
 	b.eventually(what+" (focus on "+"%s)", func() bool {
-		ok, err := chromedp.Run(b.ctx, chromedp.Evaluate[bool](`Boolean(`+expression+`)`))
+		ok, err := chromedp.Run(b.ctx, chromedp.Evaluate[bool](loaded+` && Boolean(`+expression+`)`))
 		return err == nil && ok
 	})
 }
