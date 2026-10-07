@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/juev/freshgo/internal/config"
 )
 
 // Log is a warning or an error of the server that names a user.
@@ -58,7 +60,12 @@ func (s *Store) Logs(ctx context.Context, q LogQuery) ([]*Log, error) {
 			return r
 		}, q.Text)
 		pattern := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(lowered)
-		query += ` AND LOWER(message) LIKE ? ESCAPE '\'`
+		// PostgreSQL would lower by the locale of the database.
+		column := `message`
+		if s.driver == config.DriverPostgres {
+			column += ` COLLATE "C"`
+		}
+		query += ` AND LOWER(` + column + `) LIKE ? ESCAPE '\'`
 		args = append(args, "%"+pattern+"%")
 	}
 	if q.Before != 0 {
