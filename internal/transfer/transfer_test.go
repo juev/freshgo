@@ -190,9 +190,14 @@ func TestRoundTrip(t *testing.T) {
 		if err != nil || report.Feeds != 0 || report.Entries != 0 || report.Updated != 1 {
 			t.Errorf("second import = %+v, %v; want one entry rewritten", report, err)
 		}
+		// The document of the feed says the entry is unread and says nothing
+		// of a star: the entry becomes unread and keeps its star.
+		if _, err := Import(ctx, w.db, &hooks.Registry{}, bob, "feed.json", w.write(alice, Document{Kind: "feed/2", Set: store.EntrySet{FeedID: news.ID}}), options); err != nil {
+			t.Fatal(err)
+		}
 		for _, e := range w.entries(bob) {
-			if e.GUID == "n1" && (!e.Read || !e.Starred) {
-				t.Errorf("an import took back what the reader did to an entry it does not hold: %+v", e)
+			if e.GUID == "n1" && (e.Read || !e.Starred) {
+				t.Errorf("entry after the document of its feed came again: %+v", e)
 			}
 		}
 	})
@@ -360,6 +365,26 @@ func TestImportRefusals(t *testing.T) {
 		if feeds := w.feeds(u); err != nil || report.Feeds != 1 || !report.Incomplete || len(categories) != 2 || feeds["https://e.example/"].CategoryID != store.DefaultCategoryID {
 			t.Errorf("OPML past the limits = %+v, %v; %d categories", report, err, len(categories))
 		}
+		// A NUL, which JSON can spell and a database cannot keep, is left
+		// out, and an identifier is no longer than a refresh would store.
+		long := strings.Repeat("я", 500)
+		document = `[{"id":"nul\u0000l","title":"a\u0000b \\u0000","origin":{"feedUrl":"https://a.example/feed","title":"x\u0000"},"categories":["user/-/label/l\u0000x","t\u0000ag"]},
+			{"id":"` + long + `","origin":{"feedUrl":"https://a.example/feed"}}]`
+		if report, err = Import(ctx, w.db, registry, u, "nul.json", []byte(document), options); err != nil || report.Entries != 2 {
+			t.Errorf("Import of a document with NUL characters = %+v, %v", report, err)
+		}
+		for _, e := range w.entries(u) {
+			switch {
+			case e.GUID == "null":
+				if e.Title != `ab \u0000` || !reflect.DeepEqual(e.Labels, []string{"lx"}) || !reflect.DeepEqual(e.Tags, []string{"tag"}) {
+					t.Errorf("entry of a document with NUL characters = %+v", e)
+				}
+			case strings.HasPrefix(e.GUID, "я"):
+				if len(e.GUID) > 767 || len(e.GUID) < 766 {
+					t.Errorf("a long identifier is stored with %d bytes", len(e.GUID))
+				}
+			}
+		}
 		// One unreadable file of an archive does not keep the others out.
 		var archive bytes.Buffer
 		z := zip.NewWriter(&archive)
@@ -371,6 +396,19 @@ func TestImportRefusals(t *testing.T) {
 		report, err = Import(ctx, w.db, registry, u, "two.zip", archive.Bytes(), options)
 		if err != nil || report.Entries != 1 || !report.Incomplete {
 			t.Errorf("Import of an archive with a broken file = %+v, %v", report, err)
+		}
+		// An archive is not unpacked past what an import may hold, however
+		// often it lists a file.
+		archive.Reset()
+		z = zip.NewWriter(&archive)
+		for i := range maxMembers + 5 {
+			member, _ := z.Create("f" + strconv.Itoa(i) + ".json")
+			_, _ = member.Write([]byte(`[{"id":"m` + strconv.Itoa(i) + `","origin":{"feedUrl":"https://a.example/feed"}}]`))
+		}
+		w.must(z.Close())
+		report, err = Import(ctx, w.db, registry, u, "many.zip", archive.Bytes(), options)
+		if err != nil || report.Entries != maxMembers || !report.Incomplete {
+			t.Errorf("Import of an archive of %d files = %+v, %v; want %d entries", maxMembers+5, report, err, maxMembers)
 		}
 		// A handler may refuse an entry or a feed.
 		registry.EntryBeforeAdd.Add(0, func(_ context.Context, e *store.Entry) (*store.Entry, bool) { return e, e.GUID != "no" })

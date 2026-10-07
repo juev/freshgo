@@ -40,6 +40,43 @@ const (
 	maxTotalSize  = 256 << 20
 )
 
+// maxGUID is the longest identifier of an entry, in bytes, as in FreshRSS.
+const maxGUID = 767
+
+// withoutNUL takes the NUL characters out of the strings of a JSON value:
+// JSON can spell one, and no database keeps it.
+func withoutNUL(raw json.RawMessage) json.RawMessage {
+	if !bytes.Contains(raw, []byte(`\u0000`)) {
+		return raw
+	}
+	var value any
+	if json.Unmarshal(raw, &value) != nil {
+		return raw
+	}
+	cleaned, err := json.Marshal(stripNUL(value))
+	if err != nil {
+		return raw
+	}
+	return cleaned
+}
+
+func stripNUL(value any) any {
+	switch v := value.(type) {
+	case string:
+		return strings.ReplaceAll(v, "\x00", "")
+	case []any:
+		for i := range v {
+			v[i] = stripNUL(v[i])
+		}
+	case map[string]any:
+		for key, member := range v {
+			delete(v, key)
+			v[strings.ReplaceAll(key, "\x00", "")] = stripNUL(member)
+		}
+	}
+	return value
+}
+
 // placeholderFeed is the feed of entries that name none, as in FreshRSS.
 const placeholderFeed = "http://import.localhost/import.xml"
 
@@ -122,22 +159,33 @@ func Import(ctx context.Context, db *store.Store, registry *hooks.Registry, u *s
 		if err != nil {
 			return report, fmt.Errorf("%w: %v", ErrDocument, err)
 		}
-		total := 0
+		// The bounds are on what is looked at, not on what is taken: an
+		// archive may list one large file any number of times.
+		var total uint64
+		looked := 0
 		for _, member := range archive.File {
 			kind := kindOf(member.Name)
 			if kind == kindUnknown || kind == kindZip || member.FileInfo().IsDir() {
 				continue
 			}
-			if len(files) >= maxMembers || member.UncompressedSize64 > maxMemberSize {
+			if err := ctx.Err(); err != nil {
+				return report, err
+			}
+			looked++
+			if looked > maxMembers || total+member.UncompressedSize64 > maxTotalSize {
+				report.Incomplete = true
+				break
+			}
+			if member.UncompressedSize64 > maxMemberSize {
 				report.Incomplete = true
 				continue
 			}
 			content, err := readMember(member)
-			if err != nil || total+len(content) > maxTotalSize {
+			total += uint64(len(content))
+			if err != nil {
 				report.Incomplete = true
 				continue
 			}
-			total += len(content)
 			files = append(files, file{kind, content})
 		}
 	default:
@@ -184,10 +232,11 @@ func readMember(member *zip.File) ([]byte, error) {
 	defer func() { _ = r.Close() }()
 	content, err := io.ReadAll(io.LimitReader(r, maxMemberSize+1))
 	if err != nil {
-		return nil, err
+		return content, err
 	}
 	if len(content) > maxMemberSize {
-		return nil, errors.New("transfer: a file of the archive is too large")
+		// Larger than it said it was: what was read still counts.
+		return content, errors.New("transfer: a file of the archive is too large")
 	}
 	return content, nil
 }
@@ -364,7 +413,7 @@ func Entries(ctx context.Context, db *store.Store, registry *hooks.Registry, u *
 	)
 	for _, raw := range items {
 		var it incoming
-		if json.Unmarshal(raw, &it) != nil {
+		if json.Unmarshal(withoutNUL(raw), &it) != nil {
 			continue
 		}
 		guid, ok := text(it.GUID)
@@ -372,6 +421,10 @@ func Entries(ctx context.Context, db *store.Store, registry *hooks.Registry, u *
 			if guid, ok = text(it.ID); !ok {
 				continue
 			}
+		}
+		// An identifier is stored as a refresh would store it.
+		if guid = strings.Trim(guid, " \n\r\t\v"); len(guid) > maxGUID {
+			guid = strings.ToValidUTF8(guid[:maxGUID], "")
 		}
 		if guid == "" {
 			continue
