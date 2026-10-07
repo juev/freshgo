@@ -358,14 +358,31 @@ func TestAdministration(t *testing.T) {
 		for key, value := range map[string]string{
 			"title": "News desk", "language": "ru", "max_feeds": "50", "max_categories": "5", "max_registrations": "3",
 			"cookie_days": "10", "reauth_minutes": "5", "closed_registration_message": " Ask the administrator. ",
+			"proxy": " socks5h://bob:secret@127.0.0.1:1080 ",
 		} {
 			form.Set(key, value)
 		}
 		s.follow("/admin/system", form)
 		system, _ := s.db.System(ctx)
 		if system.Title != "News desk" || system.Language != "ru" || system.Limits != (store.Limits{CookieDuration: 864000, MaxFeeds: 50, MaxCategories: 5, MaxRegistrations: 3}) ||
-			system.ReauthTime != 300 || system.ClosedRegistrationMessage != "Ask the administrator." || system.DefaultUser != "alice" {
+			system.ReauthTime != 300 || system.ClosedRegistrationMessage != "Ask the administrator." || system.DefaultUser != "alice" ||
+			system.Proxy != "socks5h://bob:secret@127.0.0.1:1080" {
 			t.Errorf("system after the form = %+v", system)
+		}
+		if body := s.page("/admin/system"); !strings.Contains(body, `name="proxy" value="socks5h://bob:secret@127.0.0.1:1080"`) {
+			t.Errorf("the page of the installation does not show its proxy:\n%s", body)
+		}
+		for _, address := range []string{"127.0.0.1:1080", "socks4://127.0.0.1:1080"} {
+			form.Set("proxy", address)
+			a := s.post("/admin/system", form)
+			if system, _ := s.db.System(ctx); a.status != http.StatusBadRequest || !strings.Contains(a.body, "The proxy has to be an address") || system.Proxy != "socks5h://bob:secret@127.0.0.1:1080" {
+				t.Errorf("the proxy %q: status %d, stored %q", address, a.status, system.Proxy)
+			}
+		}
+		form.Set("proxy", "")
+		s.follow("/admin/system", form)
+		if system, _ := s.db.System(ctx); system.Proxy != "" {
+			t.Errorf("the proxy after it was taken away = %q", system.Proxy)
 		}
 		form.Set("max_feeds", "-1")
 		if a := s.post("/admin/system", form); a.status != http.StatusBadRequest {

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -420,6 +421,13 @@ func (h *Handler) saveSystem(w http.ResponseWriter, r *http.Request) {
 		number("max_registrations", &system.Limits.MaxRegistrations, 1)
 		number("cookie_days", &system.Limits.CookieDuration, 86400)
 		number("reauth_minutes", &system.ReauthTime, 60)
+		if proxy, err := fetch.ParseProxy(form.Get("proxy")); err != nil {
+			problem = "admin.problem.proxy"
+		} else if proxy == nil {
+			system.Proxy = ""
+		} else {
+			system.Proxy = proxy.String()
+		}
 		system.ClosedRegistrationMessage = strings.TrimSpace(form.Get("closed_registration_message"))
 		system.TOS = strings.TrimSpace(form.Get("tos"))
 		return problem

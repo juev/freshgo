@@ -778,6 +778,83 @@ func TestProxy(t *testing.T) {
 	}
 }
 
+// The proxy of the installation takes the requests that name none, and is
+// connected to though it is on an internal address.
+func TestInstallationProxy(t *testing.T) {
+	var requested []string
+	proxy := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		requested = append(requested, r.URL.String())
+		_, _ = io.WriteString(w, "via the installation")
+	})
+	own := serve(t, func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "via its own") })
+	direct := serve(t, func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "direct") })
+	ownURL, _ := url.Parse(own.URL)
+
+	set := proxy.URL
+	var failure error
+	// Neither proxy is on the allowlist: only that of the feed is refused.
+	c := newClient(t, Options{Proxy: func(context.Context) (*url.URL, error) {
+		if failure != nil {
+			return nil, failure
+		}
+		return ParseProxy(set)
+	}}, direct)
+	body := func(req Request) string {
+		t.Helper()
+		res, err := c.Fetch(context.Background(), req)
+		if err != nil {
+			t.Fatalf("Fetch %s: %v", req.URL, err)
+		}
+		return string(res.Body)
+	}
+
+	const target = "http://feeds.freshgo.test/atom.xml"
+	if got := body(Request{URL: target}); got != "via the installation" || len(requested) != 1 || requested[0] != target {
+		t.Errorf("a request without a proxy: %q, the proxy was asked for %q", got, requested)
+	}
+	if got := body(Request{URL: direct.URL, Params: Params{Direct: true}}); got != "direct" {
+		t.Errorf("a request set to go direct: %q", got)
+	}
+	if _, err := c.Fetch(context.Background(), Request{URL: target, Params: Params{Proxy: ownURL}}); !errors.Is(err, ErrForbiddenAddress) {
+		t.Errorf("a proxy of the feed on an internal address: %v, want ErrForbiddenAddress", err)
+	}
+	allowed := newClient(t, Options{Proxy: func(context.Context) (*url.URL, error) { return ParseProxy(set) }}, own)
+	if res, err := allowed.Fetch(context.Background(), Request{URL: target, Params: Params{Proxy: ownURL}}); err != nil || string(res.Body) != "via its own" {
+		t.Errorf("a request with a proxy of its own: %v, %v", res, err)
+	}
+
+	// The setting is read anew for every request.
+	set = ""
+	if got := body(Request{URL: direct.URL}); got != "direct" {
+		t.Errorf("after the proxy was taken away: %q", got)
+	}
+	failure = errors.New("no database")
+	if _, err := c.Fetch(context.Background(), Request{URL: direct.URL}); !errors.Is(err, failure) {
+		t.Errorf("a setting that cannot be read: %v", err)
+	}
+}
+
+func TestParseProxy(t *testing.T) {
+	for address, want := range map[string]string{
+		"":                                  "",
+		"  ":                                "",
+		" http://proxy.example:3128 ":       "http://proxy.example:3128",
+		"https://proxy.example":             "https://proxy.example",
+		"socks5://127.0.0.1:1080":           "socks5://127.0.0.1:1080",
+		"socks5h://bob:secret@[fd00::1]:99": "socks5h://bob:secret@[fd00::1]:99",
+	} {
+		got, err := ParseProxy(address)
+		if err != nil || (got == nil) != (want == "") || (got != nil && got.String() != want) {
+			t.Errorf("ParseProxy(%q) = %v, %v; want %q", address, got, err, want)
+		}
+	}
+	for _, address := range []string{"proxy.example:3128", "127.0.0.1", "http://", "socks4://127.0.0.1:1080", "ftp://proxy.example", "http://bad host"} {
+		if got, err := ParseProxy(address); err == nil {
+			t.Errorf("ParseProxy(%q) = %v, want an error", address, got)
+		}
+	}
+}
+
 func TestInsecureSkipsCertificateCheck(t *testing.T) {
 	s := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = io.WriteString(w, "ok")

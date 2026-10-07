@@ -77,6 +77,11 @@ var proxyTypes = []struct{ value, name string }{
 	{"0", "HTTP"}, {"2", "HTTPS"}, {"5", "SOCKS5"}, {"7", "SOCKS5H"}, {"4", "SOCKS4"}, {"6", "SOCKS4A"},
 }
 
+// proxyDirect is the kind of proxy of a feed that goes through none, the
+// proxy of the installation included: CURLPROXY has no such value, and
+// FreshRSS stores -1 for it.
+const proxyDirect = "-1"
+
 // maxIcon is the largest picture taken for the icon of a feed, in bytes.
 const maxIcon = 1 << 20
 
@@ -277,7 +282,11 @@ func (h *Handler) showFeed(w http.ResponseWriter, r *http.Request, status int, f
 
 	curl := readAttrs(a["curl_params"])
 	proxyType, hasProxy := curl.number(curlProxyType)
-	page.ProxyTypes = []option{{"", v.T("feed.proxy.none"), !hasProxy || proxyType < 0 || proxyType == 3}}
+	direct := hasProxy && (proxyType < 0 || proxyType == 3)
+	page.ProxyTypes = []option{
+		{"", v.T("feed.proxy.none"), !hasProxy},
+		{proxyDirect, v.T("feed.proxy.direct"), direct},
+	}
 	for _, p := range proxyTypes {
 		page.ProxyTypes = append(page.ProxyTypes, option{p.value, p.name, hasProxy && strconv.Itoa(proxyType) == p.value})
 	}
@@ -481,7 +490,9 @@ func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, ttl
 	} {
 		delete(curl, key)
 	}
-	if proxy := get("proxy"); proxy != "" {
+	if get("proxy_type") == proxyDirect {
+		curl.set(curlProxyType, -1)
+	} else if proxy := get("proxy"); proxy != "" {
 		for _, p := range proxyTypes {
 			if p.value == get("proxy_type") {
 				kind, _ := strconv.Atoi(p.value)

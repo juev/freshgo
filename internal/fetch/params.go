@@ -20,6 +20,9 @@ type Params struct {
 	BasicAuth string
 	// Proxy is the proxy to go through: http, https, socks5 or socks5h.
 	Proxy *url.URL
+	// Direct keeps the request away from the proxy of the installation: the
+	// feed is set to go through none.
+	Direct bool
 	// Insecure skips the verification of the TLS certificate.
 	Insecure bool
 	// Timeout replaces the client's timeout when positive.
@@ -122,7 +125,11 @@ func FeedParams(httpAuth string, attributes json.RawMessage) (Params, error) {
 
 	proxyType, _ := integer(curl[curlProxyType])
 	address := proxyScheme.ReplaceAllString(text(curl[curlProxy]), "")
-	if address == "" || proxyType < 0 || proxyType == proxyTypeNoneLegacy {
+	if proxyType < 0 || proxyType == proxyTypeNoneLegacy {
+		p.Direct = true
+		return p, nil
+	}
+	if address == "" {
 		return p, nil
 	}
 	scheme, ok := proxySchemes[proxyType]
@@ -143,6 +150,24 @@ func FeedParams(httpAuth string, attributes json.RawMessage) (Params, error) {
 	}
 	p.Proxy = proxy
 	return p, nil
+}
+
+// ParseProxy reads the address of a proxy as an administrator writes it:
+// a URL with one of the schemes a feed can have. A blank address is no proxy.
+func ParseProxy(address string) (*url.URL, error) {
+	address = strings.TrimSpace(address)
+	if address == "" {
+		return nil, nil
+	}
+	proxy, err := url.Parse(address)
+	if err != nil || proxy.Host == "" {
+		return nil, fmt.Errorf("proxy address is malformed")
+	}
+	switch proxy.Scheme {
+	case "http", "https", "socks5", "socks5h":
+		return proxy, nil
+	}
+	return nil, fmt.Errorf("%w: %s", ErrUnsupportedProxy, proxy.Scheme)
 }
 
 // headers reads a list of "Name: value" lines. After FreshRSS has filtered
