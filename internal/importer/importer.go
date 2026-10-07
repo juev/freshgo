@@ -13,6 +13,9 @@ import (
 	"errors"
 	"fmt"
 	"hash/crc32"
+	"maps"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -20,6 +23,7 @@ import (
 	"strings"
 
 	"github.com/juev/freshgo/internal/favicon"
+	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
 )
@@ -175,7 +179,67 @@ func readSystemSettings(conf map[string]any) (settings store.System, unreadable 
 	if settings.Title == freshRSSTitle {
 		settings.Title = store.DefaultSystem().Title
 	}
+	if options, set := conf["curl_options"]; set {
+		proxy, err := systemProxy(options)
+		if err != nil {
+			unreadable = append(unreadable, "curl_options")
+		}
+		settings.Proxy = proxy
+	}
 	return settings, unreadable
+}
+
+// Keys of curl_options a proxy is set with, the numbers of CURLOPT_PROXYPORT,
+// CURLOPT_PROXY and CURLOPT_PROXYUSERPWD.
+const (
+	curlProxyPort    = "59"
+	curlProxy        = "10004"
+	curlProxyUserPwd = "10006"
+)
+
+// systemProxy returns the proxy the curl_options of an installation send
+// every feed through, as System.Proxy has it; empty when they name none.
+// The other options, which FreshRSS hands to cURL as they are, have no
+// counterpart.
+func systemProxy(options any) (string, error) {
+	// PHP writes an empty array as a list.
+	curl, _ := options.(map[string]any)
+	address, _ := curl[curlProxy].(string)
+	if _, rest, found := strings.Cut(address, "://"); found {
+		address = rest
+	}
+	if address == "" {
+		return "", nil
+	}
+	// The port may be an option of its own.
+	if port, set := curl[curlProxyPort]; set {
+		if at, err := url.Parse("//" + address); err == nil && at.Port() == "" {
+			address = net.JoinHostPort(at.Hostname(), fmt.Sprint(port))
+			if at.User != nil {
+				address = at.User.String() + "@" + address
+			}
+		}
+	}
+	curl = maps.Clone(curl)
+	curl[curlProxy] = address
+	raw, err := json.Marshal(map[string]any{"curl_params": curl})
+	if err != nil {
+		return "", err
+	}
+	params, err := fetch.FeedParams("", raw)
+	if err != nil || params.Proxy == nil {
+		return "", err
+	}
+	proxy := params.Proxy
+	if credentials, _ := curl[curlProxyUserPwd].(string); credentials != "" && proxy.User == nil {
+		name, password, _ := strings.Cut(credentials, ":")
+		proxy.User = url.UserPassword(name, password)
+	}
+	// SOCKS4 is a kind a feed may keep and freshgo cannot go through.
+	if _, err := fetch.ParseProxy(proxy.String()); err != nil {
+		return "", err
+	}
+	return proxy.String(), nil
 }
 
 func readSystemConfig(dataDir string) (*systemConfig, error) {
