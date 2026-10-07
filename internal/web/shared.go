@@ -45,6 +45,11 @@ type shared struct {
 	labels bool
 	prefix string
 	noTags bool
+	// form is where the search field of the page sends the visitor, hidden
+	// what goes with it, field the name the search has there.
+	form   string
+	hidden [][2]string
+	field  string
 	// opml says the stream is one OPML can describe: everything, a
 	// category or a feed.
 	opml opml.Part
@@ -89,7 +94,7 @@ func (h *Handler) sharedQuery(r *http.Request, userName, token, format string) (
 				wantsOPML && !q.ShareOpml || !wantsOPML && !q.ShareRss {
 				continue
 			}
-			lib, err := h.library(ctx, u)
+			lib, err := h.libraryOf(ctx, u, false)
 			if err != nil {
 				return nil, err
 			}
@@ -131,7 +136,9 @@ func opmlPart(get string) (opml.Part, bool) {
 // sharedFile hands out a saved query at its address: /shared/<token>.<format>.
 func (h *Handler) sharedFile(w http.ResponseWriter, r *http.Request) {
 	token, format, _ := strings.Cut(r.PathValue("file"), ".")
-	h.serveQuery(w, r, "", token, format, r.URL.Query().Get("q"))
+	h.serveQuery(w, r, "", token, format, r.URL.Query().Get("q"), func(sh *shared) {
+		sh.form, sh.field = r.URL.Path, "q"
+	})
 }
 
 // legacyQuery hands out a saved query at the address FreshRSS gave it.
@@ -157,10 +164,13 @@ func (h *Handler) legacyQuery(w http.ResponseWriter, r *http.Request) {
 		plain(w, http.StatusUnprocessableEntity, "Invalid format `f`!")
 		return
 	}
-	h.serveQuery(w, r, user, token, format, params.Get("search"))
+	h.serveQuery(w, r, user, token, format, params.Get("search"), func(sh *shared) {
+		sh.form, sh.field = r.URL.Path, "search"
+		sh.hidden = [][2]string{{"user", user}, {"t", token}, {"f", "html"}}
+	})
 }
 
-func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user, token, format, visitorSearch string) {
+func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user, token, format, visitorSearch string, place func(*shared)) {
 	if !state(r).system.APIEnabled {
 		plain(w, http.StatusServiceUnavailable, "Service Unavailable!")
 		return
@@ -182,6 +192,7 @@ func (h *Handler) serveQuery(w http.ResponseWriter, r *http.Request, user, token
 		plain(w, http.StatusNotFound, "User query not found!")
 		return
 	}
+	place(sh)
 	h.serveShared(w, r, sh, format, visitorSearch)
 }
 
@@ -211,7 +222,7 @@ func (h *Handler) userFeed(format string) http.HandlerFunc {
 			plain(w, http.StatusForbidden, "Forbidden!")
 			return
 		}
-		lib, err := h.library(r.Context(), owner)
+		lib, err := h.libraryOf(r.Context(), owner, false)
 		if err != nil {
 			h.broken(w, r, err)
 			return
@@ -256,8 +267,12 @@ type sharedPage struct {
 	Entries     []article
 	Labels      bool
 	Tags        bool
-	Self        string
-	Feed        string
+	// Form is where the search goes, Hidden what goes with it, Field the
+	// name the search has there.
+	Form   string
+	Hidden [][2]string
+	Field  string
+	Feed   string
 }
 
 // serveShared answers with a stream in one of the formats.
@@ -268,10 +283,17 @@ func (h *Handler) serveShared(w http.ResponseWriter, r *http.Request, sh *shared
 	header.Set("Access-Control-Allow-Methods", "GET")
 	header.Set("Access-Control-Allow-Origin", "*")
 	header.Set("Access-Control-Max-Age", "600")
-	header.Set("Cache-Control", "public, max-age=60")
 	if format != "html" {
 		// A document of somebody's entries is not a page of ours.
 		header.Set("Content-Security-Policy", "default-src 'none'; sandbox; frame-ancestors 'none'")
+	}
+	// A document is the same for everybody and may be kept for a minute.
+	// The page is not: it has the name and the menu of whoever is logged
+	// in, and an error is nobody's to keep.
+	document := func(contentType string, body []byte) {
+		header.Set("Content-Type", contentType)
+		header.Set("Cache-Control", "public, max-age=60")
+		_, _ = w.Write(body)
 	}
 
 	if format == "opml" {
@@ -279,13 +301,12 @@ func (h *Handler) serveShared(w http.ResponseWriter, r *http.Request, sh *shared
 			plain(w, http.StatusNotFound, "OPML not allowed for this user query!")
 			return
 		}
-		document, err := opml.ExportPart(ctx, h.db, sh.owner, h.now(), sh.opml)
+		exported, err := opml.ExportPart(ctx, h.db, sh.owner, h.now(), sh.opml)
 		if err != nil {
 			h.broken(w, r, err)
 			return
 		}
-		header.Set("Content-Type", "application/xml; charset=utf-8")
-		_, _ = w.Write(document)
+		document("application/xml; charset=utf-8", exported)
 		return
 	}
 
@@ -322,8 +343,7 @@ func (h *Handler) serveShared(w http.ResponseWriter, r *http.Request, sh *shared
 			h.broken(w, r, err)
 			return
 		}
-		header.Set("Content-Type", "application/json; charset=utf-8")
-		_, _ = out.WriteTo(w)
+		document("application/json; charset=utf-8", out.Bytes())
 		return
 	}
 
@@ -345,16 +365,14 @@ func (h *Handler) serveShared(w http.ResponseWriter, r *http.Request, sh *shared
 	}
 	switch format {
 	case "rss":
-		header.Set("Content-Type", "application/rss+xml; charset=utf-8")
-		_, _ = w.Write(rssDocument(sh, description, shown, entries, h.now()))
+		document("application/rss+xml; charset=utf-8", rssDocument(sh, description, shown, entries, h.now()))
 	case "atom":
-		header.Set("Content-Type", "application/atom+xml; charset=utf-8")
-		_, _ = w.Write(atomDocument(sh, description, shown, entries, h.now()))
+		document("application/atom+xml; charset=utf-8", atomDocument(sh, description, shown, entries, h.now()))
 	default:
 		v.Heading = sh.title
 		v.Data = sharedPage{
 			Description: description, Query: visitorSearch, Entries: shown, Labels: sh.labels, Tags: !sh.noTags,
-			Self: r.URL.Path, Feed: sh.self,
+			Form: sh.form, Hidden: sh.hidden, Field: sh.field, Feed: sh.self,
 		}
 		h.render(w, r, http.StatusOK, "shared", v)
 	}

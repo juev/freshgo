@@ -6,8 +6,8 @@
 {{if .Data.CanChange}}
 <div class="entry-actions">
 {{template "entry-actions" (dict "Entry" .Data.Entry "Here" .Data.Here "Page" .)}}
-{{template "share" (dict "Entry" .Data.Entry "Page" .)}}
 </div>
+{{template "share" (dict "Entry" .Data.Entry "Page" .)}}
 <form method="post" action="{{.Data.Entry.URL}}/labels" class="form labels" id="labels">
 <input type="hidden" name="next" value="{{.Data.Here}}">
 <fieldset>

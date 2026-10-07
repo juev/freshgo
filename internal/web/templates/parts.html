@@ -90,9 +90,9 @@
 <div class="entry-actions">
 {{if .CanChange}}{{template "entry-actions" (dict "Entry" .Entry "Here" .Here "Page" .Page)}}{{end}}
 {{if .Entry.Link}}<a class="original" href="{{.Entry.Link}}" rel="noopener noreferrer">{{.Page.T "entry.original"}}</a>{{end}}
-{{template "share" (dict "Entry" .Entry "Page" .Page)}}
 <a class="entry-page" href="{{.Entry.URL}}">{{.Page.T "entry.page"}}</a>
 </div>
+{{template "share" (dict "Entry" .Entry "Page" .Page)}}
 </article>
 {{end}}
 

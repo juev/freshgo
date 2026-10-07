@@ -259,7 +259,14 @@ func (h *Handler) saveQuery(w http.ResponseWriter, r *http.Request) {
 		// A view of a saved query is that query, narrowed.
 		base := lib.queries[s.id]
 		q.set("get", base.Get)
-		q.set("search", strings.TrimSpace(base.Search+" "+showing.query))
+		// Each in parentheses: an OR of one must not reach into the other.
+		switch {
+		case base.Search == "":
+		case showing.query == "":
+			q.set("search", base.Search)
+		default:
+			q.set("search", "("+base.Search+") ("+showing.query+")")
+		}
 	}
 	for name, spelled := range freshRSSOrders {
 		if spelled == showing.sort {

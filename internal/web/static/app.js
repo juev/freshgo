@@ -132,7 +132,6 @@
 				article.querySelector('.entry-body').append(now);
 			}
 		}
-		revealShares(article);
 		if (action) {
 			// The button that was pressed is gone; its successor takes the focus.
 			const button = article.querySelector(`.entry-actions form[action="${CSS.escape(action)}"] button`);

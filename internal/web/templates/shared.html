@@ -1,11 +1,12 @@
 {{define "content"}}
 <h1>{{.Heading}}</h1>
 <p>{{.Data.Description}} <a href="{{.Data.Feed}}">RSS</a></p>
-<form method="get" action="{{.URL .Data.Self}}" class="search" role="search">
-<label for="q">{{.T "search.label"}}</label>
-<input type="search" id="q" name="q" value="{{.Data.Query}}">
+{{if .Data.Form}}<form method="get" action="{{.URL .Data.Form}}" class="search" role="search">
+{{range .Data.Hidden}}<input type="hidden" name="{{index . 0}}" value="{{index . 1}}">
+{{end}}<label for="q">{{.T "search.label"}}</label>
+<input type="search" id="q" name="{{.Data.Field}}" value="{{.Data.Query}}">
 <button type="submit">{{.T "search.submit"}}</button>
-</form>
+</form>{{end}}
 {{if not .Data.Entries}}<p class="muted">{{.T "stream.empty"}}</p>{{end}}
 {{range .Data.Entries}}
 <article class="entry single" id="e{{.ID}}">

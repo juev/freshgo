@@ -111,9 +111,21 @@ func TestSavedQueries(t *testing.T) {
 
 		// A second one, a view of the first narrowed.
 		s.follow("/queries", url.Values{"name": {"Second"}, "stream": {"/queries/0"}, "q": {"intitle:e"}, "state": {"unread"}})
-		if got := s.queries("alice")[1]; got["get"] != "f_1" || got["search"] != "intitle:a intitle:e" || got["state"] != 2.0 {
+		if got := s.queries("alice")[1]; got["get"] != "f_1" || got["search"] != "(intitle:a) (intitle:e)" || got["state"] != 2.0 {
 			t.Errorf("a saved view of a saved query = %v", got)
 		}
+		// The saved view lists what its page listed, also when one of the
+		// two searches has an OR, which binds weaker than what joins them.
+		s.setting("alice", "queries", []map[string]any{{"name": "Either", "get": "f_1", "state": 3, "search": "intitle:a OR intitle:e"}})
+		shownPage := listed(s.page("/queries/0?q=intitle%3Azzzz"))
+		s.follow("/queries", url.Values{"name": {"Narrowed"}, "stream": {"/queries/0"}, "q": {"intitle:zzzz"}, "state": {"all"}})
+		if saved := listed(s.page("/queries/1")); len(shownPage) != 0 || len(saved) != 0 || len(listed(s.page("/queries/0"))) == 0 {
+			t.Errorf("the page of a narrowed query lists %v, the view saved from it %v (%v)", shownPage, saved, s.queries("alice")[1]["search"])
+		}
+		s.setting("alice", "queries", []map[string]any{
+			{"name": "Atom by title", "get": "f_1", "state": 3, "search": "intitle:a", "sort": "title", "order": "ASC"},
+			{"name": "Second", "get": "f_1", "state": 2, "search": "intitle:a intitle:e"},
+		})
 
 		// The page of a query stores what its form says.
 		form := s.formAt("/settings/queries/1", "/settings/queries/1")
@@ -273,6 +285,11 @@ func TestSharedQuery(t *testing.T) {
 			t.Errorf("GET %s.atom: %v, %d entries, title %q", base, err, len(feed.Entries), feed.Title)
 		}
 		page := s.get(base + ".html")
+		// The page is rendered for whoever asks: it is not for a cache to
+		// hand to somebody else, as the documents are.
+		if page.header.Get("Cache-Control") != "no-store" || !strings.Contains(page.body, `action="`+base+`.html"`) || !strings.Contains(page.body, `name="q"`) {
+			t.Errorf("GET %s.html: Cache-Control %q, or no form of its own", base, page.header.Get("Cache-Control"))
+		}
 		if page.status != http.StatusOK || !strings.Contains(page.body, "<h1>Blogs &amp; more</h1>") || strings.Count(page.body, `<article class="entry single"`) != len(want) ||
 			strings.Contains(page.body, `href="/feeds/`) || strings.Contains(page.body, `action="/entries/`) {
 			t.Errorf("GET %s.html: status %d\n%.800s", base, page.status, page.body)
@@ -310,6 +327,16 @@ func TestSharedQuery(t *testing.T) {
 		}
 		if a := s.get("/api/query.php?user=alice&t=" + token + "&f=atom&search=" + url.QueryEscape(words)); !reflect.DeepEqual(feedItems(t, a.body), found) {
 			t.Errorf("the address of FreshRSS with a search: status %d, lists %v", a.status, feedItems(t, a.body))
+		}
+		// Its page searches where FreshRSS has the search.
+		legacyPage := s.get("/api/query.php?user=alice&t=" + token + "&f=html")
+		for _, field := range []string{`action="/api/query.php"`, `name="user" value="alice"`, `name="t" value="` + token + `"`, `name="f" value="html"`, `name="search"`} {
+			if !strings.Contains(legacyPage.body, field) {
+				t.Errorf("the page at the address of FreshRSS lacks %s in its form", field)
+			}
+		}
+		if a := s.get("/api/query.php?user=alice&t=" + token + "&f=html&search=" + url.QueryEscape(words)); strings.Count(a.body, `<article class="entry single"`) != len(found) {
+			t.Errorf("the page at the address of FreshRSS with a search: status %d", a.status)
 		}
 		for target, status := range map[string]int{
 			"/api/query.php?user=bob&t=" + token + "&f=rss": http.StatusNotFound, "/api/query.php?user=alice&t=" + token + "&f=pdf": http.StatusUnprocessableEntity,

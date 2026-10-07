@@ -135,6 +135,13 @@ type library struct {
 }
 
 func (h *Handler) library(ctx context.Context, user *store.User) (*library, error) {
+	return h.libraryOf(ctx, user, true)
+}
+
+// libraryOf reads what a user has subscribed to, with the counts of unread
+// entries when they are asked for: a document handed out to the public has
+// no use for them.
+func (h *Handler) libraryOf(ctx context.Context, user *store.User, counts bool) (*library, error) {
 	userID := user.ID
 	lib := &library{feed: map[int64]*store.Feed{}, unread: map[int64]int{}, labelled: map[int64]int{}, queries: readQueries(user)}
 	var err error
@@ -147,16 +154,17 @@ func (h *Handler) library(ctx context.Context, user *store.User) (*library, erro
 	if lib.labels, err = h.db.Tags(ctx, userID); err != nil {
 		return nil, err
 	}
-	feedCounts, err := h.db.FeedCounts(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	labelCounts, err := h.db.LabelCounts(ctx, userID)
-	if err != nil {
-		return nil, err
-	}
-	if lib.starred, err = h.db.UnreadFavorites(ctx, userID); err != nil {
-		return nil, err
+	feedCounts, labelCounts := map[int64]store.Counts{}, map[int64]store.Counts{}
+	if counts {
+		if feedCounts, err = h.db.FeedCounts(ctx, userID); err != nil {
+			return nil, err
+		}
+		if labelCounts, err = h.db.LabelCounts(ctx, userID); err != nil {
+			return nil, err
+		}
+		if lib.starred, err = h.db.UnreadFavorites(ctx, userID); err != nil {
+			return nil, err
+		}
 	}
 	// The categories the user has put in order come first, in that order.
 	position := func(c *store.Category) int {
