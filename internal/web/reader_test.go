@@ -2,14 +2,17 @@ package web
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -116,6 +119,11 @@ func TestReadingScreen(t *testing.T) {
 			t.Errorf("GET /?state=all: the tree lacks the feed without unread entries\n%s", all)
 		}
 
+		// The feed being read stays in the tree with nothing unread in it.
+		if own := s.page("/feeds/8?state=unread"); !strings.Contains(own, `<a href="/feeds/8?state=unread" aria-current="page">No identifiers</a>`) {
+			t.Errorf("GET /feeds/8?state=unread: the tree lacks the feed being read\n%s", own)
+		}
+
 		unread := false
 		for target, want := range map[string]store.Listing{
 			"/":                           {Set: mainStream(), Read: &unread},
@@ -218,6 +226,29 @@ func TestReadingSettings(t *testing.T) {
 		check("the order of a feed", "/feeds/2", store.Listing{Set: store.EntrySet{FeedID: 2}, Read: &unread, Order: store.OrderTitle})
 		check("the order of the user elsewhere", "/feeds/1", store.Listing{Set: store.EntrySet{FeedID: 1}, Read: &unread, Order: store.OrderPublished, Ascending: true})
 
+		// An order of a feed that freshgo lacks is the time received, not the
+		// order of the user.
+		s.setting("alice", "sort", "title")
+		if err := s.db.InsertEntries(ctx, alice.ID, []*store.Entry{{FeedID: 3, GUID: "z", Title: "zz came first"}}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.db.InsertEntries(ctx, alice.ID, []*store.Entry{{FeedID: 3, GUID: "a", Title: "Aa came second"}}); err != nil {
+			t.Fatal(err)
+		}
+		if feed, err = s.db.FeedByID(ctx, alice.ID, 3); err != nil {
+			t.Fatal(err)
+		}
+		feed.Attributes = json.RawMessage(`{"defaultSort":"link"}`)
+		if err := s.db.UpdateFeed(ctx, feed); err != nil {
+			t.Fatal(err)
+		}
+		check("an order of a feed freshgo lacks", "/feeds/3", store.Listing{Set: store.EntrySet{FeedID: 3}, Read: &unread, Ascending: true})
+		check("the order of the user elsewhere", "/feeds/4", store.Listing{Set: store.EntrySet{FeedID: 4}, Read: &unread, Order: store.OrderTitle, Ascending: true})
+		byTitle := s.stored("alice", store.Listing{Set: store.EntrySet{FeedID: 3}, Read: &unread, Order: store.OrderTitle, Ascending: true})
+		if reflect.DeepEqual(listed(s.page("/feeds/3")), byTitle) {
+			t.Error("the feed with an order freshgo lacks is listed in the order of the user")
+		}
+
 		s.setting("alice", "hide_read_feeds", false)
 		if body := s.page("/"); !strings.Contains(body, `href="/feeds/8"`) {
 			t.Error("hide_read_feeds off: the tree lacks the feed without unread entries")
@@ -241,16 +272,18 @@ func TestEntryIsShown(t *testing.T) {
 		entries := []*store.Entry{
 			{
 				FeedID: 1, GUID: "shown", Title: `Tom & "Jerry" <b>`, Authors: []string{"Ann", "Bo"}, Link: "https://example.org/a?b=1&c=2",
-				Content:   `<p onclick="steal()">Text <a href="/relative">link</a></p><script>alert(1)</script><form action="/logout"><input name="x"></form>`,
+				Content: `<p onclick="steal()">Text <a href="/relative">link</a></p><script>alert(1)</script><form action="/logout"><input name="x"></form>` +
+					`<img src="https://example.org/inline.png">`,
 				Published: time.Date(2026, 3, 1, 23, 30, 0, 0, time.UTC).Unix(), Tags: []string{"cats", "mice"},
 				Attributes: json.RawMessage(`{"enclosures":[
 					{"url":"https://example.org/s.mp3","type":"audio/mpeg","title":"Episode"},
 					{"url":"https://example.org/pic.png"},
+					{"url":"https://example.org/inline.png","type":"image/png"},
 					{"url":"javascript:alert(1)","type":"image/png"},
 					{"url":"https://example.org/doc.pdf","type":"application/pdf"}]}`),
 			},
 			{FeedID: 1, GUID: "hidden", Title: "Hidden by a handler"},
-			{FeedID: 1, GUID: "untitled", Link: "javascript:alert(1)"},
+			{ID: time.Date(2026, 3, 5, 1, 0, 0, 0, time.UTC).UnixMicro(), FeedID: 1, GUID: "untitled", Link: "javascript:alert(1)"},
 		}
 		if err := s.db.InsertEntries(ctx, alice.ID, entries); err != nil {
 			t.Fatal(err)
@@ -277,6 +310,10 @@ func TestEntryIsShown(t *testing.T) {
 					t.Errorf("GET %s: no %q in\n%s", target, want, body)
 				}
 			}
+			// The picture the text shows is not shown again as an enclosure.
+			if n := strings.Count(body, "example.org/inline.png"); n != 1 {
+				t.Errorf("GET %s shows the picture of the text %d times, want once", target, n)
+			}
 			for _, unwanted := range []string{"onclick", "<script>alert", "steal()", `action="/logout"><input`, "javascript:alert"} {
 				if strings.Contains(body, unwanted) {
 					t.Errorf("GET %s shows %q", target, unwanted)
@@ -288,6 +325,10 @@ func TestEntryIsShown(t *testing.T) {
 		list := s.page("/feeds/1")
 		if strings.Contains(list, "Hidden by a handler") || !strings.Contains(list, "Untitled entry") {
 			t.Errorf("GET /feeds/1: the hidden entry is listed or the untitled one is not\n%s", list)
+		}
+		// An entry without a date shows the time it was received.
+		if body := s.page("/entries/" + strconv.FormatInt(entries[2].ID, 10)); !strings.Contains(body, `<time datetime="2026-03-05T10:00:00&#43;09:00">2026-03-05 10:00</time>`) {
+			t.Errorf("the entry without a date does not show when it was received\n%s", body)
 		}
 		if a := s.get("/entries/" + strconv.FormatInt(entries[1].ID, 10)); a.status != http.StatusNotFound {
 			t.Errorf("the page of an entry a handler hides: status %d", a.status)
@@ -511,9 +552,21 @@ func TestEntryLabels(t *testing.T) {
 		if body := s.page(path); !strings.Contains(body, "too long") {
 			t.Errorf("no notice about the long name\n%s", body)
 		}
+		// 191 characters, whatever bytes they take, are not too long.
+		longest := strings.Repeat("я", 191)
+		s.post(path+"/labels", url.Values{"new": {longest}, "next": {path}})
+		if got := labels(); !reflect.DeepEqual(got, []string{longest}) {
+			t.Errorf("labels = %v, want the one of 191 characters", got)
+		}
 		tags, err := s.db.Tags(ctx, alice.ID)
-		if err != nil || len(tags) != 3 {
-			t.Errorf("%d labels, %v; want the two of the reference and one new", len(tags), err)
+		if err != nil || len(tags) != 4 {
+			t.Errorf("%d labels, %v; want the two of the reference and two new", len(tags), err)
+		}
+
+		// A cookie names a notice and nothing else among the texts.
+		s.cookies[noticeCookie] = &http.Cookie{Name: noticeCookie, Value: "error.404.text:0"}
+		if m := messages.FindStringSubmatch(s.page(path)); m == nil || strings.TrimSpace(m[1]) != "" {
+			t.Errorf("a cookie that names another text is shown: %q", m)
 		}
 	})
 }
@@ -617,6 +670,32 @@ func TestMarkAllRead(t *testing.T) {
 			t.Errorf("%d unread entries left of %d with %d found", len(left), len(before), len(found))
 		}
 
+		// With a search too, what arrives after the page was made stays.
+		body = s.page("/feeds/5?q=" + url.QueryEscape("intitle:arrived OR f:5"))
+		*clock = clock.Add(time.Minute)
+		late = arrive(5, "late-found", "Arrived after the search")
+		s.post("/read-all", form(body))
+		if got := unread(store.EntrySet{FeedID: 5}); !reflect.DeepEqual(got, []int64{late}) {
+			t.Errorf("unread of the feed after marking what a search found: %v, want only the late entry %d", got, late)
+		}
+		// "before" is never later than now, with a search and without.
+		*clock = clock.Add(time.Hour)
+		ahead := arrive(5, "ahead", "Arrived by a clock that is ahead")
+		*clock = clock.Add(-30 * time.Minute)
+		for _, q := range []string{"", "intitle:arrived"} {
+			s.post("/read-all", url.Values{"stream": {"/feeds/5"}, "q": {q}, "before": {strconv.FormatInt(ahead+1, 10)}})
+			if got := unread(store.EntrySet{FeedID: 5}); !reflect.DeepEqual(got, []int64{ahead}) {
+				t.Errorf("unread of the feed after marking up to a time yet to come, search %q: %v, want only %d", q, got, ahead)
+			}
+			if _, err := s.db.SetEntriesRead(ctx, alice.ID, []int64{late}, false, 1); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := s.db.SetEntriesRead(ctx, alice.ID, []int64{late, ahead}, true, 1); err != nil {
+			t.Fatal(err)
+		}
+		*clock = clock.Add(time.Hour)
+
 		// Starred only: the rest of the main stream stays unread.
 		starred := arrive(4, "starred", "Starred")
 		if err := s.db.SetEntriesFavorite(ctx, alice.ID, []int64{starred}, true, 1); err != nil {
@@ -663,6 +742,185 @@ func TestVisitorOnlyReads(t *testing.T) {
 		}
 		if got := len(s.stored("alice", store.Listing{Read: ptr(false)})); got != 18 {
 			t.Errorf("%d unread entries after the visitor's requests, want 18", got)
+		}
+	})
+}
+
+// R4: the counts of the tree go by where a feed is shown: the main stream
+// counts the feeds shown there, a category those not kept to their own page.
+func TestTreeCountsByPriority(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		ctx := context.Background()
+		alice := s.user("alice")
+		s.asAlice()
+		counts := func(feed *store.Feed) [3]string {
+			t.Helper()
+			body := s.page("/?state=all")
+			var got [3]string
+			for i, link := range []string{`<a href="/?state=all" aria-current="page">Unread</a>`, `<a href="/categories/` + strconv.FormatInt(feed.CategoryID, 10) + `?state=all">`, `<a href="/feeds/` + strconv.FormatInt(feed.ID, 10) + `?state=all">`} {
+				m := regexp.MustCompile(regexp.QuoteMeta(link) + `(?:[^<]*</a>)? <span class="count" title="(\d+) `).FindStringSubmatch(body)
+				if m != nil {
+					got[i] = m[1]
+				}
+			}
+			return got
+		}
+		// Feed 8 is shown on its own page only: its unread entry counts there.
+		own, err := s.db.FeedByID(ctx, alice.ID, 8)
+		if err != nil {
+			t.Fatal(err)
+		}
+		before := counts(own)
+		if err := s.db.InsertEntries(ctx, alice.ID, []*store.Entry{{FeedID: 8, GUID: "unread"}}); err != nil {
+			t.Fatal(err)
+		}
+		if got, want := counts(own), [3]string{before[0], before[1], "1"}; got != want || before[0] != "18" {
+			t.Errorf("counts of the main stream, the category and a feed kept to its page: %v, want %v", got, want)
+		}
+		// Feed 2 moves out of the main stream into its category only.
+		feed, err := s.db.FeedByID(ctx, alice.ID, 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := counts(feed), [3]string{"18", "8", "4"}; got != want {
+			t.Fatalf("counts of the main stream, the category and the feed: %v, want %v", got, want)
+		}
+		feed.Priority = priorityCategory
+		if err := s.db.UpdateFeed(ctx, feed); err != nil {
+			t.Fatal(err)
+		}
+		if got, want := counts(feed), [3]string{"14", "8", "4"}; got != want {
+			t.Errorf("counts with the feed in its category only: %v, want %v", got, want)
+		}
+	})
+}
+
+// R4, R5: a shuffled stream stays as it was shuffled through its pages and
+// when an action brings the reader back to it.
+func TestShuffleIsKept(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		s.asAlice()
+		s.setting("alice", "posts_per_page", 5)
+		next := regexp.MustCompile(`<input type="hidden" name="next" value="([^"]+)">`)
+		for range 5 {
+			body := s.page("/all?sort=random")
+			first := listed(body)
+			m := next.FindStringSubmatch(body)
+			if m == nil {
+				t.Fatalf("no form of an action in\n%s", body)
+			}
+			here := strings.ReplaceAll(m[1], "&amp;", "&")
+			a := s.post("/entries/"+strconv.FormatInt(first[2], 10)+"/star", url.Values{"next": {here}, "starred": {"1"}})
+			back, _, _ := strings.Cut(a.header.Get("Location"), "#")
+			if a.status != http.StatusSeeOther || !strings.Contains(back, "seed=") {
+				t.Fatalf("an action on a shuffled page: status %d, Location %q", a.status, a.header.Get("Location"))
+			}
+			if again := listed(s.page(back)); !reflect.DeepEqual(again, first) {
+				t.Fatalf("back on the shuffled page it lists %v, it listed %v", again, first)
+			}
+
+			seen := map[int64]bool{}
+			for target := back; target != ""; {
+				body := s.page(target)
+				for _, id := range listed(body) {
+					if seen[id] {
+						t.Fatalf("entry %d is on two pages of one shuffle", id)
+					}
+					seen[id] = true
+				}
+				target = ""
+				if m := nextPage.FindStringSubmatch(body); m != nil {
+					target = strings.ReplaceAll(m[1], "&amp;", "&")
+				}
+			}
+			if len(seen) != 19 {
+				t.Fatalf("the pages of a shuffle list %d entries, want 19", len(seen))
+			}
+		}
+		// A shuffle is an order as any other: another seed, another order.
+		if reflect.DeepEqual(listed(s.page("/all?sort=random&seed=123456789")), listed(s.page("/all?sort=random&seed=987654321"))) {
+			t.Error("two seeds shuffle the same way")
+		}
+	})
+}
+
+// R2: text no database keeps, with a NUL or bytes that are not UTF-8, is
+// refused the same on both engines and never breaks the server.
+func TestUnreadableText(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		ctx := context.Background()
+		s.asAlice()
+		id := strconv.FormatInt(listed(s.page("/"))[0], 10)
+		for _, bad := range []string{"a\x00b", "a\xffb"} {
+			for _, target := range []string{
+				"/all?q=" + url.QueryEscape(bad), "/all?q=" + url.QueryEscape(`labels:"`+bad+`"`),
+				"/feeds/1?state=" + url.QueryEscape(bad), "/entries/" + id + "?x=" + url.QueryEscape(bad),
+			} {
+				if a := s.get(target); a.status != http.StatusBadRequest {
+					t.Errorf("GET %q: status %d, want 400", target, a.status)
+				}
+			}
+			for target, form := range map[string]url.Values{
+				"/entries/" + id + "/labels": {"new": {bad}},
+				"/entries/" + id + "/read":   {"next": {"/?q=" + bad}},
+				"/read-all":                  {"stream": {"/"}, "q": {`labels:"` + bad + `"`}},
+			} {
+				if a := s.post(target, form); a.status != http.StatusBadRequest {
+					t.Errorf("POST %s with %q: status %d, want 400", target, bad, a.status)
+				}
+			}
+			if a := s.login(bad, "alice-web-password", nil); a.status >= http.StatusInternalServerError {
+				t.Errorf("login as %q: status %d", bad, a.status)
+			}
+		}
+		if tags, err := s.db.Tags(ctx, s.user("alice").ID); err != nil || len(tags) != 2 {
+			t.Errorf("%d labels, %v; want the two of the reference", len(tags), err)
+		}
+		// A place in a listing with a title no entry has is no place.
+		after := base64.RawURLEncoding.EncodeToString([]byte(`{"i":1,"t":"a\u0000b"}`))
+		if a := s.get("/all?sort=title&after=" + after); a.status != http.StatusNotFound {
+			t.Errorf("GET /all?sort=title&after=<a title with a NUL>: status %d, want 404", a.status)
+		}
+	})
+}
+
+// R5: forms that name the same new label at once all get it.
+func TestEntryLabelsAtOnce(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		ctx := context.Background()
+		alice := s.user("alice")
+		s.asAlice()
+		ids := listed(s.page("/all"))[:8]
+		var wg sync.WaitGroup
+		answers := make([]*httptest.ResponseRecorder, len(ids))
+		for i, id := range ids {
+			r := httptest.NewRequest(http.MethodPost, "/entries/"+strconv.FormatInt(id, 10)+"/labels",
+				strings.NewReader(url.Values{"new": {"at once"}, "next": {"/"}}.Encode()))
+			r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			r.Header.Set("Sec-Fetch-Site", "same-origin")
+			for _, c := range s.cookies {
+				r.AddCookie(c)
+			}
+			answers[i] = httptest.NewRecorder()
+			wg.Go(func() { s.h.ServeHTTP(answers[i], r) })
+		}
+		wg.Wait()
+		for i, w := range answers {
+			if w.Code != http.StatusSeeOther || !strings.Contains(w.Header().Get("Set-Cookie"), "notice.labels:") {
+				t.Errorf("form %d: status %d, cookie %q", i, w.Code, w.Header().Get("Set-Cookie"))
+			}
+		}
+		labels, err := s.db.EntryLabels(ctx, alice.ID, ids)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, id := range ids {
+			if !slices.Contains(labels[id], "at once") {
+				t.Errorf("entry %d has the labels %v, want the new one among them", id, labels[id])
+			}
+		}
+		if tags, err := s.db.Tags(ctx, alice.ID); err != nil || len(tags) != 3 {
+			t.Errorf("%d labels, %v; want the two of the reference and one new", len(tags), err)
 		}
 	})
 }

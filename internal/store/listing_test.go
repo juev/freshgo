@@ -3,6 +3,7 @@ package store
 import (
 	"cmp"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -136,31 +137,31 @@ func TestListPage(t *testing.T) {
 	})
 }
 
-// R4: a shuffle shows every entry once whatever the size of the page.
+// R4: a shuffle shows every entry once whatever the size of the page, and a
+// seed always shuffles the same way.
 func TestListPageShuffled(t *testing.T) {
 	eachEngine(t, func(t *testing.T, s *Store) {
 		alice := newShelf(t, s)
 		all := []int64{s1, s2, s3, s4, s5, s6}
-		for _, limit := range []int{0, 1, 2, 4} {
-			got, _ := pages(t, s, alice.ID, Listing{Order: OrderRandom, Limit: limit})
-			slices.Sort(got)
-			if !reflect.DeepEqual(got, all) {
-				t.Errorf("shuffled, %d a page: entries %v, want each of %v once", limit, got, all)
+		orders := map[string]bool{}
+		for _, seed := range []int64{0, 1, 7, -5, 1 << 40, 123456789} {
+			whole, _ := pages(t, s, alice.ID, Listing{Order: OrderRandom, Seed: seed})
+			orders[fmt.Sprint(whole)] = true
+			for _, limit := range []int{1, 2, 4} {
+				// Pages of one shuffle are in the order of the whole shuffle.
+				got, _ := pages(t, s, alice.ID, Listing{Order: OrderRandom, Seed: seed, Limit: limit})
+				if !reflect.DeepEqual(got, whole) {
+					t.Errorf("seed %d, %d a page: %v, want %v as without pages", seed, limit, got, whole)
+				}
+			}
+			sorted := slices.Clone(whole)
+			slices.Sort(sorted)
+			if !reflect.DeepEqual(sorted, all) {
+				t.Errorf("seed %d: entries %v, want each of %v once", seed, whole, all)
 			}
 		}
-		// Two pages of one shuffle are in the order of the whole shuffle.
-		ctx := context.Background()
-		first, next, err := s.ListPage(ctx, alice.ID, Listing{Order: OrderRandom, Limit: 3})
-		if err != nil || len(first) != 3 || next == "" {
-			t.Fatalf("first page of a shuffle: %d entries, next %q, %v", len(first), next, err)
-		}
-		again, _, err := s.ListPage(ctx, alice.ID, Listing{Order: OrderRandom, Limit: 3, After: next})
-		if err != nil {
-			t.Fatal(err)
-		}
-		twice, _, err := s.ListPage(ctx, alice.ID, Listing{Order: OrderRandom, Limit: 3, After: next})
-		if err != nil || !reflect.DeepEqual(again, twice) || len(again) != 3 {
-			t.Errorf("the second page of a shuffle read twice: %v and %v, %v", again, twice, err)
+		if len(orders) < 2 {
+			t.Errorf("six seeds shuffle the same way: %v", orders)
 		}
 	})
 }
@@ -218,8 +219,10 @@ func TestListPageWhileEntriesArrive(t *testing.T) {
 func TestListPageRefusesForeignPlace(t *testing.T) {
 	eachEngine(t, func(t *testing.T, s *Store) {
 		alice := newShelf(t, s)
-		for _, after := range []string{"!", "bm90IGpzb24", "eyJpIjoxLCJzIjotMX0", "eyJpIjoxLCJzIjoxMDAwMDAzfQ"} {
-			_, _, err := s.ListPage(context.Background(), alice.ID, Listing{Order: OrderRandom, After: after})
+		// The last is a title with a NUL, which no entry has.
+		nul := base64.RawURLEncoding.EncodeToString([]byte(`{"i":1,"t":"a\u0000b"}`))
+		for _, after := range []string{"!", "bm90IGpzb24", nul} {
+			_, _, err := s.ListPage(context.Background(), alice.ID, Listing{Order: OrderTitle, After: after})
 			if !errors.Is(err, ErrCursor) {
 				t.Errorf("After %q: error %v, want ErrCursor", after, err)
 			}

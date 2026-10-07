@@ -184,6 +184,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // route hands a request to its page.
 func (h *Handler) route(w http.ResponseWriter, r *http.Request) {
+	if !isText(r.URL.Query()) {
+		h.fail(w, r, http.StatusBadRequest)
+		return
+	}
 	// The mux answers what it has no page for in plain text; ask it first
 	// who would handle the request.
 	if _, pattern := h.mux.Handler(r); pattern == "" {

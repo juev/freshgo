@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"html/template"
+	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -260,6 +261,8 @@ type showing struct {
 	state string
 	sort  string
 	asc   bool
+	// seed picks the shuffle when the sort is random.
+	seed  int64
 	query string
 	// asked are the parameters the reader gave, which links carry on.
 	asked url.Values
@@ -295,10 +298,24 @@ func show(params url.Values, prefs reading, s stream) showing {
 	if _, known := orders[params.Get("sort")]; known {
 		v.sort = params.Get("sort")
 		v.asked.Set("sort", v.sort)
-	} else if v.sort = freshRSSOrders[s.Sort]; v.sort == "" {
-		if v.sort = freshRSSOrders[prefs.Sort]; v.sort == "" {
+	} else {
+		// The order of the stream when it has one, even one freshgo lacks.
+		name := s.Sort
+		if name == "" {
+			name = prefs.Sort
+		}
+		if v.sort = freshRSSOrders[name]; v.sort == "" {
 			v.sort = "added"
 		}
+	}
+	if v.sort == "random" {
+		// The shuffle is named in every address the page gives out, or coming
+		// back to the page after an action would shuffle it again.
+		var err error
+		if v.seed, err = strconv.ParseInt(params.Get("seed"), 10, 64); err != nil {
+			v.seed = rand.Int64()
+		}
+		v.asked.Set("seed", strconv.FormatInt(v.seed, 10))
 	}
 	switch order := params.Get("order"); order {
 	case "asc", "desc":
@@ -312,7 +329,7 @@ func show(params url.Values, prefs reading, s stream) showing {
 
 // listing is the page of the stream the store is asked for.
 func (v showing) listing(s stream, q *search.Query) store.Listing {
-	l := store.Listing{Set: s.set, Search: q, Order: orders[v.sort], Ascending: v.asc}
+	l := store.Listing{Set: s.set, Search: q, Order: orders[v.sort], Ascending: v.asc, Seed: v.seed}
 	switch v.state {
 	case stateUnread:
 		unread := false
@@ -324,6 +341,19 @@ func (v showing) listing(s stream, q *search.Query) store.Listing {
 		l.UnreadOrFavorite = true
 	}
 	return l
+}
+
+// here is the address of the page being shown, for an action to come back
+// to: the address asked for, with the shuffle the page picked.
+func (v showing) here(asked *url.URL) string {
+	if v.sort != "random" {
+		return asked.RequestURI()
+	}
+	here := *asked
+	params := here.Query()
+	params.Set("seed", strconv.FormatInt(v.seed, 10))
+	here.RawQuery = params.Encode()
+	return here.RequestURI()
 }
 
 // link is the address of a stream listed as asked, with some parameters
@@ -597,7 +627,7 @@ func (h *Handler) reader(kind string) http.HandlerFunc {
 		v.Wide = true
 		page := readerPage{
 			Unread: s.unread, Sort: showing.sort, Asc: showing.asc, Query: showing.query, State: showing.state,
-			Asked: showing.asked, Path: s.path(), Here: r.URL.RequestURI(), Expanded: prefs.DisplayPosts,
+			Asked: showing.asked, Path: s.path(), Here: showing.here(r.URL), Expanded: prefs.DisplayPosts,
 			Before: h.now().UnixMicro(), CanChange: !who.anonymous,
 		}
 		for _, state := range []string{stateUnread, stateAll, stateStar} {
@@ -718,9 +748,22 @@ func (h *Handler) entry(w http.ResponseWriter, r *http.Request) {
 // it cannot be read, and the answer is given.
 func (h *Handler) form(w http.ResponseWriter, r *http.Request) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, maxActionForm)
-	if err := r.ParseForm(); err != nil {
+	if err := r.ParseForm(); err != nil || !isText(r.PostForm) {
 		h.fail(w, r, http.StatusBadRequest)
 		return false
+	}
+	return true
+}
+
+// isText reports whether every value is text a database keeps: UTF-8
+// without a NUL, which PostgreSQL refuses.
+func isText(values url.Values) bool {
+	for _, list := range values {
+		for _, value := range list {
+			if !utf8.ValidString(value) || strings.ContainsRune(value, 0) {
+				return false
+			}
+		}
 	}
 	return true
 }
@@ -770,6 +813,37 @@ func (h *Handler) starEntry(w http.ResponseWriter, r *http.Request) {
 	h.back(w, r, e.ID)
 }
 
+var errLabelLong = errors.New("web: the name of the label is too long")
+
+// labelNamed finds the label of a name and makes it when there is none.
+// A name a category has is store.ErrConflict.
+func (h *Handler) labelNamed(ctx context.Context, userID int64, name string) (int64, error) {
+	find := func() (int64, error) {
+		labels, err := h.db.Tags(ctx, userID)
+		for _, l := range labels {
+			if l.Name == name {
+				return l.ID, err
+			}
+		}
+		return 0, err
+	}
+	if id, err := find(); id != 0 || err != nil {
+		return id, err
+	}
+	if utf8.RuneCountInString(name) > maxLabelName {
+		return 0, errLabelLong
+	}
+	created := &store.Tag{UserID: userID, Name: name}
+	err := h.db.CreateTag(ctx, created)
+	if errors.Is(err, store.ErrConflict) {
+		// A category has the name, or another request made the label meanwhile.
+		if id, found := find(); id != 0 || found != nil {
+			return id, found
+		}
+	}
+	return created.ID, err
+}
+
 // labelEntry gives an entry the labels ticked in the form, and a new one
 // when the form names it, and takes the others off.
 func (h *Handler) labelEntry(w http.ResponseWriter, r *http.Request) {
@@ -785,35 +859,24 @@ func (h *Handler) labelEntry(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	notice := "notice.labels"
+	if name := strings.TrimSpace(r.PostForm.Get("new")); name != "" {
+		id, err := h.labelNamed(ctx, user.ID, name)
+		switch {
+		case errors.Is(err, errLabelLong):
+			notice = "notice.label-long"
+		case errors.Is(err, store.ErrConflict):
+			notice = "notice.label-taken"
+		case err != nil:
+			h.broken(w, r, err)
+			return
+		default:
+			wanted[id] = true
+		}
+	}
 	err := h.db.InTx(ctx, func(tx *store.Store) error {
 		labels, err := tx.Tags(ctx, user.ID)
 		if err != nil {
 			return err
-		}
-		if name := strings.TrimSpace(r.PostForm.Get("new")); name != "" {
-			known := false
-			for _, l := range labels {
-				if l.Name == name {
-					wanted[l.ID], known = true, true
-				}
-			}
-			switch {
-			case known:
-			case utf8.RuneCountInString(name) > maxLabelName:
-				notice = "notice.label-long"
-			default:
-				created := &store.Tag{UserID: user.ID, Name: name}
-				switch err := tx.CreateTag(ctx, created); {
-				case errors.Is(err, store.ErrConflict):
-					// A category has the name.
-					notice = "notice.label-taken"
-				case err != nil:
-					return err
-				default:
-					labels = append(labels, created)
-					wanted[created.ID] = true
-				}
-			}
 		}
 		for _, l := range labels {
 			if wanted[l.ID] {

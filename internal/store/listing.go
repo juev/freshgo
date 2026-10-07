@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"strconv"
 	"strings"
 
@@ -29,8 +28,7 @@ const (
 	// byte by byte: capital letters before small ones, ASCII before the rest.
 	OrderTitle
 	OrderFeed
-	// OrderRandom shuffles. The first page picks the shuffle, the following
-	// ones keep it.
+	// OrderRandom shuffles, the way Listing.Seed says.
 	OrderRandom
 )
 
@@ -49,6 +47,8 @@ type Listing struct {
 	Order  Order
 	// Ascending lists the smallest first; it means nothing to OrderRandom.
 	Ascending bool
+	// Seed picks the shuffle of OrderRandom: the same seed, the same order.
+	Seed int64
 	// After is what the page before returned as next; empty for the first page.
 	After string
 	// Limit is the size of the page; zero or less is no limit.
@@ -56,7 +56,8 @@ type Listing struct {
 }
 
 // shuffleMod is the prime the keys of OrderRandom are taken modulo: an entry
-// stands at (identifier mod p)·seed mod p, with a seed from 1 to p-1.
+// stands at (identifier mod p)·k mod p, with k from 1 to p-1 taken from the
+// seed.
 const shuffleMod = 1_000_003
 
 // place is where a page ended: the entry and what it was sorted by.
@@ -64,7 +65,6 @@ type place struct {
 	ID   int64  `json:"i"`
 	Num  int64  `json:"n,omitempty"`
 	Text string `json:"t,omitempty"`
-	Seed int64  `json:"s,omitempty"`
 }
 
 func (p place) String() string {
@@ -78,7 +78,8 @@ func parsePlace(after string) (place, error) {
 	if err == nil {
 		err = json.Unmarshal(data, &p)
 	}
-	if err != nil || p.Seed < 0 || p.Seed >= shuffleMod {
+	// No title and no name has a NUL, and PostgreSQL takes none in a text.
+	if err != nil || strings.ContainsRune(p.Text, 0) {
 		return place{}, ErrCursor
 	}
 	return p, nil
@@ -101,7 +102,6 @@ func (s *Store) ListPage(ctx context.Context, userID int64, l Listing) (entries 
 	var (
 		key  string
 		text bool
-		seed int64
 	)
 	switch l.Order {
 	case OrderPublished:
@@ -111,10 +111,8 @@ func (s *Store) ListPage(ctx context.Context, userID int64, l Listing) (entries 
 	case OrderFeed:
 		key, text = feedNameOfEntry, true
 	case OrderRandom:
-		if seed = after.Seed; seed == 0 {
-			seed = 1 + rand.Int64N(shuffleMod-1)
-		}
-		key = fmt.Sprintf(`((id %% %d) * %d) %% %d`, shuffleMod, seed, shuffleMod)
+		k := 1 + (l.Seed%(shuffleMod-1)+shuffleMod-1)%(shuffleMod-1)
+		key = fmt.Sprintf(`((id %% %d) * %d) %% %d`, shuffleMod, k, shuffleMod)
 		l.Ascending = true
 	}
 	if text && s.driver == config.DriverPostgres {
@@ -189,9 +187,9 @@ func (s *Store) ListPage(ctx context.Context, userID int64, l Listing) (entries 
 		return nil, "", fmt.Errorf("store: list page: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
-	last := place{Seed: seed}
+	var last place
 	for rows.Next() {
-		at := place{Seed: seed}
+		var at place
 		var sc scanner = rows
 		switch {
 		case text:
