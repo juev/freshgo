@@ -1,0 +1,32 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p class="page-links">
+<a href="{{.URL "/subscriptions/add"}}">{{.T "add.heading"}}</a>
+<a href="{{.URL "/subscriptions/problems"}}">{{.T "problems.heading"}}</a>{{if .Data.Problems}} <span class="count" title="{{.N "sub.failing-count" .Data.Problems}}">{{.Data.Problems}}</span>{{end}}
+</p>
+
+{{range .Data.Categories}}
+<section class="category">
+<h2><a href="{{.Settings}}">{{.Name}}</a>{{if .OPML}} <span class="muted">{{$.T "sub.opml"}}</span>{{end}}</h2>
+{{if .Feeds}}{{template "feed-rows" (dict "Feeds" .Feeds "Page" $)}}{{else}}<p class="muted">{{$.T "sub.no-feeds"}}</p>{{end}}
+</section>
+{{end}}
+
+<form method="post" action="{{.URL "/subscriptions/categories"}}" class="form inline">
+<label for="category-name">{{.T "sub.new-category"}}</label>
+<input type="text" id="category-name" name="name" maxlength="191" required>
+<button type="submit">{{.T "sub.add-category"}}</button>
+</form>
+
+<h2>{{.T "tree.labels"}}</h2>
+{{if .Data.Labels}}
+<ul class="feed-list">
+{{range .Data.Labels}}<li><a href="{{.URL}}">{{.Name}}</a></li>
+{{end}}</ul>
+{{else}}<p class="muted">{{.T "sub.no-labels"}}</p>{{end}}
+<form method="post" action="{{.URL "/subscriptions/labels"}}" class="form inline">
+<label for="label-name">{{.T "entry.new-label"}}</label>
+<input type="text" id="label-name" name="name" maxlength="191" required>
+<button type="submit">{{.T "sub.add-label"}}</button>
+</form>
+{{end}}

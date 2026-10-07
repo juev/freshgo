@@ -12,6 +12,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/juev/freshgo/internal/fetch"
+	"github.com/juev/freshgo/internal/hooks"
+	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/storetest"
 	"github.com/juev/freshgo/internal/web/i18n"
@@ -41,6 +44,17 @@ func eachEngine(t *testing.T, o Options, test func(t *testing.T, s *site)) {
 			o.DB, o.Log = db, slog.New(slog.NewTextHandler(io.Discard, nil))
 			if o.Version == "" {
 				o.Version = "1.2.3"
+			}
+			if o.Hooks == nil {
+				o.Hooks = &hooks.Registry{}
+			}
+			if o.Refresher == nil {
+				// The feeds of the tests are served from this machine.
+				client, err := fetch.New(fetch.Options{Allowlist: []string{"*"}})
+				if err != nil {
+					t.Fatal(err)
+				}
+				o.Refresher = refresh.New(db, client, o.Hooks, o.Log)
 			}
 			h, err := New(o)
 			if err != nil {

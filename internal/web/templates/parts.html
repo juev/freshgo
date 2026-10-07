@@ -79,3 +79,86 @@
 </div>
 </article>
 {{end}}
+
+{{define "options"}}{{range .}}<option value="{{.Value}}"{{if .On}} selected{{end}}>{{.Name}}</option>
+{{end}}{{end}}
+
+{{define "ternary"}}
+<p>
+<label for="{{.Name}}">{{.Label}}</label>
+<select id="{{.Name}}" name="{{.Name}}">
+<option value=""{{if eq .Value ""}} selected{{end}}>{{.Page.T "form.inherit"}}</option>
+<option value="1"{{if eq .Value "1"}} selected{{end}}>{{.Page.T "form.yes"}}</option>
+<option value="0"{{if eq .Value "0"}} selected{{end}}>{{.Page.T "form.no"}}</option>
+</select>
+</p>
+{{end}}
+
+{{define "retention"}}
+<fieldset>
+<legend>{{.Page.T "retention.legend"}}</legend>
+{{if .Inherit}}
+<p class="check">
+<input type="checkbox" id="keep_own" name="keep_own" value="1"{{if .Retention.Own}} checked{{end}}>
+<label for="keep_own">{{.Page.T "retention.own"}}</label>
+</p>
+{{end}}
+<p class="check">
+<input type="checkbox" id="keep_max_on" name="keep_max_on" value="1"{{if .Retention.MaxOn}} checked{{end}}>
+<label for="keep_max_on">{{.Page.T "retention.max-on"}}</label>
+</p>
+<p>
+<label for="keep_max">{{.Page.T "retention.max"}}</label>
+<input type="number" id="keep_max" name="keep_max" min="1" value="{{.Retention.Max}}">
+</p>
+<p class="check">
+<input type="checkbox" id="keep_period_on" name="keep_period_on" value="1"{{if .Retention.PeriodOn}} checked{{end}}>
+<label for="keep_period_on">{{.Page.T "retention.period-on"}}</label>
+</p>
+<p>
+<label for="keep_period_count">{{.Page.T "retention.period-count"}}</label>
+<input type="number" id="keep_period_count" name="keep_period_count" min="1" value="{{.Retention.PeriodCount}}">
+<label for="keep_period_unit">{{.Page.T "retention.period-unit"}}</label>
+<select id="keep_period_unit" name="keep_period_unit">
+{{template "options" .Units}}</select>
+</p>
+<p>
+<label for="keep_min">{{.Page.T "retention.min"}}</label>
+<input type="number" id="keep_min" name="keep_min" min="0" value="{{.Retention.Min}}">
+</p>
+<p class="check">
+<input type="checkbox" id="keep_favourites" name="keep_favourites" value="1"{{if .Retention.Favorites}} checked{{end}}>
+<label for="keep_favourites">{{.Page.T "retention.favorites"}}</label>
+</p>
+<p class="check">
+<input type="checkbox" id="keep_labels" name="keep_labels" value="1"{{if .Retention.Labels}} checked{{end}}>
+<label for="keep_labels">{{.Page.T "retention.labels"}}</label>
+</p>
+<p class="check">
+<input type="checkbox" id="keep_unreads" name="keep_unreads" value="1"{{if .Retention.Unreads}} checked{{end}}>
+<label for="keep_unreads">{{.Page.T "retention.unreads"}}</label>
+</p>
+</fieldset>
+{{end}}
+
+{{define "sorting"}}
+<fieldset>
+<legend>{{.Page.T "form.sorting"}}</legend>
+<p>
+<label for="default_sort">{{.Page.T "sort.label"}}</label>
+<select id="default_sort" name="default_sort">
+{{template "options" .Sorts}}</select>
+</p>
+<p>
+<label for="default_order">{{.Page.T "order.label"}}</label>
+<select id="default_order" name="default_order">
+{{template "options" .Orders}}</select>
+</p>
+</fieldset>
+{{end}}
+
+{{define "feed-rows"}}
+<ul class="feed-list">
+{{range .Feeds}}<li><a href="{{.Settings}}">{{.Name}}</a>{{if .Failing}} <span class="mark">{{$.Page.T "sub.failing"}}</span>{{end}}{{if .Muted}} <span class="muted">{{$.Page.T "sub.muted"}}</span>{{end}}{{if .Since}} <span class="muted">{{.Since}}</span>{{end}} <span class="feed-address">{{.Address}}</span></li>
+{{end}}</ul>
+{{end}}

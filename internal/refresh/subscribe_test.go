@@ -245,13 +245,13 @@ func TestCheckURL(t *testing.T) {
 		"example.org/feed":         "https://example.org/feed",
 		"//example.org/feed":       "https://example.org/feed",
 	} {
-		if got, err := checkURL(address); err != nil || got != want {
-			t.Errorf("checkURL(%q) = %q, %v; want %q", address, got, err, want)
+		if got, err := CheckURL(address); err != nil || got != want {
+			t.Errorf("CheckURL(%q) = %q, %v; want %q", address, got, err, want)
 		}
 	}
 	for _, address := range []string{"", "http://", "https:///path", "http://exa mple.org/"} {
-		if got, err := checkURL(address); !errors.Is(err, fetch.ErrBadURL) {
-			t.Errorf("checkURL(%q) = %q, %v; want ErrBadURL", address, got, err)
+		if got, err := CheckURL(address); !errors.Is(err, fetch.ErrBadURL) {
+			t.Errorf("CheckURL(%q) = %q, %v; want ErrBadURL", address, got, err)
 		}
 	}
 }

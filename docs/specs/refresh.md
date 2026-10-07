@@ -1,6 +1,6 @@
 # Feed refresh
 
-Status: implemented for selecting, fetching, reading and storing, for cleanup, for auto-read, for filter actions, for the full text of articles, for adding a feed, for the upkeep of icons and for WebSub.
+Status: implemented for selecting, fetching, reading and storing, for cleanup, for auto-read, for filter actions, for the full text of articles, for adding a feed, for the upkeep of icons, for WebSub, and for what the web interface asks for: refreshing one user, fetching a feed anew, trying a selector, categories that mirror an OPML document.
 Sources: user request of 2026-10-06 and the decisions recorded in `plan.md`; `FreshRSS_feed_Controller::actualizeFeeds`, `keepMaxUnreads`, `FreshRSS_Feed::load`, `loadEntries`, `cleanOldEntries`, `markAsReadUponGone`, `markAsReadMaxUnread`, `FreshRSS_Entry::applyFilterActions`, `FreshRSS_EntryDAO::addEntry`, `updateEntry`, `updateLastSeen`, `commitNewEntries`, `cleanOldEntries`, `app/actualize_script.php` and `cli/purge.php` of FreshRSS at commit `219eaf58`.
 
 ## Purpose and scope
@@ -42,6 +42,11 @@ Auto-read and cleanup. Settings are read under the names FreshRSS gives them: `m
 - F29. `Refresher.RefreshFeed` refreshes one feed of a user at once, whatever its period and whether or not it is muted.
 - F30. After a refresh of a feed that succeeded, a 304 included, the icon of the feed is looked after when the Refresher was given an icon service: `greader-api.md`, A33 and A34. The feed is read again first, for the refresh may have learnt its site.
 - F31. With WebSub on, a feed whose hub is trusted is due once in 24 hours or by its own period, whichever is longer; after a poll the topic of the feed is recorded and its hub is asked to push; `Refresher.Push` stores a pushed document through the same steps as F8–F21 and F26–F27, without F22, F23 and without counting as a poll: `websub.md`, W2, W3 and W7–W9.
+- F36. When the address, kind, credentials, selector or attributes of a feed were changed while it was being fetched, the refresh stores no validators: the answer was read by the old settings, and the next refresh has to read the document by the new ones (`web.md`, U44).
+- F32. `Refresher.AddFeed` gives `ErrTooManyFeeds`, before anything is requested, when the user has `limits.max_feeds` feeds (system settings; zero is no limit).
+- F33. `Refresher.RefreshUser` refreshes the due feeds of one user as a run does (F2–F3, F34), and gives `ErrBusy` instead of waiting when a run is going on. `Refresher.ReloadFeed` forgets the validators and `last_update` of a feed, refreshes it, and for a feed with a selector reads the pages of its newest entries again, ten from the web interface: the text the feed gave is put back first (from `original_content`, or by cutting the marked text of the page out), then completed as for a new entry (`fulltext.md`); an entry whose text changed gets `last_modified` of now, and nothing else of it is written: what the reader did to it meanwhile stands. An entry whose page could not be read, or matches none of the conditions, keeps the text it has.
+- F34. A category of kind 2 mirrors the OPML document at `opml_url` of its attributes. Reading it (`Refresher.RefreshOPML`, and every run for the categories whose last attempt, the greater of `last_update` and `error`, is older than `dynamic_opml_ttl_default` of the user, 12 hours by default): a feed of the category the document no longer lists is muted (F2), a muted one it lists is unmuted, a feed the user has nowhere is created in the category, up to `limits.max_feeds`, after `FeedBeforeInsert`, and keeps the address the document listed it under in its attribute `opml_listed_as`: it is by that address that the document knows the feed after a permanent redirect has changed the one it is fetched at (F12). Feeds are muted and unmuted under their lock (F14); its entries come with the refresh that follows in the same run. What the document says about how a feed is to be requested (`curl_params`) is not taken, as FreshRSS does for a source it does not trust. A feed the user has in another category stays there. Success sets `last_update` of the category and clears `error`; a document that cannot be fetched or is not OPML sets `error` and changes no feed.
+- F35. `Refresher.PreviewArticle` returns what a selector and a filter take from the page of the newest entry of a feed, requested with the settings of the feed; nothing is stored. A feed without an entry that has a link gives `ErrNoEntries`.
 - F25. `freshgo purge` applies F22 to every feed of every user without fetching anything and prints the number of deleted entries per user.
 
 ## Decisions
@@ -64,7 +69,7 @@ Auto-read and cleanup. Settings are read under the names FreshRSS gives them: `m
 - New entries are in the table when the cleanup of their refresh counts entries for `keep_max` and `keep_min`; FreshRSS commits them after it and counts them at the next cleanup.
 - F20 holds within one process. Two processes refreshing feeds of one category at the same moment can each store the shared entry unread.
 - `EntryAutoRead` is not called for a changed entry that is already read; FreshRSS calls it with `upon_reception` whatever the state.
-- A changed feed setting does not force a re-read while the server keeps answering 304. FreshRSS has the same limitation through its cache; the subscription editing of step 11 clears the validators.
+- A changed feed setting does not force a re-read while the server keeps answering 304. FreshRSS has the same limitation through its cache; the form of the settings of a feed drops the validators when such a setting changes (`web.md`, U44).
 - With a blank `timezone` the server's zone applies, as in FreshRSS. Moving an installation to a server in another zone shifts dates written without a zone, and with them the identifiers of entries keyed by date.
 
 ## Verification scenarios
@@ -73,6 +78,8 @@ Auto-read and cleanup. Settings are read under the names FreshRSS gives them: `m
 
 - F31: the tests of `websub_test.go`, listed in `websub.md`.
 - F28: `TestAddFeed` (one request for the document; what the caller chose stands; a second subscription is refused, another user's is not), `TestAddFeedFollowsThePage`, `TestAddFeedOfAnotherKind`, `TestAddFeedRefusals`. F29: `TestRefreshFeed`. F30: `TestRefreshKeepsIcons`.
+
+- F32: `TestFeedLimit`. F33: `TestRefreshUser`, `TestReloadFeed` (replace, append and prepend), `TestReloadFeedKeepsWhatItCannotReplace`. F34: `TestDynamicOPML`, `TestDynamicOPMLFollowsRedirects`; `Feeds` of `internal/opml` through it. F36: `TestValidatorsOfAnOvertakenFetch`. F35: `TestPreviewArticle`.
 
 - R3, F8, F10, F11: the reference installation imported and refreshed from its own corpus through a proxy that keeps the feed addresses → no new and no updated entries, every entry equal to what it was except hash and `last_seen`; a second refresh, now comparing hashes → the same; one item added to `rss.xml` → one new entry for each of the two subscribers, with an identifier above all earlier ones. Covers every feed kind, `atom:id`, RSS `guid`, items without an identifier, non-ASCII and `&` in identifiers, force-https domains. `TestRefreshOfImportedInstallation`.
 - F8, F12: `TestNewFeedIsFilledIn`, `TestRefreshAddsOnlyWhatIsNew`.

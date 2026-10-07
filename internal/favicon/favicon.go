@@ -187,7 +187,7 @@ func (s *Service) fromPage(ctx context.Context, address string) ([]byte, string)
 	if err != nil {
 		return nil, ""
 	}
-	if contentType := imageType(resp.Body); contentType != "" {
+	if contentType := ImageType(resp.Body); contentType != "" {
 		return resp.Body, contentType
 	}
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(resp.Body))
@@ -228,15 +228,15 @@ func (s *Service) image(ctx context.Context, address string) ([]byte, string) {
 	if err != nil {
 		return nil, ""
 	}
-	if contentType := imageType(resp.Body); contentType != "" {
+	if contentType := ImageType(resp.Body); contentType != "" {
 		return resp.Body, contentType
 	}
 	return nil, ""
 }
 
-// imageType returns the media type of an image that can serve as an icon,
+// ImageType returns the media type of an image that can serve as an icon,
 // or "" for anything else.
-func imageType(body []byte) string {
+func ImageType(body []byte) string {
 	if len(body) == 0 || len(body) > maxSize {
 		return ""
 	}
@@ -283,7 +283,7 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // lookup returns the stored icon for a hash; content is nil when there is none.
 func (s *Service) lookup(ctx context.Context, hash string) (content []byte, contentType string, modified time.Time, err error) {
 	if own, err := s.db.CustomIconByHash(ctx, hash); err == nil {
-		return own.Content, imageTypeOr(own.Content), time.Unix(own.Modified, 0), nil
+		return own.Content, typeOr(own.Content), time.Unix(own.Modified, 0), nil
 	} else if !errors.Is(err, store.ErrNotFound) {
 		return nil, "", time.Time{}, err
 	}
@@ -297,10 +297,10 @@ func (s *Service) lookup(ctx context.Context, hash string) (content []byte, cont
 	return icon.Content, icon.ContentType, time.Unix(icon.Modified, 0), nil
 }
 
-// imageTypeOr is the media type of an icon the user supplied: what it looks
+// typeOr is the media type of an icon the user supplied: what it looks
 // like, or the type of .ico files when it looks like nothing known.
-func imageTypeOr(content []byte) string {
-	if contentType := imageType(content); contentType != "" {
+func typeOr(content []byte) string {
+	if contentType := ImageType(content); contentType != "" {
 		return contentType
 	}
 	return "image/x-icon"

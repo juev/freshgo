@@ -677,3 +677,37 @@ func Import(ctx context.Context, db *store.Store, registry *hooks.Registry, u *s
 	}
 	return added, nil
 }
+
+// Feeds returns the feeds an OPML document lists, each address once, as
+// feeds of the given category. Nothing is stored. The document is taken for
+// one somebody else wrote: what its feeds say about how they are to be
+// requested (proxy, cookies, headers) is left out, as FreshRSS does for the
+// OPML a category mirrors.
+func Feeds(data []byte, userID, categoryID int64) ([]*store.Feed, error) {
+	outlines, err := parse(data)
+	if err != nil {
+		return nil, err
+	}
+	var (
+		feeds []*store.Feed
+		seen  = map[string]bool{}
+	)
+	for _, g := range groups(outlines) {
+		for _, n := range g.feeds {
+			f, err := feedOf(n, userID, categoryID)
+			if err != nil || seen[f.URL] {
+				continue
+			}
+			seen[f.URL] = true
+			attrs := readAttributes(f.Attributes)
+			if _, has := attrs["curl_params"]; has {
+				delete(attrs, "curl_params")
+				if f.Attributes, err = json.Marshal(attrs); err != nil {
+					return nil, err
+				}
+			}
+			feeds = append(feeds, f)
+		}
+	}
+	return feeds, nil
+}

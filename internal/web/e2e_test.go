@@ -620,5 +620,75 @@ func TestE2EDarkAndNarrow(t *testing.T) {
 		if got := b.text(`document.documentElement.scrollWidth <= window.innerWidth`); got != "true" {
 			t.Error("the narrow page scrolls sideways")
 		}
+		// The pages of settings, dark and narrow at once.
+		for _, page := range []string{"/subscriptions", "/subscriptions/add", "/subscriptions/feeds/3", "/subscriptions/categories/2", "/subscriptions/labels/1", "/subscriptions/problems"} {
+			b.open(page)
+			b.accessible(page + ", dark and narrow")
+			if got := b.text(`document.documentElement.scrollWidth <= window.innerWidth`); got != "true" {
+				t.Errorf("%s scrolls sideways on a narrow screen", page)
+			}
+		}
+	})
+}
+
+// R7, R9: a feed is added, set up, refreshed and given up with the
+// keyboard alone.
+func TestE2ESubscriptions(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		freshgoKeys(s)
+		remote := newFeedSite(t)
+		remote.serve("/feed.xml", "application/rss+xml", rssOf(remote.URL, "The Blog", "one"))
+		remote.serve("/articles/one", "text/html", `<html><body><article>Text of one</article></body></html>`)
+		b := browse(t, s)
+		b.login("alice")
+
+		// + leads to the page that adds a feed, with the focus in its field.
+		b.press("+")
+		b.until("the page that adds a feed, the focus in the address", `location.pathname === '/subscriptions/add' && document.activeElement.id === 'url'`)
+		b.accessible("the page that adds a feed")
+		b.press(remote.URL+"/feed.xml", kb.Enter)
+		b.until("the settings of the new feed", `location.pathname === '/subscriptions/feeds/9' && document.querySelector('#messages').textContent.includes('Subscribed.')`)
+		b.accessible("the settings of a feed")
+
+		// The selector is tried and stored with Tab and Enter.
+		b.tabTo("#path_entries")
+		b.press("article")
+		b.tabTo(`button[formaction$="/preview"]`)
+		b.press(kb.Enter)
+		b.until("the preview of the selector", `document.querySelector('.preview .entry-content').textContent.includes('Text of one')`)
+		b.accessible("the settings of a feed with a preview")
+		b.tabTo(`form.settings button[type="submit"]:not([formaction])`)
+		b.press(kb.Enter)
+		b.until("the settings saved", `document.querySelector('#messages').textContent.includes('Saved.')`)
+		if f := s.feed("alice", 9); f.PathEntries != "article" {
+			t.Errorf("selector of the feed after the form = %q", f.PathEntries)
+		}
+
+		// g f goes to the subscriptions, r on the page of a feed refreshes it.
+		b.press("g", "f")
+		b.until("the page of subscriptions", `location.pathname === '/subscriptions'`)
+		b.accessible("the page of subscriptions")
+		remote.serve("/feed.xml", "application/rss+xml", rssOf(remote.URL, "The Blog", "one", "two"))
+		b.open("/feeds/9")
+		b.press("r")
+		b.until("the feed refreshed", `document.querySelector('#messages').textContent.includes('The feed was refreshed.') && document.querySelectorAll('.entries article').length === 2`)
+
+		// The settings of what is being read are a Tab away; unsubscribing
+		// asks first.
+		b.tabTo("a.stream-settings")
+		b.press(kb.Enter)
+		b.until("the settings of the feed", `location.pathname === '/subscriptions/feeds/9'`)
+		b.tabTo(`details.danger form[action$="/delete"] button, details.danger:last-of-type summary`)
+		if b.focus() != "summary" {
+			t.Fatalf("the button that unsubscribes can be reached before its question is open: focus on %s", b.focus())
+		}
+		b.press(kb.Enter)
+		b.tabTo(`form[action$="/delete"] button`)
+		b.accessible("the question before unsubscribing")
+		b.press(kb.Enter)
+		b.until("the feed gone", `location.pathname === '/subscriptions' && document.querySelector('#messages').textContent.includes('Unsubscribed.')`)
+		if n := len(s.feeds("alice")); n != 8 {
+			t.Errorf("alice has %d feeds after unsubscribing, want 8", n)
+		}
 	})
 }

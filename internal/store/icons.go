@@ -83,3 +83,11 @@ func (s *Store) CustomIconByHash(ctx context.Context, hash string) (*CustomIcon,
 	}
 	return icon, nil
 }
+
+// DeleteCustomIcon removes the icon a user chose for a feed, if there is one.
+func (s *Store) DeleteCustomIcon(ctx context.Context, userID, feedID int64) error {
+	if _, err := s.exec(ctx, `DELETE FROM custom_icons WHERE user_id = ? AND feed_id = ?`, userID, feedID); err != nil {
+		return fmt.Errorf("store: custom icon of feed %d: %w", feedID, err)
+	}
+	return nil
+}

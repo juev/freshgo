@@ -665,3 +665,114 @@ kbd {
 	min-width: 0;
 	overflow-wrap: anywhere;
 }
+
+/* Pages of settings: forms in groups, lists of what there is to set up. */
+
+.form.settings {
+	max-width: 36rem;
+}
+
+.form fieldset {
+	margin: calc(var(--space) * 3) 0;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+}
+
+.form legend {
+	font-weight: 600;
+	padding: 0 var(--space);
+}
+
+.form details {
+	margin: var(--space) 0;
+}
+
+.form summary {
+	cursor: pointer;
+	color: var(--accent);
+}
+
+.form.inline {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: end;
+	gap: var(--space);
+	max-width: none;
+	margin: calc(var(--space) * 2) 0;
+}
+
+.form.inline input[type="text"] {
+	width: 16rem;
+}
+
+.hint {
+	display: block;
+	color: var(--text-muted);
+	font-size: 0.875rem;
+	margin-top: calc(var(--space) / 2);
+}
+
+input[type="file"] {
+	font: inherit;
+	color: var(--text);
+	max-width: 100%;
+}
+
+.page-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--space) * 2);
+}
+
+.feed-list {
+	list-style: none;
+	padding: 0;
+}
+
+.feed-list li {
+	padding: calc(var(--space) / 2) 0;
+}
+
+.feed-address {
+	color: var(--text-muted);
+	font-size: 0.875rem;
+	overflow-wrap: anywhere;
+}
+
+.feed-icon {
+	vertical-align: baseline;
+}
+
+.feed-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--space);
+	margin-bottom: calc(var(--space) * 2);
+}
+
+.menu.danger {
+	margin: var(--space) 0;
+}
+
+.menu.danger summary {
+	color: var(--danger);
+}
+
+.menu.danger button {
+	align-self: start;
+	color: var(--bg);
+	background: var(--danger);
+	border-color: var(--danger);
+}
+
+.preview {
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 0 calc(var(--space) * 2) var(--space);
+	margin-bottom: calc(var(--space) * 2);
+	max-width: var(--reading-width);
+}
+
+.category h2 {
+	margin-bottom: 0;
+}

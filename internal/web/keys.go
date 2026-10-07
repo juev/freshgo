@@ -48,7 +48,9 @@ var actions = []action{
 	{"go-unread", "g u", ""},
 	{"go-all", "g a", ""},
 	{"go-starred", "g s", ""},
+	{"go-subscriptions", "g f", ""},
 	{"go-keys", "g k", ""},
+	{"add-feed", "+", ""},
 	{"palette", ":", ""},
 	{"help", "?", "help"},
 }
@@ -238,7 +240,7 @@ func (h *Handler) config(v *view, who *identity) string {
 		Keys: map[string]string{}, SingleKeys: true, Texts: map[string]string{}, MarkOnOpen: true, AutoLoad: true,
 		URLs: map[string]string{
 			"palette": h.url("/palette"), "unread": h.url("/"), "all": h.url("/all"), "starred": h.url("/starred"),
-			"keys": h.url("/settings/keys"),
+			"keys": h.url("/settings/keys"), "subscriptions": h.url("/subscriptions"), "add": h.url("/subscriptions/add"),
 		},
 	}
 	var k keyboard
@@ -390,7 +392,20 @@ func (h *Handler) palette(w http.ResponseWriter, r *http.Request) {
 		places = append(places, place{l.Name, h.url("/labels/" + strconv.FormatInt(l.ID, 10)), v.T("stream.label")})
 	}
 	if !who.anonymous {
-		places = append(places, place{v.T("keys.heading"), h.url("/settings/keys"), v.T("palette.page")})
+		for _, c := range lib.categories {
+			places = append(places, place{c.Name, h.url("/subscriptions/categories/" + strconv.FormatInt(c.ID, 10)), v.T("palette.category-settings")})
+		}
+		for _, f := range lib.feeds {
+			places = append(places, place{f.Name, h.url("/subscriptions/feeds/" + strconv.FormatInt(f.ID, 10)), v.T("palette.feed-settings")})
+		}
+		for _, l := range lib.labels {
+			places = append(places, place{l.Name, h.url("/subscriptions/labels/" + strconv.FormatInt(l.ID, 10)), v.T("palette.label-settings")})
+		}
+		places = append(places,
+			place{v.T("sub.heading"), h.url("/subscriptions"), v.T("palette.page")},
+			place{v.T("add.heading"), h.url("/subscriptions/add"), v.T("palette.page")},
+			place{v.T("problems.heading"), h.url("/subscriptions/problems"), v.T("palette.page")},
+			place{v.T("keys.heading"), h.url("/settings/keys"), v.T("palette.page")})
 	}
 	places = append(places, place{v.T("about.heading"), h.url("/about"), v.T("palette.page")})
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

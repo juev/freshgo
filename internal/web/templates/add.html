@@ -1,0 +1,33 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{if .Data.Problem}}<p class="alert" role="alert" id="add-problem">{{.Data.Problem}}</p>{{end}}
+<form method="post" action="{{.URL "/subscriptions/feeds"}}" class="form">
+<p>
+<label for="url">{{.T "add.url"}}</label>
+<input type="text" id="url" name="url" value="{{.Data.Address}}" inputmode="url" autocapitalize="off" spellcheck="false" required autofocus{{if .Data.Problem}} aria-invalid="true" aria-describedby="add-problem"{{end}}>
+</p>
+<p>
+<label for="category">{{.T "feed.category"}}</label>
+<select id="category" name="category">
+{{template "options" .Data.Categories}}</select>
+</p>
+<p>
+<label for="kind">{{.T "feed.kind"}}</label>
+<select id="kind" name="kind">
+{{template "options" .Data.Kinds}}</select>
+</p>
+<fieldset>
+<legend>{{.T "feed.auth"}}</legend>
+<p>
+<label for="http_user">{{.T "feed.http-user"}}</label>
+<input type="text" id="http_user" name="http_user" value="{{.Data.User}}" autocomplete="off" autocapitalize="off" spellcheck="false">
+</p>
+<p>
+<label for="http_password">{{.T "feed.http-password"}}</label>
+<input type="password" id="http_password" name="http_password" autocomplete="off">
+</p>
+</fieldset>
+<p><button type="submit">{{.T "add.submit"}}</button></p>
+</form>
+<p><a href="{{.URL "/subscriptions"}}">{{.T "sub.back"}}</a></p>
+{{end}}

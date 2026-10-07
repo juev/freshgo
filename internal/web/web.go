@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/juev/freshgo/internal/hooks"
+	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/web/i18n"
 )
@@ -33,6 +34,8 @@ const StaticPath = "/static/"
 type Options struct {
 	DB  *store.Store
 	Log *slog.Logger
+	// Refresher fetches feeds when a page asks for it.
+	Refresher *refresh.Refresher
 	// Hooks are the extension points pages call; nil stands for none.
 	Hooks *hooks.Registry
 	// BaseURL is the public address of the server, empty when unknown. Its
@@ -48,10 +51,11 @@ type Options struct {
 
 // Handler serves the interface.
 type Handler struct {
-	db      *store.Store
-	log     *slog.Logger
-	hooks   *hooks.Registry
-	baseURL string
+	db        *store.Store
+	log       *slog.Logger
+	refresher *refresh.Refresher
+	hooks     *hooks.Registry
+	baseURL   string
 	// prefix is the path of the public address, without a trailing slash.
 	prefix  string
 	version string
@@ -74,7 +78,7 @@ type Handler struct {
 // does not hold together.
 func New(o Options) (*Handler, error) {
 	h := &Handler{
-		db: o.DB, log: o.Log, baseURL: o.BaseURL, version: o.Version, assets: map[string]string{},
+		db: o.DB, log: o.Log, refresher: o.Refresher, baseURL: o.BaseURL, version: o.Version, assets: map[string]string{},
 		proxies: o.TrustedProxies, crossOrigin: http.NewCrossOriginProtection(), now: time.Now, hooks: o.Hooks,
 	}
 	if h.hooks == nil {
@@ -146,7 +150,29 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /entries/{id}/star", h.protect(members, h.starEntry))
 	h.mux.HandleFunc("POST /entries/{id}/labels", h.protect(members, h.labelEntry))
 	h.mux.HandleFunc("POST /read-all", h.protect(members, h.markAll))
+	h.mux.HandleFunc("POST /refresh", h.protect(readers, h.refreshNow))
 	h.mux.HandleFunc("GET /palette", h.protect(readers, h.palette))
+	h.mux.HandleFunc("GET /subscriptions", h.protect(members, h.subscriptions))
+	h.mux.HandleFunc("GET /subscriptions/add", h.protect(members, h.addPage))
+	h.mux.HandleFunc("GET /subscriptions/problems", h.protect(members, h.problems))
+	h.mux.HandleFunc("POST /subscriptions/feeds", h.protect(members, h.addFeed))
+	h.mux.HandleFunc("GET /subscriptions/feeds/{id}", h.protect(members, h.feedPage))
+	h.mux.HandleFunc("POST /subscriptions/feeds/{id}", h.protect(members, h.saveFeed))
+	h.mux.HandleFunc("POST /subscriptions/feeds/{id}/preview", h.protect(members, h.previewFeed))
+	h.mux.HandleFunc("POST /subscriptions/feeds/{id}/refresh", h.protect(members, h.feedAction(h.refreshFeed)))
+	h.mux.HandleFunc("POST /subscriptions/feeds/{id}/reload", h.protect(members, h.feedAction(h.reloadFeed)))
+	h.mux.HandleFunc("POST /subscriptions/feeds/{id}/truncate", h.protect(members, h.feedAction(h.truncateFeed)))
+	h.mux.HandleFunc("POST /subscriptions/feeds/{id}/delete", h.protect(members, h.deleteFeed))
+	h.mux.HandleFunc("POST /subscriptions/categories", h.protect(members, h.createCategory))
+	h.mux.HandleFunc("GET /subscriptions/categories/{id}", h.protect(members, h.categoryPage))
+	h.mux.HandleFunc("POST /subscriptions/categories/{id}", h.protect(members, h.saveCategory))
+	h.mux.HandleFunc("POST /subscriptions/categories/{id}/delete", h.protect(members, h.categoryAction(h.deleteCategory)))
+	h.mux.HandleFunc("POST /subscriptions/categories/{id}/empty", h.protect(members, h.categoryAction(h.emptyCategory)))
+	h.mux.HandleFunc("POST /subscriptions/categories/{id}/opml", h.protect(members, h.categoryAction(h.refreshCategoryOPML)))
+	h.mux.HandleFunc("POST /subscriptions/labels", h.protect(members, h.createLabel))
+	h.mux.HandleFunc("GET /subscriptions/labels/{id}", h.protect(members, h.labelPage))
+	h.mux.HandleFunc("POST /subscriptions/labels/{id}", h.protect(members, h.saveLabel))
+	h.mux.HandleFunc("POST /subscriptions/labels/{id}/delete", h.protect(members, h.deleteLabel))
 	h.mux.HandleFunc("GET /settings/keys", h.protect(members, h.keysPage))
 	h.mux.HandleFunc("POST /settings/keys", h.protect(members, h.saveKeys))
 	h.mux.HandleFunc("GET /about", h.about)

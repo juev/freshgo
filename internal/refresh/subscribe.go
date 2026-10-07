@@ -45,11 +45,14 @@ func (r *Refresher) AddFeed(ctx context.Context, u *store.User, f *store.Feed) e
 	if !ok {
 		return ErrRefused
 	}
-	address, err := checkURL(address)
+	address, err := CheckURL(address)
 	if err != nil {
 		return err
 	}
 	f.UserID, f.URL = u.ID, address
+	if err := r.roomForFeed(ctx, u.ID); err != nil {
+		return err
+	}
 
 	j, err := r.userJob(ctx, u)
 	if err != nil {
@@ -225,10 +228,10 @@ func announcedFeed(page []byte, pageURL string) string {
 	return found
 }
 
-// checkURL returns the address of a feed in the form it is stored: with
+// CheckURL returns the address of a feed in the form it is stored: with
 // https:// in front when it names no scheme. An address that is not an
 // http(s) URL gives fetch.ErrBadURL.
-func checkURL(address string) (string, error) {
+func CheckURL(address string) (string, error) {
 	if address == "" {
 		return "", fmt.Errorf("%w: empty address", fetch.ErrBadURL)
 	}

@@ -1,0 +1,73 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p class="page-links"><a href="{{.URL .Data.ReadURL}}">{{.T "sub.read"}}</a> <a href="{{.URL "/subscriptions"}}">{{.T "sub.back"}}</a></p>
+{{if .Data.Problem}}<p class="alert" role="alert" id="form-problem">{{.Data.Problem}}</p>{{end}}
+<form method="post" action="{{.URL "/subscriptions/categories"}}/{{.Data.Category.ID}}" class="form">
+<p>
+<label for="name">{{.T "form.name"}}</label>
+<input type="text" id="name" name="name" value="{{.Data.Category.Name}}" maxlength="191"{{if .Data.Default}} readonly aria-describedby="name-hint"{{else}} required{{end}}>
+{{if .Data.Default}}<span class="hint" id="name-hint">{{.T "category.default"}}</span>{{end}}
+</p>
+<p>
+<label for="position">{{.T "category.position"}}</label>
+<input type="number" id="position" name="position" value="{{.Data.Position}}" aria-describedby="position-hint">
+<span class="hint" id="position-hint">{{.T "category.position.hint"}}</span>
+</p>
+<p>
+<label for="opml_url">{{.T "category.opml"}}</label>
+<input type="text" id="opml_url" name="opml_url" value="{{.Data.OPML}}" inputmode="url" autocapitalize="off" spellcheck="false" aria-describedby="opml-hint">
+<span class="hint" id="opml-hint">{{.T "category.opml.hint"}}{{if .Data.OPMLFailed}} {{.T "category.opml.failed"}}{{end}}</span>
+</p>
+<p>
+<label for="filters_read">{{.T "form.filters-read"}}</label>
+<textarea id="filters_read" name="filters_read" rows="4" spellcheck="false" aria-describedby="filters-hint">{{.Data.FiltersRead}}</textarea>
+<span class="hint" id="filters-hint">{{.T "form.filters-hint"}}</span>
+</p>
+<fieldset>
+<legend>{{.T "category.repeats"}}</legend>
+<p class="check">
+<input type="checkbox" id="read_when_same_title_in_category_on" name="read_when_same_title_in_category_on" value="1"{{if .Data.SameTitleOn}} checked{{end}}>
+<label for="read_when_same_title_in_category_on">{{.T "category.same-title"}}</label>
+</p>
+<p>
+<label for="read_when_same_title_in_category">{{.T "category.among"}}</label>
+<input type="number" id="read_when_same_title_in_category" name="read_when_same_title_in_category" min="0" value="{{.Data.SameTitle}}" aria-describedby="among-hint">
+</p>
+<p class="check">
+<input type="checkbox" id="read_when_same_guid_in_category_on" name="read_when_same_guid_in_category_on" value="1"{{if .Data.SameGUIDOn}} checked{{end}}>
+<label for="read_when_same_guid_in_category_on">{{.T "category.same-guid"}}</label>
+</p>
+<p>
+<label for="read_when_same_guid_in_category">{{.T "category.among"}}</label>
+<input type="number" id="read_when_same_guid_in_category" name="read_when_same_guid_in_category" min="0" value="{{.Data.SameGUID}}" aria-describedby="among-hint">
+<span class="hint" id="among-hint">{{.T "category.among.hint"}}</span>
+</p>
+</fieldset>
+{{template "retention" (dict "Retention" .Data.Retention "Units" .Data.Units "Inherit" true "Page" .)}}
+{{template "sorting" (dict "Sorts" .Data.Sorts "Orders" .Data.Orders "Page" .)}}
+<p><button type="submit">{{.T "keys.save"}}</button></p>
+</form>
+
+<h2>{{.T "form.actions"}}</h2>
+{{if .Data.OPML}}
+<form method="post" action="{{.URL "/subscriptions/categories"}}/{{.Data.Category.ID}}/opml" class="form inline">
+<button type="submit">{{.T "category.opml.refresh"}}</button>
+</form>
+{{end}}
+<details class="menu danger">
+<summary>{{.T "category.empty"}}</summary>
+<form method="post" action="{{.URL "/subscriptions/categories"}}/{{.Data.Category.ID}}/empty">
+<p>{{.N "category.empty.confirm" .Data.Feeds}}</p>
+<button type="submit">{{.T "form.delete"}}</button>
+</form>
+</details>
+{{if not .Data.Default}}
+<details class="menu danger">
+<summary>{{.T "category.delete"}}</summary>
+<form method="post" action="{{.URL "/subscriptions/categories"}}/{{.Data.Category.ID}}/delete">
+<p>{{.T "category.delete.confirm"}}</p>
+<button type="submit">{{.T "form.delete"}}</button>
+</form>
+</details>
+{{end}}
+{{end}}

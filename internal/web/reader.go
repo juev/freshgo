@@ -1,14 +1,17 @@
 package web
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
 	"html/template"
+	"math"
 	"math/rand/v2"
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -140,6 +143,14 @@ func (h *Handler) library(ctx context.Context, userID int64) (*library, error) {
 	if lib.starred, err = h.db.UnreadFavorites(ctx, userID); err != nil {
 		return nil, err
 	}
+	// The categories the user has put in order come first, in that order.
+	position := func(c *store.Category) int {
+		if p, ok := readAttrs(c.Attributes).number("position"); ok {
+			return p
+		}
+		return math.MaxInt
+	}
+	slices.SortStableFunc(lib.categories, func(a, b *store.Category) int { return cmp.Compare(position(a), position(b)) })
 	for _, f := range lib.feeds {
 		lib.feed[f.ID] = f
 		lib.unread[f.ID] = feedCounts[f.ID].Unread
@@ -603,6 +614,11 @@ type readerPage struct {
 	Before int64
 	// CanChange is false for a visitor, who only reads.
 	CanChange bool
+	// CanRefresh says whether the reader may have the feeds fetched now.
+	CanRefresh bool
+	// Settings is the page of the settings of the feed, category or label
+	// being read, empty for the other streams.
+	Settings string
 }
 
 // reader answers with a stream of entries.
@@ -633,6 +649,13 @@ func (h *Handler) reader(kind string) http.HandlerFunc {
 			Unread: s.unread, Sort: showing.sort, Asc: showing.asc, Query: showing.query, State: showing.state,
 			Asked: showing.asked, Path: s.path(), Here: showing.here(r.URL), Expanded: prefs.DisplayPosts,
 			Before: h.now().UnixMicro(), CanChange: !who.anonymous,
+			CanRefresh: !who.anonymous || state(r).system.AllowAnonymousRefresh,
+		}
+		if !who.anonymous {
+			switch s.kind {
+			case streamFeed, streamCategory, streamLabel:
+				page.Settings = "/subscriptions" + s.path()
+			}
 		}
 		for _, state := range []string{stateUnread, stateAll, stateStar} {
 			page.States = append(page.States, choice{

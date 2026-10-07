@@ -294,7 +294,7 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 		if pushed {
 			fresh.Error = 0
 		} else {
-			succeeded(fresh, f.URL, resp, now)
+			succeeded(fresh, f, resp, now)
 			fresh.WebSubTopic = topic
 		}
 		if used != criteria {
@@ -343,14 +343,14 @@ func (r *Refresher) storeUnchanged(ctx context.Context, j *job, f *store.Feed, r
 		if err := r.tidy(ctx, tx, j, fresh, now, false, false); err != nil {
 			return err
 		}
-		succeeded(fresh, f.URL, resp, now)
+		succeeded(fresh, f, resp, now)
 		return tx.UpdateFeed(ctx, fresh)
 	})
 }
 
-// succeeded writes into the feed what every successful fetch changes. feedURL
-// is the address the feed had when it was fetched.
-func succeeded(fresh *store.Feed, feedURL string, resp *fetch.Response, now int64) {
+// succeeded writes into the feed what every successful fetch changes.
+// fetched is the feed as it was when it was fetched.
+func succeeded(fresh, fetched *store.Feed, resp *fetch.Response, now int64) {
 	fresh.LastUpdate = now
 	fresh.Error = 0
 	// A 304 need not repeat the validators.
@@ -360,9 +360,16 @@ func succeeded(fresh *store.Feed, feedURL string, resp *fetch.Response, now int6
 	if !resp.NotModified || resp.Header.Get("Last-Modified") != "" {
 		fresh.HTTPLastModified = resp.Header.Get("Last-Modified")
 	}
+	// The settings of the feed were changed while it was being fetched: the
+	// answer was read by the old ones, and its validators must not keep the
+	// next refresh from reading the document by the new ones.
+	if fresh.Kind != fetched.Kind || fresh.HTTPAuth != fetched.HTTPAuth || fresh.PathEntries != fetched.PathEntries ||
+		fresh.URL != fetched.URL || !bytes.Equal(fresh.Attributes, fetched.Attributes) {
+		fresh.HTTPETag, fresh.HTTPLastModified = "", ""
+	}
 	// The address follows a permanent redirect, unless the user has changed
 	// it meanwhile.
-	if resp.PermanentURL != "" && fresh.URL == feedURL {
+	if resp.PermanentURL != "" && fresh.URL == fetched.URL {
 		fresh.URL = withoutCredentials(resp.PermanentURL)
 	}
 }

@@ -612,7 +612,11 @@
 		case 'labels': return current && current.querySelector('.entry-actions form') && showLabels(current);
 		case 'mark-all': return confirmMarkAll();
 		case 'more': return loadMore();
-		case 'refresh': return location.reload();
+		case 'refresh': {
+			// The form that has the feeds fetched, where the page has one.
+			const form = document.querySelector('form.refresh');
+			return form ? form.requestSubmit() : location.reload();
+		}
 		case 'search': {
 			const search = document.getElementById('q');
 			if (search) {
@@ -636,6 +640,8 @@
 		case 'go-all': location.href = urls.all; return undefined;
 		case 'go-starred': location.href = urls.starred; return undefined;
 		case 'go-keys': location.href = urls.keys; return undefined;
+		case 'go-subscriptions': location.href = urls.subscriptions; return undefined;
+		case 'add-feed': location.href = urls.add; return undefined;
 		case 'palette': return showPalette();
 		case 'help': return showHelp();
 		default: return undefined;

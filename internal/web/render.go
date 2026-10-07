@@ -158,7 +158,8 @@ func (h *Handler) notice(w http.ResponseWriter, r *http.Request, v *view) string
 		HttpOnly: true, Secure: h.secure(r), SameSite: http.SameSiteLaxMode,
 	})
 	key, number, _ := strings.Cut(cookie.Value, ":")
-	if !strings.HasPrefix(key, "notice.") {
+	// What a form could not do is said by the text that names the problem.
+	if !strings.HasPrefix(key, "notice.") && !strings.HasPrefix(key, "sub.problem.") {
 		return ""
 	}
 	n, _ := strconv.Atoi(number)

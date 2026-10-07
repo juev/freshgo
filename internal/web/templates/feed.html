@@ -1,0 +1,239 @@
+{{define "content"}}
+<h1><img class="feed-icon" src="{{.Data.Icon}}" alt="" width="20" height="20"> {{.Heading}}</h1>
+<p class="page-links"><a href="{{.URL .Data.ReadURL}}">{{.T "sub.read"}}</a> <a href="{{.URL "/subscriptions"}}">{{.T "sub.back"}}</a></p>
+{{if .Data.Failing}}<p class="alert">{{.T "feed.failing" .Data.Failing}}</p>{{end}}
+{{if .Data.Problem}}<p class="alert" role="alert" id="form-problem">{{.Data.Problem}}</p>{{end}}
+{{if .Data.PreviewNote}}<p class="alert" role="alert">{{.Data.PreviewNote}}</p>{{end}}
+{{if .Data.Preview}}
+<section class="preview" aria-labelledby="preview-heading">
+<h2 id="preview-heading">{{.T "feed.preview.heading"}}</h2>
+<div class="entry-content">{{.Data.Preview}}</div>
+</section>
+{{end}}
+
+<form method="post" action="{{.URL "/subscriptions/feeds"}}/{{.Data.Feed.ID}}" enctype="multipart/form-data" class="form settings">
+<fieldset>
+<legend>{{.T "feed.general"}}</legend>
+<p>
+<label for="name">{{.T "form.name"}}</label>
+<input type="text" id="name" name="name" value="{{.Data.Feed.Name}}">
+</p>
+<p>
+<label for="url">{{.T "feed.url"}}</label>
+<input type="text" id="url" name="url" value="{{.Data.Feed.URL}}" inputmode="url" autocapitalize="off" spellcheck="false" required{{if .Data.Problem}} aria-describedby="form-problem"{{end}}>
+</p>
+<p>
+<label for="website">{{.T "feed.website"}}</label>
+<input type="text" id="website" name="website" value="{{.Data.Feed.Website}}" inputmode="url" autocapitalize="off" spellcheck="false">
+</p>
+<p>
+<label for="description">{{.T "feed.description"}}</label>
+<textarea id="description" name="description" rows="2">{{.Data.Feed.Description}}</textarea>
+</p>
+<p>
+<label for="category">{{.T "feed.category"}}</label>
+<select id="category" name="category">
+{{template "options" .Data.Categories}}</select>
+</p>
+<p>
+<label for="priority">{{.T "feed.priority"}}</label>
+<select id="priority" name="priority">
+{{template "options" .Data.Priorities}}</select>
+</p>
+<p>
+<label for="ttl">{{.T "feed.ttl"}}</label>
+<select id="ttl" name="ttl">
+{{template "options" .Data.Periods}}</select>
+</p>
+<p class="check">
+<input type="checkbox" id="mute" name="mute" value="1"{{if .Data.Muted}} checked{{end}}>
+<label for="mute">{{.T "feed.mute"}}</label>
+</p>
+</fieldset>
+
+<fieldset>
+<legend>{{.T "feed.icon"}}</legend>
+<p>
+<label for="icon">{{.T "feed.icon.file"}}</label>
+<input type="file" id="icon" name="icon" accept="image/*">
+</p>
+{{if .Data.CustomIcon}}
+<p class="check">
+<input type="checkbox" id="icon_reset" name="icon_reset" value="1">
+<label for="icon_reset">{{.T "feed.icon.reset"}}</label>
+</p>
+{{end}}
+</fieldset>
+
+<fieldset>
+<legend>{{.T "feed.auth"}}</legend>
+<p>
+<label for="http_user">{{.T "feed.http-user"}}</label>
+<input type="text" id="http_user" name="http_user" value="{{.Data.HTTPUser}}" autocomplete="off" autocapitalize="off" spellcheck="false">
+</p>
+<p>
+<label for="http_password">{{.T "feed.http-password"}}</label>
+<input type="password" id="http_password" name="http_password" autocomplete="off" aria-describedby="password-hint">
+<span class="hint" id="password-hint">{{.T "feed.http-password.hint"}}</span>
+</p>
+</fieldset>
+
+<fieldset>
+<legend>{{.T "feed.fulltext"}}</legend>
+<p>
+<label for="path_entries">{{.T "feed.selector"}}</label>
+<input type="text" id="path_entries" name="path_entries" value="{{.Data.Feed.PathEntries}}" autocapitalize="off" spellcheck="false" aria-describedby="selector-hint">
+<span class="hint" id="selector-hint">{{.T "feed.selector.hint"}}</span>
+</p>
+<p>
+<label for="path_entries_filter">{{.T "feed.selector-filter"}}</label>
+<input type="text" id="path_entries_filter" name="path_entries_filter" value="{{.Data.Filter}}" autocapitalize="off" spellcheck="false">
+</p>
+<p>
+<label for="path_entries_conditions">{{.T "feed.selector-conditions"}}</label>
+<textarea id="path_entries_conditions" name="path_entries_conditions" rows="3" spellcheck="false" aria-describedby="filters-hint">{{.Data.Conditions}}</textarea>
+</p>
+<p>
+<label for="content_action">{{.T "feed.content-action"}}</label>
+<select id="content_action" name="content_action">
+{{template "options" .Data.ContentAction}}</select>
+</p>
+<p><button type="submit" formaction="{{.URL "/subscriptions/feeds"}}/{{.Data.Feed.ID}}/preview">{{.T "feed.preview"}}</button></p>
+</fieldset>
+
+<fieldset>
+<legend>{{.T "feed.reading"}}</legend>
+<p>
+<label for="filters_read">{{.T "form.filters-read"}}</label>
+<textarea id="filters_read" name="filters_read" rows="4" spellcheck="false" aria-describedby="filters-hint">{{.Data.FiltersRead}}</textarea>
+<span class="hint" id="filters-hint">{{.T "form.filters-hint"}}</span>
+</p>
+{{template "ternary" (dict "Name" "read_upon_reception" "Label" (.T "feed.read-upon-reception") "Value" .Data.UponArrival "Page" .)}}
+{{template "ternary" (dict "Name" "read_upon_gone" "Label" (.T "feed.read-upon-gone") "Value" .Data.UponGone "Page" .)}}
+{{template "ternary" (dict "Name" "mark_updated_article_unread" "Label" (.T "feed.updated-unread") "Value" .Data.UpdatedAgain "Page" .)}}
+<p>
+<label for="keep_max_n_unread">{{.T "feed.max-unread"}}</label>
+<input type="number" id="keep_max_n_unread" name="keep_max_n_unread" min="0" value="{{.Data.MaxUnread}}" aria-describedby="empty-hint">
+</p>
+<p>
+<label for="read_when_same_title_in_feed">{{.T "feed.same-title"}}</label>
+<input type="number" id="read_when_same_title_in_feed" name="read_when_same_title_in_feed" min="0" value="{{.Data.SameTitle}}" aria-describedby="empty-hint">
+<span class="hint" id="empty-hint">{{.T "form.empty-inherits"}}</span>
+</p>
+</fieldset>
+
+{{template "retention" (dict "Retention" .Data.Retention "Units" .Data.Units "Inherit" true "Page" .)}}
+{{template "sorting" (dict "Sorts" .Data.Sorts "Orders" .Data.Orders "Page" .)}}
+
+<fieldset>
+<legend>{{.T "feed.source"}}</legend>
+<p>
+<label for="kind">{{.T "feed.kind"}}</label>
+<select id="kind" name="kind">
+{{template "options" .Data.Kinds}}</select>
+</p>
+<details>
+<summary>{{.T "feed.xpath"}}</summary>
+{{range .Data.XPath}}<p>
+<label for="{{.Name}}">{{.Label}}</label>
+<input type="text" id="{{.Name}}" name="{{.Name}}" value="{{.Value}}" autocapitalize="off" spellcheck="false">
+</p>
+{{end}}</details>
+<details>
+<summary>{{.T "feed.json"}}</summary>
+<p>
+<label for="xpath_to_json">{{.T "feed.xpath-to-json"}}</label>
+<input type="text" id="xpath_to_json" name="xpath_to_json" value="{{.Data.XPathToJSON}}" autocapitalize="off" spellcheck="false">
+</p>
+{{range .Data.JSON}}<p>
+<label for="{{.Name}}">{{.Label}}</label>
+<input type="text" id="{{.Name}}" name="{{.Name}}" value="{{.Value}}" autocapitalize="off" spellcheck="false">
+</p>
+{{end}}</details>
+<p>
+<label for="unicity">{{.T "feed.unicity"}}</label>
+<select id="unicity" name="unicity">
+{{template "options" .Data.Criteria}}</select>
+</p>
+<p class="check">
+<input type="checkbox" id="unicity_forced" name="unicity_forced" value="1"{{if .Data.Forced}} checked{{end}}>
+<label for="unicity_forced">{{.T "feed.unicity.forced"}}</label>
+</p>
+</fieldset>
+
+<fieldset>
+<legend>{{.T "feed.request"}}</legend>
+<p>
+<label for="proxy_type">{{.T "feed.proxy"}}</label>
+<select id="proxy_type" name="proxy_type">
+{{template "options" .Data.ProxyTypes}}</select>
+</p>
+<p>
+<label for="proxy">{{.T "feed.proxy.address"}}</label>
+<input type="text" id="proxy" name="proxy" value="{{.Data.Proxy}}" autocapitalize="off" spellcheck="false">
+</p>
+<p>
+<label for="user_agent">{{.T "feed.user-agent"}}</label>
+<input type="text" id="user_agent" name="user_agent" value="{{.Data.UserAgent}}" autocapitalize="off" spellcheck="false">
+</p>
+<p>
+<label for="cookie">{{.T "feed.cookie"}}</label>
+<input type="text" id="cookie" name="cookie" value="{{.Data.Cookie}}" autocapitalize="off" spellcheck="false">
+</p>
+<p class="check">
+<input type="checkbox" id="cookie_file" name="cookie_file" value="1"{{if .Data.CookieFile}} checked{{end}}>
+<label for="cookie_file">{{.T "feed.cookie-file"}}</label>
+</p>
+<p>
+<label for="headers">{{.T "feed.headers"}}</label>
+<textarea id="headers" name="headers" rows="3" spellcheck="false">{{.Data.Headers}}</textarea>
+</p>
+<p>
+<label for="method">{{.T "feed.method"}}</label>
+<select id="method" name="method">
+<option value="GET"{{if not .Data.Post}} selected{{end}}>GET</option>
+<option value="POST"{{if .Data.Post}} selected{{end}}>POST</option>
+</select>
+</p>
+<p>
+<label for="post_fields">{{.T "feed.post-fields"}}</label>
+<textarea id="post_fields" name="post_fields" rows="2" spellcheck="false">{{.Data.PostFields}}</textarea>
+</p>
+<p>
+<label for="redirects">{{.T "feed.redirects"}}</label>
+<input type="number" id="redirects" name="redirects" min="-1" value="{{.Data.Redirects}}">
+</p>
+<p>
+<label for="timeout">{{.T "feed.timeout"}}</label>
+<input type="number" id="timeout" name="timeout" min="0" value="{{.Data.Timeout}}">
+</p>
+{{template "ternary" (dict "Name" "ssl_verify" "Label" (.T "feed.ssl-verify") "Value" .Data.SSLVerify "Page" .)}}
+</fieldset>
+
+<p><button type="submit">{{.T "keys.save"}}</button></p>
+</form>
+
+<h2>{{.T "form.actions"}}</h2>
+<div class="feed-actions">
+<form method="post" action="{{.URL "/subscriptions/feeds"}}/{{.Data.Feed.ID}}/refresh">
+<button type="submit">{{.T "feed.refresh"}}</button>
+</form>
+<form method="post" action="{{.URL "/subscriptions/feeds"}}/{{.Data.Feed.ID}}/reload">
+<button type="submit">{{.T "feed.reload"}}</button>
+</form>
+</div>
+<details class="menu danger">
+<summary>{{.T "feed.truncate"}}</summary>
+<form method="post" action="{{.URL "/subscriptions/feeds"}}/{{.Data.Feed.ID}}/truncate">
+<p>{{.T "feed.truncate.confirm"}}</p>
+<button type="submit">{{.T "form.delete"}}</button>
+</form>
+</details>
+<details class="menu danger">
+<summary>{{.T "feed.delete"}}</summary>
+<form method="post" action="{{.URL "/subscriptions/feeds"}}/{{.Data.Feed.ID}}/delete">
+<p>{{.T "feed.delete.confirm"}}</p>
+<button type="submit">{{.T "form.delete"}}</button>
+</form>
+</details>
+{{end}}

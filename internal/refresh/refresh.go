@@ -101,6 +101,7 @@ func (r *Refresher) Run(ctx context.Context, o Options) ([]Stats, error) {
 		if err != nil {
 			return all, fmt.Errorf("refresh: user %s: %w", u.Name, err)
 		}
+		r.refreshOPMLs(ctx, j)
 		st, err := r.refreshUser(ctx, j, o)
 		all = append(all, st)
 		if err != nil {

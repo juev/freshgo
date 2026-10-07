@@ -32,6 +32,14 @@
 </select>
 <button type="submit">{{.T "sort.submit"}}</button>
 </form>
+{{if .Data.CanRefresh}}
+<form method="post" action="{{.URL "/refresh"}}" class="refresh">
+<input type="hidden" name="stream" value="{{.Data.Path}}">
+<input type="hidden" name="next" value="{{.Data.Here}}">
+<button type="submit">{{.T "refresh.submit"}}</button>
+</form>
+{{end}}
+{{if .Data.Settings}}<a class="stream-settings" href="{{.URL .Data.Settings}}">{{.T "stream.settings"}}</a>{{end}}
 {{if .Data.CanChange}}
 <details class="menu">
 <summary>{{.T "mark-all.label"}}</summary>

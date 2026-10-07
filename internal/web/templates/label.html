@@ -1,0 +1,24 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p class="page-links"><a href="{{.URL .Data.ReadURL}}">{{.T "sub.read"}}</a> <a href="{{.URL "/subscriptions"}}">{{.T "sub.back"}}</a></p>
+{{if .Data.Problem}}<p class="alert" role="alert" id="form-problem">{{.Data.Problem}}</p>{{end}}
+<form method="post" action="{{.URL "/subscriptions/labels"}}/{{.Data.Label.ID}}" class="form">
+<p>
+<label for="name">{{.T "form.name"}}</label>
+<input type="text" id="name" name="name" value="{{.Data.Label.Name}}" maxlength="191" required{{if .Data.Problem}} aria-invalid="true" aria-describedby="form-problem"{{end}}>
+</p>
+<p>
+<label for="filters_label">{{.T "label.filters"}}</label>
+<textarea id="filters_label" name="filters_label" rows="4" spellcheck="false" aria-describedby="filters-hint">{{.Data.Filters}}</textarea>
+<span class="hint" id="filters-hint">{{.T "form.filters-hint"}}</span>
+</p>
+<p><button type="submit">{{.T "keys.save"}}</button></p>
+</form>
+<details class="menu danger">
+<summary>{{.T "label.delete"}}</summary>
+<form method="post" action="{{.URL "/subscriptions/labels"}}/{{.Data.Label.ID}}/delete">
+<p>{{.T "label.delete.confirm"}}</p>
+<button type="submit">{{.T "form.delete"}}</button>
+</form>
+</details>
+{{end}}

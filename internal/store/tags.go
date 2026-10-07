@@ -152,3 +152,23 @@ func (s *Store) UntagEntries(ctx context.Context, userID, tagID int64, entryIDs 
 		return nil
 	})
 }
+
+// UpdateTag replaces the name and the attributes of a label. A name taken by
+// another label or by a category gives ErrConflict, a missing label
+// ErrNotFound.
+func (s *Store) UpdateTag(ctx context.Context, t *Tag) error {
+	return s.InTx(ctx, func(tx *Store) error {
+		if err := tx.nameFree(ctx, "categories", t.UserID, t.Name); err != nil {
+			return fmt.Errorf("store: update tag %d: %w", t.ID, err)
+		}
+		n, err := tx.affected(ctx, `UPDATE tags SET name = ?, attributes = ? WHERE user_id = ? AND id = ?`,
+			t.Name, jsonObject(t.Attributes), t.UserID, t.ID)
+		if err != nil {
+			return fmt.Errorf("store: update tag %d: %w", t.ID, err)
+		}
+		if n == 0 {
+			return fmt.Errorf("store: update tag %d: %w", t.ID, ErrNotFound)
+		}
+		return nil
+	})
+}

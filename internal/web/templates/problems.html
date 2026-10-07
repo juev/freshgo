@@ -1,0 +1,10 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<h2>{{.T "problems.failing"}}</h2>
+{{if .Data.Failing}}{{template "feed-rows" (dict "Feeds" .Data.Failing "Page" .)}}{{else}}<p class="muted">{{.T "problems.none"}}</p>{{end}}
+<h2>{{.T "problems.idle"}}</h2>
+{{if .Data.Idle}}{{template "feed-rows" (dict "Feeds" .Data.Idle "Page" .)}}{{else}}<p class="muted">{{.T "problems.none"}}</p>{{end}}
+<h2>{{.T "problems.muted"}}</h2>
+{{if .Data.Muted}}{{template "feed-rows" (dict "Feeds" .Data.Muted "Page" .)}}{{else}}<p class="muted">{{.T "problems.none"}}</p>{{end}}
+<p><a href="{{.URL "/subscriptions"}}">{{.T "sub.back"}}</a></p>
+{{end}}

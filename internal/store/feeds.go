@@ -154,3 +154,36 @@ type prefixed struct {
 func (p prefixed) Scan(dest ...any) error {
 	return p.sc.Scan(append([]any{p.first}, dest...)...)
 }
+
+// DeleteFeedEntries removes every entry of a feed, the feed stays. It
+// returns how many entries there were.
+func (s *Store) DeleteFeedEntries(ctx context.Context, userID, feedID int64) (int, error) {
+	n, err := s.affected(ctx, `DELETE FROM entries WHERE user_id = ? AND feed_id = ?`, userID, feedID)
+	if err != nil {
+		return 0, fmt.Errorf("store: delete entries of feed %d: %w", feedID, err)
+	}
+	return n, nil
+}
+
+// NewestEntryDates returns, by feed, the date of the newest entry of the
+// feeds that have entries.
+func (s *Store) NewestEntryDates(ctx context.Context, userID int64) (map[int64]int64, error) {
+	rows, err := s.query(ctx, `
+		SELECT feed_id, MAX(published) FROM entries WHERE user_id = ? GROUP BY feed_id`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("store: newest entries: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	dates := map[int64]int64{}
+	for rows.Next() {
+		var feedID, date int64
+		if err := rows.Scan(&feedID, &date); err != nil {
+			return nil, fmt.Errorf("store: newest entries: %w", err)
+		}
+		dates[feedID] = date
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: newest entries: %w", err)
+	}
+	return dates, nil
+}

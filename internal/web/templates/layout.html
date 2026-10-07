@@ -15,6 +15,7 @@
 <nav class="site-nav" aria-label="{{.T "nav.main"}}">
 <ul>
 <li><a href="{{.URL "/"}}"{{if eq .Section "reader"}} aria-current="page"{{end}}>{{.T "nav.reader"}}</a></li>
+{{if .User}}<li><a href="{{.URL "/subscriptions"}}"{{if eq .Section "subscriptions"}} aria-current="page"{{end}}>{{.T "nav.subscriptions"}}</a></li>{{end}}
 {{if .User}}<li><a href="{{.URL "/settings/keys"}}"{{if eq .Section "keys"}} aria-current="page"{{end}}>{{.T "nav.keys"}}</a></li>{{end}}
 <li><a href="{{.URL "/about"}}"{{if eq .Section "about"}} aria-current="page"{{end}}>{{.T "nav.about"}}</a></li>
 </ul>
