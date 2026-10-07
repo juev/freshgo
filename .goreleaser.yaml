@@ -24,6 +24,7 @@ release:
   prerelease: auto
 
 changelog:
+  abbrev: 7
   groups:
     - title: Features
       regexp: '^.*?feat(\(.+\))?!?:.+$'
