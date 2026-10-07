@@ -79,7 +79,7 @@ freshgo serve
 
 Open the address of the server in a browser and sign in. Pages are rendered by the server: every action is a link or a form and works without JavaScript; the script adds keys and actions that do not reload the page.
 
-The reading screen has the tree of streams, categories, feeds, labels and saved queries on the left and the entries on the right. An entry opens in place. The search field takes the search language of FreshRSS. The other sections are subscriptions (feeds with all their settings, categories, labels, import and export), statistics, settings, and administration for administrators (users, the installation, how users log in, the log).
+The reading screen has the tree of streams, categories, feeds, labels and saved queries on the left and the entries on the right, laid out after Google Reader: an entry is one row with its star, feed, title and the beginning of its text, and opens in place as a card. "List" and "Expanded" above the entries switch between rows and open entries. The pages come in two looks, "Reader classic" and "Reader 2011", each with light and dark colours; the choice is on the page "Display" of the settings. The search field takes the search language of FreshRSS. The other sections are subscriptions (feeds with all their settings, categories, labels, import and export), statistics, settings, and administration for administrators (users, the installation, how users log in, the log).
 
 ### Keys
 

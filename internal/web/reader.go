@@ -502,7 +502,11 @@ func (h *Handler) tree(v *view, lib *library, current stream, state showing, hid
 		{streamMain, "stream.main"}, {streamAll, "stream.all"}, {streamStarred, "stream.starred"},
 	} {
 		one, _ := lib.stream(s.kind, 0)
-		t.Streams = append(t.Streams, at(one, v.T(s.name)))
+		b := at(one, v.T(s.name))
+		// Each of the three is known by the state it lists by itself: with
+		// the state of the page carried along they would all list the same.
+		b.URL = state.link(h, one.path(), "q", "", "state", "")
+		t.Streams = append(t.Streams, b)
 	}
 	for _, c := range lib.categories {
 		one, _ := lib.stream(streamCategory, c.ID)

@@ -518,12 +518,24 @@ button.link {
 }
 
 /* The name of the stream stands on a bar, the controls under it. */
-.stream h1 {
-	margin: 0;
+.stream-head {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0 calc(var(--space) * 2);
 	padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);
 	border-radius: var(--radius) var(--radius) 0 0;
 	background: var(--bar);
+}
+
+.stream h1 {
+	margin: 0;
 	font-size: 1.15rem;
+}
+
+/* How the entries are listed is said on the bar, away from which of them. */
+.stream-head .views {
+	margin-left: auto;
 }
 
 .visually-hidden {
@@ -723,7 +735,7 @@ button.star[aria-pressed="true"] {
 	content: "▾";
 }
 
-.entry.read summary {
+.entry.read {
 	background: var(--read-bg);
 }
 
@@ -1173,21 +1185,51 @@ input[type="file"] {
 }
 
 /* Sections of several pages name them in a row above the page. */
+/* The pages of a section are tabs on a strip: the current one stands on
+   the page. */
 .tabs ul {
 	display: flex;
 	flex-wrap: wrap;
-	gap: calc(var(--space) * 2);
+	gap: calc(var(--space) / 2);
 	list-style: none;
-	padding: 0;
-	margin: 0 0 calc(var(--space) * 2);
+	margin: var(--space) 0 calc(var(--space) * 2);
+	padding: var(--space) var(--space) 0;
 	border-bottom: 1px solid var(--border);
-	padding-bottom: var(--space);
+	border-radius: var(--radius) var(--radius) 0 0;
+	background: var(--bg-raised);
+}
+
+.tabs a {
+	display: block;
+	padding: calc(var(--space) / 2) calc(var(--space) * 1.5);
+	border: 1px solid transparent;
+	border-bottom: 0;
+	border-radius: var(--radius) var(--radius) 0 0;
+	text-decoration: none;
 }
 
 .tabs a[aria-current="page"] {
+	margin-bottom: -1px;
+	border-color: var(--border);
+	background: var(--bg);
 	color: var(--text);
-	font-weight: 600;
-	text-decoration: none;
+	font-weight: 700;
+}
+
+/* The name of a page stands on a bar, as the name of a stream does. */
+.page:not(.wide) > h1 {
+	margin: var(--space) 0 calc(var(--space) * 2);
+	padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);
+	border-radius: var(--radius);
+	background: var(--bar);
+	font-size: 1.15rem;
+}
+
+.page:not(.wide) h2 {
+	margin-top: calc(var(--space) * 4);
+	padding-bottom: calc(var(--space) / 2);
+	border-bottom: 1px solid var(--row-border);
+	font-size: 1.05rem;
 }
 
 table.data {
@@ -1200,8 +1242,13 @@ table.data th,
 table.data td {
 	text-align: left;
 	vertical-align: top;
-	padding: var(--space);
-	border-bottom: 1px solid var(--border);
+	padding: calc(var(--space) * 0.6) var(--space);
+	border-bottom: 1px solid var(--row-border);
+}
+
+table.data thead th {
+	background: var(--bg-raised);
+	border-bottom-color: var(--border);
 }
 
 table.log td:last-child {
@@ -1252,4 +1299,68 @@ table.log td:last-child {
 
 .chart .bar {
 	fill: var(--accent);
+}
+
+/* The modern look: the classic one with more air and fewer lines. */
+:root[data-look="modern"] .stream-head,
+:root[data-look="modern"] .page:not(.wide) > h1 {
+	padding-inline: 0;
+	border-bottom: 1px solid var(--border);
+	border-radius: 0;
+	background: none;
+	font-weight: 400;
+}
+
+:root[data-look="modern"] .stream h1,
+:root[data-look="modern"] .page:not(.wide) > h1 {
+	font-size: 1.4rem;
+	font-weight: 400;
+}
+
+:root[data-look="modern"] .toolbar {
+	padding-inline: 0;
+	background: none;
+}
+
+:root[data-look="modern"] .entry > details[open] {
+	margin: var(--space) 0;
+	border-width: 1px;
+}
+
+:root[data-look="modern"] .entry > details[open] .entry-title {
+	color: var(--text);
+	font-weight: 400;
+	font-size: 1.5em;
+}
+
+:root[data-look="modern"] .entry-actions {
+	background: none;
+}
+
+:root[data-look="modern"] .tabs ul {
+	padding-inline: 0;
+	background: none;
+}
+
+:root[data-look="modern"] .tabs a[aria-current="page"] {
+	border-color: transparent;
+	border-bottom: 2px solid var(--button-bg);
+	margin-bottom: -1px;
+}
+
+:root[data-look="modern"] .tree a[aria-current="page"] {
+	background: none;
+	color: var(--danger);
+}
+
+:root[data-look="modern"] .site-header {
+	padding-block: var(--space);
+}
+
+/* One red button a row is enough: the others are plain. */
+:root[data-look="modern"] .toolbar button:not(.link),
+:root[data-look="modern"] .more-actions button {
+	color: var(--text);
+	background: var(--bg-raised);
+	border-color: var(--border);
 }

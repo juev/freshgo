@@ -121,6 +121,17 @@ func TestReadingScreen(t *testing.T) {
 				t.Errorf("GET /: no %q in\n%s", want, body)
 			}
 		}
+		// The three streams are known by what each lists by itself: the
+		// state of the page does not follow the reader there, its order does.
+		chosen := s.page("/feeds/1?state=starred&sort=title")
+		for _, want := range []string{`<a href="/?sort=title">Unread</a>`, `<a href="/all?sort=title">All entries</a>`, `<a href="/starred?sort=title">Starred</a>`, `<a href="/categories/2?sort=title&amp;state=starred">Blogs</a>`} {
+			if !strings.Contains(chosen, want) {
+				t.Errorf("GET /feeds/1?state=starred&sort=title: no %q in the tree\n%s", want, chosen)
+			}
+		}
+		if all := s.page("/all"); !strings.Contains(all, `<a href="/all?state=all" aria-current="true">All</a>`) {
+			t.Errorf("GET /all: the states above the list do not say all\n%s", all)
+		}
 		// The feed with nothing unread is left out of the tree while unread
 		// entries are listed, and is there otherwise.
 		if strings.Contains(body, `href="/feeds/8"`) {
@@ -768,7 +779,7 @@ func TestTreeCountsByPriority(t *testing.T) {
 			t.Helper()
 			body := s.page("/?state=all")
 			var got [3]string
-			for i, link := range []string{`<a href="/?state=all" aria-current="page">Unread</a>`, `<a href="/categories/` + strconv.FormatInt(feed.CategoryID, 10) + `?state=all">`, `<a href="/feeds/` + strconv.FormatInt(feed.ID, 10) + `?state=all">`} {
+			for i, link := range []string{`<a href="/" aria-current="page">Unread</a>`, `<a href="/categories/` + strconv.FormatInt(feed.CategoryID, 10) + `?state=all">`, `<a href="/feeds/` + strconv.FormatInt(feed.ID, 10) + `?state=all">`} {
 				m := regexp.MustCompile(regexp.QuoteMeta(link) + `(?:[^<]*</a>)? <span class="count" title="(\d+) `).FindStringSubmatch(body)
 				if m != nil {
 					got[i] = m[1]
