@@ -2,7 +2,7 @@
 
 A feed aggregator server in one binary that takes over an existing [FreshRSS](https://freshrss.org) installation. It imports the FreshRSS data, keeps refreshing the same feeds and answers the same Google Reader API, so mobile and desktop clients keep working with the tokens and article identifiers they already have. Users log in to its web interface with the web passwords they had in FreshRSS.
 
-What it does:
+## Features
 
 - stores data in SQLite or PostgreSQL;
 - imports a FreshRSS installation that ran on SQLite or PostgreSQL (not MySQL/MariaDB);
@@ -12,17 +12,95 @@ What it does:
 - serves the Google Reader API, OPML import and export, and feed icons;
 - has a web interface of its own, in English and Russian, in which everything can be done from the keyboard and without JavaScript;
 - subscribes to WebSub hubs;
-- has extension points modelled on the FreshRSS hooks, for handlers compiled into the binary, which can also add links to the menu and a block to the login page. PHP extensions of FreshRSS do not run.
+- has extension points modelled on the FreshRSS hooks, for handlers compiled into the binary, which can also add links to the menu and a block to the login page. PHP extensions of FreshRSS do not run;
+- runs as one static binary or from a container image of about 25 MB, for amd64 and arm64.
 
 The Fever API is not implemented.
 
-## Build
+## Running on your own server
 
-Needs Go 1.27.
+### With Docker
+
+Every release is published as `ghcr.io/juev/freshgo`, tagged with its version (`1.2.3`), with the minor version (`1.2`) and with `latest`. The image holds the binary and the root certificates, nothing else: there is no shell in it. The server runs as user 65532, listens on port 8080 and keeps a SQLite database in the volume `/data`.
+
+```sh
+docker volume create freshgo
+docker run --rm -it -v freshgo:/data ghcr.io/juev/freshgo user create alice    # asks for the password
+docker run -d --name freshgo --restart unless-stopped \
+  -v freshgo:/data -p 127.0.0.1:8080:8080 ghcr.io/juev/freshgo
+```
+
+The first user is the administrator. The interface is now at `http://127.0.0.1:8080`; the settings are the variables of the table below, given with `-e`. If you mount a directory of the host instead of a volume, give it to user 65532 first: `chown 65532:65532 /srv/freshgo`.
+
+The other commands run in the same container:
+
+```sh
+docker exec freshgo /freshgo user list
+docker exec -i freshgo /freshgo opml import -user alice < subscriptions.opml
+```
+
+### Behind a reverse proxy
+
+Serve it over HTTPS from a reverse proxy and tell the server its public address. This `compose.yaml` puts [Caddy](https://caddyserver.com) in front, which gets the certificate for the name by itself:
+
+```yaml
+services:
+  freshgo:
+    image: ghcr.io/juev/freshgo
+    restart: unless-stopped
+    environment:
+      FRESHGO_BASE_URL: https://rss.example.org
+      FRESHGO_TRUSTED_PROXIES: 172.30.0.0/24
+    volumes:
+      - freshgo:/data
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    command: caddy reverse-proxy --from rss.example.org --to freshgo:8080
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy:/data
+
+volumes:
+  freshgo:
+  caddy:
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+```
+
+`FRESHGO_TRUSTED_PROXIES` names the network of the two containers. The proxy connects from an address of that network, not from the loopback address the default expects, and without the setting the server would count the failed logins of all visitors against the proxy.
+
+```sh
+docker compose run --rm freshgo user create alice
+docker compose up -d
+```
+
+### With PostgreSQL
+
+Set `FRESHGO_DATABASE_URL` to `postgres://user:password@host:5432/freshgo`. The server creates its tables at the first start; the volume `/data` is then not used.
+
+### Updates and backups
+
+To update, pull the new image and start the container again: `docker compose pull && docker compose up -d`. The server brings the database to its version when it starts.
+
+To back up a SQLite installation, stop the container and copy the volume: next to `freshgo.sqlite` lie the files `-wal` and `-shm`, and a copy taken from a running server may miss what they hold.
+
+### Without Docker
+
+The binary needs nothing beside it. Every [release](https://github.com/juev/freshgo/releases) has archives for Linux and macOS, amd64 and arm64, with a file of checksums. Or build it with Go 1.27:
 
 ```sh
 make build        # bin/freshgo
 ```
+
+Run `freshgo serve` under the service manager of the system, with the settings in its environment; "Starting without FreshRSS" below shows the commands.
 
 ## Moving from FreshRSS
 
@@ -42,6 +120,12 @@ The move is one-way: a freshgo database cannot be taken back to FreshRSS. Keep t
 
    ```sh
    freshgo serve -database-url sqlite:///var/lib/freshgo/freshgo.sqlite -listen 0.0.0.0:8080
+   ```
+
+   With the image, mount the data directory, which user 65532 must be able to read, and import into the volume the server will use:
+
+   ```sh
+   docker run --rm -v freshgo:/data -v /path/to/FreshRSS/data:/import:ro ghcr.io/juev/freshgo import -data /import
    ```
 
 4. Put it where FreshRSS was. Clients configured with `https://rss.example.org/api/greader.php` keep working without changes: that path is served as an alias, and the API passwords, the tokens already issued and the identifiers of articles, feeds and labels are the imported ones.
@@ -182,6 +266,15 @@ make test-integration   # the same tests on SQLite and on a PostgreSQL started i
 make lint
 make test-e2e           # needs Chrome: the interface in a headless browser, keyboard only, with accessibility checks
 ```
+
+GitHub Actions runs the lint, the integration tests, the browser tests and a trial build of the release on every push to `main` and on every pull request (`.github/workflows/ci.yml`). A release is a tag:
+
+```sh
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+[GoReleaser](https://goreleaser.com) then builds the binaries, publishes the GitHub release with the archives and a changelog made from the commit messages, and pushes the image for both platforms to `ghcr.io` (`.goreleaser.yaml`, `.github/workflows/release.yml`). `goreleaser release --snapshot --clean` does the same locally without publishing anything.
 
 Behaviour is checked against a real FreshRSS 1.30.1: `testdata/reference/` holds what it produced from a fixed corpus of feeds and what it answered to a list of API requests; `testdata/reference/README.md` says how to regenerate it. The contracts are in `docs/specs/`.
 
