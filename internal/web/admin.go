@@ -26,18 +26,27 @@ func (h *Handler) administrators(page http.HandlerFunc) http.HandlerFunc {
 			h.fail(w, r, http.StatusForbidden)
 			return
 		}
-		if h.stale(s) {
-			// What a form was about to do is not done: its page is where
-			// the administrator comes back to.
-			next := r.URL.RequestURI()
-			if r.Method != http.MethodGet && r.Method != http.MethodHead {
-				next = "/admin/users"
-			}
-			http.Redirect(w, r, h.url("/reauth")+"?next="+url.QueryEscape(next), http.StatusSeeOther)
-			return
+		if h.fresh(w, r) {
+			page(w, r)
 		}
-		page(w, r)
 	})
+}
+
+// fresh reports whether the administrator who asks typed the password
+// recently enough to act as one; when not, the answer is given: the way to
+// type it again.
+func (h *Handler) fresh(w http.ResponseWriter, r *http.Request) bool {
+	if !h.stale(state(r)) {
+		return true
+	}
+	// What a form was about to do is not done: its page is where the
+	// administrator comes back to.
+	next := r.URL.RequestURI()
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
+		next = "/admin/users"
+	}
+	http.Redirect(w, r, h.url("/reauth")+"?next="+url.QueryEscape(next), http.StatusSeeOther)
+	return false
 }
 
 // stale reports whether the user has to type the password again before
@@ -429,6 +438,14 @@ func (h *Handler) saveAuthentication(w http.ResponseWriter, r *http.Request) {
 		if system.AuthType == store.AuthForm && who.prefs.PasswordHash == "" {
 			return "admin.problem.no-password"
 		}
+		// So would a way of telling users apart that does not know the
+		// administrator who asks for it: the reverse proxy has to vouch for
+		// them on this very request, the default user has to be there.
+		if system.AuthType != store.AuthForm {
+			if after, err := h.identify(r, *system); err != nil || after == nil || after.anonymous || !after.admin {
+				return "admin.problem.lockout"
+			}
+		}
 		return ""
 	})
 }
@@ -456,6 +473,10 @@ func (h *Handler) journal(w http.ResponseWriter, r *http.Request) {
 	ctx, who := r.Context(), state(r).who
 	params := r.URL.Query()
 	all := params.Get("all") != "" && who.admin
+	// What is about everybody is the administration's.
+	if all && !h.fresh(w, r) {
+		return
+	}
 	var v *view
 	if all {
 		v = h.adminView(r, "log")
@@ -503,6 +524,9 @@ func (h *Handler) clearJournal(w http.ResponseWriter, r *http.Request) {
 	if r.PostForm.Get("all") != "" {
 		if !who.admin {
 			h.fail(w, r, http.StatusForbidden)
+			return
+		}
+		if !h.fresh(w, r) {
 			return
 		}
 		user, target = "", "/log?all=1"

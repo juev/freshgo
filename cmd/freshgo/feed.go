@@ -62,6 +62,7 @@ func runFeedAdd(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	defer s.close()
 	categoryID, err := categoryNamed(ctx, db, u, *category)
 	if err != nil {
 		return err

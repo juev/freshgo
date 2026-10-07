@@ -44,6 +44,7 @@ func runOPMLImport(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	defer s.close()
 
 	// When some feeds could not be added, the rest still are.
 	added, importErr := opml.Import(ctx, db, s.registry, u, data, opml.Limits{})

@@ -88,6 +88,7 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	defer s.close()
 	api := greader.New(greader.Options{
 		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL,
 	})

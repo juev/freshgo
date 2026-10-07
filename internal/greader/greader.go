@@ -408,7 +408,8 @@ func (h *Handler) authenticate(ctx context.Context, r *http.Request) (user *stor
 		return nil, 0, err
 	}
 	if subtle.ConstantTimeCompare([]byte(want), []byte(token)) != 1 {
-		h.log.Warn("invalid API authorisation", "user", name)
+		// The name is not vouched for: the record is not one about the user.
+		h.log.Warn("invalid API authorisation", "name", name)
 		return nil, http.StatusUnauthorized, nil
 	}
 	return user, 0, nil
@@ -466,7 +467,7 @@ func (h *Handler) clientLogin(ctx context.Context, q *request) {
 		return
 	}
 	if user.APIPasswordHash == "" || bcrypt.CompareHashAndPassword([]byte(user.APIPasswordHash), []byte(password)) != nil {
-		h.log.Warn("password API mismatch", "user", name)
+		h.log.Warn("password API mismatch", "name", name)
 		unauthorized(q.w)
 		return
 	}

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"reflect"
 	"strings"
@@ -252,7 +254,7 @@ func TestProfile(t *testing.T) {
 
 // R15: administrators manage users and the installation; nobody else does.
 func TestAdministration(t *testing.T) {
-	imported(t, Options{FetchAllowlist: []string{"10.0.0.0/8"}}, func(t *testing.T, s *site) {
+	imported(t, Options{FetchAllowlist: []string{"10.0.0.0/8"}, TrustedProxies: []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")}}, func(t *testing.T, s *site) {
 		ctx := context.Background()
 		now := s.clock()
 		pages := []string{"/admin/users", "/admin/users/bob", "/admin/system", "/admin/authentication"}
@@ -375,6 +377,24 @@ func TestAdministration(t *testing.T) {
 			t.Errorf("system after the form of signing in = %+v", system)
 		}
 
+		// A way of telling users apart that would not know the administrator
+		// who asks for it is not switched on.
+		for _, kind := range []string{store.AuthHTTP, "nonsense"} {
+			a := s.post("/admin/authentication", url.Values{"auth_type": {kind}, "api_enabled": {"1"}})
+			if system, _ := s.db.System(ctx); system.AuthType != store.AuthForm || (kind == store.AuthHTTP && (a.status != http.StatusBadRequest || !strings.Contains(a.body, "would not know you"))) {
+				t.Errorf("switching to %q without a proxy that vouches: status %d, auth_type %q", kind, a.status, system.AuthType)
+			}
+		}
+		form = url.Values{"auth_type": {store.AuthHTTP}, "api_enabled": {"1"}}
+		r := httptest.NewRequest(http.MethodPost, "/admin/authentication", strings.NewReader(form.Encode()))
+		r.RemoteAddr = "127.0.0.1:4000"
+		vouched := s.send(r, map[string]string{"Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Site": "same-origin", "Remote-User": "alice"})
+		if system, _ := s.db.System(ctx); vouched.status != http.StatusSeeOther || system.AuthType != store.AuthHTTP {
+			t.Errorf("switching to the reverse proxy that vouches for the administrator: status %d, auth_type %q", vouched.status, system.AuthType)
+		}
+		s.system(func(system *store.System) { system.AuthType = store.AuthForm })
+		form = s.formAt("/admin/system", "/admin/system")
+
 		// After a while administration asks for the password again; the
 		// rest of the interface does not.
 		*now = now.Add(6 * time.Minute)
@@ -387,6 +407,22 @@ func TestAdministration(t *testing.T) {
 		}
 		if system, _ := s.db.System(ctx); system.Limits.MaxFeeds != 50 {
 			t.Error("a form of the administration was stored without the password typed again")
+		}
+		// The journal of everybody is the administration's too.
+		if a := s.get("/log?all=1"); a.header.Get("Location") != "/reauth?next=%2Flog%3Fall%3D1" {
+			t.Errorf("the journal of everybody at that time: status %d, Location %q", a.status, a.header.Get("Location"))
+		}
+		if err := s.db.AddLog(ctx, &store.Log{Time: 1, User: "carol", Level: "WARN", Message: "kept"}); err != nil {
+			t.Fatal(err)
+		}
+		if a := s.post("/log/clear", url.Values{"all": {"1"}}); a.status != http.StatusSeeOther || !strings.HasPrefix(a.header.Get("Location"), "/reauth") {
+			t.Errorf("clearing the journal of everybody at that time: status %d", a.status)
+		}
+		if logs, _ := s.db.Logs(ctx, store.LogQuery{}); len(logs) != 1 {
+			t.Error("the journal of everybody was cleared without the password typed again")
+		}
+		if a := s.get("/log"); a.status != http.StatusOK {
+			t.Errorf("one's own journal at that time: status %d", a.status)
 		}
 		s.shown("/reauth?next=%2Fadmin%2Fsystem")
 		if a := s.get("/settings/display"); a.status != http.StatusOK {
@@ -430,7 +466,7 @@ func TestJournalPage(t *testing.T) {
 		for i, l := range []store.Log{
 			{User: "alice", Level: "WARN", Message: "feed failed url=http://one.example/ 100%"},
 			{User: "bob", Level: "ERROR", Message: "feed failed url=http://two.example/"},
-			{User: "alice", Level: "ERROR", Message: "<b>other</b> trouble"},
+			{User: "alice", Level: "ERROR", Message: "<b>other</b> trouble: Новости"},
 		} {
 			l.Time = 1791280000 + int64(i)
 			if err := s.db.AddLog(ctx, &l); err != nil {
@@ -451,14 +487,14 @@ func TestJournalPage(t *testing.T) {
 		s.cookies = nil
 		s.asAlice()
 		body = s.shown("/log")
-		first, second := strings.Index(body, "&lt;b&gt;other&lt;/b&gt; trouble"), strings.Index(body, "one.example")
+		first, second := strings.Index(body, "&lt;b&gt;other&lt;/b&gt; trouble: Новости"), strings.Index(body, "one.example")
 		if first < 0 || second < first || strings.Contains(body, "two.example") {
 			t.Errorf("the journal of alice, newest first:\n%s", body)
 		}
 		if all := s.shown("/log?all=1"); !strings.Contains(all, "two.example") || !strings.Contains(all, "<td>bob</td>") {
 			t.Errorf("the journal of everybody:\n%s", all)
 		}
-		for query, want := range map[string]int{"FEED": 1, "100%": 1, "%": 1, "nothing": 0} {
+		for query, want := range map[string]int{"FEED": 1, "100%": 1, "%": 1, "nothing": 0, "Новости": 1, "TROUBLE: Нов": 1} {
 			if got := strings.Count(s.page("/log?q="+url.QueryEscape(query)), "<td>WARN</td>") + strings.Count(s.page("/log?q="+url.QueryEscape(query)), "<td>ERROR</td>"); got != want {
 				t.Errorf("the journal searched for %q lists %d records, want %d", query, got, want)
 			}

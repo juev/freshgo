@@ -9,7 +9,7 @@ import (
 	"log/slog"
 	"strconv"
 	"strings"
-	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/juev/freshgo/internal/store"
@@ -33,20 +33,65 @@ const userKey = "user"
 // warnings or errors about a user.
 type Handler struct {
 	next slog.Handler
-	db   *store.Store
-	now  func() time.Time
 	// attrs are the attributes records get from With, as text, and user the
 	// user among them.
 	attrs string
 	user  string
-	// pruned is when old records were last cleared away, in Unix seconds;
-	// handlers made by With share it.
-	pruned *atomic.Int64
+	// out is where records are kept; handlers made by With share it.
+	out *writer
 }
 
-// New returns a handler in front of next.
+// writer keeps records behind the back of whoever logs them: a record is
+// often logged inside a transaction, and one more write to the database
+// from there would wait for that transaction to end.
+type writer struct {
+	db  *store.Store
+	now func() time.Time
+	// records are the records waiting to be kept; one that finds the queue
+	// full is dropped, and is still in the log of the server.
+	records chan store.Log
+	done    chan struct{}
+	mu      sync.RWMutex
+	closed  bool
+}
+
+// queued is how many records may wait to be kept.
+const queued = 256
+
+// New returns a handler in front of next. Close has to be called for the
+// records still waiting to be kept.
 func New(next slog.Handler, db *store.Store) *Handler {
-	return &Handler{next: next, db: db, now: time.Now, pruned: &atomic.Int64{}}
+	w := &writer{db: db, now: time.Now, records: make(chan store.Log, queued), done: make(chan struct{})}
+	go w.run()
+	return &Handler{next: next, out: w}
+}
+
+// run keeps the records as they come, until the queue is closed.
+func (w *writer) run() {
+	defer close(w.done)
+	var pruned time.Time
+	for record := range w.records {
+		ctx, cancel := context.WithTimeout(context.Background(), writeTimeout)
+		// A record that cannot be kept is in the log of the server.
+		_ = w.db.AddLog(ctx, &record)
+		if now := w.now(); now.Sub(pruned) >= pruneEvery {
+			pruned = now
+			_ = w.db.DeleteLogsBefore(ctx, now.Add(-Kept).Unix())
+		}
+		cancel()
+	}
+}
+
+// Close keeps the records that are waiting and stops keeping new ones.
+func (h *Handler) Close() {
+	w := h.out
+	w.mu.Lock()
+	if !w.closed {
+		w.closed = true
+		close(w.records)
+	}
+	w.mu.Unlock()
+	<-w.done
 }
 
 // Enabled reports whether the handler in front of which this one stands
@@ -95,14 +140,14 @@ func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
 	if r.Level >= slog.LevelError {
 		level = "ERROR"
 	}
-	// The request the record is about may be over: the record is kept all
-	// the same. A record that cannot be kept is in the log of the server.
-	write, cancel := context.WithTimeout(context.WithoutCancel(ctx), writeTimeout)
-	defer cancel()
-	now := h.now()
-	_ = h.db.AddLog(write, &store.Log{Time: now.Unix(), Level: level, User: user, Message: message})
-	if last := h.pruned.Load(); now.Unix()-last >= int64(pruneEvery/time.Second) && h.pruned.CompareAndSwap(last, now.Unix()) {
-		_ = h.db.DeleteLogsBefore(write, now.Add(-Kept).Unix())
+	w := h.out
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	if !w.closed {
+		select {
+		case w.records <- store.Log{Time: w.now().Unix(), Level: level, User: user, Message: message}:
+		default:
+		}
 	}
 	return err
 }

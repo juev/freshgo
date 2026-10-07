@@ -189,7 +189,7 @@ type retention struct {
 
 var (
 	retentionPeriod = regexp.MustCompile(`^(PT?)(\d+)([YMWDH])$`)
-	retentionUnit   = regexp.MustCompile(`^PT?1[YMWDH]$`)
+	retentionUnit   = regexp.MustCompile(`^(P1[YMWD]|PT1H)$`)
 )
 
 // Defaults of FreshRSS for a rule that is switched on without a value.

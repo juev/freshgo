@@ -35,6 +35,9 @@ type services struct {
 	icons     *favicon.Service
 	// webSub is nil when WebSub is off.
 	webSub *websub.Service
+	// close lets go of what the services hold; it comes before the
+	// database is closed.
+	close func()
 }
 
 func newServices(ctx context.Context, e env, conf *config.Config, db *store.Store) (*services, error) {
@@ -43,7 +46,8 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 		return nil, err
 	}
 	// What goes wrong for a user is kept for the user to read as well.
-	s := &services{registry: newHooks(), log: slog.New(journal.New(slog.NewTextHandler(e.stderr, nil), db))}
+	kept := journal.New(slog.NewTextHandler(e.stderr, nil), db)
+	s := &services{registry: newHooks(), log: slog.New(kept), close: kept.Close}
 	s.registry.Init.Call(ctx, struct{}{})
 	s.icons = favicon.New(db, client, s.log)
 	s.refresher = refresh.New(db, client, s.registry, s.log)
@@ -78,6 +82,7 @@ func runRefresh(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	defer s.close()
 
 	// A feed that fails is reported and does not fail the command: the next
 	// run tries it again.
@@ -104,6 +109,7 @@ func runPurge(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	defer s.close()
 	stats, err := s.refresher.Purge(ctx)
 	for _, st := range stats {
 		if _, werr := fmt.Fprintf(e.stdout, "%s: %d entries deleted\n", st.User, st.Deleted); werr != nil {

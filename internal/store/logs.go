@@ -50,7 +50,14 @@ func (s *Store) Logs(ctx context.Context, q LogQuery) ([]*Log, error) {
 	}
 	if q.Text != "" {
 		// The wildcards of LIKE are text here.
-		pattern := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(strings.ToLower(q.Text))
+		// Only ASCII letters are lowered, as LOWER of SQLite lowers them.
+		lowered := strings.Map(func(r rune) rune {
+			if r >= 'A' && r <= 'Z' {
+				return r + 'a' - 'A'
+			}
+			return r
+		}, q.Text)
+		pattern := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(lowered)
 		query += ` AND LOWER(message) LIKE ? ESCAPE '\'`
 		args = append(args, "%"+pattern+"%")
 	}
