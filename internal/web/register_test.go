@@ -130,7 +130,7 @@ func TestEmailValidation(t *testing.T) {
 			t.Fatalf("registration: status %d\n%s", r.status, r.body)
 		}
 		letters := smtp.Letters()[before:]
-		if len(letters) != 1 || letters[0].To != "carol@example.org" || letters[0].Subject != "Подтвердите адрес — FreshRSS" || !strings.Contains(letters[0].Body, "Здравствуйте, carol!") {
+		if len(letters) != 1 || letters[0].To != "carol@example.org" || letters[0].Subject != "Подтвердите адрес — freshgo" || !strings.Contains(letters[0].Body, "Здравствуйте, carol!") {
 			t.Fatalf("letters after registering = %+v", letters)
 		}
 		link := mailedLink.FindString(letters[0].Body)

@@ -547,6 +547,85 @@ func sourceExec(t *testing.T, dataDir, user, query string) {
 	}
 }
 
+// readOnly takes the right to write away from the directories of the users,
+// as a volume mounted read-only does.
+func readOnly(t *testing.T, dataDir string) {
+	t.Helper()
+	if os.Geteuid() == 0 {
+		t.Skip("root writes to a directory whatever its mode")
+	}
+	for _, user := range []string{"alice", "bob"} {
+		dir := filepath.Join(dataDir, "users", user)
+		if err := os.Chmod(dir, 0o500); err != nil {
+			t.Fatal(err)
+		}
+		// So that the test can remove its directory.
+		t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+	}
+}
+
+// FreshRSS keeps its databases in WAL mode, and the data directory is
+// mounted read-only for the import.
+func TestImportFromReadOnlyDirectory(t *testing.T) {
+	ctx := context.Background()
+	dir := brokenCopy(t)
+	for _, user := range []string{"alice", "bob"} {
+		sourceExec(t, dir, user, `PRAGMA journal_mode=WAL`)
+	}
+	readOnly(t, dir)
+
+	driver, dsn := storetest.Engines()[0].New(t)
+	dst, err := store.Open(ctx, driver, dsn)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = dst.Close() })
+	report, err := Run(ctx, dst, Options{DataDir: dir})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	checkImport(t, dst, report, sqliteReferenceDir, sqliteReference(sqliteReferenceDir))
+}
+
+// Changes still in the log cannot be read without writing next to the
+// database; the import says so instead of leaving them out.
+func TestImportRefusesUnreadableLog(t *testing.T) {
+	ctx := context.Background()
+	dir := brokenCopy(t)
+	// A connection that stays open keeps the log from being folded back.
+	path := filepath.Join(dir, "users", "alice", "db.sqlite")
+	db, err := sql.Open("sqlite", "file:"+path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`PRAGMA journal_mode=WAL; UPDATE feed SET name = name`); err != nil {
+		t.Fatal(err)
+	}
+	wal, err := os.ReadFile(path + "-wal")
+	if err != nil || len(wal) == 0 {
+		t.Fatalf("no log to test with: %d bytes, err %v", len(wal), err)
+	}
+	// Closing folds the log back; what was in it is put there again, as a
+	// FreshRSS that was killed leaves it.
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path+"-wal", wal, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	readOnly(t, dir)
+
+	driver, dsn := storetest.Engines()[0].New(t)
+	dst, err := store.Open(ctx, driver, dsn)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = dst.Close() })
+	if _, err := Run(ctx, dst, Options{DataDir: dir}); err == nil || !strings.Contains(err.Error(), "db.sqlite-wal") {
+		t.Fatalf("Run: error = %v, want a failure naming the log", err)
+	}
+}
+
 func TestImportIsAllOrNothing(t *testing.T) {
 	eachDestination(t, func(t *testing.T, dst *store.Store) {
 		ctx := context.Background()

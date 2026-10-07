@@ -23,8 +23,9 @@ func TestImportSystemSettings(t *testing.T) {
 			t.Fatal(err)
 		}
 		want := store.DefaultSystem()
-		// What the config.php of the reference installation says.
-		want.Title, want.DefaultUser, want.AuthType, want.APIEnabled = "FreshRSS", "alice", store.AuthForm, true
+		// What the config.php of the reference installation says, but for
+		// the title, which there is the one FreshRSS gives itself.
+		want.DefaultUser, want.AuthType, want.APIEnabled = "alice", store.AuthForm, true
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("System after the import:\n got %+v\nwant %+v", got, want)
 		}
@@ -40,7 +41,7 @@ func TestReadSystemSettings(t *testing.T) {
 		"base_url":        "https://rss.example.org",
 	})
 	want := store.DefaultSystem()
-	want.Title, want.DefaultUser, want.APIEnabled = "FreshRSS", "_", false
+	want.DefaultUser, want.APIEnabled = "_", false
 	want.AuthType, want.AllowAnonymous = store.AuthHTTP, true
 	want.Limits.MaxFeeds, want.Limits.MaxRegistrations = 10, 0
 	if !reflect.DeepEqual(got, want) {
@@ -48,6 +49,25 @@ func TestReadSystemSettings(t *testing.T) {
 	}
 	if !reflect.DeepEqual(unreadable, []string{"reauth_time"}) {
 		t.Errorf("unreadable = %v, want only reauth_time", unreadable)
+	}
+}
+
+// A title somebody chose comes over; the name FreshRSS gives itself does not.
+func TestImportedTitle(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		conf map[string]any
+		want string
+	}{
+		{"not set", map[string]any{}, "freshgo"},
+		{"the default of FreshRSS", map[string]any{"title": "FreshRSS"}, "freshgo"},
+		{"chosen", map[string]any{"title": "News of the family"}, "News of the family"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got, _ := readSystemSettings(tc.conf); got.Title != tc.want {
+				t.Errorf("title = %q, want %q", got.Title, tc.want)
+			}
+		})
 	}
 }
 
