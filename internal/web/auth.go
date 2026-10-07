@@ -242,7 +242,14 @@ func (h *Handler) proxyUser(r *http.Request, system store.System) (*store.User, 
 	if !store.ValidUserName(name) {
 		return nil, nil
 	}
-	ctx := r.Context()
+	return h.userOrNew(r.Context(), name, system, "user created on the word of the reverse proxy")
+}
+
+// userOrNew returns the user with the name somebody else vouches for: the
+// reverse proxy, or the provider visitors sign in through. A name nobody
+// has gets a user when the installation allows it, and created is then
+// what the log says; nil otherwise.
+func (h *Handler) userOrNew(ctx context.Context, name string, system store.System, created string) (*store.User, error) {
 	user, err := h.userNamed(ctx, name)
 	if err != nil || user != nil || !system.HTTPAuthAutoRegister {
 		return user, err
@@ -255,7 +262,7 @@ func (h *Handler) proxyUser(r *http.Request, system store.System) (*store.User, 
 	case err != nil:
 		return nil, err
 	}
-	h.log.Info("user created on the word of the reverse proxy", "user", name)
+	h.log.Info(created, "user", name)
 	return user, nil
 }
 
@@ -500,6 +507,27 @@ type loginForm struct {
 	CanRegister bool
 	// Before is what extensions put before the button.
 	Before []template.HTML
+	// Provider is what the provider visitors can sign in through is called
+	// and ProviderURL where that starts; both empty without one.
+	Provider, ProviderURL string
+}
+
+// showLogin shows the login page with what the form says, the way through
+// the provider next to it.
+func (h *Handler) showLogin(w http.ResponseWriter, r *http.Request, status int, form loginForm) {
+	s := state(r)
+	v := h.view(r, "login", "login.heading")
+	open, _, err := h.registrationOpen(r.Context(), s.system)
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	form.CanRegister, form.Before = open, h.hooks.BeforeLogin.Call(r.Context(), v.asks)
+	if h.oidcOn(s.system) {
+		form.Provider, form.ProviderURL = oidcName(s.system), h.oidcStart(form.Next)
+	}
+	v.Data = form
+	h.render(w, r, status, "login", v)
 }
 
 func (h *Handler) loginPage(w http.ResponseWriter, r *http.Request) {
@@ -509,14 +537,7 @@ func (h *Handler) loginPage(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, h.localTarget(next), http.StatusSeeOther)
 		return
 	}
-	v := h.view(r, "login", "login.heading")
-	open, _, err := h.registrationOpen(r.Context(), s.system)
-	if err != nil {
-		h.broken(w, r, err)
-		return
-	}
-	v.Data = loginForm{Next: next, CanRegister: open, Before: h.hooks.BeforeLogin.Call(r.Context(), v.asks)}
-	h.render(w, r, http.StatusOK, "login", v)
+	h.showLogin(w, r, http.StatusOK, loginForm{Next: next})
 }
 
 func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
@@ -530,9 +551,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	name, password := strings.TrimSpace(r.PostFormValue("username")), r.PostFormValue("password")
 	next := r.PostFormValue("next")
 	refuse := func(status int, message string) {
-		v := h.view(r, "login", "login.heading")
-		v.Data = loginForm{Name: name, Next: next, Error: message, Before: h.hooks.BeforeLogin.Call(r.Context(), v.asks)}
-		h.render(w, r, status, "login", v)
+		h.showLogin(w, r, status, loginForm{Name: name, Next: next, Error: message})
 	}
 	texts := h.view(r, "", "login.heading")
 

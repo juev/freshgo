@@ -10,4 +10,5 @@
 </p>
 <p><button type="submit">{{.T "reauth.submit"}}</button></p>
 </form>
+{{if .Data.Provider}}<p><a href="{{.Data.ProviderURL}}">{{.T "login.oidc" .Data.Provider}}</a></p>{{end}}
 {{end}}

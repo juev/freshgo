@@ -53,6 +53,10 @@ type Options struct {
 	// TrustedProxies are the reverse proxies whose word is taken for who
 	// the user is, when the installation tells users apart that way.
 	TrustedProxies []netip.Prefix
+	// OIDCClientSecret is the secret of the client the settings name at an
+	// OpenID Connect provider; empty when the server was given none, and
+	// then nobody signs in through a provider.
+	OIDCClientSecret string
 }
 
 // Handler serves the interface.
@@ -82,6 +86,9 @@ type Handler struct {
 	letters guard
 	decoys  decoys
 	now     func() time.Time
+	// oidcSecret and oidc are what signing in through a provider takes.
+	oidcSecret string
+	oidc       oidcProviders
 }
 
 // New returns the interface, or an error when what is built into the binary
@@ -94,6 +101,7 @@ func New(o Options) (*Handler, error) {
 	if h.hooks == nil {
 		h.hooks = &hooks.Registry{}
 	}
+	h.oidcSecret, h.oidc.client = o.OIDCClientSecret, &http.Client{Timeout: oidcTimeout}
 	if o.BaseURL != "" {
 		public, err := url.Parse(o.BaseURL)
 		if err != nil {
@@ -216,6 +224,8 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /settings/profile/delete", h.protect(members, h.deleteAccount))
 	h.mux.HandleFunc("GET /log", h.protect(members, h.journal))
 	h.mux.HandleFunc("POST /log/clear", h.protect(members, h.clearJournal))
+	h.mux.HandleFunc("GET /oidc/login", h.oidcLogin)
+	h.mux.HandleFunc("GET "+oidcCallbackPath, h.oidcCallback)
 	h.mux.HandleFunc("GET /reauth", h.protect(members, h.reauthPage))
 	h.mux.HandleFunc("POST /reauth", h.protect(members, h.reauth))
 	h.mux.HandleFunc("GET /admin/users", h.administrators(h.usersPage))
