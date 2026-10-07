@@ -180,12 +180,19 @@ func TestOIDCSignIn(t *testing.T) {
 		}
 
 		// Another user at the browser takes over.
+		alices := s.cookies[sessionCookie].Value
 		p.user = "bob"
 		if a := p.signIn(s, "https://elsewhere.example/", nil); a.status != http.StatusSeeOther || a.header.Get("Location") != "/" {
 			t.Errorf("a sign-in that asks to land on another site: status %d, Location %q", a.status, a.header.Get("Location"))
 		}
 		if who := s.signedInAs(); who != "bob" {
 			t.Errorf("signed in as %q, want bob", who)
+		}
+		if session, err := s.db.Session(t.Context(), tokenHash(alices), time.Now().Unix()); err == nil {
+			t.Errorf("the login alice had is still there: %+v", session)
+		}
+		if a := p.signIn(s, "/"+strings.Repeat("a", maxOIDCNext), nil); a.status != http.StatusSeeOther || a.header.Get("Location") != "/" {
+			t.Errorf("a sign-in with a landing page too long to keep: status %d, Location %.40q", a.status, a.header.Get("Location"))
 		}
 	})
 }
@@ -375,6 +382,22 @@ func TestOIDCAdministratorWithoutPassword(t *testing.T) {
 		if a := p.signIn(s, "/", nil); a.status != http.StatusSeeOther {
 			t.Fatalf("the sign-in: status %d", a.status)
 		}
+		// A first password opens the administration from then on: it takes
+		// a login as recent as the administration asks for.
+		now := s.clock()
+		if a := p.signIn(s, "/", nil); a.status != http.StatusSeeOther {
+			t.Fatalf("the sign-in: status %d", a.status)
+		}
+		*now = now.Add(21 * time.Minute)
+		first := url.Values{"new": {"a first password"}, "again": {"a first password"}}
+		a := s.post("/settings/profile/password", first)
+		if alice := s.user("alice"); a.header.Get("Location") != "/reauth?next=%2Fsettings%2Fprofile" || readPreferences(alice).PasswordHash != "" {
+			t.Errorf("a first password with an aged login: status %d, Location %q, hash %q", a.status, a.header.Get("Location"), readPreferences(alice).PasswordHash)
+		}
+		if a := p.signIn(s, "/settings/profile", nil); a.status != http.StatusSeeOther {
+			t.Fatalf("signing in again: status %d", a.status)
+		}
+
 		form := s.formAt("/admin/authentication", "/admin/authentication")
 		if a := s.post("/admin/authentication", form); a.status != http.StatusSeeOther {
 			t.Errorf("saving the page with a provider and no password: status %d\n%s", a.status, a.body)
@@ -383,6 +406,9 @@ func TestOIDCAdministratorWithoutPassword(t *testing.T) {
 		form.Set("oidc_client_id", "")
 		if a := s.post("/admin/authentication", form); a.status != http.StatusBadRequest || !strings.Contains(a.body, "You have no password") {
 			t.Errorf("taking the provider away with no password: status %d", a.status)
+		}
+		if a := s.post("/settings/profile/password", first); a.status != http.StatusSeeOther || readPreferences(s.user("alice")).PasswordHash == "" {
+			t.Errorf("a first password with a fresh login: status %d", a.status)
 		}
 	})
 }

@@ -27,6 +27,9 @@ const (
 	// oidcCallbackPath is where the provider sends the browser back to; it
 	// is the address a client is registered with there.
 	oidcCallbackPath = "/oidc/callback"
+	// maxOIDCNext is the longest address to land on that a sign-in carries
+	// through the provider, in bytes; a longer one lands on the start page.
+	maxOIDCNext = 2048
 	// oidcTimeout bounds one request to the provider.
 	oidcTimeout = 15 * time.Second
 )
@@ -119,7 +122,11 @@ func (h *Handler) oidcLogin(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, http.StatusNotFound)
 		return
 	}
+	// What is kept in the cookie has to fit into one.
 	next := r.URL.Query().Get("next")
+	if len(next) > maxOIDCNext {
+		next = ""
+	}
 	_, config, _, err := h.oidcClient(r, s.system)
 	if err != nil {
 		h.oidcRefused(w, r, http.StatusBadGateway, next, err)
