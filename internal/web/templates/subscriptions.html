@@ -2,6 +2,7 @@
 <h1>{{.Heading}}</h1>
 <p class="page-links">
 <a href="{{.URL "/subscriptions/add"}}">{{.T "add.heading"}}</a>
+<a href="{{.URL "/subscriptions/transfer"}}">{{.T "transfer.heading"}}</a>
 <a href="{{.URL "/subscriptions/problems"}}">{{.T "problems.heading"}}</a>{{if .Data.Problems}} <span class="count" title="{{.N "sub.failing-count" .Data.Problems}}">{{.Data.Problems}}</span>{{end}}
 </p>
 

@@ -20,9 +20,15 @@ type EntrySet struct {
 	// the first, less than the second.
 	MinPriority   *int
 	BelowPriority *int
-	// OnlyFavorite keeps starred entries.
-	OnlyFavorite bool
+	// OnlyFavorite keeps starred entries, Labeled those with a label, and
+	// FavoriteOrLabeled those that are either.
+	OnlyFavorite      bool
+	Labeled           bool
+	FavoriteOrLabeled bool
 }
+
+// anyLabel is true for an entry some label is attached to.
+const anyLabel = `EXISTS (SELECT 1 FROM entry_tags t WHERE t.user_id = entries.user_id AND t.entry_id = entries.id)`
 
 // where returns the condition on the entries table, starting with " AND",
 // and its arguments.
@@ -59,6 +65,12 @@ func (set EntrySet) where(userID int64) (string, []any) {
 	}
 	if set.OnlyFavorite {
 		b.WriteString(` AND is_favorite`)
+	}
+	if set.Labeled {
+		b.WriteString(` AND ` + anyLabel)
+	}
+	if set.FavoriteOrLabeled {
+		b.WriteString(` AND (is_favorite OR ` + anyLabel + `)`)
 	}
 	return b.String(), args
 }

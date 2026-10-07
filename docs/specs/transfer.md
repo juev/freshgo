@@ -1,0 +1,34 @@
+# Import and export of entries
+
+Status: implemented.
+Sources: user requests of 2026-10-06 and requirement R10 of `plan.md`; `FreshRSS_Entry::toGReader` in its `freshrss` mode, `app/views/helpers/export/articles.phtml`, `FreshRSS_Export_Service` and `FreshRSS_importExport_Controller::importFile`, `importJson`, `addFeedJson`, `guessFileType` of FreshRSS at commit `219eaf58`.
+
+## Purpose and scope
+
+`internal/transfer` writes the entries of a user as the JSON documents FreshRSS exports, and reads such documents, those of Google Reader and of readers that write the same format, OPML documents, lists of addresses and ZIP archives of all of these. The pages that use it are in `web.md`, U53–U54; OPML itself is `internal/opml` (`greader-api.md`).
+
+Out of scope: the starred articles of Tiny Tiny RSS, which FreshRSS reads from an XML file of its own format.
+
+## Requirements
+
+- T1. A document is a JSON object: `id` (`user/<name>/state/org.freshrss/<kind>`, the kind being `starred` or `feed/<id>`), `title`, `author` (the name of the user) and `items`, the entries oldest first. Text is written as it is, not as the escapes JSON allows for `<`, `>` and `&`.
+- T2. An item has `frss:id` (the identifier), `id` (`tag:google.com,2005:reader/item/` and the identifier as 16 hexadecimal digits), `crawlTimeMsec` and `timestampUsec` (the identifier is the time the entry was received), `published`, `title` and `author` (the authors joined by `; `) with `&`, `<`, `>` and `"` written as HTML entities, the way FreshRSS keeps and writes them, `canonical` and `alternate` (the link; `type` `text/html` in the second), `content.content` (the text as stored), `guid`, `origin` (`streamId` `feed/<id>`, `htmlUrl`, `title`, and `feedUrl`, the address of the feed without its credentials), `enclosure` (`href`, `type` or else the medium, `length`) and `categories`: `user/-/state/com.google/reading-list`; `…/org.freshrss/main` for a feed of priority 10 and above, with `…/important` from 20, `…/hidden` for -10 and below; `…/com.google/read` or `…/unread`; `…/starred`; `user/-/label/<name>` for every label; then the tags of the feed.
+- T3. Handlers of `EntryBeforeDisplay` see every entry on its way into a document and may keep it out.
+- T4. `Import` tells what a file holds by its name, as FreshRSS does: `.zip` an archive; `.txt` a list of feed addresses, one a line; a name with `opml`, or ending in `.xml`, an OPML document; `.json` a document of entries, a list of starred ones when the name has `starred` in it. Any other name is `ErrUnknownFile`. Of an archive, the files with such names are read, up to 1000 of them, 64 MiB each unpacked and 256 MiB together; subscriptions are taken in before entries. A file that is not what its name says is `ErrDocument` (`opml.ErrDocument` for OPML) when it is the only one, and otherwise leaves the import incomplete.
+- T5. An item becomes an entry of the feed it names: `origin.feedUrl`, else `origin.streamId` after `feed/`, else `origin.htmlUrl`, each spelled as `Refresher.AddFeed` spells addresses and compared without credentials; an item that names none goes to the muted feed `http://import.localhost/import.xml`. A feed the user does not have is added without being fetched, with `origin.title` (or `Import`) for its name, `origin.htmlUrl` for its site and the category `origin.category` names, which is created when there is none; `FeedBeforeInsert` may refuse it. `Options.MaxFeeds` and `MaxCategories` bound what is added.
+- T6. Of an item are read: `guid`, else `id`, as the identifier within the feed (an item without one is passed over, the first of several with one identifier stands); `title` with the entities of T2 decoded (the link when there is none; none when it equals the identifier); `author` split at semicolons; the text from `content.content`, `summary.content` or a plain `content`, cleaned as the text of a feed is; the link from `alternate[0].href` or `url`, when it is an `http` or `https` address; the date from `published`, `timestampUsec` or `updated`, as Unix seconds, milliseconds, or a date written out, in the time zone of the user; `categories`: the states `read`, `unread` and `starred` and the labels of any user (`user/<anything>/…`), everything else the tags of the entry. An entry whose item says neither read nor unread is read when the user marks entries read on arrival (`mark_when.reception`). In a list of starred entries, an item without a label is starred without saying so.
+- T7. An entry the feed does not have is added, after `EntryBeforeInsert` and `EntryBeforeAdd`, without a hash (`refresh.md`, F10), with identifiers in the order of the dates. One the feed has, by its identifier, gets the title, authors, text, link, date and tags of the item after `EntryBeforeInsert` and `EntryBeforeUpdate`; it becomes read or unread only when the item says so, starred when the item says so, and never loses its star. Labels are attached, and made when the user has none of that name; a name a category has gives no label and leaves the import incomplete.
+- T8. One document is taken in within one transaction. The report counts the feeds added and the entries added and rewritten, and says when something was left out: a feed past the limit or refused, an item whose feed has no usable address, a label that could not be made, a part of an archive that was passed over.
+
+## Decisions
+
+- **The format is that of FreshRSS**, entities in titles included: a file freshgo writes can be read by FreshRSS and the other way round. Reading decodes the entities; FreshRSS encodes them once more when it reads its own export, which freshgo does not reproduce.
+- **Every entry of a chosen feed is exported**, not the newest 50 as in FreshRSS: the bound there keeps a PHP request within its memory.
+- **An import does not fetch anything.** Feeds it adds get their entries with the next refresh.
+
+## Verification scenarios
+
+`internal/transfer`, on SQLite and, under `make test-integration`, on PostgreSQL.
+
+- T1–T3: `TestDocumentFormat`. T4, T8: `TestImportRefusals`, `TestRoundTrip`. T5, T6: `TestForeignDocuments`. T7: `TestRoundTrip` (a second import keeps what the reader did), `TestImportRefusals` (handlers that refuse).
+- R10 of `plan.md`: `TestRoundTrip` exports the subscriptions, the starred and labelled entries and the entries of two feeds of one user into a ZIP archive and imports it into the empty account of another: the entries are the same in everything a reader sees. `TestExportAndImport` of `internal/web` does the same through the pages, over the reference installation.

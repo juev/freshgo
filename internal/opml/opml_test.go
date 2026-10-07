@@ -128,7 +128,7 @@ func TestExportAndImportKeepSettings(t *testing.T) {
 		if err := db.CreateUser(ctx, bob); err != nil {
 			t.Fatal(err)
 		}
-		added, err := Import(ctx, db, &hooks.Registry{}, bob, doc)
+		added, err := Import(ctx, db, &hooks.Registry{}, bob, doc, Limits{})
 		if err != nil || len(added) != 4 {
 			t.Fatalf("Import: %d feeds, %v; want 4", len(added), err)
 		}
@@ -223,7 +223,7 @@ func TestImport(t *testing.T) {
 			return f, f.Name != "Refused"
 		})
 
-		added, err := Import(ctx, db, registry, u, []byte(doc))
+		added, err := Import(ctx, db, registry, u, []byte(doc), Limits{})
 		if !errors.Is(err, ErrIncomplete) {
 			t.Errorf("Import error = %v, want ErrIncomplete: a feed without address, a refused one, a category named like a label", err)
 		}
@@ -298,7 +298,7 @@ func TestImport(t *testing.T) {
 		}
 
 		// The same document again adds nothing.
-		added, err = Import(ctx, db, registry, u, []byte(doc))
+		added, err = Import(ctx, db, registry, u, []byte(doc), Limits{})
 		if !errors.Is(err, ErrIncomplete) || len(added) != 0 {
 			t.Errorf("second Import: %d feeds, %v; want none added", len(added), err)
 		}
@@ -313,7 +313,7 @@ func TestImportRefusesWhatIsNotOPML(t *testing.T) {
 			"broken XML": `<opml><body><outline text="a" xmlUrl="http://example.org/"`,
 			"empty":      "",
 		} {
-			added, err := Import(context.Background(), db, &hooks.Registry{}, u, []byte(doc))
+			added, err := Import(context.Background(), db, &hooks.Registry{}, u, []byte(doc), Limits{})
 			if !errors.Is(err, ErrDocument) || len(added) != 0 {
 				t.Errorf("%s: %d feeds, error %v; want ErrDocument", name, len(added), err)
 			}

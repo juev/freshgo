@@ -621,7 +621,7 @@ func TestE2EDarkAndNarrow(t *testing.T) {
 			t.Error("the narrow page scrolls sideways")
 		}
 		// The pages of settings, dark and narrow at once.
-		for _, page := range []string{"/subscriptions", "/subscriptions/add", "/subscriptions/feeds/3", "/subscriptions/categories/2", "/subscriptions/labels/1", "/subscriptions/problems"} {
+		for _, page := range []string{"/subscriptions", "/subscriptions/add", "/subscriptions/feeds/3", "/subscriptions/categories/2", "/subscriptions/labels/1", "/subscriptions/problems", "/subscriptions/transfer"} {
 			b.open(page)
 			b.accessible(page + ", dark and narrow")
 			if got := b.text(`document.documentElement.scrollWidth <= window.innerWidth`); got != "true" {

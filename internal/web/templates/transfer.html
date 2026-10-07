@@ -1,0 +1,40 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p class="page-links"><a href="{{.URL "/subscriptions"}}">{{.T "sub.back"}}</a></p>
+{{if .Data.Problem}}<p class="alert" role="alert" id="form-problem">{{.Data.Problem}}</p>{{end}}
+
+<h2>{{.T "transfer.import"}}</h2>
+<form method="post" action="{{.URL "/subscriptions/import"}}" enctype="multipart/form-data" class="form">
+<p>
+<label for="file">{{.T "transfer.file"}}</label>
+<input type="file" id="file" name="file" required aria-describedby="file-hint">
+<span class="hint" id="file-hint">{{.T "transfer.file.hint"}}</span>
+</p>
+<p><button type="submit">{{.T "transfer.import.submit"}}</button></p>
+</form>
+
+<h2>{{.T "transfer.export"}}</h2>
+<form method="post" action="{{.URL "/subscriptions/export"}}" class="form">
+<p class="check">
+<input type="checkbox" id="opml" name="opml" value="1" checked>
+<label for="opml">{{.T "transfer.opml"}}</label>
+</p>
+<p class="check">
+<input type="checkbox" id="starred" name="starred" value="1">
+<label for="starred">{{.T "transfer.starred"}}</label>
+</p>
+<p class="check">
+<input type="checkbox" id="labelled" name="labelled" value="1">
+<label for="labelled">{{.T "transfer.labelled"}}</label>
+</p>
+{{if .Data.Feeds}}
+<p>
+<label for="feed">{{.T "transfer.feeds"}}</label>
+<select id="feed" name="feed" multiple size="8" aria-describedby="feed-hint">
+{{template "options" .Data.Feeds}}</select>
+<span class="hint" id="feed-hint">{{.T "transfer.feeds.hint"}}</span>
+</p>
+{{end}}
+<p><button type="submit">{{.T "transfer.export.submit"}}</button></p>
+</form>
+{{end}}

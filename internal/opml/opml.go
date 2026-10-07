@@ -565,13 +565,23 @@ func mergeObjects(under, over map[string]any) map[string]any {
 	return under
 }
 
+// Limits bound the number of categories and of feeds a user may have; zero
+// is no bound.
+type Limits struct {
+	Feeds      int
+	Categories int
+}
+
 // Import adds the categories and feeds of an OPML document to those of the
 // user and returns the feeds it added; their entries are for a refresh to
 // fetch. A feed the user already has, by address, stays where it is and
 // takes its name, site, description, kind and settings from the document;
 // if it was muted, it no longer is. When some feeds could not be added, the
 // rest still are, and the error is ErrIncomplete.
-func Import(ctx context.Context, db *store.Store, registry *hooks.Registry, u *store.User, data []byte) ([]*store.Feed, error) {
+//
+// limits bound what the user may end up with: a category or a feed past
+// them is not added and makes the import incomplete.
+func Import(ctx context.Context, db *store.Store, registry *hooks.Registry, u *store.User, data []byte, limits Limits) ([]*store.Feed, error) {
 	outlines, err := parse(data)
 	if err != nil {
 		return nil, err
@@ -610,7 +620,10 @@ func Import(ctx context.Context, db *store.Store, registry *hooks.Registry, u *s
 				continue
 			}
 			categoryID, exists := byName[g.name]
-			if !exists && g.category != nil && g.name != "" {
+			if !exists && g.category != nil && g.name != "" && limits.Categories > 0 && len(byName) >= limits.Categories {
+				// One category too many: its feeds go to the default one.
+				incomplete = true
+			} else if !exists && g.category != nil && g.name != "" {
 				// New categories line up after the ones the user has put
 				// in order, as they come in the document.
 				position++
@@ -658,6 +671,10 @@ func Import(ctx context.Context, db *store.Store, registry *hooks.Registry, u *s
 					if err := tx.UpdateFeed(ctx, has); err != nil {
 						return err
 					}
+					continue
+				}
+				if limits.Feeds > 0 && len(known) >= limits.Feeds {
+					incomplete = true
 					continue
 				}
 				if err := tx.CreateFeed(ctx, f); err != nil {

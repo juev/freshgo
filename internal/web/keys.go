@@ -404,6 +404,7 @@ func (h *Handler) palette(w http.ResponseWriter, r *http.Request) {
 		places = append(places,
 			place{v.T("sub.heading"), h.url("/subscriptions"), v.T("palette.page")},
 			place{v.T("add.heading"), h.url("/subscriptions/add"), v.T("palette.page")},
+			place{v.T("transfer.heading"), h.url("/subscriptions/transfer"), v.T("palette.page")},
 			place{v.T("problems.heading"), h.url("/subscriptions/problems"), v.T("palette.page")},
 			place{v.T("keys.heading"), h.url("/settings/keys"), v.T("palette.page")})
 	}

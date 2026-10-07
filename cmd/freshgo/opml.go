@@ -46,7 +46,7 @@ func runOPMLImport(ctx context.Context, e env, args []string) (err error) {
 	}
 
 	// When some feeds could not be added, the rest still are.
-	added, importErr := opml.Import(ctx, db, s.registry, u, data)
+	added, importErr := opml.Import(ctx, db, s.registry, u, data, opml.Limits{})
 	if importErr != nil && !errors.Is(importErr, opml.ErrIncomplete) {
 		return importErr
 	}
