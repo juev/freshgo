@@ -58,6 +58,10 @@ type System struct {
 	// TOS are the terms a visitor has to accept to register, as HTML; empty
 	// for none. FreshRSS keeps them in the file data/tos.html.
 	TOS string `json:"tos"`
+	// Proxy is the address of the proxy feeds are fetched through unless
+	// they have their own or are set to go through none: a URL with the
+	// scheme http, https, socks5 or socks5h. Empty for none.
+	Proxy string `json:"proxy"`
 }
 
 // Limits bound what users may take up.

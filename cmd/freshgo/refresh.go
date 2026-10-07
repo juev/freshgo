@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 
 	"github.com/juev/freshgo/internal/config"
 	"github.com/juev/freshgo/internal/favicon"
@@ -41,7 +42,18 @@ type services struct {
 }
 
 func newServices(ctx context.Context, e env, conf *config.Config, db *store.Store) (*services, error) {
-	client, err := fetch.New(fetch.Options{UserAgent: userAgent(), Allowlist: conf.Allowlist()})
+	client, err := fetch.New(fetch.Options{
+		UserAgent: userAgent(), Allowlist: conf.Allowlist(),
+		// Read for every request: an administrator changes it while the
+		// server runs, and a refresh may run in a process of its own.
+		Proxy: func(ctx context.Context) (*url.URL, error) {
+			system, err := db.System(ctx)
+			if err != nil {
+				return nil, err
+			}
+			return fetch.ParseProxy(system.Proxy)
+		},
+	})
 	if err != nil {
 		return nil, err
 	}

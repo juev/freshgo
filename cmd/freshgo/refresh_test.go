@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -89,6 +90,45 @@ func TestRefresh(t *testing.T) {
 
 	if code, _, stderr := runCLI(t, "refresh", "-database-url", database, "-fetch-allowlist", "10.0.0.0/40"); code != 1 || stderr == "" {
 		t.Errorf("refresh with a malformed allowlist: code %d, stderr %q", code, stderr)
+	}
+}
+
+// The proxy the administrator set takes the feeds that have none.
+func TestRefreshThroughTheProxyOfTheInstallation(t *testing.T) {
+	database, _, hits := subscribed(t)
+	var asked atomic.Int32
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A proxy is asked with the whole address.
+		if r.URL.Host == "" || r.URL.Path != "/feed" {
+			http.NotFound(w, r)
+			return
+		}
+		asked.Add(1)
+		_, _ = io.WriteString(w, testFeed)
+	}))
+	t.Cleanup(proxy.Close)
+
+	ctx := context.Background()
+	db, err := store.Open(ctx, config.DriverSQLite, strings.TrimPrefix(database, "sqlite://"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	system, err := db.System(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	system.Proxy = proxy.URL
+	if err := errors.Join(db.SetSystem(ctx, system), db.Close()); err != nil {
+		t.Fatal(err)
+	}
+
+	// Neither the feed nor the proxy is on the allowlist.
+	code, stdout, stderr := runCLI(t, "refresh", "-database-url", database)
+	if code != 0 || stdout != "alice: 1 feeds refreshed, 0 failed, 2 new and 0 updated entries\n" {
+		t.Errorf("refresh: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	if asked.Load() != 1 || hits.Load() != 0 {
+		t.Errorf("the proxy was asked %d times, the site %d; want 1 and 0", asked.Load(), hits.Load())
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
@@ -93,6 +94,11 @@ type Options struct {
 	MaxBodySize int64
 	// HostConcurrency is the number of simultaneous requests to one host.
 	HostConcurrency int
+	// Proxy tells the proxy of the installation, nil for none. It is asked
+	// before every request whose settings name no proxy and are not Direct.
+	// The address is the administrator's choice and is connected to whatever
+	// the Allowlist says.
+	Proxy func(context.Context) (*url.URL, error)
 }
 
 // Client fetches documents. It is safe for concurrent use and keeps
@@ -103,6 +109,7 @@ type Client struct {
 	maxBody   int64
 	perHost   int
 	guard     *guard
+	proxy     func(context.Context) (*url.URL, error)
 	now       func() time.Time
 
 	mu         sync.Mutex
@@ -112,7 +119,9 @@ type Client struct {
 }
 
 type transportKey struct {
-	proxy    string
+	proxy string
+	// trusted is set for the proxy of the installation.
+	trusted  bool
 	insecure bool
 }
 
@@ -129,6 +138,7 @@ func New(o Options) (*Client, error) {
 		maxBody:    o.MaxBodySize,
 		perHost:    o.HostConcurrency,
 		guard:      g,
+		proxy:      o.Proxy,
 		now:        time.Now,
 		transports: map[transportKey]*http.Transport{},
 		hosts:      map[string]chan struct{}{},
@@ -180,7 +190,14 @@ func (c *Client) Fetch(ctx context.Context, req Request) (*Response, error) {
 		return nil, err
 	}
 	p := req.Params
-	transport, err := c.transport(p)
+	trusted := false
+	if p.Proxy == nil && !p.Direct && c.proxy != nil {
+		if p.Proxy, err = c.proxy(ctx); err != nil {
+			return nil, fmt.Errorf("proxy of the installation: %w", err)
+		}
+		trusted = p.Proxy != nil
+	}
+	transport, err := c.transport(p, trusted)
 	if err != nil {
 		return nil, err
 	}
@@ -362,8 +379,8 @@ func (c *Client) do(ctx context.Context, u *url.URL, h *hop) (int, http.Header, 
 }
 
 // transport returns the connection pool for the proxy and TLS settings.
-func (c *Client) transport(p Params) (*http.Transport, error) {
-	key := transportKey{insecure: p.Insecure}
+func (c *Client) transport(p Params, trusted bool) (*http.Transport, error) {
+	key := transportKey{insecure: p.Insecure, trusted: trusted}
 	if p.Proxy != nil {
 		switch p.Proxy.Scheme {
 		case "http", "https", "socks5", "socks5h":
@@ -377,10 +394,15 @@ func (c *Client) transport(p Params) (*http.Transport, error) {
 	if t, ok := c.transports[key]; ok {
 		return t, nil
 	}
+	dial := c.guard.dialContext
+	if trusted {
+		dial = (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext
+	}
 	t := &http.Transport{
-		// The proxy of the environment is not used: only the feed's own.
+		// The proxy of the environment is not used: only the feed's own or
+		// the one of the installation.
 		Proxy:               http.ProxyURL(p.Proxy),
-		DialContext:         c.guard.dialContext,
+		DialContext:         dial,
 		ForceAttemptHTTP2:   true,
 		MaxIdleConnsPerHost: c.perHost,
 		IdleConnTimeout:     90 * time.Second,

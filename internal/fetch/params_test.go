@@ -79,8 +79,9 @@ func TestFeedParams(t *testing.T) {
 			Params{Proxy: proxy("socks5h://127.0.0.1:1080")}},
 		{"the type wins over a scheme in the address", "", `{"curl_params":{"101":5,"10004":"http://127.0.0.1:1080"}}`,
 			Params{Proxy: proxy("socks5://127.0.0.1:1080")}},
-		{"proxy type none", "", `{"curl_params":{"101":-1,"10004":"proxy.example:3128"}}`, Params{}},
-		{"proxy type none, legacy", "", `{"curl_params":{"101":3,"10004":"proxy.example:3128"}}`, Params{}},
+		{"proxy type none", "", `{"curl_params":{"101":-1,"10004":"proxy.example:3128"}}`, Params{Direct: true}},
+		{"proxy type none, legacy", "", `{"curl_params":{"101":3,"10004":"proxy.example:3128"}}`, Params{Direct: true}},
+		{"proxy type none without an address", "", `{"curl_params":{"101":-1}}`, Params{Direct: true}},
 		{"proxy type without an address", "", `{"curl_params":{"101":5}}`, Params{}},
 
 		{"options FreshRSS does not allow are ignored", "", `{"curl_params":{"64":false,"81":0,"10005":"u:p"}}`, Params{}},

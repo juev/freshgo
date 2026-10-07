@@ -545,6 +545,9 @@ func TestFeedFormKeepsRequestSettings(t *testing.T) {
 		s.asAlice()
 		for stored, want := range map[string]string{
 			`{"101":4,"10004":"proxy.example:1080"}`: `{"10004":"proxy.example:1080","101":4}`,
+			// A feed kept away from the proxy of the installation stays so.
+			`{"101":-1}`:                             `{"101":-1}`,
+			`{"101":3,"10004":"proxy.example:1080"}`: `{"101":-1}`,
 			`{"52":false}`:                           `{"52":false,"68":0}`,
 			`{"68":0}`:                               `{"52":false,"68":0}`,
 			`{"68":"3","52":true,"64":false}`:        `{"52":true,"64":false,"68":3}`,

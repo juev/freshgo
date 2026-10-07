@@ -48,6 +48,14 @@
 <input type="number" id="reauth_minutes" name="reauth_minutes" min="0" value="{{.Data.ReauthMinutes}}" required>
 </p>
 </fieldset>
+<fieldset>
+<legend>{{.T "admin.system.feeds"}}</legend>
+<p>
+<label for="proxy">{{.T "admin.system.proxy"}}</label>
+<input type="text" id="proxy" name="proxy" value="{{.Data.System.Proxy}}" autocapitalize="off" spellcheck="false" aria-describedby="proxy-hint">
+<span class="hint" id="proxy-hint">{{.T "admin.system.proxy.hint"}}</span>
+</p>
+</fieldset>
 <p><button type="submit">{{.T "keys.save"}}</button></p>
 </form>
 <h2>{{.T "admin.system.allowlist"}}</h2>
