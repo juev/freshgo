@@ -23,7 +23,7 @@ const minPassword = 7
 // Pages of settings, in the order their menu lists them.
 var settingsTabs = []struct{ name, path string }{
 	{"display", "/settings/display"}, {"reading", "/settings/reading"}, {"archiving", "/settings/archiving"},
-	{"queries", "/settings/queries"}, {"keys", "/settings/keys"}, {"privacy", "/settings/privacy"}, {"profile", "/settings/profile"}, {"log", "/log"},
+	{"queries", "/settings/queries"}, {"integrations", "/settings/integrations"}, {"keys", "/settings/keys"}, {"privacy", "/settings/privacy"}, {"profile", "/settings/profile"}, {"log", "/log"},
 }
 
 // Pages of the administration.

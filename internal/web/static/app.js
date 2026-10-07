@@ -132,6 +132,7 @@
 				article.querySelector('.entry-body').append(now);
 			}
 		}
+		revealShares(article);
 		if (action) {
 			// The button that was pressed is gone; its successor takes the focus.
 			const button = article.querySelector(`.entry-actions form[action="${CSS.escape(action)}"] button`);
@@ -225,6 +226,55 @@
 		}
 	}
 
+	// ---- Sharing ----
+
+	// What a browser does itself to pass an entry on needs the script: the
+	// buttons for it are hidden without one.
+	const shareWith = {
+		clipboard: (link) => navigator.clipboard.writeText(link).then(() => say(t('js.copied')), () => say(t('js.failed'))),
+		print: () => window.print(),
+		'web-sharing-api': (link, title) => navigator.share({ url: link, title }).catch(() => {}),
+	};
+	const canShare = {
+		clipboard: () => Boolean(navigator.clipboard),
+		print: () => true,
+		'web-sharing-api': () => Boolean(navigator.share),
+	};
+
+	function revealShares(root) {
+		for (const button of root.querySelectorAll('button[data-share]')) {
+			const kind = button.dataset.share;
+			button.hidden = !(canShare[kind] && canShare[kind]());
+		}
+	}
+	revealShares(document);
+
+	document.addEventListener('click', (event) => {
+		const button = event.target.closest('button[data-share]');
+		if (button && shareWith[button.dataset.share]) {
+			shareWith[button.dataset.share](button.dataset.link, button.dataset.title);
+		}
+	});
+
+	// share opens the ways an entry can be sent on, or goes the only way
+	// there is.
+	const share = (article) => {
+		const menu = article.querySelector('details.share');
+		if (!menu) {
+			say(t('js.no-share'));
+			return;
+		}
+		const ways = Array.from(menu.querySelectorAll('a, button:not([hidden])'));
+		if (ways.length === 1) {
+			ways[0].click();
+			return;
+		}
+		menu.open = true;
+		if (ways.length) {
+			ways[0].focus();
+		}
+	};
+
 	// ---- The next page ----
 
 	let loading = null;
@@ -243,7 +293,9 @@
 					const page = parse(html);
 					for (const article of page.querySelectorAll('.entries > article.entry')) {
 						if (!document.getElementById(article.id)) {
-							entries.append(document.adoptNode(article));
+							const added = document.adoptNode(article);
+							entries.append(added);
+							revealShares(added);
 						}
 					}
 					const more = page.querySelector('.more');
@@ -610,6 +662,7 @@
 		case 'read': return current && act(current, 'read');
 		case 'star': return current && act(current, 'star');
 		case 'labels': return current && current.querySelector('.entry-actions form') && showLabels(current);
+		case 'share': return current && share(current);
 		case 'mark-all': return confirmMarkAll();
 		case 'more': return loadMore();
 		case 'refresh': {

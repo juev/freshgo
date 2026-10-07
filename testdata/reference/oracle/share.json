@@ -1,0 +1,410 @@
+[
+    {
+        "type": "archiveORG",
+        "name": "archive.org",
+        "advanced": false,
+        "button": false,
+        "help": "https://web.archive.org",
+        "urls": [
+            "https://web.archive.org/save/https://example.org/post",
+            "https://web.archive.org/save/https://example.org/a b?x=1&y=2#frag+ment",
+            "https://web.archive.org/save/"
+        ]
+    },
+    {
+        "type": "archiveIS",
+        "name": "archive.is",
+        "advanced": false,
+        "button": false,
+        "help": "https://archive.is/",
+        "urls": [
+            "https://archive.is/submit/?url=https://example.org/post",
+            "https://archive.is/submit/?url=https://example.org/a b?x=1&y=2#frag+ment",
+            "https://archive.is/submit/?url="
+        ]
+    },
+    {
+        "type": "archivePH",
+        "name": "archive.ph",
+        "advanced": false,
+        "button": false,
+        "help": "https://archive.ph/",
+        "urls": [
+            "https://archive.ph/submit/?url=https://example.org/post",
+            "https://archive.ph/submit/?url=https://example.org/a b?x=1&y=2#frag+ment",
+            "https://archive.ph/submit/?url="
+        ]
+    },
+    {
+        "type": "bluesky",
+        "name": "Bluesky",
+        "advanced": false,
+        "button": false,
+        "help": "",
+        "urls": [
+            "https://bsky.app/intent/compose?text=https%3A%2F%2Fexample.org%2Fpost",
+            "https://bsky.app/intent/compose?text=https%3A%2F%2Fexample.org%2Fa+b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "https://bsky.app/intent/compose?text="
+        ]
+    },
+    {
+        "type": "buffer",
+        "name": "Buffer",
+        "advanced": false,
+        "button": false,
+        "help": "https://support.buffer.com/en-us/articles/scheduling-posts-4Qdld7giAZ",
+        "urls": [
+            "https://publish.buffer.com/compose?url=https%3A%2F%2Fexample.org%2Fpost&amp;text=Plain%20title",
+            "https://publish.buffer.com/compose?url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;text=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "https://publish.buffer.com/compose?url=&amp;text="
+        ]
+    },
+    {
+        "type": "clipboard",
+        "name": "Clipboard",
+        "advanced": false,
+        "button": true,
+        "help": "",
+        "urls": [
+            "https://example.org/post",
+            "https://example.org/a b?x=1&y=2#frag+ment",
+            ""
+        ]
+    },
+    {
+        "type": "diaspora",
+        "name": "Diaspora*",
+        "advanced": true,
+        "button": false,
+        "help": "https://diasporafoundation.org/",
+        "urls": [
+            "https://social.example/bookmarklet?url=https%3A%2F%2Fexample.org%2Fpost&amp;title=Plain%20title",
+            "https://my.example/wallabag/bookmarklet?url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;title=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "/bookmarklet?url=&amp;title="
+        ]
+    },
+    {
+        "type": "email",
+        "name": "Email",
+        "advanced": false,
+        "button": false,
+        "help": "",
+        "urls": [
+            "mailto:?subject=Plain%20title&amp;body=https%3A%2F%2Fexample.org%2Fpost",
+            "mailto:?subject=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;body=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "mailto:?subject=&amp;body="
+        ]
+    },
+    {
+        "type": "email-webmail-firefox-fix",
+        "name": "Email (webmail - fix for Firefox)",
+        "advanced": false,
+        "button": false,
+        "help": "",
+        "urls": [
+            "mailto:?subject=Plain%20title&amp;body=https%3A%2F%2Fexample.org%2Fpost",
+            "mailto:?subject=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;body=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "mailto:?subject=&amp;body="
+        ]
+    },
+    {
+        "type": "facebook",
+        "name": "Facebook",
+        "advanced": false,
+        "button": false,
+        "help": "",
+        "urls": [
+            "https://www.facebook.com/sharer.php?u=https%3A%2F%2Fexample.org%2Fpost&amp;t=Plain%20title",
+            "https://www.facebook.com/sharer.php?u=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;t=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "https://www.facebook.com/sharer.php?u=&amp;t="
+        ]
+    },
+    {
+        "type": "gnusocial",
+        "name": "GNU social",
+        "advanced": true,
+        "button": false,
+        "help": "https://gnusocial.rocks/",
+        "urls": [
+            "https://social.example/notice/new?content=Plain+title%20https%3A%2F%2Fexample.org%2Fpost",
+            "https://my.example/wallabag/notice/new?content=Q%26A%3A+%221+%3C+2%22+%2B+50%25+off%2C+d%C3%A9j%C3%A0+vu+%2F+%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82+%7ELINK%7E%20https%3A%2F%2Fexample.org%2Fa+b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "/notice/new?content=%20"
+        ]
+    },
+    {
+        "type": "jdh",
+        "name": "Journal du hacker",
+        "advanced": false,
+        "button": false,
+        "help": "",
+        "urls": [
+            "https://www.journalduhacker.net/stories/new?url=https%3A%2F%2Fexample.org%2Fpost&amp;title=Plain%20title",
+            "https://www.journalduhacker.net/stories/new?url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;title=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "https://www.journalduhacker.net/stories/new?url=&amp;title="
+        ]
+    },
+    {
+        "type": "Known",
+        "name": "Known based sites",
+        "advanced": true,
+        "button": false,
+        "help": "https://withknown.com/",
+        "urls": [
+            "https://social.example/share?share_url=https%3A%2F%2Fexample.org%2Fpost&amp;share_title=Plain%20title",
+            "https://my.example/wallabag/share?share_url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;share_title=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "/share?share_url=&amp;share_title="
+        ]
+    },
+    {
+        "type": "lemmy",
+        "name": "Lemmy",
+        "advanced": true,
+        "button": false,
+        "help": "https://join-lemmy.org/",
+        "urls": [
+            "https://social.example/create_post?url=https%3A%2F%2Fexample.org%2Fpost&amp;title=Plain%20title",
+            "https://my.example/wallabag/create_post?url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;title=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "/create_post?url=&amp;title="
+        ]
+    },
+    {
+        "type": "linkace",
+        "name": "LinkAce",
+        "advanced": true,
+        "button": false,
+        "help": "https://www.linkace.org/",
+        "urls": [
+            "https://social.example/bookmarklet/add?u=https%3A%2F%2Fexample.org%2Fpost&amp;t=Plain%20title",
+            "https://my.example/wallabag/bookmarklet/add?u=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;t=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "/bookmarklet/add?u=&amp;t="
+        ]
+    },
+    {
+        "type": "linkding",
+        "name": "Linkding",
+        "advanced": true,
+        "button": false,
+        "help": "https://linkding.link/how-to/",
+        "urls": [
+            "https://social.example/bookmarks/new?url=https%3A%2F%2Fexample.org%2Fpost&amp;title=Plain%20title&amp;auto_close",
+            "https://my.example/wallabag/bookmarks/new?url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;title=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;auto_close",
+            "/bookmarks/new?url=&amp;title=&amp;auto_close"
+        ]
+    },
+    {
+        "type": "linkedin",
+        "name": "LinkedIn",
+        "advanced": false,
+        "button": false,
+        "help": "",
+        "urls": [
+            "https://www.linkedin.com/shareArticle?url=https%3A%2F%2Fexample.org%2Fpost&amp;title=Plain%20title&amp;source=FreshRSS",
+            "https://www.linkedin.com/shareArticle?url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;title=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;source=FreshRSS",
+            "https://www.linkedin.com/shareArticle?url=&amp;title=&amp;source=FreshRSS"
+        ]
+    },
+    {
+        "type": "mastodon",
+        "name": "Mastodon",
+        "advanced": true,
+        "button": false,
+        "help": "https://joinmastodon.org/",
+        "urls": [
+            "https://social.example/share?title=Plain%20title&amp;url=https%3A%2F%2Fexample.org%2Fpost",
+            "https://my.example/wallabag/share?title=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "/share?title=&amp;url="
+        ]
+    },
+    {
+        "type": "movim",
+        "name": "Movim",
+        "advanced": true,
+        "button": false,
+        "help": "https://movim.eu/",
+        "urls": [
+            "https://social.example/?share/https%3A%2F%2Fexample.org%2Fpost",
+            "https://my.example/wallabag/?share/https%3A%2F%2Fexample.org%2Fa+b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "/?share/"
+        ]
+    },
+    {
+        "type": "nextcloud-bookmarks",
+        "name": "Nextcloud Bookmarks",
+        "advanced": true,
+        "button": false,
+        "help": "https://github.com/nextcloud/bookmarks",
+        "urls": [
+            "https://social.example/apps/bookmarks/bookmarklet?url=https%3A%2F%2Fexample.org%2Fpost&amp;title=Plain%20title",
+            "https://my.example/wallabag/apps/bookmarks/bookmarklet?url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;title=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "/apps/bookmarks/bookmarklet?url=&amp;title="
+        ]
+    },
+    {
+        "type": "omnivore",
+        "name": "Omnivore",
+        "advanced": true,
+        "button": false,
+        "help": "https://github.com/omnivore-app/omnivore",
+        "urls": [
+            "https://social.example/api/save?url=https%3A%2F%2Fexample.org%2Fpost",
+            "https://my.example/wallabag/api/save?url=https%3A%2F%2Fexample.org%2Fa+b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "/api/save?url="
+        ]
+    },
+    {
+        "type": "pinboard",
+        "name": "Pinboard",
+        "advanced": false,
+        "button": false,
+        "help": "https://pinboard.in/api/",
+        "urls": [
+            "https://pinboard.in/add?next=same&amp;url=https%3A%2F%2Fexample.org%2Fpost&amp;title=Plain+title",
+            "https://pinboard.in/add?next=same&amp;url=https%3A%2F%2Fexample.org%2Fa+b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;title=Q%26A%3A+%221+%3C+2%22+%2B+50%25+off%2C+d%C3%A9j%C3%A0+vu+%2F+%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82+%7ELINK%7E",
+            "https://pinboard.in/add?next=same&amp;url=&amp;title="
+        ]
+    },
+    {
+        "type": "pinterest",
+        "name": "Pinterest",
+        "advanced": false,
+        "button": false,
+        "help": "https://www.pinterest.com/",
+        "urls": [
+            "https://www.pinterest.com/pin/create/button/?url=https%3A%2F%2Fexample.org%2Fpost",
+            "https://www.pinterest.com/pin/create/button/?url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "https://www.pinterest.com/pin/create/button/?url="
+        ]
+    },
+    {
+        "type": "print",
+        "name": "Print",
+        "advanced": false,
+        "button": true,
+        "help": "",
+        "urls": [
+            "#",
+            "#",
+            "#"
+        ]
+    },
+    {
+        "type": "raindrop",
+        "name": "Raindrop.io",
+        "advanced": false,
+        "button": false,
+        "help": "",
+        "urls": [
+            "https://app.raindrop.io/add?link=https%3A%2F%2Fexample.org%2Fpost&amp;title=Plain%20title",
+            "https://app.raindrop.io/add?link=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;title=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "https://app.raindrop.io/add?link=&amp;title="
+        ]
+    },
+    {
+        "type": "reddit",
+        "name": "Reddit",
+        "advanced": false,
+        "button": false,
+        "help": "https://www.reddit.com/wiki/submitting?v=c2ae883a-04b9-11e4-a68c-12313b01a1fc",
+        "urls": [
+            "https://www.reddit.com/submit?url=https%3A%2F%2Fexample.org%2Fpost",
+            "https://www.reddit.com/submit?url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "https://www.reddit.com/submit?url="
+        ]
+    },
+    {
+        "type": "shaarli",
+        "name": "Shaarli",
+        "advanced": true,
+        "button": false,
+        "help": "https://sebsauvage.net/wiki/doku.php?id=php:shaarli",
+        "urls": [
+            "https://social.example?post=https%3A%2F%2Fexample.org%2Fpost&amp;title=Plain%20title&amp;source=FreshRSS",
+            "https://my.example/wallabag?post=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;title=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;source=FreshRSS",
+            "?post=&amp;title=&amp;source=FreshRSS"
+        ]
+    },
+    {
+        "type": "telegram",
+        "name": "Telegram",
+        "advanced": false,
+        "button": false,
+        "help": "",
+        "urls": [
+            "https://t.me/share/url?url=https%3A%2F%2Fexample.org%2Fpost&amp;text=Plain%20title",
+            "https://t.me/share/url?url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;text=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "https://t.me/share/url?url=&amp;text="
+        ]
+    },
+    {
+        "type": "twitter",
+        "name": "Twitter",
+        "advanced": false,
+        "button": false,
+        "help": "",
+        "urls": [
+            "https://twitter.com/share?url=https%3A%2F%2Fexample.org%2Fpost&amp;text=Plain%20title",
+            "https://twitter.com/share?url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment&amp;text=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "https://twitter.com/share?url=&amp;text="
+        ]
+    },
+    {
+        "type": "wallabag",
+        "name": "wallabag v1",
+        "advanced": true,
+        "button": false,
+        "help": "https://wallabag.org/",
+        "urls": [
+            "https://social.example?action=add&amp;url=https%3A%2F%2Fexample.org%2Fpost",
+            "https://my.example/wallabag?action=add&amp;url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "?action=add&amp;url="
+        ]
+    },
+    {
+        "type": "wallabagv2",
+        "name": "wallabag v2",
+        "advanced": true,
+        "button": false,
+        "help": "https://wallabag.org/",
+        "urls": [
+            "https://social.example/bookmarklet?url=https%3A%2F%2Fexample.org%2Fpost",
+            "https://my.example/wallabag/bookmarklet?url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "/bookmarklet?url="
+        ]
+    },
+    {
+        "type": "web-sharing-api",
+        "name": "System sharing",
+        "advanced": false,
+        "button": true,
+        "help": "",
+        "urls": [
+            "https://example.org/post",
+            "https://example.org/a b?x=1&y=2#frag+ment",
+            ""
+        ]
+    },
+    {
+        "type": "whatsapp",
+        "name": "Whatsapp",
+        "advanced": false,
+        "button": false,
+        "help": "https://faq.whatsapp.com/iphone/how-to-link-to-whatsapp-from-a-different-app/?lang=en",
+        "urls": [
+            "https://wa.me/?text=Plain%20title%20|%20https%3A%2F%2Fexample.org%2Fpost",
+            "https://wa.me/?text=Q%26A%3A%20%221%20%3C%202%22%20%2B%2050%25%20off%2C%20d%C3%A9j%C3%A0%20vu%20%2F%20%D0%9F%D1%80%D0%B8%D0%B2%D0%B5%D1%82%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment%20|%20https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "https://wa.me/?text=%20|%20"
+        ]
+    },
+    {
+        "type": "xing",
+        "name": "Xing",
+        "advanced": false,
+        "button": false,
+        "help": "https://dev.xing.com/plugins/share_button/docs",
+        "urls": [
+            "https://www.xing.com/spi/shares/new?url=https%3A%2F%2Fexample.org%2Fpost",
+            "https://www.xing.com/spi/shares/new?url=https%3A%2F%2Fexample.org%2Fa%20b%3Fx%3D1%26y%3D2%23frag%2Bment",
+            "https://www.xing.com/spi/shares/new?url="
+        ]
+    }
+]

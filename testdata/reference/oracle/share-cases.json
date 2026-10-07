@@ -1,0 +1,5 @@
+[
+  {"id": "1791274998925400", "base": "https://social.example", "title": "Plain title", "link": "https://example.org/post"},
+  {"id": "7", "base": "https://my.example/wallabag", "title": "Q&A: \"1 < 2\" + 50% off, déjà vu / Привет ~LINK~", "link": "https://example.org/a b?x=1&y=2#frag+ment"},
+  {"id": "0", "base": "", "title": "", "link": ""}
+]

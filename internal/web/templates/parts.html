@@ -32,6 +32,15 @@
 </form>
 {{end}}
 
+{{define "share"}}{{if .Entry.Share}}
+<details class="menu share">
+<summary>{{.Page.T "entry.share"}}</summary>
+<ul>
+{{range .Entry.Share}}<li>{{if .Button}}<button type="button" class="link" data-share="{{.Button}}" data-link="{{$.Entry.Link}}" data-title="{{$.Entry.Title}}" hidden>{{.Name}}</button>{{else}}<a href="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.Name}}</a>{{end}}</li>
+{{end}}</ul>
+</details>
+{{end}}{{end}}
+
 {{define "branch"}}<a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}{{if .Failing}} class="failing"{{else if .Muted}} class="muted"{{end}}>{{.Name}}</a>{{end}}
 
 {{define "tree"}}
@@ -81,6 +90,7 @@
 <div class="entry-actions">
 {{if .CanChange}}{{template "entry-actions" (dict "Entry" .Entry "Here" .Here "Page" .Page)}}{{end}}
 {{if .Entry.Link}}<a class="original" href="{{.Entry.Link}}" rel="noopener noreferrer">{{.Page.T "entry.original"}}</a>{{end}}
+{{template "share" (dict "Entry" .Entry "Page" .Page)}}
 <a class="entry-page" href="{{.Entry.URL}}">{{.Page.T "entry.page"}}</a>
 </div>
 </article>

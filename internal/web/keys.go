@@ -37,6 +37,7 @@ var actions = []action{
 	{"read", "m", "mark_read"},
 	{"star", "s", "mark_favorite"},
 	{"labels", "l", "mylabels"},
+	{"share", "S", "auto_share"},
 	{"mark-all", "A", ""},
 	{"more", "", "load_more"},
 	{"refresh", "r", "actualize"},
@@ -209,7 +210,7 @@ func (k keyboard) bindings() map[string]string {
 var scriptTexts = []string{
 	"js.close", "js.confirm", "js.cancel", "js.failed", "js.help", "js.help.key", "js.help.action", "js.help.fixed-enter",
 	"js.help.fixed-escape", "js.help.fixed-palette", "js.help.none", "js.mark-all", "js.palette",
-	"js.palette.empty", "js.palette.hint", "js.palette.action", "js.labels", "js.no-entry",
+	"js.palette.empty", "js.palette.hint", "js.palette.action", "js.labels", "js.no-entry", "js.copied", "js.no-share",
 }
 
 // scriptConfig is what a page hands to the script.

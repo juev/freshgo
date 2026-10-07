@@ -613,7 +613,7 @@ func TestE2EDarkAndNarrow(t *testing.T) {
 		}
 		// The pages of settings, dark and narrow at once.
 		for _, page := range []string{"/subscriptions", "/subscriptions/add", "/subscriptions/feeds/3", "/subscriptions/categories/2", "/subscriptions/labels/1", "/subscriptions/problems", "/subscriptions/transfer",
-			"/settings/display", "/settings/reading", "/settings/archiving", "/settings/privacy", "/settings/profile", "/log",
+			"/settings/display", "/settings/queries", "/settings/integrations", "/settings/reading", "/settings/archiving", "/settings/privacy", "/settings/profile", "/log",
 			"/admin/users", "/admin/users/bob", "/admin/system", "/admin/authentication", "/log?all=1", "/reauth"} {
 			b.open(page)
 			b.accessible(page + ", dark and narrow")
@@ -621,6 +621,44 @@ func TestE2EDarkAndNarrow(t *testing.T) {
 				t.Errorf("%s scrolls sideways on a narrow screen", page)
 			}
 		}
+	})
+}
+
+// R7, R13: an entry is passed on from the keyboard.
+func TestE2EShare(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		freshgoKeys(s)
+		b := browse(t, s)
+		b.login("alice")
+		b.press("j")
+		b.until("an entry open", `document.querySelector('.entry.current details').open`)
+		// Nothing is set up yet: the key says so.
+		b.press("S")
+		b.until("the hint to set sharing up", `document.querySelector('#messages').textContent.includes('Integrations')`)
+
+		// A service is added with Tab and Enter.
+		b.open("/settings/integrations")
+		b.accessible("the integrations")
+		b.tabTo("#add_type")
+		b.press("Mastodon")
+		b.tabTo("#add_url")
+		b.press("https://social.example", kb.Enter)
+		b.until("the service stored", `document.querySelector('#messages').textContent.includes('Saved.') && document.querySelector('#name-0')`)
+		b.accessible("the integrations with a service")
+		s.setting("alice", "sharing", []map[string]any{
+			{"type": "mastodon", "name": "Mastodon", "url": "https://social.example"}, {"type": "print", "name": "Print"},
+		})
+
+		b.open("/")
+		b.press("j")
+		b.until("an entry open", `document.querySelector('.entry.current details').open`)
+		b.press("S")
+		b.until("the menu of sharing open, the focus on its first way",
+			`document.querySelector('.entry.current details.share').open && document.activeElement.textContent === 'Mastodon' && document.activeElement.href.startsWith('https://social.example/share?title=')`)
+		b.until("the button of the browser's own way shown", `!document.querySelector('.entry.current button[data-share="print"]').hidden`)
+		b.accessible("the menu of sharing")
+		b.press(kb.Escape)
+		b.until("the menu closed", `!document.querySelector('.entry.current details.share').open`)
 	})
 }
 

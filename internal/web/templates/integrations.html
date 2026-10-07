@@ -1,0 +1,46 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p>{{.T "integrations.intro"}}</p>
+{{template "problem" .Data.Problem}}
+<form method="post" action="{{.URL "/settings/integrations"}}" class="form settings">
+{{range .Data.Rows}}
+<fieldset>
+<legend>{{.Service}}</legend>
+<p>
+<label for="name-{{.N}}">{{$.T "integrations.name"}}</label>
+<input type="text" id="name-{{.N}}" name="name-{{.N}}" value="{{.Name}}" maxlength="191">
+</p>
+{{if .Advanced}}
+<p>
+<label for="url-{{.N}}">{{$.T "integrations.address"}}</label>
+<input type="text" id="url-{{.N}}" name="url-{{.N}}" value="{{.URL}}" inputmode="url" autocapitalize="off" spellcheck="false" required>
+{{if .Help}}<span class="hint"><a href="{{.Help}}" rel="noopener noreferrer">{{$.T "integrations.help" .Service}}</a></span>{{end}}
+</p>
+{{end}}
+<p class="check">
+<input type="checkbox" id="remove-{{.N}}" name="remove-{{.N}}" value="1">
+<label for="remove-{{.N}}">{{$.T "integrations.remove"}}</label>
+</p>
+</fieldset>
+{{end}}
+<fieldset>
+<legend>{{.T "integrations.add"}}</legend>
+<p>
+<label for="add_type">{{.T "integrations.service"}}</label>
+<select id="add_type" name="add_type">
+{{template "options" .Data.Services}}</select>
+</p>
+<p>
+<label for="add_name">{{.T "integrations.name"}}</label>
+<input type="text" id="add_name" name="add_name" maxlength="191" aria-describedby="add-name-hint">
+<span class="hint" id="add-name-hint">{{.T "integrations.name.hint"}}</span>
+</p>
+<p>
+<label for="add_url">{{.T "integrations.address"}}</label>
+<input type="text" id="add_url" name="add_url" inputmode="url" autocapitalize="off" spellcheck="false" aria-describedby="add-url-hint">
+<span class="hint" id="add-url-hint">{{.T "integrations.address.hint"}}</span>
+</p>
+</fieldset>
+<p><button type="submit">{{.T "keys.save"}}</button></p>
+</form>
+{{end}}

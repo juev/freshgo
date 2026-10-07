@@ -91,6 +91,8 @@ type reading struct {
 	ToplineWebsite string   `json:"topline_website"`
 	ToplineDate    *bool    `json:"topline_date"`
 	Referrers      []string `json:"send_referrer_allowlist"`
+	// Sharing are the services entries can be sent to.
+	Sharing []sharing `json:"sharing"`
 }
 
 func readReading(u *store.User) reading {
@@ -582,6 +584,8 @@ type article struct {
 	Starred     bool
 	// ShowFeed and ShowDate say what the row of the entry in a list names.
 	ShowFeed, ShowDate bool
+	// Share are the ways the entry can be sent on.
+	Share []shareLink
 }
 
 // articles prepares entries for a page. Handlers of EntryBeforeDisplay see
@@ -619,6 +623,7 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 		if address, err := url.Parse(e.Link); err == nil && (address.Scheme == "http" || address.Scheme == "https") {
 			a.Link = e.Link
 		}
+		a.Share = shareLinks(prefs.Sharing, e.ID, e.Title, a.Link)
 		if a.Title == "" {
 			a.Title = v.T("entry.untitled")
 		}

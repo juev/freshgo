@@ -827,3 +827,14 @@ table.log td:last-child {
 :root[data-width="no_limit"] {
 	--reading-width: none;
 }
+
+/* The ways to pass an entry on. */
+.menu.share ul {
+	list-style: none;
+	padding: 0;
+	margin: var(--space) 0 0;
+}
+
+.menu.share li {
+	padding: calc(var(--space) / 4) 0;
+}
