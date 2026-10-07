@@ -424,6 +424,9 @@ func (h *Handler) palette(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	for _, l := range v.Menu {
+		places = append(places, place{l.Name, l.URL, v.T("palette.extension")})
+	}
 	places = append(places, place{v.T("about.heading"), h.url("/about"), v.T("palette.page")})
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")

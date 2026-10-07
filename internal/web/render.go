@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/web/i18n"
 )
@@ -69,6 +70,10 @@ type view struct {
 	Admin bool
 	// Width is how wide the text of an entry may get, empty for the usual.
 	Width string
+	// Menu are the places extensions add to the main menu.
+	Menu []hooks.Link
+	// asks is what the hooks of the interface are told about the page.
+	asks hooks.Page
 	// Tabs are the pages of the section the page belongs to, when it is
 	// one of several.
 	Tabs []choice
@@ -111,6 +116,22 @@ func (h *Handler) view(r *http.Request, section, heading string) *view {
 	v.Localizer = h.texts.Match(language, r.Header.Get("Accept-Language"), s.system.Language)
 	v.Heading = v.T(heading)
 	v.Config = h.config(v, s.who)
+	v.asks = hooks.Page{Admin: v.Admin, Language: v.Lang()}
+	if v.User != "" {
+		v.asks.User = s.who.user
+	}
+	for _, l := range h.hooks.NavMenu.Call(r.Context(), v.asks) {
+		switch {
+		case strings.HasPrefix(l.URL, "/") && !strings.HasPrefix(l.URL, "//"):
+			// A path of this server is spelled as links have to spell it.
+			l.URL = h.url(l.URL)
+		case !strings.HasPrefix(l.URL, "https://") && !strings.HasPrefix(l.URL, "http://"):
+			// The palette follows an address as it is: what is not a
+			// page is left out.
+			continue
+		}
+		v.Menu = append(v.Menu, l)
+	}
 	return v
 }
 

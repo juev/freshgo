@@ -164,3 +164,22 @@ func TestEntitiesSurviveJSON(t *testing.T) {
 		}
 	}
 }
+
+func TestGatherPutsTogetherWhatHandlersGive(t *testing.T) {
+	ctx := context.Background()
+	var r Registry
+	if got := r.NavMenu.Call(ctx, Page{}); got != nil {
+		t.Errorf("a hook without handlers gave %+v", got)
+	}
+	r.NavMenu.Add(5, func(_ context.Context, p Page) []Link {
+		return []Link{{Name: "late for " + p.Language, URL: "/late"}}
+	})
+	r.NavMenu.Add(0, func(context.Context, Page) []Link { return nil })
+	r.NavMenu.Add(-1, func(context.Context, Page) []Link {
+		return []Link{{Name: "first", URL: "/1"}, {Name: "second", URL: "/2"}}
+	})
+	want := []Link{{Name: "first", URL: "/1"}, {Name: "second", URL: "/2"}, {Name: "late for ru", URL: "/late"}}
+	if got := r.NavMenu.Call(ctx, Page{Language: "ru"}); !reflect.DeepEqual(got, want) {
+		t.Errorf("Call = %+v, want %+v", got, want)
+	}
+}

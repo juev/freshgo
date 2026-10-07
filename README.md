@@ -1,8 +1,6 @@
 # freshgo
 
-A feed aggregator server in one binary that takes over an existing [FreshRSS](https://freshrss.org) installation. It imports the FreshRSS data, keeps refreshing the same feeds and answers the same Google Reader API, so mobile and desktop clients keep working with the tokens and article identifiers they already have.
-
-freshgo has no web interface yet: you read through a Google Reader API client and administer from the command line.
+A feed aggregator server in one binary that takes over an existing [FreshRSS](https://freshrss.org) installation. It imports the FreshRSS data, keeps refreshing the same feeds and answers the same Google Reader API, so mobile and desktop clients keep working with the tokens and article identifiers they already have. Users log in to its web interface with the web passwords they had in FreshRSS.
 
 What it does:
 
@@ -12,8 +10,9 @@ What it does:
 - applies the retention settings, the auto-read rules and the filter actions of FreshRSS, with its search language;
 - fetches the full text of articles by CSS selector;
 - serves the Google Reader API, OPML import and export, and feed icons;
+- has a web interface of its own, in English and Russian, in which everything can be done from the keyboard and without JavaScript;
 - subscribes to WebSub hubs;
-- has extension points modelled on the FreshRSS hooks, for handlers compiled into the binary. PHP extensions of FreshRSS do not run.
+- has extension points modelled on the FreshRSS hooks, for handlers compiled into the binary, which can also add links to the menu and a block to the login page. PHP extensions of FreshRSS do not run.
 
 The Fever API is not implemented.
 
@@ -47,9 +46,9 @@ The move is one-way: a freshgo database cannot be taken back to FreshRSS. Keep t
 
 4. Put it where FreshRSS was. Clients configured with `https://rss.example.org/api/greader.php` keep working without changes: that path is served as an alias, and the API passwords, the tokens already issued and the identifiers of articles, feeds and labels are the imported ones.
 
-What the import carries over: users with their settings and API passwords, categories, feeds with their settings, articles with read and starred states, labels, custom feed icons, the installation's own `force-https.txt`.
+What the import carries over: users with their settings, web and API passwords, the settings of the installation (how users log in, the default user, anonymous reading, limits, the terms of use), categories, feeds with their settings, articles with read and starred states, labels, custom feed icons, the installation's own `force-https.txt`.
 
-What it does not: web passwords (there is no web interface), icons fetched from sites (fetched again after the first refresh of a feed), WebSub subscriptions (made again at the first refresh, see below), articles left half-stored by an interrupted refresh.
+What it does not: the theme and the other settings of the FreshRSS pages that the interface of freshgo has no counterpart for, icons fetched from sites (fetched again after the first refresh of a feed), WebSub subscriptions (made again at the first refresh, see below), articles left half-stored by an interrupted refresh.
 
 ### What behaves differently
 
@@ -68,13 +67,60 @@ The full lists are in the Decisions sections of `docs/specs/`.
 ```sh
 export FRESHGO_DATABASE_URL=sqlite:///var/lib/freshgo/freshgo.sqlite
 
-freshgo user create alice                      # asks for the API password
+freshgo user create alice                      # asks for the password
 freshgo feed add -user alice -category News https://example.org/
 freshgo opml import -user alice subscriptions.opml
 freshgo serve
 ```
 
-`feed add` takes the address of a feed or of a site that announces one. `user create` and `user passwd` ask for the password at a terminal and otherwise read it from the first line of standard input; it must be at least 7 characters long. Changing the password invalidates the tokens clients hold.
+`feed add` takes the address of a feed or of a site that announces one. `user create` and `user passwd` ask for the password at a terminal and otherwise read it from the first line of standard input; it must be at least 7 characters long. The password is for the web interface and for API clients alike. The first user of an installation is its administrator; `user create -admin` makes further ones. Changing the password invalidates the tokens clients hold and ends the user's logins.
+
+## Web interface
+
+Open the address of the server in a browser and sign in. Pages are rendered by the server: every action is a link or a form and works without JavaScript; the script adds keys and actions that do not reload the page.
+
+The reading screen has the tree of streams, categories, feeds, labels and saved queries on the left and the entries on the right. An entry opens in place. The search field takes the search language of FreshRSS. The other sections are subscriptions (feeds with all their settings, categories, labels, import and export), statistics, settings, and administration for administrators (users, the installation, how users log in, the log).
+
+### Keys
+
+| Key | Action |
+|---|---|
+| `j`, `k` | open the next, the previous entry |
+| `h` | open the next unread entry |
+| `n`, `p` | move to the next, the previous entry without opening it |
+| `o` or `Enter` | open or close the entry |
+| `Space` | page through the entry, then go to the next one |
+| `v` | open the original in a new tab |
+| `m` | mark read or unread |
+| `s` | star |
+| `l` | labels |
+| `S` | share |
+| `A` | mark everything shown as read |
+| `r` | refresh the feeds |
+| `/` | search |
+| `J`, `K`, `U` | next, previous, next unread stream of the tree |
+| `t` | show or hide the tree |
+| `g u`, `g a`, `g s`, `g f`, `g k` | go to unread, all, starred, subscriptions, keys |
+| `+` | add a feed |
+| `:` or `Ctrl+K` | palette of commands: finds any stream, feed, category, label, saved query, page and action by a few letters |
+| `?` | help with the keys in force |
+| `Esc` | close a dialog |
+
+Keys are changed on the page "Keys" of the settings, where one checkbox switches off all keys pressed alone. A user imported from FreshRSS keeps the keys set there. Keys do nothing while the focus is in a field.
+
+### How users log in
+
+An administrator chooses on the page "Signing in":
+
+- **by password** (the default), with the form of the server;
+- **by the reverse proxy**, which names the user in the header `Remote-User` or `X-WebAuth-User`. The header counts only on requests from the addresses of `-trusted-proxies`, so the proxy must remove a header of that name sent by the browser. With automatic registration on, a name nobody has yet becomes a user;
+- **without a login**: everybody is the default user.
+
+Anonymous reading, a separate switch, lets visitors who are not logged in read what the default user reads and change nothing.
+
+Behind a reverse proxy set `-base-url` to the public address. If the address has a path, such as `https://example.org/rss`, the proxy has to strip that path from requests; links are written with it. The server counts failed logins per address and takes the address of the browser from `X-Forwarded-For` only when the connection comes from a trusted proxy.
+
+A saved query can be handed out without a login at `/shared/<token>.rss`, `.atom`, `.html`, `.opml` or `.json`; the addresses FreshRSS gave for shared queries and for the feed of a user (`/api/query.php`, `/i/?a=rss`) keep answering.
 
 ## Clients
 
@@ -93,11 +139,11 @@ freshrss-password "…"
 
 | Command | What it does |
 |---|---|
-| `serve` | Answers API clients and refreshes the feeds that are due, at start and every `-refresh-interval`. |
+| `serve` | Serves the web interface, answers API clients and refreshes the feeds that are due, at start and every `-refresh-interval`. |
 | `refresh [-force]` | Refreshes the feeds that are due once, for cron; `-force` takes all of them. |
 | `purge` | Deletes old articles by the retention settings without waiting for a refresh. |
 | `import -data <dir>` | Imports a FreshRSS installation into an empty database. |
-| `user create\|passwd\|delete <name>`, `user list` | Manages users. Deleting a user deletes their feeds and articles. |
+| `user create [-admin]\|passwd\|delete <name>`, `user list` | Manages users. Deleting a user deletes their feeds and articles. |
 | `feed add -user <name> [-category <name>] <address>` | Subscribes a user to a feed and fetches it. |
 | `opml import -user <name> [<file>]`, `opml export -user <name>` | Reads subscriptions from a file or standard input; writes them to standard output. |
 | `version` | Prints the version. |
@@ -116,6 +162,8 @@ Every setting is a flag and an environment variable; the flag wins.
 | `-refresh-interval` | `FRESHGO_REFRESH_INTERVAL` | `10m` | How often `serve` looks for feeds that are due. |
 | `-fetch-allowlist` | `FRESHGO_FETCH_ALLOWLIST` | | Internal destinations feeds may be fetched from: `host:port`, a CIDR range, or `*`, separated by commas. Without it, requests to private and loopback addresses are refused. |
 | `-websub` | `FRESHGO_WEBSUB` | off | Subscribe to the WebSub hubs feeds announce. |
+| `-trusted-proxies` | `FRESHGO_TRUSTED_PROXIES` | `127.0.0.0/8,::1/128` | Reverse proxies whose word is taken for who the user is and for the address of the browser: addresses or CIDR ranges, separated by commas. |
+| `-smtp-url` | `FRESHGO_SMTP_URL` | | SMTP server for the letters that confirm e-mail addresses: `smtp[s]://user:password@host:port?from=address`. Without it, confirmation cannot be required. |
 
 ### WebSub
 
@@ -123,7 +171,7 @@ With `-websub` and a `-base-url` that hubs can reach, a feed that announces a hu
 
 ### Paths the server answers
 
-`/accounts/` and `/reader/` (Google Reader API), `/api/greader.php` (the same API at the FreshRSS path), `/favicon/` (feed icons), `/websub/` (when WebSub is on), `/api/misc.php` (extensions).
+`/accounts/` and `/reader/` (Google Reader API), `/api/greader.php` (the same API at the FreshRSS path), `/favicon/` (feed icons), `/websub/` (when WebSub is on), `/api/misc.php` (extensions). Every other path belongs to the web interface.
 
 ## Development
 
@@ -131,6 +179,7 @@ With `-websub` and a `-base-url` that hubs can reach, a feed that announces a hu
 make test               # unit tests, SQLite only
 make test-integration   # the same tests on SQLite and on a PostgreSQL started in Docker
 make lint
+make test-e2e           # needs Chrome: the interface in a headless browser, keyboard only, with accessibility checks
 ```
 
 Behaviour is checked against a real FreshRSS 1.30.1: `testdata/reference/` holds what it produced from a fixed corpus of feeds and what it answered to a list of API requests; `testdata/reference/README.md` says how to regenerate it. The contracts are in `docs/specs/`.

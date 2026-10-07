@@ -19,7 +19,8 @@
 {{if .User}}<li><a href="{{.URL "/stats"}}"{{if eq .Section "stats"}} aria-current="page"{{end}}>{{.T "nav.stats"}}</a></li>{{end}}
 {{if .User}}<li><a href="{{.URL "/settings/display"}}"{{if eq .Section "settings"}} aria-current="page"{{end}}>{{.T "nav.settings"}}</a></li>{{end}}
 {{if .Admin}}<li><a href="{{.URL "/admin/users"}}"{{if eq .Section "admin"}} aria-current="page"{{end}}>{{.T "nav.admin"}}</a></li>{{end}}
-<li><a href="{{.URL "/about"}}"{{if eq .Section "about"}} aria-current="page"{{end}}>{{.T "nav.about"}}</a></li>
+{{range .Menu}}<li><a href="{{.URL}}">{{.Name}}</a></li>
+{{end}}<li><a href="{{.URL "/about"}}"{{if eq .Section "about"}} aria-current="page"{{end}}>{{.T "nav.about"}}</a></li>
 </ul>
 </nav>
 <div class="account">

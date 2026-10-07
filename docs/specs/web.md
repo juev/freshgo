@@ -1,6 +1,6 @@
 # Web interface
 
-Status: in progress. Implemented: the frame of every page, texts in two languages, static files, error pages (U1–U8); logging in and who may see what (U9–U18); the reading screen without a script (U19–U31); the script, keys and their page (U32–U40); subscriptions, categories and labels (U41–U52); import and export (U53–U54); settings of a user and administration (U55–U66); saved queries and what is handed out without a login (U67–U73); sharing entries (U74–U75); statistics (U76–U77); registration, terms and the confirmation of e-mail addresses (U78–U81). Extension points and the closing checks are the last step of `plan.md`.
+Status: implemented: the frame of every page, texts in two languages, static files, error pages (U1–U8); logging in and who may see what (U9–U18); the reading screen without a script (U19–U31); the script, keys and their page (U32–U40); subscriptions, categories and labels (U41–U52); import and export (U53–U54); settings of a user and administration (U55–U66); saved queries and what is handed out without a login (U67–U73); sharing entries (U74–U75); statistics (U76–U77); registration, terms and the confirmation of e-mail addresses (U78–U81). Extension points (U82).
 Sources: user requests of 2026-10-06 (an interface of freshgo's own, usable from the keyboard alone, with everything the web interface of FreshRSS can do, in English and Russian) and the decisions recorded in `plan.md`; FreshRSS at commit `219eaf58` for what the settings carried over by the import mean.
 
 ## Purpose and scope
@@ -135,6 +135,10 @@ Registration.
 - U80. With `force_email_validation` a new user gets `email_validation_token` and a letter, in the language of the page, with a link to `/validate-email?user=&token=`. Until the link is followed, every page the user asks for leads to `/validate-email`, which says where the letter went and sends it again (`POST /validate-email/resend`), and every form is refused with 403; the profile, the terms and logging out stay. The link clears the token, whoever follows it; any other token, or a token of another user, is 404. A user who changes their address gets a new token and a letter at the new address once the settings are stored. Administrators are not held up. The rule is not switched on (U65), and nobody registers, while the server has no SMTP server.
 - U81. Letters go out through the SMTP server of `-smtp-url` (`$FRESHGO_SMTP_URL`): `smtp://user:password@host:port?from=address`, with STARTTLS when the server offers it, or `smtps://` for TLS from the start; plain text in UTF-8 to one recipient, who cannot be more than an address (`internal/mail`).
 
+Extension points.
+
+- U82. Handlers compiled into the binary (`hooks.md`) add to the pages. `NavMenu` gives links that stand in the main menu before "About" and in the palette, as places of the kind "Extension"; a handler is told who the page is for, whether they are an administrator, and the language. A link is an `http` or `https` address, or a path of this server, which gets the public path in front; anything else is left out. `BeforeLogin` gives HTML shown on the login page right before its button. `EntryBeforeDisplay` sees every entry a page is about to show and may change or hide it (U24). Without handlers the pages are the same.
+
 ## Invariants
 
 - Colours are CSS variables in one place, in a light and a dark set; the dark one applies by the preference of the system unless the page says `data-theme="light"`, and always when it says `data-theme="dark"`.
@@ -173,6 +177,7 @@ In `internal/web`, on SQLite and, under `make test-integration`, on PostgreSQL.
 - U74: `TestShareServicesMatchFreshRSS` builds, for every service and three entries, the address FreshRSS 1.30.1 builds (`testdata/reference/oracle/share.json`, made by `share.php` there from its own list and the encoders of PHP), and compares the names and kinds of the services; `TestSharing` (a setting FreshRSS left, the form). U75: `TestSharing`; in a browser `TestE2EShare`.
 - U76: `TestMatchesFreshRSS` of `internal/stats` compares every number with what `FreshRSS_StatsDAO` of FreshRSS 1.30.1 gave for alice of the reference installation and for one of her feeds (`testdata/reference/stats`, made by `generate.sh` there), on both engines; `TestCounting` (the days before today, another time zone, a change of the clock). U76, U77: `TestStatisticsPages`. U78, U79: `TestRegistration`; `TestTermsAreImported` of `internal/importer`. U80: `TestEmailValidation`, with the letters taken by an SMTP server of the test. U81: `TestSend`, `TestNew` of `internal/mail`. In a browser: `TestE2ERegister`, and the pages of statistics in `TestE2EDarkAndNarrow`.
 - U18: `TestUsersFromTheCommandLine`, `TestUserCreateAdmin` in `cmd/freshgo`; `TestFirstUserIsTheDefault` in `internal/store`.
+- U82: `TestInterfaceHooks`, `TestNoInterfaceHooks`; `EntryBeforeDisplay` on a page: `TestEntryIsShown`.
 
 ## Decisions
 

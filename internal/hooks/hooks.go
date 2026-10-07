@@ -9,6 +9,7 @@ package hooks
 
 import (
 	"context"
+	"html/template"
 	"net/http"
 	"sort"
 
@@ -58,6 +59,11 @@ type Registry struct {
 	Init Signal[struct{}]
 	// UserMaintenance runs for a user before each refresh of their feeds.
 	UserMaintenance Signal[*store.User]
+	// NavMenu adds places to the main menu of the web interface and to its
+	// palette of commands.
+	NavMenu Gather[Page, Link]
+	// BeforeLogin adds blocks to the login page, right before its button.
+	BeforeLogin Gather[Page, template.HTML]
 
 	// endpoints are the HTTP endpoints of extensions, see HandleAPI.
 	endpoints map[string]http.Handler
@@ -120,6 +126,27 @@ type EntriesFavorite struct {
 	UserID     int64
 	IDs        []int64
 	IsFavorite bool
+}
+
+// Page is the argument of the hooks of the web interface: whom a page is
+// being made for.
+type Page struct {
+	// User is who is logged in, nil for a visitor.
+	User *store.User
+	// Admin says the user is an administrator.
+	Admin bool
+	// Language is the language of the page, "en" or "ru".
+	Language string
+}
+
+// Link is a place NavMenu adds to the interface.
+type Link struct {
+	// Name is shown as it is, so it is in the language of the page.
+	Name string
+	// URL is where the place is: an http or https address, or a path of
+	// this server that starts with one slash, such as that of an endpoint
+	// of HandleAPI. A link with anything else is left out.
+	URL string
 }
 
 // handlers keeps functions in call order: by priority, lower first, and in
@@ -187,6 +214,28 @@ func (e *Event[A]) Call(ctx context.Context, arg A) bool {
 		}
 	}
 	return false
+}
+
+// Gather is an extension point every handler of which may add to what the
+// caller shows: the results are put together in call order. This is the
+// NoneToString signature of FreshRSS, which joins the strings its handlers
+// return.
+type Gather[A, R any] struct {
+	handlers[func(context.Context, A) []R]
+}
+
+// Add registers a handler; the lower the priority value, the earlier it runs.
+func (g *Gather[A, R]) Add(priority int, fn func(context.Context, A) []R) {
+	g.add(priority, fn)
+}
+
+// Call runs every handler and returns what they gave, nil when nothing.
+func (g *Gather[A, R]) Call(ctx context.Context, arg A) []R {
+	var all []R
+	for _, h := range g.list {
+		all = append(all, h.fn(ctx, arg)...)
+	}
+	return all
 }
 
 // Signal is an extension point all of whose handlers always run. This is the

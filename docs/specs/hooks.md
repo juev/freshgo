@@ -7,7 +7,7 @@ Sources: user request of 2026-10-06 and the decisions recorded in `plan.md`; `li
 
 `internal/hooks` is the registry of extension points modelled on `Minz_HookType`: which hooks exist, what a handler gets and returns, and in what order handlers run. Covers plan requirement R8.
 
-Out of scope: a runtime for extensions. Handlers are Go functions compiled into the binary and registered in `newHooks` of `cmd/freshgo`; freshgo ships none. Hooks of the web interface (menus, navigation, `js_vars`, view modes, favicon buttons) belong to the plan of the web interface.
+Out of scope: a runtime for extensions. Handlers are Go functions compiled into the binary and registered in `newHooks` of `cmd/freshgo`; freshgo ships none. Of the hooks FreshRSS has in its pages, freshgo has `NavMenu` and `BeforeLogin`; `js_vars`, view modes, the entries of the settings and administration menus and favicon buttons have none.
 
 ## Requirements
 
@@ -16,6 +16,7 @@ Out of scope: a runtime for extensions. Handlers are Go functions compiled into 
 - H3. Chain hooks (`OneToOne` in FreshRSS): each handler gets what the previous one returned. A handler that returns `false` drops the value; the remaining handlers are not called and the caller abandons the operation for that value. FreshRSS expresses the same with a `null` result.
 - H4. Event hooks (`PassArguments`): handlers are called with the argument in turn and may change what it points to. A handler that returns `true` ends the call. In FreshRSS the first result other than `null` does.
 - H5. Signal hooks (`NoneToNone`): every handler is called.
+- H8. Gather hooks (`NoneToString`): every handler is called and what the handlers return is put together in call order. FreshRSS joins strings of HTML; here a handler returns a list of values, none when it has nothing to add.
 - H6. Entries and feeds that pass through hooks are `store.Entry` and `store.Feed`; both survive a round trip through JSON unchanged, so that an out-of-process runtime can be put behind a handler later.
 - H7. Handlers are registered before the first call and are then called from several goroutines at once: the refresh handles feeds of one user in parallel. A handler guards the state it shares.
 
@@ -36,6 +37,8 @@ Out of scope: a runtime for extensions. Handlers are Go functions compiled into 
 | `EntryAutoRead` | event | entry and reason | when a rule marks an arriving entry read, once per rule that applies: `upon_reception`, `same_title_in_feed` (also for a title repeated in the category), `same_guid_in_category`, and `filter` for a filter action |
 | `EntryAutoUnread` | event | entry and reason | when a changed entry is made unread, reason `updated_article` |
 | `EntriesRead`, `EntriesFavorite` | event | user, entry ids, new state | after `edit-tag` of the API has changed the state: `EntriesRead` with all the identifiers given when at least one entry changed, `EntriesFavorite` always. Not for `mark-all-as-read`, as in FreshRSS |
+| `NavMenu` | gather | whom the page is for: user (none for a visitor), whether an administrator, language | for every page of the web interface and for its palette of commands; returns links, see `web.md`, U82 |
+| `BeforeLogin` | gather | the same | for the login page, also when it is shown after a failed attempt; returns HTML put before the button |
 | `Init` | signal | none | when a command that refreshes or serves starts |
 | `UserMaintenance` | signal | user | before the feeds of a user are refreshed |
 
@@ -43,7 +46,8 @@ Out of scope: a runtime for extensions. Handlers are Go functions compiled into 
 
 - **`FetchBefore` and `ParseAfter` replace `simplepie_before_init` and `simplepie_after_init`**: there is no SimplePie object to hand out. `FetchBefore` gets the request and may change its headers and parameters; `ParseAfter` gets the items with identifiers assigned and may change their exported fields.
 - **A dropped entry is offered again on the next refresh**, since nothing records it. FreshRSS behaves the same.
-- **The `NoneToString` signature is not implemented.** All its hooks belong to the web interface; the type arrives with the first of them.
+- **`NavMenu` returns links, not HTML**: one handler then serves the menu and the palette, and an address is checked before it is shown. `BeforeLogin` returns HTML as it is, which is code compiled into the binary; the policy of the page still keeps inline scripts from running.
+- **One `NavMenu` stands for the menu hooks of FreshRSS** (`nav_menu`, `nav_entries`, `menu_configuration_entry`, `menu_admin_entry`, `menu_other_entry`): the interface has one menu, and a handler decides by the user it is told whom to show a link.
 - **`api_misc` is `Registry.HandleAPI`**: an extension registers an `http.Handler` under its name and gets the requests to `/api/misc.php/<name>`. FreshRSS calls the first handler of the one extension it has enabled for the request, which comes to the same.
 - **Hooks run before the transaction** that stores a feed, so a slow handler does not hold a database lock. What the user changes in an entry while handlers run is kept, see `refresh.md`, F9.
 
@@ -52,6 +56,6 @@ Out of scope: a runtime for extensions. Handlers are Go functions compiled into 
 - H1, H3: three handlers added out of priority order → called by priority, each sees the previous result; a dropping handler stops the chain. `TestChainPassesResultOnInPriorityOrder`, `TestChainDropStopsTheRest`.
 - H2: `TestEmptyRegistryChangesNothing`; every other test of `internal/refresh` runs with an empty registry.
 - `EntryAutoRead`: `TestReadUponReception`, `TestReadWhenSameTitleInFeed`, `TestReadWhenSameInCategory` in `internal/refresh`.
-- H4: `TestEventStopsAtTheHandlerThatDealtWithIt`, `TestEventHandlerMayChangeTheEntry`. H5: `TestSignalCallsEveryHandler`. H6: `TestEntitiesSurviveJSON`.
+- H4: `TestEventStopsAtTheHandlerThatDealtWithIt`, `TestEventHandlerMayChangeTheEntry`. H5: `TestSignalCallsEveryHandler`. H8: `TestGatherPutsTogetherWhatHandlersGive`; `NavMenu`, `BeforeLogin`: `TestInterfaceHooks`, `TestNoInterfaceHooks` in `internal/web`. H6: `TestEntitiesSurviveJSON`.
 - `EntryBeforeDisplay`, `EntriesRead`, `EntriesFavorite`: `TestHooks` in `internal/greader`. `CheckURLBeforeAdd`, `FeedBeforeInsert`: `TestAddFeedRefusals` in `internal/refresh`, `TestImport` in `internal/opml`. Extension endpoints: `TestRoutes` in `cmd/freshgo`.
 - In the pipeline (`internal/refresh`): an entry dropped by `EntryBeforeInsert` or `EntryBeforeAdd` is not stored; a title changed by one handler reaches the next and the database; a feed dropped by `FeedBeforeActualize` is not requested; a header set in `FetchBefore` reaches the server; tags added in `ParseAfter` are stored; a changed entry passes `EntryBeforeUpdate`. `TestHooksInThePipeline`. `EntryAutoUnread`: `TestChangedEntryBecomesUnreadWhenAsked`. `UserMaintenance` and `FeedsListBeforeActualize`: `TestWhichFeedsAreRefreshed`. `ParseAfter` on failures: `TestFailedFeed`.

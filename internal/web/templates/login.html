@@ -15,7 +15,8 @@
 <input type="checkbox" id="remember" name="remember" value="1">
 <label for="remember">{{.T "login.remember"}}</label>
 </p>
-<p><button type="submit">{{.T "login.submit"}}</button></p>
+{{range .Data.Before}}{{.}}
+{{end}}<p><button type="submit">{{.T "login.submit"}}</button></p>
 </form>
 {{if .Data.CanRegister}}<p><a href="{{.URL "/register"}}">{{.T "register.heading"}}</a></p>{{end}}
 {{end}}

@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"html/template"
 	"net"
 	"net/http"
 	"net/netip"
@@ -484,6 +485,8 @@ type loginForm struct {
 	Error string
 	// CanRegister says a visitor can make an account for themselves.
 	CanRegister bool
+	// Before is what extensions put before the button.
+	Before []template.HTML
 }
 
 func (h *Handler) loginPage(w http.ResponseWriter, r *http.Request) {
@@ -499,7 +502,7 @@ func (h *Handler) loginPage(w http.ResponseWriter, r *http.Request) {
 		h.broken(w, r, err)
 		return
 	}
-	v.Data = loginForm{Next: next, CanRegister: open}
+	v.Data = loginForm{Next: next, CanRegister: open, Before: h.hooks.BeforeLogin.Call(r.Context(), v.asks)}
 	h.render(w, r, http.StatusOK, "login", v)
 }
 
@@ -515,7 +518,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	next := r.PostFormValue("next")
 	refuse := func(status int, message string) {
 		v := h.view(r, "login", "login.heading")
-		v.Data = loginForm{Name: name, Next: next, Error: message}
+		v.Data = loginForm{Name: name, Next: next, Error: message, Before: h.hooks.BeforeLogin.Call(r.Context(), v.asks)}
 		h.render(w, r, status, "login", v)
 	}
 	texts := h.view(r, "", "login.heading")
