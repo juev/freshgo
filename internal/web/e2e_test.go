@@ -865,7 +865,14 @@ func TestE2EToolbar(t *testing.T) {
 		b.login("alice")
 		b.accessible("the reading screen with its row of controls")
 
+		// An entry the reader opened by its row, not by a key, closes like
+		// any other when a key moves on.
+		b.tabTo(e(ids[0]) + " summary")
+		b.press(kb.Enter)
+		b.until("the first entry open by its row", `document.querySelector('`+e(ids[0])+` details').open`)
 		b.press("j")
+		b.until("the second entry open, the first closed", current(ids[1], true)+` && !document.querySelector('`+e(ids[0])+` details').open`)
+		b.press("k")
 		b.until("the first entry open", current(ids[0], true))
 		b.tabTo(e(ids[0]) + " button[data-fold]")
 		b.press(kb.Enter)
@@ -882,6 +889,9 @@ func TestE2EToolbar(t *testing.T) {
 		b.press(kb.Enter)
 		b.until("every entry open", `document.querySelectorAll('.entries details:not([open])').length === 0 && document.querySelector('form.views button[value="expanded"]').getAttribute('aria-pressed') === 'true'`)
 		b.accessible("the reading screen with every entry open")
+		// Where every entry is open, moving on closes none.
+		b.press("j", "j")
+		b.until("still every entry open", `document.querySelector('.entry.current') && document.querySelectorAll('.entries details:not([open])').length === 0`)
 		if s.settings("alice")["display_posts"] != true {
 			t.Errorf("display_posts after the switch = %v", s.settings("alice")["display_posts"])
 		}

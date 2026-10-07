@@ -40,9 +40,8 @@
 
 	// ---- Entries ----
 
-	// current is the entry keys act on, opened the one a key opened last.
+	// current is the entry keys act on.
 	let current = null;
-	let opened = null;
 
 	const listed = () => (entries ? Array.from(entries.querySelectorAll('article.entry')) : []);
 	const detailsOf = (article) => article.querySelector('details');
@@ -67,11 +66,17 @@
 
 	const select = (article, open) => {
 		if (open) {
-			if (opened && opened !== article) {
-				detailsOf(opened).open = false;
+			// Among rows one entry is open at a time, whoever opened the
+			// others, a key or the reader by the row; where every entry is
+			// listed open, they stay so.
+			if (entries.dataset.view !== 'expanded') {
+				for (const other of listed()) {
+					if (other !== article && isOpen(other)) {
+						detailsOf(other).open = false;
+					}
+				}
 			}
 			detailsOf(article).open = true;
-			opened = article;
 		}
 		setCurrent(article);
 		article.focus({ preventScroll: true });
