@@ -71,6 +71,37 @@ func TestImportedTitle(t *testing.T) {
 	}
 }
 
+// The proxy FreshRSS sends every feed through becomes that of the
+// installation.
+func TestImportedProxy(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		options any
+		want    string
+		fails   bool
+	}{
+		{"no options", []any{}, "", false},
+		{"options without a proxy", map[string]any{"64": false}, "", false},
+		{"address with a port", map[string]any{"10004": "proxy.example:3128"}, "http://proxy.example:3128", false},
+		{"port of its own", map[string]any{"101": 0, "10004": "127.0.0.1", "59": 8080}, "http://127.0.0.1:8080", false},
+		{"the port of the address wins", map[string]any{"10004": "127.0.0.1:3128", "59": 8080}, "http://127.0.0.1:3128", false},
+		{"socks5h with credentials", map[string]any{"101": 7, "10004": "socks.example:1080", "10006": "bob:secret"}, "socks5h://bob:secret@socks.example:1080", false},
+		{"a scheme in the address", map[string]any{"101": 5, "10004": "socks5://10.0.0.1:1080"}, "socks5://10.0.0.1:1080", false},
+		{"switched off", map[string]any{"101": -1, "10004": "proxy.example:3128"}, "", false},
+		{"a kind freshgo has not", map[string]any{"101": 4, "10004": "proxy.example:1080"}, "", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, unreadable := readSystemSettings(map[string]any{"curl_options": tc.options})
+			if got.Proxy != tc.want {
+				t.Errorf("proxy = %q, want %q", got.Proxy, tc.want)
+			}
+			if failed := len(unreadable) == 1 && unreadable[0] == "curl_options"; failed != tc.fails || len(unreadable) > 1 {
+				t.Errorf("unreadable = %v, want curl_options there: %v", unreadable, tc.fails)
+			}
+		})
+	}
+}
+
 // The terms of use FreshRSS keeps in a file come along.
 func TestTermsAreImported(t *testing.T) {
 	dir := t.TempDir()

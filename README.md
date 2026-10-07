@@ -130,7 +130,7 @@ The move is one-way: a freshgo database cannot be taken back to FreshRSS. Keep t
 
 4. Put it where FreshRSS was. Clients configured with `https://rss.example.org/api/greader.php` keep working without changes: that path is served as an alias, and the API passwords, the tokens already issued and the identifiers of articles, feeds and labels are the imported ones.
 
-What the import carries over: users with their settings, web and API passwords, the settings of the installation (its title when it has one of its own, how users log in, the default user, anonymous reading, limits, the terms of use), categories, feeds with their settings, articles with read and starred states, labels, custom feed icons, the installation's own `force-https.txt`.
+What the import carries over: users with their settings, web and API passwords, the settings of the installation (its title when it has one of its own, how users log in, the default user, anonymous reading, limits, the terms of use, the proxy all feeds went through), categories, feeds with their settings, articles with read and starred states, labels, custom feed icons, the installation's own `force-https.txt`.
 
 What it does not: the theme and the other settings of the FreshRSS pages that the interface of freshgo has no counterpart for, icons fetched from sites (fetched again after the first refresh of a feed), WebSub subscriptions (made again at the first refresh, see below), articles left half-stored by an interrupted refresh.
 
@@ -249,6 +249,10 @@ Every setting is a flag and an environment variable; the flag wins.
 | `-websub` | `FRESHGO_WEBSUB` | off | Subscribe to the WebSub hubs feeds announce. |
 | `-trusted-proxies` | `FRESHGO_TRUSTED_PROXIES` | `127.0.0.0/8,::1/128` | Reverse proxies whose word is taken for who the user is and for the address of the browser: addresses or CIDR ranges, separated by commas. |
 | `-smtp-url` | `FRESHGO_SMTP_URL` | | SMTP server for the letters that confirm e-mail addresses: `smtp[s]://user:password@host:port?from=address`. Without it, confirmation cannot be required. |
+
+### Proxy
+
+An administrator sets one proxy for all feeds on the page "System" of the administration: `http://`, `https://`, `socks5://` or `socks5h://`, with `user:password@` when it asks for them. Feeds, the pages of their articles and icons are then fetched through it, from the next request on. A feed keeps a proxy of its own, and can be set to go through none. The proxy of the environment (`HTTP_PROXY`) is not used.
 
 ### WebSub
 
