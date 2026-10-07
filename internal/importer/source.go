@@ -78,7 +78,7 @@ func sourceOpener(system *systemConfig, opts Options) (open func(user string) (*
 			if _, err := os.Stat(path); err != nil {
 				return nil, err
 			}
-			db, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
+			db, err := openSQLite(path)
 			if err != nil {
 				return nil, err
 			}
@@ -106,6 +106,28 @@ func sourceOpener(system *systemConfig, opts Options) (open func(user string) (*
 	default:
 		return nil, nil, fmt.Errorf("importer: unknown database type %q in config.php", dbType)
 	}
+}
+
+// openSQLite opens the database file of a FreshRSS user for reading. A
+// database in WAL mode, which is how FreshRSS leaves its own, needs a file
+// next to it even to be read, so it does not open in a directory that cannot
+// be written to, such as a volume mounted read-only. When no log is left
+// beside it the file holds everything, and it is read as one nobody changes.
+func openSQLite(path string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
+	if err != nil {
+		return nil, err
+	}
+	var tables int
+	probeErr := db.QueryRow(`SELECT count(*) FROM sqlite_master`).Scan(&tables)
+	if probeErr == nil {
+		return db, nil
+	}
+	_ = db.Close()
+	if wal, err := os.Stat(path + "-wal"); err == nil && wal.Size() > 0 {
+		return nil, fmt.Errorf("%w; %s has changes FreshRSS has not written into the database yet, and reading them takes a directory that can be written to", probeErr, wal.Name())
+	}
+	return sql.Open("sqlite", "file:"+path+"?mode=ro&immutable=1")
 }
 
 // postgresURL builds a connection URL from the db section of config.php,

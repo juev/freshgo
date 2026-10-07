@@ -130,7 +130,7 @@ The move is one-way: a freshgo database cannot be taken back to FreshRSS. Keep t
 
 4. Put it where FreshRSS was. Clients configured with `https://rss.example.org/api/greader.php` keep working without changes: that path is served as an alias, and the API passwords, the tokens already issued and the identifiers of articles, feeds and labels are the imported ones.
 
-What the import carries over: users with their settings, web and API passwords, the settings of the installation (how users log in, the default user, anonymous reading, limits, the terms of use), categories, feeds with their settings, articles with read and starred states, labels, custom feed icons, the installation's own `force-https.txt`.
+What the import carries over: users with their settings, web and API passwords, the settings of the installation (its title when it has one of its own, how users log in, the default user, anonymous reading, limits, the terms of use), categories, feeds with their settings, articles with read and starred states, labels, custom feed icons, the installation's own `force-https.txt`.
 
 What it does not: the theme and the other settings of the FreshRSS pages that the interface of freshgo has no counterpart for, icons fetched from sites (fetched again after the first refresh of a feed), WebSub subscriptions (made again at the first refresh, see below), articles left half-stored by an interrupted refresh.
 

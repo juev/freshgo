@@ -145,12 +145,15 @@ var systemKeys = []string{
 	"closed_registration_message", "limits",
 }
 
+// freshRSSTitle is what FreshRSS calls an installation nobody has named.
+const freshRSSTitle = "FreshRSS"
+
 // readSystemSettings takes the settings of an installation from its
 // config.php. A file written by FreshRSS holds only what differs from the
-// defaults, so those come first.
+// defaults, so those come first. The title is the exception: the name of
+// the program that is gone is not carried over, only a title somebody chose.
 func readSystemSettings(conf map[string]any) (settings store.System, unreadable []string) {
 	settings = store.DefaultSystem()
-	settings.Title = "FreshRSS"
 	settings.DefaultUser = "_"
 	settings.APIEnabled = false
 	for _, key := range systemKeys {
@@ -168,6 +171,9 @@ func readSystemSettings(conf map[string]any) (settings store.System, unreadable 
 			}
 		}
 		unreadable = append(unreadable, key)
+	}
+	if settings.Title == freshRSSTitle {
+		settings.Title = store.DefaultSystem().Title
 	}
 	return settings, unreadable
 }
