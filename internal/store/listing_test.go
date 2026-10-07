@@ -230,26 +230,6 @@ func TestListPageRefusesForeignPlace(t *testing.T) {
 	})
 }
 
-func TestUnreadFavorites(t *testing.T) {
-	eachEngine(t, func(t *testing.T, s *Store) {
-		lib := newLibrary(t, s)
-		ctx := context.Background()
-		// Starred: entry 2 and 6 unread, entry 3 read.
-		if n, err := s.UnreadFavorites(ctx, lib.alice.ID); err != nil || n != 2 {
-			t.Errorf("UnreadFavorites = %d, %v; want 2", n, err)
-		}
-		if _, err := s.SetEntriesRead(ctx, lib.alice.ID, []int64{e2}, true, 1); err != nil {
-			t.Fatal(err)
-		}
-		if n, err := s.UnreadFavorites(ctx, lib.alice.ID); err != nil || n != 1 {
-			t.Errorf("UnreadFavorites after reading one = %d, %v; want 1", n, err)
-		}
-		if n, err := s.UnreadFavorites(ctx, lib.bob.ID); err != nil || n != 2 {
-			t.Errorf("UnreadFavorites of the other user = %d, %v; want 2", n, err)
-		}
-	})
-}
-
 // Searches by label and by what else the database tells apart, alone and
 // mixed with texts, negations and alternatives; the reference cases have few.
 var structuralSearches = []string{
@@ -531,9 +511,6 @@ func BenchmarkSearchRareMatch(b *testing.B) {
 			b.Run("counts", func(b *testing.B) {
 				for b.Loop() {
 					if _, err := s.FeedCounts(ctx, u.ID); err != nil {
-						b.Fatal(err)
-					}
-					if _, err := s.UnreadFavorites(ctx, u.ID); err != nil {
 						b.Fatal(err)
 					}
 				}

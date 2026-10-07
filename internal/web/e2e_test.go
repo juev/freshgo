@@ -910,5 +910,16 @@ func TestE2EToolbar(t *testing.T) {
 		b.open("/categories/2")
 		b.press("J")
 		b.until("the next category, past the feeds of the folded one", `location.pathname === '/categories/3'`)
+
+		// A feed of the folded category shows where the reader is, and
+		// the tree, brought up to date after an entry is read, comes with
+		// its categories open: neither undoes what the reader folded.
+		b.open("/feeds/1")
+		b.until("the category of the feed being read open", `document.querySelector('#tree details.branch').open`)
+		unread := b.text(`document.getElementById('stream-unread').textContent`)
+		b.press("j")
+		b.until("the tree brought up to date", `document.getElementById('stream-unread').textContent !== '`+unread+`'`)
+		b.open("/?state=all")
+		b.until("the category folded as the reader left it", `!document.querySelector('#tree details.branch').open && JSON.parse(localStorage.getItem('freshgo.folded')).length === 1`)
 	})
 }

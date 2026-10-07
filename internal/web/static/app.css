@@ -717,7 +717,7 @@ button.star[aria-pressed="true"] {
 	color: var(--star);
 }
 
-.entry summary {
+.entry > details > summary {
 	display: flex;
 	align-items: baseline;
 	gap: calc(var(--space) * 1.5);
@@ -729,19 +729,19 @@ button.star[aria-pressed="true"] {
 	list-style: none;
 }
 
-.entry summary::-webkit-details-marker {
+.entry > details > summary::-webkit-details-marker {
 	display: none;
 }
 
 /* The summary is a row, which takes the marker of the browser away. */
-.entry summary::before {
+.entry > details > summary::before {
 	content: "▸";
 	position: absolute;
 	left: 0;
 	color: var(--text-muted);
 }
 
-.entry details[open] > summary::before {
+.entry > details[open] > summary::before {
 	content: "▾";
 }
 
@@ -788,7 +788,7 @@ button.star[aria-pressed="true"] {
 	content: "– ";
 }
 
-.entry summary time {
+.entry > details > summary time {
 	flex: none;
 	margin-left: auto;
 	font-size: 0.9em;
@@ -895,7 +895,7 @@ button.star[aria-pressed="true"] {
 }
 
 @media (max-width: 48rem) {
-	.entry summary {
+	.entry > details > summary {
 		flex-wrap: wrap;
 		white-space: normal;
 		gap: 0 var(--space);
@@ -956,7 +956,7 @@ button.star[aria-pressed="true"] {
 	box-shadow: inset 3px 0 0 var(--card-border);
 }
 
-.entry.current summary {
+.entry.current > details > summary {
 	background: var(--selected);
 }
 

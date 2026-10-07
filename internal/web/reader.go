@@ -34,10 +34,7 @@ const (
 
 // Kinds of streams of entries the reading screen shows.
 const (
-	streamMain = "main"
-	// streamStarred is what a saved query of the starred entries lists; it
-	// has no page of its own.
-	streamStarred  = "starred"
+	streamMain     = "main"
 	streamFeed     = "feed"
 	streamCategory = "category"
 	streamLabel    = "label"
@@ -130,7 +127,6 @@ type library struct {
 	feed       map[int64]*store.Feed
 	unread     map[int64]int
 	labelled   map[int64]int
-	starred    int
 	// queries are the views the user has saved.
 	queries []savedQuery
 }
@@ -161,9 +157,6 @@ func (h *Handler) libraryOf(ctx context.Context, user *store.User, counts bool) 
 			return nil, err
 		}
 		if labelCounts, err = h.db.LabelCounts(ctx, userID); err != nil {
-			return nil, err
-		}
-		if lib.starred, err = h.db.UnreadFavorites(ctx, userID); err != nil {
 			return nil, err
 		}
 	}
@@ -236,9 +229,6 @@ func (lib *library) stream(kind string, id int64) (s stream, ok bool) {
 		minPriority := priorityMain
 		s.set.MinPriority = &minPriority
 		s.unread = lib.unreadFrom(0, priorityMain)
-	case streamStarred:
-		s.set.OnlyFavorite = true
-		s.unread = lib.starred
 	case streamFeed:
 		f := lib.feed[id]
 		if f == nil {
@@ -475,7 +465,7 @@ type branch struct {
 type tree struct {
 	// Root is the stream of everything, where the reader comes back to
 	// from a category or a feed.
-	Root branch
+	Root       branch
 	Categories []branch
 	Labels     []branch
 	Queries    []branch

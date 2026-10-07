@@ -436,23 +436,31 @@
 
 	if (tree) {
 		foldBranches();
-		tree.addEventListener('toggle', (event) => {
-			const one = event.target;
-			if (!one.matches || !one.matches('details.branch')) {
+		// What the reader folds and unfolds is kept; a category the script
+		// opens, to show where the reader is, or a fresh tree brings open,
+		// is not: the toggle event tells the two apart no more than the
+		// attribute does, the click on the marker does.
+		tree.addEventListener('click', (event) => {
+			const marker = event.target.closest('details.branch > summary');
+			if (!marker) {
 				return;
 			}
-			const folded = foldedBranches();
-			if (one.open) {
-				folded.delete(one.dataset.branch);
-			} else {
-				folded.add(one.dataset.branch);
-			}
-			try {
-				localStorage.setItem(foldedKey, JSON.stringify(Array.from(folded)));
-			} catch {
-				// Without storage a fold lasts as long as the page.
-			}
-		}, true);
+			// The category folds after this event.
+			setTimeout(() => {
+				const one = marker.parentElement;
+				const folded = foldedBranches();
+				if (one.open) {
+					folded.delete(one.dataset.branch);
+				} else {
+					folded.add(one.dataset.branch);
+				}
+				try {
+					localStorage.setItem(foldedKey, JSON.stringify(Array.from(folded)));
+				} catch {
+					// Without storage a fold lasts as long as the page.
+				}
+			});
+		});
 		// On a narrow screen the tree stands above the list: fold it.
 		if (window.matchMedia('(max-width: 48rem)').matches) {
 			tree.querySelector('details').open = false;

@@ -352,15 +352,3 @@ func writeCondition(b *strings.Builder, args []any, userID int64, c *search.Cond
 	}
 	return args
 }
-
-// UnreadFavorites returns the number of starred entries the user has not read.
-func (s *Store) UnreadFavorites(ctx context.Context, userID int64) (int, error) {
-	var n int
-	err := s.queryRow(ctx, `
-		SELECT COUNT(*) FROM entries WHERE user_id = ? AND is_favorite = ? AND is_read = ?`,
-		userID, true, false).Scan(&n)
-	if err != nil {
-		return 0, fmt.Errorf("store: unread starred entries: %w", err)
-	}
-	return n, nil
-}
