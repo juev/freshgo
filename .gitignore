@@ -1,4 +1,5 @@
 /bin/
+/dist/
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm

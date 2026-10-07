@@ -1,0 +1,48 @@
+version: 2
+
+builds:
+  - main: ./cmd/freshgo
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    flags:
+      - -trimpath
+    # timetzdata puts the time zone database into the binary: the image has
+    # none, and users choose their zones by name.
+    tags:
+      - timetzdata
+    ldflags:
+      - -s -w -X main.version=v{{ .Version }}
+
+changelog:
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))?!?:.+$'
+      order: 0
+    - title: Fixes
+      regexp: '^.*?fix(\(.+\))?!?:.+$'
+      order: 1
+    - title: Other
+      order: 999
+
+dockers_v2:
+  - images:
+      - ghcr.io/juev/freshgo
+    # A pre-release is published under its own version only.
+    tags:
+      - "{{ .Version }}"
+      - "{{ if not .Prerelease }}{{ .Major }}.{{ .Minor }}{{ end }}"
+      - "{{ if not .Prerelease }}latest{{ end }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    labels:
+      org.opencontainers.image.source: https://github.com/juev/freshgo
+      org.opencontainers.image.version: "{{ .Version }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.licenses: AGPL-3.0-only
