@@ -475,7 +475,7 @@ func TestE2ETabOnly(t *testing.T) {
 		b.press(" ")
 		b.eventually("the entry starred", func() bool { return s.entry("alice", ids[0]).IsFavorite })
 		b.until("the focus on the button that takes the star off",
-			`document.activeElement.textContent === 'Remove star' && document.activeElement.closest('article').id === '`+first[1:]+`'`)
+			`document.activeElement.getAttribute('aria-label') === 'Remove star' && document.activeElement.closest('article').id === '`+first[1:]+`'`)
 		b.press(kb.Enter)
 		b.eventually("the star off", func() bool { return !s.entry("alice", ids[0]).IsFavorite })
 
@@ -876,5 +876,29 @@ func TestE2EToolbar(t *testing.T) {
 		b.press("T")
 		b.until("the entries by title", `new URLSearchParams(location.search).get('sort') === 'title' && document.getElementById('sort').value === 'title'`)
 		b.until("no button where the script sorts", `document.querySelector('form.sorting button').hidden`)
+
+		// The switch of the view opens every entry and keeps the choice.
+		b.tabTo(`form.views button[value="expanded"]`)
+		b.press(kb.Enter)
+		b.until("every entry open", `document.querySelectorAll('.entries details:not([open])').length === 0 && document.querySelector('form.views button[value="expanded"]').getAttribute('aria-pressed') === 'true'`)
+		b.accessible("the reading screen with every entry open")
+		if s.settings("alice")["display_posts"] != true {
+			t.Errorf("display_posts after the switch = %v", s.settings("alice")["display_posts"])
+		}
+		b.tabTo(`form.views button[value="list"]`)
+		b.press(kb.Enter)
+		b.until("rows again", `document.querySelectorAll('.entries details[open]').length === 0`)
+
+		// A category is folded from the keyboard and stays folded on the
+		// next page; K and J pass over its feeds.
+		b.tabTo("#tree details.branch summary")
+		b.press(kb.Enter)
+		b.until("the category folded", `!document.querySelector('#tree details.branch').open`)
+		b.open("/all")
+		b.until("the category still folded", `!document.querySelector('#tree details.branch').open && document.querySelectorAll('#tree details.branch')[1].open`)
+		b.accessible("the tree with a category folded")
+		b.open("/categories/2")
+		b.press("J")
+		b.until("the next category, past the feeds of the folded one", `location.pathname === '/categories/3'`)
 	})
 }

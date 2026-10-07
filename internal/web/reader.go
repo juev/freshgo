@@ -309,6 +309,9 @@ func (lib *library) streamAt(path string) (stream, bool) {
 // showing is how a stream is listed: what the reader asked for where they
 // did, the settings of the stream and of the user otherwise.
 type showing struct {
+	// view is how the entries are listed for this page alone, viewList or
+	// viewExpanded, empty when the setting of the user decides.
+	view  string
 	state string
 	sort  string
 	asc   bool
@@ -372,6 +375,11 @@ func show(params url.Values, prefs reading, s stream) showing {
 			v.seed = rand.Int64()
 		}
 		v.asked.Set("seed", strconv.FormatInt(v.seed, 10))
+	}
+	switch view := params.Get("view"); view {
+	case viewList, viewExpanded:
+		v.view = view
+		v.asked.Set("view", view)
 	}
 	switch order := params.Get("order"); order {
 	case "asc", "desc":
@@ -457,8 +465,11 @@ func searchProblem(err error) string {
 
 // branch is an entry of the tree of subscriptions.
 type branch struct {
-	Name    string
+	Name string
+	// URL is the stream as the page lists streams now, Path the stream
+	// itself, by which the script remembers a category that is folded.
 	URL     string
+	Path    string
 	Unread  int
 	Current bool
 	// Failing marks a feed whose last refresh failed, Muted one that is not
@@ -482,7 +493,7 @@ func (h *Handler) tree(v *view, lib *library, current stream, state showing, hid
 			name = s.name
 		}
 		return branch{
-			Name: name, URL: state.link(h, s.path(), "q", ""), Unread: s.unread,
+			Name: name, URL: state.link(h, s.path(), "q", ""), Path: s.path(), Unread: s.unread,
 			Current: s.kind == current.kind && s.id == current.id,
 		}
 	}
@@ -572,19 +583,24 @@ func attachments(e *store.Entry) []attachment {
 	return out
 }
 
+// excerptLength is how much of the text of an entry its row may show.
+const excerptLength = 200
+
 // article is an entry as a page shows it.
 type article struct {
 	ID    int64
 	Title string
 	// URL is the page of the entry, Link the address the feed gave it.
-	URL         string
-	Link        string
-	Feed        string
-	FeedURL     string
-	Authors     string
-	Date        string
-	DateTime    string
-	Content     template.HTML
+	URL      string
+	Link     string
+	Feed     string
+	FeedURL  string
+	Authors  string
+	Date     string
+	DateTime string
+	Content  template.HTML
+	// Excerpt is the beginning of the text, for the row of the entry.
+	Excerpt     string
 	Attachments []attachment
 	Tags        []string
 	Labels      []string
@@ -628,6 +644,7 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 			Attachments: attachments(e), Tags: e.Tags, Labels: labels[e.ID], Read: e.IsRead, Starred: e.IsFavorite,
 			ShowFeed: prefs.ToplineWebsite != "none", ShowDate: prefs.ToplineDate == nil || *prefs.ToplineDate,
 		}
+		a.Excerpt = sanitize.Text(string(a.Content), excerptLength)
 		if address, err := url.Parse(e.Link); err == nil && (address.Scheme == "http" || address.Scheme == "https") {
 			a.Link = e.Link
 		}
@@ -696,6 +713,9 @@ type readerPage struct {
 	Here     string
 	Next     string
 	Expanded bool
+	// Views are the two ways to list entries, as links, for a visitor, who
+	// has no setting to keep the choice in.
+	Views []choice
 	// Before is the moment the page was made, as an entry identifier:
 	// "mark all as read" leaves what arrived later alone.
 	Before int64
@@ -706,6 +726,31 @@ type readerPage struct {
 	// Settings is the page of the settings of the feed, category or label
 	// being read, empty for the other streams.
 	Settings string
+}
+
+// The two ways to list entries: rows that open in place, or every entry
+// open.
+const (
+	viewList     = "list"
+	viewExpanded = "expanded"
+)
+
+// saveView keeps the way the user wants entries listed, the setting
+// display_posts, and goes back to the stream.
+func (h *Handler) saveView(w http.ResponseWriter, r *http.Request) {
+	if !h.form(w, r) {
+		return
+	}
+	expanded := r.PostForm.Get("view") == viewExpanded
+	err := h.db.UpdateUserSettings(r.Context(), state(r).who.user.ID, func(settings map[string]json.RawMessage) error {
+		attrs(settings).set("display_posts", expanded)
+		return nil
+	})
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	http.Redirect(w, r, h.localTarget(r.PostForm.Get("next")), http.StatusSeeOther)
 }
 
 // reader answers with a stream of entries.
@@ -734,9 +779,13 @@ func (h *Handler) reader(kind string) http.HandlerFunc {
 			v.Heading = s.name
 		}
 		v.Wide = true
+		expanded := prefs.DisplayPosts
+		if showing.view != "" {
+			expanded = showing.view == viewExpanded
+		}
 		page := readerPage{
 			Unread: s.unread, Sort: showing.sort, Asc: showing.asc, Query: showing.query, State: showing.state,
-			Asked: showing.asked, Path: s.path(), Here: showing.here(r.URL), Expanded: prefs.DisplayPosts,
+			Asked: showing.asked, Path: s.path(), Here: showing.here(r.URL), Expanded: expanded,
 			Before: h.now().UnixMicro(), CanChange: !who.anonymous,
 			CanRefresh: !who.anonymous || state(r).system.AllowAnonymousRefresh,
 		}
@@ -750,6 +799,13 @@ func (h *Handler) reader(kind string) http.HandlerFunc {
 			page.States = append(page.States, choice{
 				Name: v.T("state." + state), URL: showing.link(h, s.path(), "state", state), Current: state == showing.state,
 			})
+		}
+		if who.anonymous {
+			for _, view := range []string{viewList, viewExpanded} {
+				page.Views = append(page.Views, choice{
+					Name: v.T("view." + view), URL: showing.link(h, s.path(), "view", view), Current: expanded == (view == viewExpanded),
+				})
+			}
 		}
 		for _, name := range orderNames {
 			page.Sorts = append(page.Sorts, choice{Name: v.T("sort." + name), URL: name, Current: name == showing.sort})

@@ -698,6 +698,7 @@
   "tree.categories": "Categories",
   "tree.failing": "The last refresh of this feed failed",
   "tree.label": "Subscriptions",
+  "tree.feeds": "Feeds of %s",
   "tree.labels": "Labels",
   "tree.queries": "Saved queries",
   "tree.unread": {
@@ -709,5 +710,8 @@
   "validate.mail.body": "Hello %s,\n\nsomebody, probably you, gave this address for an account at %s.\nTo confirm it, open this link:\n\n%s\n\nIf it was not you, do nothing: the account stays closed.\n",
   "validate.mail.subject": "Confirm your address — %s",
   "validate.profile": "Change the address in the profile",
-  "validate.resend": "Send the letter again"
+  "validate.resend": "Send the letter again",
+  "view.expanded": "Expanded",
+  "view.label": "View",
+  "view.list": "List"
 }

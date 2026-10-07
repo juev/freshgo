@@ -211,3 +211,23 @@ func TestAllowedScheme(t *testing.T) {
 		}
 	}
 }
+
+func TestText(t *testing.T) {
+	for _, c := range []struct {
+		fragment string
+		limit    int
+		want     string
+	}{
+		{"", 10, ""},
+		{"<p>One</p><p>two&nbsp;&amp; three</p>", 50, "One two & three"},
+		{"  <b>Bold</b>and plain\n\n text <img src=x> end ", 50, "Bold and plain text end"},
+		{"<style>p{}</style>Shown<script>alert(1)</script> too", 50, "Shown too"},
+		{"<p>Привет, мир и все остальные</p>", 12, "Привет, мир…"},
+		{"exactly ten", 11, "exactly ten"},
+		{"a &lt;b&gt; c", 50, "a <b> c"},
+	} {
+		if got := Text(c.fragment, c.limit); got != c.want {
+			t.Errorf("Text(%q, %d) = %q, want %q", c.fragment, c.limit, got, c.want)
+		}
+	}
+}

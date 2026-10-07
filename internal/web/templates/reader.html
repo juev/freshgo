@@ -17,6 +17,14 @@
 <ul class="choices" aria-label="{{.T "state.label"}}">
 {{range .Data.States}}<li><a href="{{.URL}}"{{if .Current}} aria-current="true"{{end}}>{{.Name}}</a></li>
 {{end}}</ul>
+{{if .Data.Views}}<ul class="choices views" aria-label="{{.T "view.label"}}">
+{{range .Data.Views}}<li><a href="{{.URL}}"{{if .Current}} aria-current="true"{{end}}>{{.Name}}</a></li>
+{{end}}</ul>{{else}}
+<form method="post" action="{{.URL "/settings/view"}}" class="views" aria-label="{{.T "view.label"}}">
+<input type="hidden" name="next" value="{{.Data.Here}}">
+<button type="submit" name="view" value="list" class="link" aria-pressed="{{if .Data.Expanded}}false{{else}}true{{end}}">{{.T "view.list"}}</button>
+<button type="submit" name="view" value="expanded" class="link" aria-pressed="{{if .Data.Expanded}}true{{else}}false{{end}}">{{.T "view.expanded"}}</button>
+</form>{{end}}
 <form method="get" action="{{.URL .Data.Path}}" class="sorting">
 {{range $key, $values := .Data.Asked}}{{if and (ne $key "sort") (ne $key "order")}}<input type="hidden" name="{{$key}}" value="{{index $values 0}}">{{end}}{{end}}
 <label for="sort" class="visually-hidden">{{.T "sort.label"}}</label>

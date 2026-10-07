@@ -118,10 +118,16 @@
 	// says it is now, without touching the text being read.
 	const sync = (article, fresh) => {
 		const focused = article.contains(document.activeElement) ? document.activeElement : null;
-		const form = focused && focused.closest('.entry-actions form');
+		const form = focused && focused.closest('form.entry-action');
 		const action = form && form.getAttribute('action');
 		article.classList.toggle('read', fresh.classList.contains('read'));
-		for (const part of ['.entry-state', '.entry-actions', '.entry-labels']) {
+		// The menu of sharing is among the actions that are replaced: it
+		// stays open if it was.
+		const menu = article.querySelector('details.share');
+		const shared = Boolean(menu && menu.open);
+		const ways = 'a, button:not([hidden])';
+		const way = menu && menu.contains(focused) ? Array.from(menu.querySelectorAll(ways)).indexOf(focused) : -1;
+		for (const part of ['.entry-state', '.entry-star', '.entry-labels', '.entry-actions']) {
 			const old = article.querySelector(part);
 			const now = fresh.querySelector(part);
 			if (old && now) {
@@ -129,12 +135,19 @@
 			} else if (old) {
 				old.remove();
 			} else if (now) {
-				article.querySelector('.entry-body').append(now);
+				article.querySelector('.entry-actions').before(now);
 			}
 		}
-		if (action) {
+		revealShares(article);
+		const fresher = article.querySelector('details.share');
+		if (shared && fresher) {
+			fresher.open = true;
+		}
+		if (way >= 0 && fresher) {
+			(fresher.querySelectorAll(ways)[way] || fresher.querySelector('summary')).focus({ preventScroll: true });
+		} else if (action) {
 			// The button that was pressed is gone; its successor takes the focus.
-			const button = article.querySelector(`.entry-actions form[action="${CSS.escape(action)}"] button`);
+			const button = article.querySelector(`form.entry-action[action="${CSS.escape(action)}"] button`);
 			(button || article).focus({ preventScroll: true });
 		} else if (focused && !article.contains(document.activeElement)) {
 			article.focus({ preventScroll: true });
@@ -181,7 +194,7 @@
 	// entry that an answer has replaced meanwhile gives way to its successor.
 	const send = (form, article) => inTurn(() => {
 		const action = CSS.escape(form.getAttribute('action'));
-		const live = form.isConnected ? form : article.querySelector(`.entry-actions form[action="${action}"]`);
+		const live = form.isConnected ? form : article.querySelector(`form.entry-action[action="${action}"]`);
 		return live ? post(live, article) : false;
 	});
 
@@ -189,7 +202,7 @@
 	// With unreadOnly it leaves an entry alone that is read by the time its
 	// turn comes: the button would make it unread again.
 	const act = (article, kind, unreadOnly) => inTurn(() => {
-		const form = article.querySelector(`.entry-actions form[action$="/${kind}"]`);
+		const form = article.querySelector(`form.entry-action[action$="/${kind}"]`);
 		if (!form || (unreadOnly && article.classList.contains('read'))) {
 			return false;
 		}
@@ -199,7 +212,7 @@
 	if (entries) {
 		entries.addEventListener('submit', (event) => {
 			const article = event.target.closest('article.entry');
-			if (article && event.target.matches('.entry-actions form')) {
+			if (article && event.target.matches('form.entry-action')) {
 				event.preventDefault();
 				send(event.target, article);
 			}
@@ -291,6 +304,8 @@
 			ways[0].click();
 			return;
 		}
+		// The menu is in the text of the entry, which may be folded.
+		detailsOf(article).open = true;
 		menu.open = true;
 		if (ways.length) {
 			ways[0].focus();
@@ -382,6 +397,7 @@
 			const focused = tree.contains(document.activeElement) ? document.activeElement.getAttribute('href') : null;
 			fresh.open = old.open;
 			old.replaceWith(document.adoptNode(fresh));
+			foldBranches();
 			if (focused) {
 				const link = Array.from(tree.querySelectorAll('a')).find((a) => a.getAttribute('href') === focused);
 				(link || tree.querySelector('summary')).focus({ preventScroll: true });
@@ -389,7 +405,43 @@
 		}, 200);
 	}
 
+	// The categories the reader folded stay folded on this browser.
+	const foldedKey = 'freshgo.folded';
+	const foldedBranches = () => {
+		try {
+			return new Set(JSON.parse(localStorage.getItem(foldedKey)) || []);
+		} catch {
+			return new Set();
+		}
+	};
+	function foldBranches() {
+		const folded = foldedBranches();
+		for (const one of tree.querySelectorAll('details.branch')) {
+			// The category being read, or the one of the feed being read,
+			// shows where the reader is.
+			one.open = !folded.has(one.dataset.branch) || Boolean(one.querySelector('ul a[aria-current="page"]'));
+		}
+	}
+
 	if (tree) {
+		foldBranches();
+		tree.addEventListener('toggle', (event) => {
+			const one = event.target;
+			if (!one.matches || !one.matches('details.branch')) {
+				return;
+			}
+			const folded = foldedBranches();
+			if (one.open) {
+				folded.delete(one.dataset.branch);
+			} else {
+				folded.add(one.dataset.branch);
+			}
+			try {
+				localStorage.setItem(foldedKey, JSON.stringify(Array.from(folded)));
+			} catch {
+				// Without storage a fold lasts as long as the page.
+			}
+		}, true);
 		// On a narrow screen the tree stands above the list: fold it.
 		if (window.matchMedia('(max-width: 48rem)').matches) {
 			tree.querySelector('details').open = false;
@@ -406,7 +458,9 @@
 		if (!tree) {
 			return;
 		}
-		const links = Array.from(tree.querySelectorAll('li > a'));
+		// The feeds of a folded category are passed over.
+		const links = Array.from(tree.querySelectorAll('li a'))
+			.filter((a) => !a.closest('details.branch:not([open]) > ul'));
 		let at = links.findIndex((a) => a.getAttribute('aria-current') === 'page');
 		for (at += step; at >= 0 && at < links.length; at += step) {
 			if (!unreadOnly || links[at].parentElement.querySelector(':scope > .count')) {
@@ -683,7 +737,7 @@
 		}
 		case 'read': return current && act(current, 'read');
 		case 'star': return current && act(current, 'star');
-		case 'labels': return current && current.querySelector('.entry-actions form') && showLabels(current);
+		case 'labels': return current && current.querySelector('form.entry-action') && showLabels(current);
 		case 'share': return current && share(current);
 		case 'mark-all': return confirmMarkAll();
 		case 'more': return loadMore();

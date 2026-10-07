@@ -170,6 +170,7 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /entries/{id}/star", h.protect(members, h.starEntry))
 	h.mux.HandleFunc("POST /entries/{id}/labels", h.protect(members, h.labelEntry))
 	h.mux.HandleFunc("POST /read-all", h.protect(members, h.markAll))
+	h.mux.HandleFunc("POST /settings/view", h.protect(members, h.saveView))
 	h.mux.HandleFunc("POST /refresh", h.protect(readers, h.refreshNow))
 	h.mux.HandleFunc("GET /palette", h.protect(readers, h.palette))
 	h.mux.HandleFunc("GET /subscriptions", h.protect(members, h.subscriptions))

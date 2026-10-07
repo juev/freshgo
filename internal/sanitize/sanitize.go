@@ -8,6 +8,7 @@ package sanitize
 import (
 	"regexp"
 	"strings"
+	"unicode"
 
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
@@ -353,4 +354,52 @@ func write(b *strings.Builder, n *html.Node) {
 	b.WriteString("</")
 	b.WriteString(n.Data)
 	b.WriteByte('>')
+}
+
+// Text returns the beginning of the text of an HTML fragment for a line that
+// tells what the fragment is about: no markup, runs of white space as one
+// space, at most limit characters, the last of them an ellipsis when the text
+// goes on.
+func Text(fragment string, limit int) string {
+	var text []rune
+	space, skipped := false, 0
+	tokens := html.NewTokenizer(strings.NewReader(fragment))
+	// One character more than fits tells whether the text goes on.
+	for len(text) <= limit {
+		kind := tokens.Next()
+		if kind == html.ErrorToken {
+			break
+		}
+		if kind != html.TextToken {
+			// Markup between two words parts them, as it does on a page.
+			space = true
+			name, _ := tokens.TagName()
+			if tag := atom.Lookup(name); tag == atom.Script || tag == atom.Style {
+				if kind == html.StartTagToken {
+					skipped++
+				} else if kind == html.EndTagToken && skipped > 0 {
+					skipped--
+				}
+			}
+			continue
+		}
+		if skipped > 0 {
+			continue
+		}
+		for _, r := range html.UnescapeString(string(tokens.Raw())) {
+			if unicode.IsSpace(r) {
+				space = true
+				continue
+			}
+			if space && len(text) > 0 {
+				text = append(text, ' ')
+			}
+			space = false
+			text = append(text, r)
+		}
+	}
+	if len(text) <= limit {
+		return string(text)
+	}
+	return strings.TrimRight(string(text[:limit-1]), " ") + "…"
 }

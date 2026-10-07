@@ -114,7 +114,8 @@ func TestReadingScreen(t *testing.T) {
 			`<h1 id="stream-heading">Unread</h1>`, `<input type="search" id="q" name="q" value="" placeholder="Search">`,
 			`<a href="/?state=unread" aria-current="true">Unread</a>`, `<a href="/?state=all">All</a>`,
 			`<option value="added" selected>Time received</option>`, `<option value="desc" selected>`,
-			`action="/read-all"`, `>Mark as read</button>`, `>Star</button>`,
+			`action="/read-all"`, `>Mark as read</button>`, `aria-label="Star" title="Star" aria-pressed="false">☆</button>`,
+			`<button type="submit" name="view" value="list" class="link" aria-pressed="true">List</button>`,
 		} {
 			if !strings.Contains(body, want) {
 				t.Errorf("GET /: no %q in\n%s", want, body)
@@ -931,6 +932,79 @@ func TestEntryLabelsAtOnce(t *testing.T) {
 		}
 		if tags, err := s.db.Tags(ctx, alice.ID); err != nil || len(tags) != 3 {
 			t.Errorf("%d labels, %v; want the two of the reference and one new", len(tags), err)
+		}
+	})
+}
+
+// R3, R5: the row of an entry tells how its text begins, and entries are
+// listed as rows or open, as the user chose last or a visitor asks.
+func TestRowsAndViews(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		ctx := context.Background()
+		alice := s.user("alice")
+		long := strings.Repeat("word ", 60)
+		err := s.db.InsertEntries(ctx, alice.ID, []*store.Entry{
+			{FeedID: 1, GUID: "row", Title: "Row", Content: "<p>First <b>line</b></p><script>x()</script><p>second &amp; last.</p>"},
+			{FeedID: 1, GUID: "long", Title: "Long", Content: "<p>" + long + "</p>"},
+			{FeedID: 1, GUID: "bare", Title: "Bare"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		s.asAlice()
+		body := s.page("/feeds/1")
+		if !strings.Contains(body, `<span class="entry-excerpt">First line second &amp; last.</span>`) {
+			t.Errorf("the row does not tell how the text begins\n%s", body)
+		}
+		cut := `<span class="entry-excerpt">` + strings.TrimSpace(long)[:199] + "…</span>"
+		if !strings.Contains(body, cut) {
+			t.Errorf("a long text is not cut to %d characters", excerptLength)
+		}
+		if n := strings.Count(body, `class="entry-excerpt"`); n != len(listed(body))-1 {
+			t.Errorf("%d rows of %d tell how the text begins, want all but the one without text", n, len(listed(body)))
+		}
+		if strings.Contains(body, "<details open>\n<summary>\n<span class=\"entry-feed\"") {
+			t.Error("entries are open before anybody asked")
+		}
+
+		// The switch keeps the choice and comes back to the page.
+		a := s.post("/settings/view", url.Values{"view": {"expanded"}, "next": {"/feeds/1?state=all"}})
+		if a.status != http.StatusSeeOther || a.header.Get("Location") != "/feeds/1?state=all" {
+			t.Fatalf("POST /settings/view: status %d, Location %q", a.status, a.header.Get("Location"))
+		}
+		if s.settings("alice")["display_posts"] != true {
+			t.Errorf("display_posts = %v", s.settings("alice")["display_posts"])
+		}
+		body = s.page("/feeds/1")
+		if !strings.Contains(body, "<details open>\n<summary>\n<span class=\"entry-feed\"") ||
+			!strings.Contains(body, `value="expanded" class="link" aria-pressed="true">Expanded</button>`) {
+			t.Errorf("entries are not open after the switch\n%s", body)
+		}
+		// Never to another site.
+		if a := s.post("/settings/view", url.Values{"view": {"list"}, "next": {"https://example.org/"}}); a.header.Get("Location") != "/" {
+			t.Errorf("POST /settings/view with a foreign next: Location %q", a.header.Get("Location"))
+		}
+		if s.settings("alice")["display_posts"] != false {
+			t.Errorf("display_posts after the switch back = %v", s.settings("alice")["display_posts"])
+		}
+
+		// A visitor has no setting: the address carries the choice.
+		s.cookies = nil
+		s.system(func(system *store.System) { system.AllowAnonymous = true })
+		if a := s.post("/settings/view", url.Values{"view": {"expanded"}}); a.status != http.StatusForbidden {
+			t.Errorf("POST /settings/view by a visitor: status %d", a.status)
+		}
+		body = s.page("/feeds/1?view=expanded")
+		for _, want := range []string{
+			"<details open>", `<a href="/feeds/1?view=list">List</a>`, `<a href="/feeds/1?view=expanded" aria-current="true">Expanded</a>`,
+			`<a href="/feeds/1?state=all&amp;view=expanded">All</a>`,
+		} {
+			if !strings.Contains(body, want) {
+				t.Errorf("a visitor who asked for open entries: no %q in\n%s", want, body)
+			}
+		}
+		if strings.Contains(body, `action="/settings/view"`) || strings.Contains(s.page("/feeds/1"), "<details open>\n<summary>\n<span") {
+			t.Error("a visitor is offered the setting, or has entries open unasked")
 		}
 	})
 }

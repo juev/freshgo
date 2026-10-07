@@ -244,7 +244,7 @@ func TestPartsForTheScript(t *testing.T) {
 			t.Errorf("the entry is read %v, %v", e.IsRead, err)
 		}
 		a = s.part(http.MethodPost, path+"/star", "entry", url.Values{"starred": {"1"}, "next": {"/"}})
-		if a.status != http.StatusOK || !strings.Contains(a.body, ">Remove star</button>") || !strings.Contains(a.body, "Starred</span>") {
+		if a.status != http.StatusOK || !strings.Contains(a.body, `aria-label="Remove star" title="Remove star" aria-pressed="true">★</button>`) || !strings.Contains(a.body, "Starred</span>") {
 			t.Errorf("star for the script: status %d\n%s", a.status, a.body)
 		}
 		a = s.part(http.MethodPost, path+"/labels", "entry", url.Values{"label": {"1"}, "new": {"Blogs"}, "next": {"/"}})
