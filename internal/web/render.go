@@ -69,6 +69,8 @@ type view struct {
 	Wide bool
 	// Notice is what the action before this page has to say.
 	Notice string
+	// Config is what the script needs to know, as JSON.
+	Config string
 	// Data is what the page itself shows.
 	Data any
 }
@@ -96,7 +98,22 @@ func (h *Handler) view(r *http.Request, section, heading string) *view {
 	v.CanLogin = v.User == "" && s.system.AuthType == store.AuthForm
 	v.Localizer = h.texts.Match(language, r.Header.Get("Accept-Language"), s.system.Language)
 	v.Heading = v.T(heading)
+	v.Config = h.config(v, s.who)
 	return v
+}
+
+// fragment writes a part of the reading screen for the script to put in
+// place.
+func (h *Handler) fragment(w http.ResponseWriter, r *http.Request, name string, data any) {
+	var out bytes.Buffer
+	if err := h.pages["reader"].ExecuteTemplate(&out, name, data); err != nil {
+		h.log.Error("part of a page cannot be rendered", "part", name, "path", r.URL.Path, "error", err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = out.WriteTo(w)
 }
 
 // render writes a page. It is rendered in full first, so that a template
@@ -145,6 +162,12 @@ func (h *Handler) notice(w http.ResponseWriter, r *http.Request, v *view) string
 		return ""
 	}
 	n, _ := strconv.Atoi(number)
+	return noticeText(v, key, n)
+}
+
+// noticeText is the text of a notice about n things, empty when there is
+// no such notice.
+func noticeText(v *view, key string, n int) string {
 	if text := v.N(key, n); text != key {
 		return text
 	}

@@ -65,15 +65,19 @@ const maxLabelName = 191
 // reading are the settings of a user the reading screen goes by, under the
 // names FreshRSS gives them.
 type reading struct {
-	PostsPerPage  int             `json:"posts_per_page"`
-	DefaultView   string          `json:"default_view"`
-	Sort          string          `json:"sort"`
-	SortOrder     string          `json:"sort_order"`
-	HideReadFeeds *bool           `json:"hide_read_feeds"`
-	ShowFavUnread bool            `json:"show_fav_unread"`
-	DisplayPosts  bool            `json:"display_posts"`
-	Timezone      string          `json:"timezone"`
-	Queries       json.RawMessage `json:"queries"`
+	PostsPerPage  int    `json:"posts_per_page"`
+	DefaultView   string `json:"default_view"`
+	Sort          string `json:"sort"`
+	SortOrder     string `json:"sort_order"`
+	HideReadFeeds *bool  `json:"hide_read_feeds"`
+	ShowFavUnread bool   `json:"show_fav_unread"`
+	DisplayPosts  bool   `json:"display_posts"`
+	AutoLoadMore  *bool  `json:"auto_load_more"`
+	MarkWhen      struct {
+		Article *bool `json:"article"`
+	} `json:"mark_when"`
+	Timezone string          `json:"timezone"`
+	Queries  json.RawMessage `json:"queries"`
 }
 
 func readReading(u *store.User) reading {
@@ -640,6 +644,12 @@ func (h *Handler) reader(kind string) http.HandlerFunc {
 		}
 		hideRead := showing.state == stateUnread && (prefs.HideReadFeeds == nil || *prefs.HideReadFeeds)
 		page.Tree = h.tree(v, lib, s, showing, hideRead)
+		if r.Header.Get(fragmentHeader) == "tree" {
+			// The script asks for the tree alone to bring its counts up to date.
+			v.Data = page
+			h.fragment(w, r, "tree", v)
+			return
+		}
 
 		status := http.StatusOK
 		query, err := h.parseSearch(showing.query, prefs)
@@ -768,14 +778,59 @@ func isText(values url.Values) bool {
 	return true
 }
 
-// back sends the reader to the page the form was on, at the entry when
-// there is one, so that reading goes on where it was.
-func (h *Handler) back(w http.ResponseWriter, r *http.Request, entryID int64) {
-	target := h.localTarget(r.PostForm.Get("next"))
-	if entryID != 0 {
-		target += "#e" + strconv.FormatInt(entryID, 10)
+// fragmentHeader is what the script sends to get a part of a page instead
+// of the page: "tree" for the tree of a stream, "entry" for the entry an
+// action was about.
+const fragmentHeader = "X-Fragment"
+
+// noticeHeader carries what an action has to say with a part of a page,
+// encoded as a path segment.
+const noticeHeader = "X-Notice"
+
+// back ends an action on an entry. The reader is sent to the page the form
+// was on, at the entry, so that reading goes on where it was, and the page
+// says what notice names; the script gets the entry as it is now instead.
+func (h *Handler) back(w http.ResponseWriter, r *http.Request, entryID int64, notice string) {
+	next := r.PostForm.Get("next")
+	if r.Header.Get(fragmentHeader) == "entry" {
+		h.entryFragment(w, r, entryID, next, notice)
+		return
 	}
-	http.Redirect(w, r, target, http.StatusSeeOther)
+	if notice != "" {
+		h.notify(w, r, notice, 0)
+	}
+	http.Redirect(w, r, h.localTarget(next)+"#e"+strconv.FormatInt(entryID, 10), http.StatusSeeOther)
+}
+
+// entryFragment answers with an entry as a stream lists it.
+func (h *Handler) entryFragment(w http.ResponseWriter, r *http.Request, entryID int64, here, notice string) {
+	ctx, who := r.Context(), state(r).who
+	e, err := h.db.EntryByID(ctx, who.user.ID, entryID)
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	lib, err := h.library(ctx, who.user.ID)
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	v := h.view(r, "reader", "entry.untitled")
+	prefs := readReading(who.user)
+	shown, err := h.articles(ctx, v, lib, who.user.ID, prefs.location(), []*store.Entry{e})
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	if len(shown) == 0 {
+		h.fail(w, r, http.StatusNotFound)
+		return
+	}
+	if notice != "" {
+		w.Header().Set(noticeHeader, url.PathEscape(noticeText(v, notice, 0)))
+	}
+	v.Data = dict("Entry", shown[0], "Here", here, "Page", v, "Expanded", prefs.DisplayPosts, "CanChange", true)
+	h.fragment(w, r, "article", v.Data)
 }
 
 // markEntry makes an entry read or unread.
@@ -794,7 +849,7 @@ func (h *Handler) markEntry(w http.ResponseWriter, r *http.Request) {
 	if n > 0 {
 		h.hooks.EntriesRead.Call(ctx, hooks.EntriesRead{UserID: user.ID, IDs: []int64{e.ID}, IsRead: read})
 	}
-	h.back(w, r, e.ID)
+	h.back(w, r, e.ID, "")
 }
 
 // starEntry stars an entry or takes the star off.
@@ -810,7 +865,7 @@ func (h *Handler) starEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.hooks.EntriesFavorite.Call(ctx, hooks.EntriesFavorite{UserID: user.ID, IDs: []int64{e.ID}, IsFavorite: starred})
-	h.back(w, r, e.ID)
+	h.back(w, r, e.ID, "")
 }
 
 var errLabelLong = errors.New("web: the name of the label is too long")
@@ -894,8 +949,7 @@ func (h *Handler) labelEntry(w http.ResponseWriter, r *http.Request) {
 		h.broken(w, r, err)
 		return
 	}
-	h.notify(w, r, notice, 0)
-	h.back(w, r, e.ID)
+	h.back(w, r, e.ID, notice)
 }
 
 // markAll makes read the unread entries a page of the reading screen was
@@ -960,5 +1014,5 @@ func (h *Handler) markAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.notify(w, r, "notice.marked", n)
-	h.back(w, r, 0)
+	http.Redirect(w, r, h.localTarget(r.PostForm.Get("next")), http.StatusSeeOther)
 }

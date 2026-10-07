@@ -540,3 +540,128 @@ button.link {
 .sorting select {
 	max-width: 100%;
 }
+
+/* The entry keys act on. */
+.entry.current {
+	box-shadow: inset 3px 0 0 var(--accent);
+	padding-left: calc(var(--space) * 1.5);
+}
+
+.entries[aria-busy="true"]::after {
+	content: "…";
+	display: block;
+	padding: var(--space) 0;
+	color: var(--text-muted);
+}
+
+kbd {
+	padding: 0 calc(var(--space) * 0.75);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--bg-raised);
+	font-family: var(--font-mono);
+	font-size: 0.9em;
+	white-space: nowrap;
+}
+
+.dialog {
+	width: min(40rem, calc(100vw - var(--space) * 4));
+	max-height: calc(100vh - var(--space) * 8);
+	padding: calc(var(--space) * 2);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--bg);
+	color: var(--text);
+}
+
+.dialog[open] {
+	display: flex;
+	flex-direction: column;
+	gap: var(--space);
+}
+
+.dialog::backdrop {
+	background: rgb(0 0 0 / 50%);
+}
+
+.dialog header {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: calc(var(--space) * 2);
+}
+
+.dialog h2 {
+	margin: 0;
+	font-size: 1.1rem;
+}
+
+.dialog-body,
+.dialog [role="listbox"] {
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.dialog-buttons {
+	display: flex;
+	align-items: baseline;
+	gap: calc(var(--space) * 2);
+}
+
+.dialog table,
+.keys table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.dialog th,
+.dialog td,
+.keys th,
+.keys td {
+	padding: calc(var(--space) / 2) var(--space) calc(var(--space) / 2) 0;
+	border-bottom: 1px solid var(--border);
+	text-align: left;
+	vertical-align: baseline;
+	font-weight: 400;
+}
+
+.dialog thead th,
+.keys thead th {
+	color: var(--text-muted);
+	font-size: 0.85rem;
+}
+
+.keys input[type="text"] {
+	width: 10rem;
+	font-family: var(--font-mono);
+}
+
+.problem {
+	color: var(--danger);
+}
+
+.dialog [role="listbox"] {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.dialog [role="option"] {
+	display: flex;
+	align-items: baseline;
+	gap: calc(var(--space) * 2);
+	padding: calc(var(--space) / 2) var(--space);
+	border-radius: var(--radius);
+	cursor: pointer;
+}
+
+.dialog [role="option"][aria-selected="true"] {
+	background: var(--bg-raised);
+	box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.palette-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}

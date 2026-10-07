@@ -1,0 +1,28 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p>{{.T "keys.intro"}}</p>
+<p>{{.T "keys.notation"}}</p>
+{{if .Data.Failed}}<p class="alert" role="alert">{{.T "keys.failed"}}</p>{{end}}
+<form method="post" action="{{.URL "/settings/keys"}}" class="form keys">
+<p class="check">
+<input type="checkbox" id="single" name="single" value="1"{{if .Data.SingleKeys}} checked{{end}}>
+<label for="single">{{.T "keys.single"}}</label>
+</p>
+<table>
+<thead>
+<tr><th scope="col">{{.T "keys.action"}}</th><th scope="col">{{.T "keys.key"}}</th><th scope="col">{{.T "keys.default"}}</th></tr>
+</thead>
+<tbody>
+{{range .Data.Rows}}<tr>
+<th scope="row"><label for="key-{{.ID}}">{{.Name}}</label></th>
+<td><input type="text" id="key-{{.ID}}" name="key-{{.ID}}" value="{{.Key}}" size="12" autocomplete="off" autocapitalize="off" spellcheck="false"{{if .Problem}} aria-invalid="true" aria-describedby="key-{{.ID}}-problem"{{end}}>{{if .Problem}} <span class="problem" id="key-{{.ID}}-problem">{{.Problem}}</span>{{end}}</td>
+<td>{{if .Default}}<kbd>{{.Default}}</kbd>{{else}}{{$.T "keys.none"}}{{end}}</td>
+</tr>
+{{end}}</tbody>
+</table>
+<p>
+<button type="submit">{{.T "keys.save"}}</button>
+<button type="submit" name="reset" value="1">{{.T "keys.reset"}}</button>
+</p>
+</form>
+{{end}}

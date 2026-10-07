@@ -726,7 +726,7 @@ func TestVisitorOnlyReads(t *testing.T) {
 		if n := len(listed(body)); n != 18 {
 			t.Errorf("a visitor sees %d entries, want the 18 of the default user", n)
 		}
-		for _, unwanted := range []string{`action="/read-all"`, "/star\"", "/read\"", "Mark as read"} {
+		for _, unwanted := range []string{`action="/read-all"`, "/star\"", "/read\"", ">Mark as read<"} {
 			if strings.Contains(body, unwanted) {
 				t.Errorf("the page of a visitor has %q", unwanted)
 			}
