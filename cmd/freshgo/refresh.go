@@ -33,8 +33,8 @@ type services struct {
 	registry  *hooks.Registry
 	log       *slog.Logger
 	refresher *refresh.Refresher
-	// client is what the services fetch with.
-	client *fetch.Client
+	// images fetches the images of entries the server hands out.
+	images *fetch.Client
 	icons  *favicon.Service
 	// webSub is nil when WebSub is off.
 	webSub *websub.Service
@@ -44,7 +44,7 @@ type services struct {
 }
 
 func newServices(ctx context.Context, e env, conf *config.Config, db *store.Store) (*services, error) {
-	client, err := fetch.New(fetch.Options{
+	fetching := fetch.Options{
 		UserAgent: userAgent(), Allowlist: conf.Allowlist(),
 		// Read for every request: an administrator changes it while the
 		// server runs, and a refresh may run in a process of its own.
@@ -55,13 +55,21 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 			}
 			return fetch.ParseProxy(system.Proxy)
 		},
-	})
+	}
+	client, err := fetch.New(fetching)
+	if err != nil {
+		return nil, err
+	}
+	// Images are fetched with a client of their own: the pauses a site
+	// asks for and the requests it is given at once are kept by client, and
+	// what readers look at must not hold back the feeds of the site.
+	images, err := fetch.New(fetching)
 	if err != nil {
 		return nil, err
 	}
 	// What goes wrong for a user is kept for the user to read as well.
 	kept := journal.New(slog.NewTextHandler(e.stderr, nil), db)
-	s := &services{registry: newHooks(), log: slog.New(kept), close: kept.Close, client: client}
+	s := &services{registry: newHooks(), log: slog.New(kept), close: kept.Close, images: images}
 	s.registry.Init.Call(ctx, struct{}{})
 	s.icons = favicon.New(db, client, s.log)
 	s.refresher = refresh.New(db, client, s.registry, s.log)
