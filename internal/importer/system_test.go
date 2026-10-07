@@ -87,6 +87,10 @@ func TestImportedProxy(t *testing.T) {
 		{"the port of the address wins", map[string]any{"10004": "127.0.0.1:3128", "59": 8080}, "http://127.0.0.1:3128", false},
 		{"socks5h with credentials", map[string]any{"101": 7, "10004": "socks.example:1080", "10006": "bob:secret"}, "socks5h://bob:secret@socks.example:1080", false},
 		{"a scheme in the address", map[string]any{"101": 5, "10004": "socks5://10.0.0.1:1080"}, "socks5://10.0.0.1:1080", false},
+		{"the kind by the scheme alone", map[string]any{"10004": "socks5h://127.0.0.1:9050"}, "socks5h://127.0.0.1:9050", false},
+		{"the kind by the scheme, with credentials", map[string]any{"10004": "SOCKS5://u:p@10.0.0.1:1080"}, "socks5://u:p@10.0.0.1:1080", false},
+		{"the kind wins over the scheme", map[string]any{"101": 0, "10004": "socks5://10.0.0.1:1080"}, "http://10.0.0.1:1080", false},
+		{"a scheme freshgo has not", map[string]any{"10004": "socks4://10.0.0.1:1080"}, "", true},
 		{"switched off", map[string]any{"101": -1, "10004": "proxy.example:3128"}, "", false},
 		{"a kind freshgo has not", map[string]any{"101": 4, "10004": "proxy.example:1080"}, "", true},
 	} {

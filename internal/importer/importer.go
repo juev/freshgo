@@ -193,9 +193,14 @@ func readSystemSettings(conf map[string]any) (settings store.System, unreadable 
 // CURLOPT_PROXY and CURLOPT_PROXYUSERPWD.
 const (
 	curlProxyPort    = "59"
+	curlProxyType    = "101"
 	curlProxy        = "10004"
 	curlProxyUserPwd = "10006"
 )
+
+// curlProxyKinds are the values of CURLOPT_PROXYTYPE by the scheme that
+// spells them in the address of a proxy.
+var curlProxyKinds = map[string]int{"http": 0, "https": 2, "socks4": 4, "socks5": 5, "socks4a": 6, "socks5h": 7}
 
 // systemProxy returns the proxy the curl_options of an installation send
 // every feed through, as System.Proxy has it; empty when they name none.
@@ -205,11 +210,17 @@ func systemProxy(options any) (string, error) {
 	// PHP writes an empty array as a list.
 	curl, _ := options.(map[string]any)
 	address, _ := curl[curlProxy].(string)
-	if _, rest, found := strings.Cut(address, "://"); found {
+	scheme, rest, found := strings.Cut(address, "://")
+	if found {
 		address = rest
 	}
 	if address == "" {
 		return "", nil
+	}
+	curl = maps.Clone(curl)
+	// Without a kind of its own, cURL takes the one the address spells.
+	if kind, spelled := curlProxyKinds[strings.ToLower(scheme)]; found && spelled && curl[curlProxyType] == nil {
+		curl[curlProxyType] = kind
 	}
 	// The port may be an option of its own.
 	if port, set := curl[curlProxyPort]; set {
@@ -220,7 +231,6 @@ func systemProxy(options any) (string, error) {
 			}
 		}
 	}
-	curl = maps.Clone(curl)
 	curl[curlProxy] = address
 	raw, err := json.Marshal(map[string]any{"curl_params": curl})
 	if err != nil {
