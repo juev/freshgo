@@ -105,6 +105,7 @@ func TestReadingScreen(t *testing.T) {
 		for _, want := range []string{
 			`<a href="/" aria-current="page">Reading</a>`,
 			`<span class="count" id="stream-unread" title="18 unread entries">18</span>`,
+			`<a href="/" aria-current="page">All items</a> <span class="count" title="18 unread entries">18</span>`,
 			`<a href="/categories/2">Blogs</a> <span class="count" title="8 unread entries">8</span>`,
 			`<a href="/categories/3">Scraped &amp; parsed</a> <span class="count" title="10 unread entries">10</span>`,
 			`<a href="/feeds/1">Atom corpus</a> <span class="count" title="4 unread entries">4</span>`,
@@ -125,6 +126,11 @@ func TestReadingScreen(t *testing.T) {
 			if strings.Contains(body, unwanted) {
 				t.Errorf("GET /: the page has %q", unwanted)
 			}
+		}
+		// From a category the tree leads back to everything, with the
+		// state and the order of the page, as its other links do.
+		if inside := s.page("/categories/2?state=all&sort=title"); !strings.Contains(inside, `<a href="/?sort=title&amp;state=all">All items</a>`) {
+			t.Errorf("GET /categories/2: the tree does not lead back to everything\n%s", inside)
 		}
 		for _, gone := range []string{"/all", "/starred"} {
 			if a := s.get(gone); a.status != http.StatusNotFound {

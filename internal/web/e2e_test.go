@@ -378,7 +378,7 @@ func TestE2EDialogs(t *testing.T) {
 		b.press("J")
 		b.until("the first stream of the tree", `location.pathname === '/categories/2' && document.querySelector('.entries')`)
 		b.press("K")
-		b.until("back above the tree, where everything is", `location.pathname === '/' && document.querySelector('.entries')`)
+		b.until("back at the head of the tree, where everything is", `location.pathname === '/' && document.querySelector('#tree a[aria-current="page"]').textContent === 'All items'`)
 		b.press("U")
 		b.until("the next stream with unread entries", `location.pathname === '/categories/2'`)
 	})

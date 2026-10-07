@@ -56,6 +56,9 @@
 {{define "tree"}}
 <details open>
 <summary>{{.T "tree.label"}}</summary>
+<ul class="root">
+<li>{{template "branch" .Data.Tree.Root}}{{if .Data.Tree.Root.Unread}} <span class="count" title="{{.N "tree.unread" .Data.Tree.Root.Unread}}">{{.Data.Tree.Root.Unread}}</span>{{end}}</li>
+</ul>
 <h2>{{.T "tree.categories"}}</h2>
 <ul>
 {{range .Data.Tree.Categories}}<li>{{template "branch" .}}{{if .Unread}} <span class="count" title="{{$.N "tree.unread" .Unread}}">{{.Unread}}</span>{{end}}

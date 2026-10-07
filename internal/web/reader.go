@@ -473,6 +473,9 @@ type branch struct {
 
 // tree is what the reading screen offers to read.
 type tree struct {
+	// Root is the stream of everything, where the reader comes back to
+	// from a category or a feed.
+	Root branch
 	Categories []branch
 	Labels     []branch
 	Queries    []branch
@@ -489,6 +492,8 @@ func (h *Handler) tree(v *view, lib *library, current stream, state showing, hid
 		}
 	}
 	var t tree
+	root, _ := lib.stream(streamMain, 0)
+	t.Root = at(root, v.T("stream.main"))
 	for _, c := range lib.categories {
 		one, _ := lib.stream(streamCategory, c.ID)
 		category := at(one, "")
