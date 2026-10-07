@@ -71,6 +71,8 @@ func (h *Handler) media(w http.ResponseWriter, r *http.Request) {
 	etag := `"` + hex.EncodeToString(sum[:16]) + `"`
 	header.Set("Cache-Control", mediaCache)
 	header.Set("ETag", etag)
+	// Also with a 304, whose headers a browser puts over those it kept.
+	header.Set("Content-Security-Policy", mediaSecurityPolicy)
 	// The browser has the image: the site is not asked again.
 	if r.Header.Get("If-None-Match") == etag {
 		w.WriteHeader(http.StatusNotModified)
@@ -102,6 +104,5 @@ func (h *Handler) media(w http.ResponseWriter, r *http.Request) {
 	}
 	header.Set("Content-Type", resp.Header.Get("Content-Type"))
 	header.Set("Content-Length", strconv.Itoa(len(resp.Body)))
-	header.Set("Content-Security-Policy", mediaSecurityPolicy)
 	_, _ = w.Write(resp.Body)
 }

@@ -80,7 +80,8 @@ func TestMediaProxy(t *testing.T) {
 			!strings.Contains(a.header.Get("Content-Security-Policy"), "sandbox") || a.header.Get("X-Content-Type-Options") != "nosniff" {
 			t.Fatalf("GET %s: status %d, header %v, body %q", address, a.status, a.header, a.body)
 		}
-		if again := s.do(http.MethodGet, address, map[string]string{"If-None-Match": a.header.Get("ETag")}); again.status != http.StatusNotModified || again.body != "" || asked.Load() != before+1 {
+		if again := s.do(http.MethodGet, address, map[string]string{"If-None-Match": a.header.Get("ETag")}); again.status != http.StatusNotModified || again.body != "" || asked.Load() != before+1 ||
+			!strings.Contains(again.header.Get("Content-Security-Policy"), "sandbox") {
 			t.Errorf("the image a browser has: status %d, the site was asked %d times", again.status, asked.Load()-before)
 		}
 
