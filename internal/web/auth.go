@@ -49,6 +49,8 @@ type preferences struct {
 	// DarkMode is "auto" or "no" in FreshRSS; freshgo adds "dark".
 	DarkMode     string `json:"darkMode"`
 	ContentWidth string `json:"content_width"`
+	// Look is the look of the pages, "classic" unless it is "modern".
+	Look string `json:"look"`
 	// Enabled is false for a user who is kept out.
 	Enabled *bool `json:"enabled"`
 	IsAdmin bool  `json:"is_admin"`
@@ -69,6 +71,17 @@ func readPreferences(u *store.User) preferences {
 }
 
 func (p preferences) enabled() bool { return p.Enabled == nil || *p.Enabled }
+
+// looks are the looks the pages come in; the first is the usual one.
+var looks = []string{"classic", "modern"}
+
+// look is the value of data-look the stylesheet understands.
+func (p preferences) look() string {
+	if slices.Contains(looks, p.Look) {
+		return p.Look
+	}
+	return looks[0]
+}
 
 // theme is the value of data-theme the stylesheet understands.
 func (p preferences) theme() string {

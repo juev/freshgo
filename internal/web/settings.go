@@ -124,6 +124,10 @@ func (h *Handler) showDisplay(w http.ResponseWriter, r *http.Request, status int
 	for _, m := range []struct{ value, theme string }{{"auto", "auto"}, {"no", "light"}, {"dark", "dark"}} {
 		page.Options["darkMode"] = append(page.Options["darkMode"], option{m.value, v.T("settings.theme." + m.theme), m.theme == mode})
 	}
+	look := preferences{Look: s.text("look")}.look()
+	for _, name := range looks {
+		page.Options["look"] = append(page.Options["look"], option{name, v.T("settings.look." + name), name == look})
+	}
 	width := s.text("content_width")
 	if !slices.Contains(contentWidths, width) {
 		width = "thin"
@@ -153,6 +157,9 @@ func (h *Handler) saveDisplay(w http.ResponseWriter, r *http.Request) {
 		switch mode := form.Get("darkMode"); mode {
 		case "auto", "no", "dark":
 			s.set("darkMode", mode)
+		}
+		if look := form.Get("look"); slices.Contains(looks, look) {
+			s.set("look", look)
 		}
 		if width := form.Get("content_width"); slices.Contains(contentWidths, width) {
 			s.set("content_width", width)

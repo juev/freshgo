@@ -59,8 +59,9 @@ type view struct {
 	Heading string
 	// Section is the entry of the main menu the page belongs to.
 	Section string
-	// Theme is "auto", "light" or "dark".
+	// Theme is "auto", "light" or "dark"; Look is one of looks.
 	Theme string
+	Look  string
 	// User is the name of the user who is logged in, empty for a visitor.
 	User string
 	// CanLogin and CanLogout say whether the page offers to log in or out:
@@ -96,7 +97,7 @@ func (v *view) Asset(name string) string { return v.h.asset(name) }
 // the text that names the page.
 func (h *Handler) view(r *http.Request, section, heading string) *view {
 	s := state(r)
-	v := &view{h: h, Site: s.system.Title, Section: section, Theme: "auto"}
+	v := &view{h: h, Site: s.system.Title, Section: section, Theme: "auto", Look: looks[0]}
 	language := ""
 	if s.who != nil {
 		// A visitor reads the entries of the default user, not the
@@ -108,6 +109,7 @@ func (h *Handler) view(r *http.Request, section, heading string) *view {
 			v.Admin = s.who.admin
 		}
 		v.Theme = s.who.prefs.theme()
+		v.Look = s.who.prefs.look()
 		if slices.Contains(contentWidths[1:], s.who.prefs.ContentWidth) {
 			v.Width = s.who.prefs.ContentWidth
 		}

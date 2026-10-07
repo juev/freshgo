@@ -596,18 +596,24 @@ func TestUserPreferences(t *testing.T) {
 		s.setting("alice", "language", "ru")
 		s.setting("alice", "darkMode", "no")
 		english := map[string]string{"Accept-Language": "en"}
-		if a := s.do(http.MethodGet, "/about", english); !strings.Contains(a.body, `<html lang="en" data-theme="auto">`) {
+		if a := s.do(http.MethodGet, "/about", english); !strings.Contains(a.body, `<html lang="en" data-theme="auto" data-look="classic">`) {
 			t.Errorf("a page for a visitor:\n%.200s", a.body)
 		}
 		s.login("alice", "alice-web-password", nil)
-		if a := s.do(http.MethodGet, "/about", english); !strings.Contains(a.body, `<html lang="ru" data-theme="light">`) || !strings.Contains(a.body, ">Выйти</button>") {
+		if a := s.do(http.MethodGet, "/about", english); !strings.Contains(a.body, `<html lang="ru" data-theme="light" data-look="classic">`) || !strings.Contains(a.body, ">Выйти</button>") {
 			t.Errorf("a page for alice, who reads Russian on a light background:\n%s", a.body)
 		}
 		s.setting("alice", "darkMode", "dark")
+		s.setting("alice", "look", "modern")
 		// A language freshgo does not speak leaves the choice to the browser.
 		s.setting("alice", "language", "zh-CN")
-		if a := s.do(http.MethodGet, "/about", english); !strings.Contains(a.body, `<html lang="en" data-theme="dark">`) {
+		if a := s.do(http.MethodGet, "/about", english); !strings.Contains(a.body, `<html lang="en" data-theme="dark" data-look="modern">`) {
 			t.Errorf("a page for alice with a dark background:\n%.200s", a.body)
+		}
+		// A look there is not is the usual one.
+		s.setting("alice", "look", "origine")
+		if a := s.do(http.MethodGet, "/about", english); !strings.Contains(a.body, `data-theme="dark" data-look="classic">`) {
+			t.Errorf("a page for alice with a look there is not:\n%.200s", a.body)
 		}
 	})
 }

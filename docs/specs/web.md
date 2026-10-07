@@ -93,7 +93,7 @@ Subscriptions, for users who are logged in. Every form answers with a redirect t
 
 Settings of a user, for users who are logged in; the main menu leads there, and every page of the section names the others. A form stores its fields under the names FreshRSS has for them in the settings of the user and leaves every other setting alone; one that cannot be stored answers with 400 and the form as it was sent.
 
-- U55. `/settings/display`: `language` (a language of the interface), `timezone` (a name of the tz database, or empty for the zone of the server; one there is not is refused), `darkMode` (`auto`, `no`, `dark`), `content_width` (`thin`, `medium`, `large`, `no_limit`: how wide a page and the text of an entry get, as `data-width` of `html`), and what the row of an entry in a list names: its feed (`topline_website`, `full` or `none`) and its date (`topline_date`).
+- U55. `/settings/display`: `language` (a language of the interface), `timezone` (a name of the tz database, or empty for the zone of the server; one there is not is refused), `look` (`classic`, `modern`: the look of every page, `data-look` of `html`; anything else, and a visitor, get `classic`), `darkMode` (`auto`, `no`, `dark`: each look has light and dark colours), `content_width` (`thin`, `medium`, `large`, `no_limit`: how wide a page and the text of an entry get, as `data-width` of `html`), and what the row of an entry in a list names: its feed (`topline_website`, `full` or `none`) and its date (`topline_date`).
 - U56. `/settings/reading`: `posts_per_page` (1 to 500), `default_view` (`adaptive`, `unread`, `all`, `unread_or_favorite`), `sort` and `sort_order`, `display_posts`, `auto_load_more`, `hide_read_feeds`, `show_fav_unread`, `mark_updated_article_unread`; of `mark_when` the keys `article`, `reception`, `gone`, `max_n_unread` (a number, or `false`) and `same_title_in_feed` (a number, or `false`), its other keys staying as FreshRSS left them; and the searches whose matches are marked read and starred, in `filters`. The reading screen, the script and the refresh go by what is stored (U21–U23, U37, U39; `refresh.md`, F18–F24).
 - U57. `/settings/archiving`: `ttl_default` and the rules of keeping entries (`archiving`, as U43 has them, without a level above). `POST /settings/archiving/purge` applies the rules of the user, the categories and the feeds now (`Refresher.PurgeUser`) and says how many entries went.
 - U58. `/settings/privacy`: `send_referrer_allowlist`, host names one a line. A frame an entry embeds from one of these hosts gets `referrerpolicy="strict-origin-when-cross-origin"`; everything else an entry loads is told nothing (U5).
@@ -142,7 +142,7 @@ Extension points.
 
 ## Invariants
 
-- Colours are CSS variables in one place, in a light and a dark set; the dark one applies by the preference of the system unless the page says `data-theme="light"`, and always when it says `data-theme="dark"`.
+- Colours are CSS variables in one place, a light and a dark set for each look; the dark one applies by the preference of the system unless the page says `data-theme="light"`, and always when it says `data-theme="dark"`.
 - Keyboard focus is visible on every control.
 - Installation-wide settings live in the database: `storage.md`, S29.
 

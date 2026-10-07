@@ -1,19 +1,8 @@
-/* freshgo: one stylesheet, light and dark. Colours and sizes are variables;
+/* freshgo: one stylesheet, two looks, each light and dark. Colours and sizes are variables;
    nothing below the :root blocks names a colour. */
 
 :root {
 	color-scheme: light dark;
-	--bg: #ffffff;
-	--bg-raised: #f4f4f2;
-	--text: #1c1c1a;
-	--text-muted: #5c5c57;
-	--border: #d3d3ce;
-	--accent: #0b57c2;
-	--accent-text: #ffffff;
-	--danger: #b3261e;
-	--focus: #0b57c2;
-	--unread: #1c1c1a;
-	--read: #6b6b66;
 	--font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
 	--font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 	--reading-width: 44rem;
@@ -21,41 +10,104 @@
 	--radius: 0.375rem;
 }
 
-/* The dark palette: by the system's preference unless the user chose light,
-   and whenever the user chose dark. */
-@media (prefers-color-scheme: dark) {
-	:root:not([data-theme="light"]) {
-		--bg: #161615;
-		--bg-raised: #222220;
-		--text: #e8e8e3;
-		--text-muted: #a3a39c;
-		--border: #3b3b37;
-		--accent: #8ab4f8;
-		--accent-text: #10100f;
-		--danger: #f2b8b5;
-		--focus: #8ab4f8;
-		--unread: #e8e8e3;
-		--read: #8f8f88;
-	}
-}
-
 :root[data-theme="dark"] {
 	color-scheme: dark;
-	--bg: #161615;
-	--bg-raised: #222220;
-	--text: #e8e8e3;
-	--text-muted: #a3a39c;
-	--border: #3b3b37;
-	--accent: #8ab4f8;
-	--accent-text: #10100f;
-	--danger: #f2b8b5;
-	--focus: #8ab4f8;
-	--unread: #e8e8e3;
-	--read: #8f8f88;
 }
 
 :root[data-theme="light"] {
 	color-scheme: light;
+}
+
+/* The looks. Each has a light palette and a dark one; the dark one applies by
+   the system's preference unless the user chose light, and whenever the user
+   chose dark. */
+
+:root[data-look="classic"] {
+	--bg: #ffffff;
+	--bg-raised: #ebeff9;
+	--text: #1a1a1a;
+	--text-muted: #5a5f6b;
+	--border: #c5d0e6;
+	--accent: #1a3fc4;
+	--accent-text: #ffffff;
+	--danger: #b3261e;
+	--focus: #1a3fc4;
+	--unread: #000000;
+	--read: #555b66;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root[data-look="classic"]:not([data-theme="light"]) {
+		--bg: #14161c;
+		--bg-raised: #1d2233;
+		--text: #e6e8ee;
+		--text-muted: #a4a9b8;
+		--border: #353d54;
+		--accent: #8fb0ff;
+		--accent-text: #0d1020;
+		--danger: #f2b8b5;
+		--focus: #8fb0ff;
+		--unread: #f2f4f8;
+		--read: #9aa0ae;
+	}
+}
+
+:root[data-look="classic"][data-theme="dark"] {
+	--bg: #14161c;
+	--bg-raised: #1d2233;
+	--text: #e6e8ee;
+	--text-muted: #a4a9b8;
+	--border: #353d54;
+	--accent: #8fb0ff;
+	--accent-text: #0d1020;
+	--danger: #f2b8b5;
+	--focus: #8fb0ff;
+	--unread: #f2f4f8;
+	--read: #9aa0ae;
+}
+
+:root[data-look="modern"] {
+	--bg: #ffffff;
+	--bg-raised: #f5f5f5;
+	--text: #222222;
+	--text-muted: #666666;
+	--border: #dcdcdc;
+	--accent: #1155cc;
+	--accent-text: #ffffff;
+	--danger: #b3261e;
+	--focus: #1155cc;
+	--unread: #111111;
+	--read: #6b6b6b;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root[data-look="modern"]:not([data-theme="light"]) {
+		--bg: #1b1b1b;
+		--bg-raised: #262626;
+		--text: #e8e8e8;
+		--text-muted: #a8a8a8;
+		--border: #3d3d3d;
+		--accent: #8ab4f8;
+		--accent-text: #10100f;
+		--danger: #f2b8b5;
+		--focus: #8ab4f8;
+		--unread: #f2f2f2;
+		--read: #939393;
+	}
+}
+
+:root[data-look="modern"][data-theme="dark"] {
+	--bg: #1b1b1b;
+	--bg-raised: #262626;
+	--text: #e8e8e8;
+	--text-muted: #a8a8a8;
+	--border: #3d3d3d;
+	--accent: #8ab4f8;
+	--accent-text: #10100f;
+	--danger: #f2b8b5;
+	--focus: #8ab4f8;
+	--unread: #f2f2f2;
+	--read: #939393;
 }
 
 *,

@@ -177,7 +177,9 @@ var axeSource = func() string {
 	return string(source)
 }()
 
-// accessible checks the page with axe-core and fails on what it finds.
+// accessible checks the page with axe-core, in every look and in its light
+// and its dark colours, and fails on what it finds. The page is left as it
+// was.
 func (b *browser) accessible(what string) {
 	b.t.Helper()
 	if !read[bool](b, `typeof axe !== 'undefined'`) {
@@ -190,12 +192,22 @@ func (b *browser) accessible(what string) {
 			HTML string `json:"html"`
 		} `json:"nodes"`
 	}
-	violations := read[[]violation](b, `axe.run(document).then(result => result.violations)`, chromedp.EvalAwaitPromise)
-	for _, v := range violations {
-		for _, node := range v.Nodes {
-			b.t.Errorf("%s: axe finds %s (%s) at %.300s", what, v.ID, v.Help, node.HTML)
+	was := read[[]string](b, `[document.documentElement.dataset.look, document.documentElement.dataset.theme]`)
+	dress := func(look, theme string) {
+		b.run(chromedp.Evaluate[chromedp.Void](`document.documentElement.dataset.look = '` + look + `'; document.documentElement.dataset.theme = '` + theme + `'`))
+	}
+	for _, look := range looks {
+		for _, theme := range []string{"light", "dark"} {
+			dress(look, theme)
+			violations := read[[]violation](b, `axe.run(document).then(result => result.violations)`, chromedp.EvalAwaitPromise)
+			for _, v := range violations {
+				for _, node := range v.Nodes {
+					b.t.Errorf("%s, %s and %s: axe finds %s (%s) at %.300s", what, look, theme, v.ID, v.Help, node.HTML)
+				}
+			}
 		}
 	}
+	dress(was[0], was[1])
 }
 
 func e(id int64) string { return "#e" + strconv.FormatInt(id, 10) }
@@ -737,13 +749,16 @@ func TestE2ESettings(t *testing.T) {
 		b.until("the page of the display", `location.pathname === '/settings/display'`)
 		b.accessible("the settings of the display")
 		// A select is changed by typing into it.
+		b.tabTo("#look")
+		b.press("Reader 2")
 		b.tabTo("#darkMode")
 		b.press("D")
 		b.tabTo(`form[action$="/settings/display"] button[type="submit"]`)
 		b.press(kb.Enter)
-		b.until("the dark colours", `document.documentElement.dataset.theme === 'dark' && document.querySelector('#messages').textContent.includes('Saved.')`)
-		if got := s.settings("alice")["darkMode"]; got != "dark" {
-			t.Errorf("darkMode after the form = %v", got)
+		b.until("the other look in dark colours",
+			`document.documentElement.dataset.look === 'modern' && document.documentElement.dataset.theme === 'dark' && document.querySelector('#messages').textContent.includes('Saved.')`)
+		if got := s.settings("alice"); got["darkMode"] != "dark" || got["look"] != "modern" {
+			t.Errorf("after the form darkMode = %v, look = %v", got["darkMode"], got["look"])
 		}
 
 		// The menu of the section is a Tab away; so is every page of it.

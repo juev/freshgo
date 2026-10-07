@@ -13,6 +13,11 @@
 <span class="hint" id="timezone-hint">{{.T "settings.timezone.hint"}}</span>
 </p>
 <p>
+<label for="look">{{.T "settings.look"}}</label>
+<select id="look" name="look">
+{{template "options" (index .Data.Options "look")}}</select>
+</p>
+<p>
 <label for="darkMode">{{.T "settings.theme"}}</label>
 <select id="darkMode" name="darkMode">
 {{template "options" (index .Data.Options "darkMode")}}</select>

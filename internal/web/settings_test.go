@@ -51,16 +51,16 @@ func TestUserSettings(t *testing.T) {
 
 		// Display: the form as shown changes nothing it shows.
 		form := s.formAt("/settings/display", "/settings/display")
-		for key, value := range map[string]string{"language": "ru", "timezone": " Europe/Moscow ", "darkMode": "dark", "content_width": "large"} {
+		for key, value := range map[string]string{"language": "ru", "timezone": " Europe/Moscow ", "darkMode": "dark", "content_width": "large", "look": "modern"} {
 			form.Set(key, value)
 		}
 		form.Del("show_date")
 		location, body := s.follow("/settings/display", form)
-		if location != "/settings/display" || notice(body) != "Сохранено." || !strings.Contains(body, `<html lang="ru" data-theme="dark" data-width="large">`) {
+		if location != "/settings/display" || notice(body) != "Сохранено." || !strings.Contains(body, `<html lang="ru" data-theme="dark" data-look="modern" data-width="large">`) {
 			t.Errorf("after saving the display: at %q, notice %q\n%.300s", location, notice(body), body)
 		}
 		got := s.settings("alice")
-		for key, want := range map[string]any{"language": "ru", "timezone": "Europe/Moscow", "darkMode": "dark", "content_width": "large", "topline_date": false, "topline_website": "full"} {
+		for key, want := range map[string]any{"language": "ru", "timezone": "Europe/Moscow", "darkMode": "dark", "content_width": "large", "look": "modern", "topline_date": false, "topline_website": "full"} {
 			if got[key] != want {
 				t.Errorf("setting %s = %v, want %v", key, got[key], want)
 			}

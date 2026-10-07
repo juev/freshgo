@@ -113,7 +113,7 @@ func (s *site) get(target string) answer { return s.do(http.MethodGet, target, n
 func TestAboutPage(t *testing.T) {
 	eachEngine(t, Options{}, func(t *testing.T, s *site) {
 		a := s.get("/about")
-		if a.status != http.StatusOK || !strings.HasPrefix(a.body, "<!DOCTYPE html>\n<html lang=\"en\" data-theme=\"auto\">") {
+		if a.status != http.StatusOK || !strings.HasPrefix(a.body, "<!DOCTYPE html>\n<html lang=\"en\" data-theme=\"auto\" data-look=\"classic\">") {
 			t.Fatalf("GET /about: status %d, body starts %.80q", a.status, a.body)
 		}
 		for _, want := range []string{
