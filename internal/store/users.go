@@ -145,3 +145,47 @@ func (s *Store) UpdateUserSettings(ctx context.Context, userID int64, change fun
 		return nil
 	})
 }
+
+// UserTotals is how much a user keeps.
+type UserTotals struct {
+	Feeds   int
+	Entries int
+}
+
+// UserTotals counts the feeds and the entries of every user that has any,
+// by user.
+func (s *Store) UserTotals(ctx context.Context) (map[int64]UserTotals, error) {
+	totals := map[int64]UserTotals{}
+	for i, query := range []string{
+		`SELECT user_id, COUNT(*) FROM feeds GROUP BY user_id`,
+		`SELECT user_id, COUNT(*) FROM entries GROUP BY user_id`,
+	} {
+		rows, err := s.query(ctx, query)
+		if err != nil {
+			return nil, fmt.Errorf("store: user totals: %w", err)
+		}
+		for rows.Next() {
+			var (
+				userID int64
+				n      int
+			)
+			if err := rows.Scan(&userID, &n); err != nil {
+				_ = rows.Close()
+				return nil, fmt.Errorf("store: user totals: %w", err)
+			}
+			t := totals[userID]
+			if i == 0 {
+				t.Feeds = n
+			} else {
+				t.Entries = n
+			}
+			totals[userID] = t
+		}
+		err = rows.Err()
+		_ = rows.Close()
+		if err != nil {
+			return nil, fmt.Errorf("store: user totals: %w", err)
+		}
+	}
+	return totals, nil
+}

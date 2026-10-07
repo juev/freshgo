@@ -256,7 +256,7 @@ func TestPartsForTheScript(t *testing.T) {
 		}
 		for _, want := range []place{
 			{"Unread", "/", "Stream"}, {"Starred", "/starred", "Stream"}, {"Blogs", "/categories/2", "Category"},
-			{"No identifiers", "/feeds/8", "Feed"}, {"work & play", "/labels/2", "Label"}, {"Keys", "/settings/keys", "Page"},
+			{"No identifiers", "/feeds/8", "Feed"}, {"work & play", "/labels/2", "Label"}, {"Keys", "/settings/keys", "Settings"}, {"Users", "/admin/users", "Administration"},
 		} {
 			if !slices.Contains(places, want) {
 				t.Errorf("the palette lacks %+v among %+v", want, places)

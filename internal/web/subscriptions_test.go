@@ -168,7 +168,7 @@ func notice(body string) string {
 }
 
 // rawKey finds a text that was not found and is shown as its key.
-var rawKey = regexp.MustCompile(`[>"](add|category|feed|form|label|notice|palette|period|problems|retention|sub|settings|admin|stats|query|share|transfer)\.[a-z0-9:_.-]+[<"]`)
+var rawKey = regexp.MustCompile(`[>"](add|category|feed|form|label|notice|palette|period|problems|retention|sub|settings|admin|stats|query|share|transfer|log|reauth|language)\.[a-z0-9:_.-]+[<"]`)
 
 // shown asks for a page, which has to be there with every text it names.
 func (s *site) shown(target string) string {

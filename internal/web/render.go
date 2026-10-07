@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"net/http"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -64,6 +65,13 @@ type view struct {
 	// CanLogin and CanLogout say whether the page offers to log in or out:
 	// neither makes sense when users are told apart without a login.
 	CanLogin, CanLogout bool
+	// Admin says the reader is an administrator.
+	Admin bool
+	// Width is how wide the text of an entry may get, empty for the usual.
+	Width string
+	// Tabs are the pages of the section the page belongs to, when it is
+	// one of several.
+	Tabs []choice
 	// Wide lets the page take the width of the window: it has columns of
 	// its own.
 	Wide bool
@@ -92,8 +100,12 @@ func (h *Handler) view(r *http.Request, section, heading string) *view {
 			language = s.who.prefs.Language
 			v.User = s.who.user.Name
 			v.CanLogout = s.who.session != nil
+			v.Admin = s.who.admin
 		}
 		v.Theme = s.who.prefs.theme()
+		if slices.Contains(contentWidths[1:], s.who.prefs.ContentWidth) {
+			v.Width = s.who.prefs.ContentWidth
+		}
 	}
 	v.CanLogin = v.User == "" && s.system.AuthType == store.AuthForm
 	v.Localizer = h.texts.Match(language, r.Header.Get("Accept-Language"), s.system.Language)

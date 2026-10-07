@@ -10,6 +10,7 @@ import (
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/hooks"
+	"github.com/juev/freshgo/internal/journal"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/websub"
@@ -41,7 +42,8 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 	if err != nil {
 		return nil, err
 	}
-	s := &services{registry: newHooks(), log: slog.New(slog.NewTextHandler(e.stderr, nil))}
+	// What goes wrong for a user is kept for the user to read as well.
+	s := &services{registry: newHooks(), log: slog.New(journal.New(slog.NewTextHandler(e.stderr, nil), db))}
 	s.registry.Init.Call(ctx, struct{}{})
 	s.icons = favicon.New(db, client, s.log)
 	s.refresher = refresh.New(db, client, s.registry, s.log)

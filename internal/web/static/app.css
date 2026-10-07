@@ -776,3 +776,54 @@ input[type="file"] {
 .category h2 {
 	margin-bottom: 0;
 }
+
+/* Sections of several pages name them in a row above the page. */
+.tabs ul {
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--space) * 2);
+	list-style: none;
+	padding: 0;
+	margin: 0 0 calc(var(--space) * 2);
+	border-bottom: 1px solid var(--border);
+	padding-bottom: var(--space);
+}
+
+.tabs a[aria-current="page"] {
+	color: var(--text);
+	font-weight: 600;
+	text-decoration: none;
+}
+
+table.data {
+	border-collapse: collapse;
+	width: 100%;
+	margin: calc(var(--space) * 2) 0;
+}
+
+table.data th,
+table.data td {
+	text-align: left;
+	vertical-align: top;
+	padding: var(--space);
+	border-bottom: 1px solid var(--border);
+}
+
+table.log td:last-child {
+	overflow-wrap: anywhere;
+	font-family: var(--font-mono);
+	font-size: 0.875rem;
+}
+
+/* How wide the text of an entry may get is the reader's choice. */
+:root[data-width="medium"] {
+	--reading-width: 56rem;
+}
+
+:root[data-width="large"] {
+	--reading-width: 72rem;
+}
+
+:root[data-width="no_limit"] {
+	--reading-width: none;
+}

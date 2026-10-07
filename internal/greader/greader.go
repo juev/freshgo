@@ -73,6 +73,8 @@ type request struct {
 	body string
 	form url.Values
 	user *store.User
+	// limits are what the installation lets a user have.
+	limits store.Limits
 }
 
 // get returns a query parameter, post a form field, either the one found
@@ -163,6 +165,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
+	system, err := h.db.System(ctx)
+	if err != nil {
+		h.fail(w, err)
+		return
+	}
+	if !system.APIEnabled {
+		// What FreshRSS answers while an administrator has the API off.
+		text(w, http.StatusServiceUnavailable, "Service Unavailable!")
+		return
+	}
+	q.limits = system.Limits
 	if q.parts[1] != "accounts" {
 		user, status, err := h.authenticate(ctx, r)
 		switch {

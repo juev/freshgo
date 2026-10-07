@@ -1,0 +1,32 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{template "problem" .Data.Problem}}
+<form method="post" action="{{.URL "/settings/display"}}" class="form">
+<p>
+<label for="language">{{.T "settings.language"}}</label>
+<select id="language" name="language">
+{{template "options" (index .Data.Options "language")}}</select>
+</p>
+<p>
+<label for="timezone">{{.T "settings.timezone"}}</label>
+<input type="text" id="timezone" name="timezone" value="{{index .Data.Text "timezone"}}" autocapitalize="off" spellcheck="false" aria-describedby="timezone-hint">
+<span class="hint" id="timezone-hint">{{.T "settings.timezone.hint"}}</span>
+</p>
+<p>
+<label for="darkMode">{{.T "settings.theme"}}</label>
+<select id="darkMode" name="darkMode">
+{{template "options" (index .Data.Options "darkMode")}}</select>
+</p>
+<p>
+<label for="content_width">{{.T "settings.width"}}</label>
+<select id="content_width" name="content_width">
+{{template "options" (index .Data.Options "content_width")}}</select>
+</p>
+<fieldset>
+<legend>{{.T "settings.row"}}</legend>
+{{template "check" (dict "Name" "show_feed" "Label" (.T "settings.row.feed") "On" (index .Data.On "show_feed"))}}
+{{template "check" (dict "Name" "show_date" "Label" (.T "settings.row.date") "On" (index .Data.On "show_date"))}}
+</fieldset>
+<p><button type="submit">{{.T "keys.save"}}</button></p>
+</form>
+{{end}}

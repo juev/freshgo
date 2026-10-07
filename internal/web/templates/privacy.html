@@ -1,0 +1,12 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{template "problem" .Data.Problem}}
+<form method="post" action="{{.URL "/settings/privacy"}}" class="form settings">
+<p>
+<label for="hosts">{{.T "settings.referrer"}}</label>
+<textarea id="hosts" name="hosts" rows="5" spellcheck="false" autocapitalize="off" aria-describedby="hosts-hint">{{index .Data.Text "hosts"}}</textarea>
+<span class="hint" id="hosts-hint">{{.T "settings.referrer.hint"}}</span>
+</p>
+<p><button type="submit">{{.T "keys.save"}}</button></p>
+</form>
+{{end}}

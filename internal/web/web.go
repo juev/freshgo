@@ -44,6 +44,9 @@ type Options struct {
 	BaseURL string
 	// Version is shown on the about page.
 	Version string
+	// FetchAllowlist are the internal addresses feeds may be fetched from,
+	// shown to administrators.
+	FetchAllowlist []string
 	// TrustedProxies are the reverse proxies whose word is taken for who
 	// the user is, when the installation tells users apart that way.
 	TrustedProxies []netip.Prefix
@@ -63,9 +66,10 @@ type Handler struct {
 	pages   pages
 	// assets maps the name of a static file to what its address ends with
 	// to tell its versions apart.
-	assets  map[string]string
-	mux     *http.ServeMux
-	proxies []netip.Prefix
+	assets    map[string]string
+	mux       *http.ServeMux
+	proxies   []netip.Prefix
+	allowlist []string
 	// crossOrigin turns down requests that change something and come from
 	// another site.
 	crossOrigin *http.CrossOriginProtection
@@ -79,7 +83,7 @@ type Handler struct {
 func New(o Options) (*Handler, error) {
 	h := &Handler{
 		db: o.DB, log: o.Log, refresher: o.Refresher, baseURL: o.BaseURL, version: o.Version, assets: map[string]string{},
-		proxies: o.TrustedProxies, crossOrigin: http.NewCrossOriginProtection(), now: time.Now, hooks: o.Hooks,
+		proxies: o.TrustedProxies, allowlist: o.FetchAllowlist, crossOrigin: http.NewCrossOriginProtection(), now: time.Now, hooks: o.Hooks,
 	}
 	if h.hooks == nil {
 		h.hooks = &hooks.Registry{}
@@ -176,6 +180,32 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("GET /subscriptions/labels/{id}", h.protect(members, h.labelPage))
 	h.mux.HandleFunc("POST /subscriptions/labels/{id}", h.protect(members, h.saveLabel))
 	h.mux.HandleFunc("POST /subscriptions/labels/{id}/delete", h.protect(members, h.deleteLabel))
+	h.mux.HandleFunc("GET /settings/display", h.protect(members, h.displayPage))
+	h.mux.HandleFunc("POST /settings/display", h.protect(members, h.saveDisplay))
+	h.mux.HandleFunc("GET /settings/reading", h.protect(members, h.readingPage))
+	h.mux.HandleFunc("POST /settings/reading", h.protect(members, h.saveReading))
+	h.mux.HandleFunc("GET /settings/archiving", h.protect(members, h.archivingPage))
+	h.mux.HandleFunc("POST /settings/archiving", h.protect(members, h.saveArchiving))
+	h.mux.HandleFunc("POST /settings/archiving/purge", h.protect(members, h.purgeNow))
+	h.mux.HandleFunc("GET /settings/privacy", h.protect(members, h.privacyPage))
+	h.mux.HandleFunc("POST /settings/privacy", h.protect(members, h.savePrivacy))
+	h.mux.HandleFunc("GET /settings/profile", h.protect(members, h.profilePage))
+	h.mux.HandleFunc("POST /settings/profile", h.protect(members, h.saveProfile))
+	h.mux.HandleFunc("POST /settings/profile/password", h.protect(members, h.changePassword))
+	h.mux.HandleFunc("POST /settings/profile/api-password", h.protect(members, h.changeAPIPassword))
+	h.mux.HandleFunc("POST /settings/profile/delete", h.protect(members, h.deleteAccount))
+	h.mux.HandleFunc("GET /log", h.protect(members, h.journal))
+	h.mux.HandleFunc("POST /log/clear", h.protect(members, h.clearJournal))
+	h.mux.HandleFunc("GET /reauth", h.protect(members, h.reauthPage))
+	h.mux.HandleFunc("POST /reauth", h.protect(members, h.reauth))
+	h.mux.HandleFunc("GET /admin/users", h.administrators(h.usersPage))
+	h.mux.HandleFunc("POST /admin/users", h.administrators(h.createUser))
+	h.mux.HandleFunc("GET /admin/users/{name}", h.administrators(h.userPage))
+	h.mux.HandleFunc("POST /admin/users/{name}", h.administrators(h.updateUser))
+	h.mux.HandleFunc("GET /admin/system", h.administrators(h.systemPage))
+	h.mux.HandleFunc("POST /admin/system", h.administrators(h.saveSystem))
+	h.mux.HandleFunc("GET /admin/authentication", h.administrators(h.authenticationPage))
+	h.mux.HandleFunc("POST /admin/authentication", h.administrators(h.saveAuthentication))
 	h.mux.HandleFunc("GET /settings/keys", h.protect(members, h.keysPage))
 	h.mux.HandleFunc("POST /settings/keys", h.protect(members, h.saveKeys))
 	h.mux.HandleFunc("GET /about", h.about)

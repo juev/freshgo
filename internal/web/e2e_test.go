@@ -149,7 +149,7 @@ func (b *browser) eventually(what string, ok func() bool) {
 func (b *browser) tabTo(selector string) {
 	b.t.Helper()
 	quoted, _ := json.Marshal(selector)
-	for range 120 {
+	for range 300 {
 		b.press(kb.Tab)
 		if read[bool](b, `Boolean(document.activeElement && document.activeElement.matches(`+string(quoted)+`))`) {
 			return
@@ -621,13 +621,75 @@ func TestE2EDarkAndNarrow(t *testing.T) {
 			t.Error("the narrow page scrolls sideways")
 		}
 		// The pages of settings, dark and narrow at once.
-		for _, page := range []string{"/subscriptions", "/subscriptions/add", "/subscriptions/feeds/3", "/subscriptions/categories/2", "/subscriptions/labels/1", "/subscriptions/problems", "/subscriptions/transfer"} {
+		for _, page := range []string{"/subscriptions", "/subscriptions/add", "/subscriptions/feeds/3", "/subscriptions/categories/2", "/subscriptions/labels/1", "/subscriptions/problems", "/subscriptions/transfer",
+			"/settings/display", "/settings/reading", "/settings/archiving", "/settings/privacy", "/settings/profile", "/log",
+			"/admin/users", "/admin/users/bob", "/admin/system", "/admin/authentication", "/log?all=1", "/reauth"} {
 			b.open(page)
 			b.accessible(page + ", dark and narrow")
 			if got := b.text(`document.documentElement.scrollWidth <= window.innerWidth`); got != "true" {
 				t.Errorf("%s scrolls sideways on a narrow screen", page)
 			}
 		}
+	})
+}
+
+// R7, R11, R15: settings are changed and a user is added with the keyboard
+// alone.
+func TestE2ESettings(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		freshgoKeys(s)
+		b := browse(t, s)
+		b.login("alice")
+
+		// The palette knows the pages of settings.
+		b.chord("k", kb.ModifierCtrl)
+		b.until("the palette", `document.activeElement.id === 'palette-input'`)
+		b.press("Display")
+		b.until("the page found", `document.querySelector('[role="option"][aria-selected="true"]').textContent.includes('Display')`)
+		b.press(kb.Enter)
+		b.until("the page of the display", `location.pathname === '/settings/display'`)
+		b.accessible("the settings of the display")
+		// A select is changed by typing into it.
+		b.tabTo("#darkMode")
+		b.press("D")
+		b.tabTo(`form[action$="/settings/display"] button[type="submit"]`)
+		b.press(kb.Enter)
+		b.until("the dark colours", `document.documentElement.dataset.theme === 'dark' && document.querySelector('#messages').textContent.includes('Saved.')`)
+		if got := s.settings("alice")["darkMode"]; got != "dark" {
+			t.Errorf("darkMode after the form = %v", got)
+		}
+
+		// The menu of the section is a Tab away; so is every page of it.
+		b.tabTo(`nav.tabs a[href$="/settings/reading"]`)
+		b.press(kb.Enter)
+		b.until("the page of reading", `location.pathname === '/settings/reading'`)
+		b.accessible("the settings of reading, dark")
+		b.tabTo("#display_posts")
+		b.press(" ")
+		b.tabTo(`form[action$="/settings/reading"] button[type="submit"]`)
+		b.press(kb.Enter)
+		b.until("the settings saved", `document.querySelector('#messages').textContent.includes('Saved.')`)
+		if got := s.settings("alice")["display_posts"]; got != true {
+			t.Errorf("display_posts after the form = %v", got)
+		}
+
+		// An administrator adds a user.
+		b.open("/admin/users")
+		b.accessible("the users")
+		b.tabTo("#name")
+		b.press("carol")
+		b.tabTo("#new")
+		b.press("carol-password")
+		b.tabTo("#again")
+		b.press("carol-password", kb.Enter)
+		b.until("the user added", `document.querySelector('#messages').textContent.includes('User added.')`)
+		if s.user("carol").Name != "carol" {
+			t.Error("the user was not added")
+		}
+		b.tabTo(`a[href$="/admin/users/carol"]`)
+		b.press(kb.Enter)
+		b.until("the page of the user", `location.pathname === '/admin/users/carol'`)
+		b.accessible("the page of a user")
 	})
 }
 

@@ -301,6 +301,11 @@ func (r *Refresher) Purge(ctx context.Context) ([]PurgeStats, error) {
 	return all, nil
 }
 
+// PurgeUser does for one user what Purge does for all.
+func (r *Refresher) PurgeUser(ctx context.Context, u *store.User) (PurgeStats, error) {
+	return r.purgeUser(ctx, u)
+}
+
 func (r *Refresher) purgeUser(ctx context.Context, u *store.User) (PurgeStats, error) {
 	st := PurgeStats{User: u.Name}
 	j := &job{user: u, conf: readUserSettings(u.Settings)}

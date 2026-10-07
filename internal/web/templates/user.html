@@ -1,0 +1,41 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p class="page-links"><a href="{{.URL "/admin/users"}}">{{.T "admin.users.heading"}}</a></p>
+{{template "problem" .Data.Problem}}
+<p>{{if .Data.Row.Default}}{{.T "admin.user.default"}}{{else if .Data.Row.Admin}}{{.T "admin.user.admin"}}{{else}}{{.T "admin.user.plain"}}{{end}}{{if not .Data.Row.Enabled}}, {{.T "admin.user.disabled"}}{{end}}.
+{{.N "admin.user.feed-count" .Data.Row.Feeds}}, {{.N "admin.user.entry-count" .Data.Row.Entries}}.{{if .Data.Email}} {{.Data.Email}}{{end}}</p>
+
+<h2>{{.T "settings.password"}}</h2>
+<form method="post" action="{{.URL "/admin/users"}}/{{.Data.Row.Name}}" class="form">
+<input type="hidden" name="action" value="password">
+<p>
+<label for="new">{{.T "settings.password.new"}}</label>
+<input type="password" id="new" name="new" autocomplete="new-password" minlength="7" required aria-describedby="new-hint">
+<span class="hint" id="new-hint">{{.T "admin.user.password.hint"}}</span>
+</p>
+<p>
+<label for="again">{{.T "settings.password.again"}}</label>
+<input type="password" id="again" name="again" autocomplete="new-password" minlength="7" required>
+</p>
+<p><button type="submit">{{.T "settings.password.submit"}}</button></p>
+</form>
+
+{{if not .Data.Protected}}
+<h2>{{.T "form.actions"}}</h2>
+<form method="post" action="{{.URL "/admin/users"}}/{{.Data.Row.Name}}" class="feed-actions">
+{{if .Data.Row.Enabled}}<button type="submit" name="action" value="disable">{{.T "admin.user.disable"}}</button>
+{{else}}<button type="submit" name="action" value="enable">{{.T "admin.user.enable"}}</button>{{end}}
+{{if .Data.Row.Admin}}<button type="submit" name="action" value="demote">{{.T "admin.user.demote"}}</button>
+{{else}}<button type="submit" name="action" value="promote">{{.T "admin.user.promote"}}</button>{{end}}
+</form>
+<details class="menu danger">
+<summary>{{.T "admin.user.delete"}}</summary>
+<form method="post" action="{{.URL "/admin/users"}}/{{.Data.Row.Name}}">
+<p>{{.T "admin.user.delete.confirm"}}</p>
+<button type="submit" name="action" value="delete">{{.T "form.delete"}}</button>
+</form>
+</details>
+{{else}}
+<p class="muted">{{.T "admin.user.protected"}}</p>
+{{end}}
+{{end}}

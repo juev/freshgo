@@ -1,0 +1,37 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<table class="data">
+<thead>
+<tr><th scope="col">{{.T "login.username"}}</th><th scope="col">{{.T "admin.user.role"}}</th><th scope="col">{{.T "admin.user.feeds"}}</th><th scope="col">{{.T "admin.user.entries"}}</th></tr>
+</thead>
+<tbody>
+{{range .Data.Users}}<tr>
+<th scope="row"><a href="{{.URL}}">{{.Name}}</a></th>
+<td>{{if .Default}}{{$.T "admin.user.default"}}{{else if .Admin}}{{$.T "admin.user.admin"}}{{else}}{{$.T "admin.user.plain"}}{{end}}{{if not .Enabled}}, {{$.T "admin.user.disabled"}}{{end}}</td>
+<td>{{.Feeds}}</td>
+<td>{{.Entries}}</td>
+</tr>
+{{end}}</tbody>
+</table>
+
+<h2>{{.T "admin.user.add"}}</h2>
+{{template "problem" .Data.Problem}}
+<form method="post" action="{{.URL "/admin/users"}}" class="form">
+<p>
+<label for="name">{{.T "login.username"}}</label>
+<input type="text" id="name" name="name" value="{{.Data.Name}}" maxlength="39" autocomplete="off" autocapitalize="off" spellcheck="false" required aria-describedby="name-hint">
+<span class="hint" id="name-hint">{{.T "admin.user.name.hint"}}</span>
+</p>
+<p>
+<label for="new">{{.T "login.password"}}</label>
+<input type="password" id="new" name="new" autocomplete="new-password" minlength="7" required aria-describedby="new-hint">
+<span class="hint" id="new-hint">{{.T "settings.password.hint"}}</span>
+</p>
+<p>
+<label for="again">{{.T "settings.password.again"}}</label>
+<input type="password" id="again" name="again" autocomplete="new-password" minlength="7" required>
+</p>
+{{template "check" (dict "Name" "admin" "Label" (.T "admin.user.make-admin") "On" false)}}
+<p><button type="submit">{{.T "admin.user.add.submit"}}</button></p>
+</form>
+{{end}}

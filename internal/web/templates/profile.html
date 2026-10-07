@@ -1,0 +1,63 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{template "problem" .Data.Problem}}
+<form method="post" action="{{.URL "/settings/profile"}}" class="form">
+<p>
+<label for="email">{{.T "settings.email"}}</label>
+<input type="email" id="email" name="email" value="{{.Data.Email}}" autocomplete="email">
+</p>
+<p>
+<label for="token">{{.T "settings.token"}}</label>
+<input type="text" id="token" name="token" value="{{.Data.Token}}" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="token-hint">
+<span class="hint" id="token-hint">{{.T "settings.token.hint"}}</span>
+</p>
+<p><button type="submit">{{.T "keys.save"}}</button></p>
+</form>
+
+<h2>{{.T "settings.password"}}</h2>
+<form method="post" action="{{.URL "/settings/profile/password"}}" class="form">
+{{if .Data.HasPassword}}
+<p>
+<label for="password">{{.T "settings.password.current"}}</label>
+<input type="password" id="password" name="password" autocomplete="current-password" required>
+</p>
+{{end}}
+<p>
+<label for="new">{{.T "settings.password.new"}}</label>
+<input type="password" id="new" name="new" autocomplete="new-password" minlength="7" required aria-describedby="new-hint">
+<span class="hint" id="new-hint">{{.T "settings.password.hint"}}</span>
+</p>
+<p>
+<label for="again">{{.T "settings.password.again"}}</label>
+<input type="password" id="again" name="again" autocomplete="new-password" minlength="7" required>
+</p>
+<p><button type="submit">{{.T "settings.password.submit"}}</button></p>
+</form>
+
+<h2>{{.T "settings.api-password"}}</h2>
+<form method="post" action="{{.URL "/settings/profile/api-password"}}" class="form">
+<p>
+<label for="api-new">{{.T "settings.api-password.new"}}</label>
+<input type="password" id="api-new" name="new" autocomplete="new-password" aria-describedby="api-hint">
+<span class="hint" id="api-hint">{{if .Data.HasAPI}}{{.T "settings.api-password.has"}}{{else}}{{.T "settings.api-password.none"}}{{end}} {{.T "settings.api-password.hint"}}</span>
+</p>
+<p><button type="submit">{{.T "settings.api-password.submit"}}</button></p>
+</form>
+
+{{if .Data.CanDelete}}
+<h2>{{.T "settings.delete"}}</h2>
+<details class="menu danger">
+<summary>{{.T "settings.delete.open"}}</summary>
+<form method="post" action="{{.URL "/settings/profile/delete"}}" class="form">
+<p>{{.T "settings.delete.confirm"}}</p>
+{{if .Data.HasPassword}}
+<p>
+<label for="delete-password">{{.T "settings.password.current"}}</label>
+<input type="password" id="delete-password" name="password" autocomplete="current-password" required>
+</p>
+{{end}}
+<button type="submit">{{.T "form.delete"}}</button>
+</form>
+</details>
+{{end}}
+{{end}}

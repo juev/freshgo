@@ -1,0 +1,31 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p>{{if .Data.All}}{{.T "log.intro.all"}}{{else}}{{.T "log.intro"}}{{end}}</p>
+<form method="get" action="{{.URL "/log"}}" class="search" role="search">
+{{if .Data.All}}<input type="hidden" name="all" value="1">{{end}}
+<label for="q">{{.T "search.label"}}</label>
+<input type="search" id="q" name="q" value="{{.Data.Query}}">
+<button type="submit">{{.T "search.submit"}}</button>
+</form>
+{{if .Data.Rows}}
+<table class="data log">
+<thead>
+<tr><th scope="col">{{.T "log.time"}}</th><th scope="col">{{.T "log.level"}}</th>{{if .Data.All}}<th scope="col">{{.T "login.username"}}</th>{{end}}<th scope="col">{{.T "log.message"}}</th></tr>
+</thead>
+<tbody>
+{{range .Data.Rows}}<tr>
+<td>{{.Time}}</td><td>{{.Level}}</td>{{if $.Data.All}}<td>{{.User}}</td>{{end}}<td>{{.Message}}</td>
+</tr>
+{{end}}</tbody>
+</table>
+{{if .Data.Next}}<p class="more"><a href="{{.Data.Next}}" rel="next">{{.T "log.older"}}</a></p>{{end}}
+<details class="menu danger">
+<summary>{{.T "log.clear"}}</summary>
+<form method="post" action="{{.URL "/log/clear"}}">
+{{if .Data.All}}<input type="hidden" name="all" value="1">{{end}}
+<p>{{if .Data.All}}{{.T "log.clear.confirm.all"}}{{else}}{{.T "log.clear.confirm"}}{{end}}</p>
+<button type="submit">{{.T "form.delete"}}</button>
+</form>
+</details>
+{{else}}<p class="muted">{{.T "log.empty"}}</p>{{end}}
+{{end}}

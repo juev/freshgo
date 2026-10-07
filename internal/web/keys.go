@@ -288,7 +288,7 @@ func (h *Handler) keysPage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) showKeys(w http.ResponseWriter, r *http.Request, status int, keys map[string]string, single bool, problems map[string]string) {
-	v := h.view(r, "keys", "keys.heading")
+	v := h.settingsView(r, "keys")
 	page := keysPage{SingleKeys: single, Failed: len(problems) > 0}
 	for _, a := range actions {
 		page.Rows = append(page.Rows, keyRow{ID: a.id, Name: v.T("key." + a.id), Key: keys[a.id], Default: a.key, Problem: problems[a.id]})
@@ -405,8 +405,15 @@ func (h *Handler) palette(w http.ResponseWriter, r *http.Request) {
 			place{v.T("sub.heading"), h.url("/subscriptions"), v.T("palette.page")},
 			place{v.T("add.heading"), h.url("/subscriptions/add"), v.T("palette.page")},
 			place{v.T("transfer.heading"), h.url("/subscriptions/transfer"), v.T("palette.page")},
-			place{v.T("problems.heading"), h.url("/subscriptions/problems"), v.T("palette.page")},
-			place{v.T("keys.heading"), h.url("/settings/keys"), v.T("palette.page")})
+			place{v.T("problems.heading"), h.url("/subscriptions/problems"), v.T("palette.page")})
+		for _, tab := range settingsTabs {
+			places = append(places, place{v.T("settings." + tab.name + ".heading"), h.url(tab.path), v.T("palette.settings")})
+		}
+		if who.admin {
+			for _, tab := range adminTabs {
+				places = append(places, place{v.T("admin." + tab.name + ".heading"), h.url(tab.path), v.T("palette.admin")})
+			}
+		}
 	}
 	places = append(places, place{v.T("about.heading"), h.url("/about"), v.T("palette.page")})
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

@@ -1,0 +1,51 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{template "problem" .Data.Problem}}
+<form method="post" action="{{.URL "/admin/system"}}" class="form settings">
+<p>
+<label for="title">{{.T "admin.system.title"}}</label>
+<input type="text" id="title" name="title" value="{{.Data.System.Title}}" maxlength="191" required>
+</p>
+<p>
+<label for="language">{{.T "admin.system.language"}}</label>
+<select id="language" name="language">
+{{template "options" .Data.Languages}}</select>
+</p>
+<fieldset>
+<legend>{{.T "admin.system.limits"}}</legend>
+<p>
+<label for="max_feeds">{{.T "admin.system.max-feeds"}}</label>
+<input type="number" id="max_feeds" name="max_feeds" min="0" value="{{.Data.System.Limits.MaxFeeds}}" required aria-describedby="limits-hint">
+</p>
+<p>
+<label for="max_categories">{{.T "admin.system.max-categories"}}</label>
+<input type="number" id="max_categories" name="max_categories" min="0" value="{{.Data.System.Limits.MaxCategories}}" required aria-describedby="limits-hint">
+<span class="hint" id="limits-hint">{{.T "admin.system.limits.hint"}}</span>
+</p>
+<p>
+<label for="max_registrations">{{.T "admin.system.max-registrations"}}</label>
+<input type="number" id="max_registrations" name="max_registrations" min="0" value="{{.Data.System.Limits.MaxRegistrations}}" required aria-describedby="registrations-hint">
+<span class="hint" id="registrations-hint">{{.T "admin.system.max-registrations.hint"}}</span>
+</p>
+<p>
+<label for="closed_registration_message">{{.T "admin.system.closed-message"}}</label>
+<textarea id="closed_registration_message" name="closed_registration_message" rows="2">{{.Data.System.ClosedRegistrationMessage}}</textarea>
+</p>
+</fieldset>
+<fieldset>
+<legend>{{.T "admin.system.logins"}}</legend>
+<p>
+<label for="cookie_days">{{.T "admin.system.cookie-days"}}</label>
+<input type="number" id="cookie_days" name="cookie_days" min="0" value="{{.Data.CookieDays}}" required>
+</p>
+<p>
+<label for="reauth_minutes">{{.T "admin.system.reauth-minutes"}}</label>
+<input type="number" id="reauth_minutes" name="reauth_minutes" min="0" value="{{.Data.ReauthMinutes}}" required>
+</p>
+</fieldset>
+<p><button type="submit">{{.T "keys.save"}}</button></p>
+</form>
+<h2>{{.T "admin.system.allowlist"}}</h2>
+<p>{{.T "admin.system.allowlist.hint"}}</p>
+{{if .Data.Allowlist}}<ul>{{range .Data.Allowlist}}<li><code>{{.}}</code></li>{{end}}</ul>{{else}}<p class="muted">{{.T "problems.none"}}</p>{{end}}
+{{end}}

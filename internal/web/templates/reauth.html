@@ -1,0 +1,13 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p>{{.T "reauth.intro"}}</p>
+{{template "problem" .Data.Error}}
+<form method="post" action="{{.URL "/reauth"}}" class="form">
+<input type="hidden" name="next" value="{{.Data.Next}}">
+<p>
+<label for="password">{{.T "login.password"}}</label>
+<input type="password" id="password" name="password" autocomplete="current-password" required autofocus>
+</p>
+<p><button type="submit">{{.T "reauth.submit"}}</button></p>
+</form>
+{{end}}

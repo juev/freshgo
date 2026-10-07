@@ -585,3 +585,56 @@ func TestDepartures(t *testing.T) {
 		}
 	})
 }
+
+// R15: an administrator turns the API off, and the limits of the
+// installation hold for what clients add.
+func TestSwitchAndLimits(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		system := func(change func(*store.System)) {
+			t.Helper()
+			s, err := w.db.System(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			change(&s)
+			if err := w.db.SetSystem(ctx, s); err != nil {
+				t.Fatal(err)
+			}
+		}
+		system(func(s *store.System) { s.APIEnabled = false })
+		for _, path := range []string{"/reader/api/0/tag/list?output=json", "/accounts/ClientLogin?Email=alice&Passwd=alice-password", "/api/greader.php/reader/api/0/token"} {
+			if status, body := w.get(w.auth, path); status != http.StatusServiceUnavailable || body != "Service Unavailable!" {
+				t.Errorf("GET %s with the API off: status %d, body %q", path, status, body)
+			}
+		}
+		system(func(s *store.System) { s.APIEnabled, s.Limits.MaxCategories = true, 2 })
+		if status, _ := w.get(w.auth, "/reader/api/0/tag/list?output=json"); status != http.StatusOK {
+			t.Fatalf("the API switched on again: status %d", status)
+		}
+
+		// One category beside the default one is all alice may have: a feed
+		// moved to one more goes to the default category.
+		one := w.feed(w.alice, &store.Feed{URL: "http://one.example/feed", Name: "One"})
+		two := w.feed(w.alice, &store.Feed{URL: "http://two.example/feed", Name: "Two"})
+		_, token := w.get(w.auth, "/reader/api/0/token")
+		move := func(f *store.Feed, category string) {
+			t.Helper()
+			form := url.Values{"ac": {"edit"}, "s": {"feed/" + strconv.FormatInt(f.ID, 10)}, "a": {"user/-/label/" + category}, "T": {strings.TrimSpace(token)}}
+			if status, body := w.post(w.auth, "/reader/api/0/subscription/edit", form.Encode()); status != http.StatusOK {
+				t.Fatalf("moving a feed: status %d, body %q", status, body)
+			}
+		}
+		move(one, "First")
+		move(two, "Second")
+		categories, err := w.db.Categories(ctx, w.alice.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		moved, _ := w.db.FeedByID(ctx, w.alice.ID, one.ID)
+		kept, _ := w.db.FeedByID(ctx, w.alice.ID, two.ID)
+		if len(categories) != 2 || moved.CategoryID == store.DefaultCategoryID || kept.CategoryID != store.DefaultCategoryID {
+			t.Errorf("%d categories; the first feed is in %d, the second in %d", len(categories), moved.CategoryID, kept.CategoryID)
+		}
+	})
+}

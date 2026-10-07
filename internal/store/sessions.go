@@ -84,3 +84,12 @@ func (s *Store) DeleteExpiredSessions(ctx context.Context, now int64) error {
 	}
 	return nil
 }
+
+// ConfirmSession records that the user of a session typed the password at
+// the given time.
+func (s *Store) ConfirmSession(ctx context.Context, tokenHash string, at int64) error {
+	if _, err := s.exec(ctx, `UPDATE sessions SET authenticated = ? WHERE token_hash = ?`, at, tokenHash); err != nil {
+		return fmt.Errorf("store: confirm session: %w", err)
+	}
+	return nil
+}

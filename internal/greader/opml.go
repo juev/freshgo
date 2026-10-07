@@ -24,7 +24,7 @@ func (h *Handler) subscriptionExport(ctx context.Context, q *request) error {
 // subscriptionImport adds the subscriptions of the OPML document in the
 // body and fetches the entries of the new feeds.
 func (h *Handler) subscriptionImport(ctx context.Context, q *request) error {
-	added, err := opml.Import(ctx, h.db, h.hooks, q.user, []byte(q.body), opml.Limits{})
+	added, err := opml.Import(ctx, h.db, h.hooks, q.user, []byte(q.body), opml.Limits{Feeds: q.limits.MaxFeeds, Categories: q.limits.MaxCategories})
 	if err != nil && !errors.Is(err, opml.ErrIncomplete) && !errors.Is(err, opml.ErrDocument) {
 		return err
 	}

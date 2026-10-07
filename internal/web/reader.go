@@ -17,6 +17,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/PuerkitoBio/goquery"
+
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/sanitize"
 	"github.com/juev/freshgo/internal/search"
@@ -81,6 +83,12 @@ type reading struct {
 	} `json:"mark_when"`
 	Timezone string          `json:"timezone"`
 	Queries  json.RawMessage `json:"queries"`
+	// ToplineWebsite and ToplineDate say whether the row of an entry names
+	// its feed and its date; Referrers are the hosts whose frames are told
+	// where the reader comes from.
+	ToplineWebsite string   `json:"topline_website"`
+	ToplineDate    *bool    `json:"topline_date"`
+	Referrers      []string `json:"send_referrer_allowlist"`
 }
 
 func readReading(u *store.User) reading {
@@ -539,11 +547,14 @@ type article struct {
 	Labels      []string
 	Read        bool
 	Starred     bool
+	// ShowFeed and ShowDate say what the row of the entry in a list names.
+	ShowFeed, ShowDate bool
 }
 
 // articles prepares entries for a page. Handlers of EntryBeforeDisplay see
 // each and may leave it out.
-func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID int64, loc *time.Location, entries []*store.Entry) ([]article, error) {
+func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID int64, prefs reading, entries []*store.Entry) ([]article, error) {
+	loc := prefs.location()
 	ids := make([]int64, len(entries))
 	for i, e := range entries {
 		ids[i] = e.ID
@@ -568,8 +579,9 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 			Authors: strings.Join(e.Authors, ", "), Date: date.Format("2006-01-02 15:04"), DateTime: date.Format(time.RFC3339),
 			// What is stored was cleaned when it was fetched, but not all of it by
 			// freshgo: an import brings what FreshRSS let through.
-			Content:     template.HTML(sanitize.HTML(e.Content, e.Link, nil)), //nolint:gosec // cleaned on this line
+			Content:     template.HTML(withReferrers(sanitize.HTML(e.Content, e.Link, nil), prefs.Referrers)), //nolint:gosec // cleaned on this line
 			Attachments: attachments(e), Tags: e.Tags, Labels: labels[e.ID], Read: e.IsRead, Starred: e.IsFavorite,
+			ShowFeed: prefs.ToplineWebsite != "none", ShowDate: prefs.ToplineDate == nil || *prefs.ToplineDate,
 		}
 		if address, err := url.Parse(e.Link); err == nil && (address.Scheme == "http" || address.Scheme == "https") {
 			a.Link = e.Link
@@ -583,6 +595,35 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 		out = append(out, a)
 	}
 	return out, nil
+}
+
+// withReferrers lets the frames of the given hosts know where the reader
+// comes from, which some players ask for before they play: everything else
+// an entry embeds is told nothing.
+func withReferrers(content string, hosts []string) string {
+	if len(hosts) == 0 || !strings.Contains(content, "<iframe") {
+		return content
+	}
+	doc, err := goquery.NewDocumentFromReader(strings.NewReader("<html><body>" + content + "</body></html>"))
+	if err != nil {
+		return content
+	}
+	changed := false
+	doc.Find("iframe[src]").Each(func(_ int, frame *goquery.Selection) {
+		address, err := url.Parse(frame.AttrOr("src", ""))
+		if err == nil && slices.Contains(hosts, strings.ToLower(address.Hostname())) {
+			frame.SetAttr("referrerpolicy", "strict-origin-when-cross-origin")
+			changed = true
+		}
+	})
+	if !changed {
+		return content
+	}
+	out, err := doc.Find("body").Html()
+	if err != nil {
+		return content
+	}
+	return out
 }
 
 // choice is a link among alternatives, one of which is in effect.
@@ -688,7 +729,7 @@ func (h *Handler) reader(kind string) http.HandlerFunc {
 				return
 			}
 			if err == nil {
-				page.Entries, err = h.articles(ctx, v, lib, who.user.ID, prefs.location(), entries)
+				page.Entries, err = h.articles(ctx, v, lib, who.user.ID, prefs, entries)
 			}
 			if err != nil {
 				h.broken(w, r, err)
@@ -750,7 +791,7 @@ func (h *Handler) entry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := h.view(r, "reader", "entry.untitled")
-	shown, err := h.articles(ctx, v, lib, who.user.ID, readReading(who.user).location(), []*store.Entry{e})
+	shown, err := h.articles(ctx, v, lib, who.user.ID, readReading(who.user), []*store.Entry{e})
 	if err != nil {
 		h.broken(w, r, err)
 		return
@@ -840,7 +881,7 @@ func (h *Handler) entryFragment(w http.ResponseWriter, r *http.Request, entryID 
 	}
 	v := h.view(r, "reader", "entry.untitled")
 	prefs := readReading(who.user)
-	shown, err := h.articles(ctx, v, lib, who.user.ID, prefs.location(), []*store.Entry{e})
+	shown, err := h.articles(ctx, v, lib, who.user.ID, prefs, []*store.Entry{e})
 	if err != nil {
 		h.broken(w, r, err)
 		return

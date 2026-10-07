@@ -62,8 +62,8 @@
 <details{{if .Expanded}} open{{end}}>
 <summary>
 <h2 class="entry-title" id="t{{.Entry.ID}}">{{.Entry.Title}}</h2>
-<span class="entry-feed">{{.Entry.Feed}}</span>
-<time datetime="{{.Entry.DateTime}}">{{.Entry.Date}}</time>
+{{if .Entry.ShowFeed}}<span class="entry-feed">{{.Entry.Feed}}</span>{{end}}
+{{if .Entry.ShowDate}}<time datetime="{{.Entry.DateTime}}">{{.Entry.Date}}</time>{{end}}
 <span class="entry-state">{{if not .Entry.Read}}{{.Page.T "entry.unread"}}{{end}}{{if .Entry.Starred}} {{.Page.T "entry.starred"}}{{end}}</span>
 </summary>
 <div class="entry-body">
@@ -162,3 +162,12 @@
 {{range .Feeds}}<li><a href="{{.Settings}}">{{.Name}}</a>{{if .Failing}} <span class="mark">{{$.Page.T "sub.failing"}}</span>{{end}}{{if .Muted}} <span class="muted">{{$.Page.T "sub.muted"}}</span>{{end}}{{if .Since}} <span class="muted">{{.Since}}</span>{{end}} <span class="feed-address">{{.Address}}</span></li>
 {{end}}</ul>
 {{end}}
+
+{{define "check"}}
+<p class="check">
+<input type="checkbox" id="{{.Name}}" name="{{.Name}}" value="1"{{if .On}} checked{{end}}>
+<label for="{{.Name}}">{{.Label}}</label>
+</p>
+{{end}}
+
+{{define "problem"}}{{if .}}<p class="alert" role="alert" id="form-problem">{{.}}</p>{{end}}{{end}}

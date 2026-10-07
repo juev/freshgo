@@ -94,6 +94,8 @@ func (w *world) entries(u *store.User) []shown {
 	w.must(err)
 	var out []shown
 	for _, e := range entries {
+		// Labels come in the order they were made, which is not the test's to say.
+		sort.Strings(labels[e.ID])
 		out = append(out, shown{address[e.FeedID], e.GUID, e.Title, e.Content, e.Link, e.Authors, e.Tags, labels[e.ID], e.Published, e.IsRead, e.IsFavorite})
 	}
 	sort.Slice(out, func(a, b int) bool { return out[a].Feed+out[a].GUID < out[b].Feed+out[b].GUID })

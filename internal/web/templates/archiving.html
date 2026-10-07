@@ -1,0 +1,17 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<form method="post" action="{{.URL "/settings/archiving"}}" class="form settings">
+<p>
+<label for="ttl_default">{{.T "settings.ttl"}}</label>
+<select id="ttl_default" name="ttl_default">
+{{template "options" (index .Data.Options "ttl_default")}}</select>
+</p>
+{{template "retention" (dict "Retention" .Data.Retention "Units" .Data.Units "Inherit" false "Page" .)}}
+<p><button type="submit">{{.T "keys.save"}}</button></p>
+</form>
+<h2>{{.T "form.actions"}}</h2>
+<form method="post" action="{{.URL "/settings/archiving/purge"}}" class="form">
+<p><button type="submit" aria-describedby="purge-hint">{{.T "settings.purge"}}</button>
+<span class="hint" id="purge-hint">{{.T "settings.purge.hint"}}</span></p>
+</form>
+{{end}}

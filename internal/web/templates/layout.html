@@ -1,5 +1,5 @@
 {{define "layout"}}<!DOCTYPE html>
-<html lang="{{.Lang}}" data-theme="{{.Theme}}">
+<html lang="{{.Lang}}" data-theme="{{.Theme}}"{{if .Width}} data-width="{{.Width}}"{{end}}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -16,7 +16,8 @@
 <ul>
 <li><a href="{{.URL "/"}}"{{if eq .Section "reader"}} aria-current="page"{{end}}>{{.T "nav.reader"}}</a></li>
 {{if .User}}<li><a href="{{.URL "/subscriptions"}}"{{if eq .Section "subscriptions"}} aria-current="page"{{end}}>{{.T "nav.subscriptions"}}</a></li>{{end}}
-{{if .User}}<li><a href="{{.URL "/settings/keys"}}"{{if eq .Section "keys"}} aria-current="page"{{end}}>{{.T "nav.keys"}}</a></li>{{end}}
+{{if .User}}<li><a href="{{.URL "/settings/display"}}"{{if eq .Section "settings"}} aria-current="page"{{end}}>{{.T "nav.settings"}}</a></li>{{end}}
+{{if .Admin}}<li><a href="{{.URL "/admin/users"}}"{{if eq .Section "admin"}} aria-current="page"{{end}}>{{.T "nav.admin"}}</a></li>{{end}}
 <li><a href="{{.URL "/about"}}"{{if eq .Section "about"}} aria-current="page"{{end}}>{{.T "nav.about"}}</a></li>
 </ul>
 </nav>
@@ -28,6 +29,11 @@
 </header>
 <div class="messages" id="messages" role="status" aria-live="polite">{{if .Notice}}<p>{{.Notice}}</p>{{end}}</div>
 <main class="page{{if .Wide}} wide{{end}}" id="content" tabindex="-1">
+{{if .Tabs}}<nav class="tabs" aria-label="{{.T "nav.section"}}">
+<ul>
+{{range .Tabs}}<li><a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Name}}</a></li>
+{{end}}</ul>
+</nav>{{end}}
 {{template "content" .}}
 </main>
 </body>

@@ -134,7 +134,7 @@ func (s *Service) Refresh(ctx context.Context, f *store.Feed) {
 		return
 	}
 	if err := s.refresh(ctx, source(f)); err != nil && ctx.Err() == nil {
-		s.log.Warn("icon is not stored", "user", f.UserID, "feed", f.ID, "error", err)
+		s.log.Warn("icon is not stored", "user_id", f.UserID, "feed", f.ID, "error", err)
 	}
 }
 

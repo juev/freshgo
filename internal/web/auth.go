@@ -45,7 +45,8 @@ var proxyUserHeaders = []string{"Remote-User", "X-WebAuth-User"}
 type preferences struct {
 	Language string `json:"language"`
 	// DarkMode is "auto" or "no" in FreshRSS; freshgo adds "dark".
-	DarkMode string `json:"darkMode"`
+	DarkMode     string `json:"darkMode"`
+	ContentWidth string `json:"content_width"`
 	// Enabled is false for a user who is kept out.
 	Enabled *bool `json:"enabled"`
 	IsAdmin bool  `json:"is_admin"`

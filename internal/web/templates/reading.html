@@ -1,0 +1,62 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{template "problem" .Data.Problem}}
+<form method="post" action="{{.URL "/settings/reading"}}" class="form settings">
+<fieldset>
+<legend>{{.T "settings.reading.list"}}</legend>
+<p>
+<label for="posts_per_page">{{.T "settings.posts-per-page"}}</label>
+<input type="number" id="posts_per_page" name="posts_per_page" min="1" max="500" value="{{index .Data.Text "posts_per_page"}}" required>
+</p>
+<p>
+<label for="default_view">{{.T "settings.view"}}</label>
+<select id="default_view" name="default_view">
+{{template "options" (index .Data.Options "default_view")}}</select>
+</p>
+<p>
+<label for="sort">{{.T "sort.label"}}</label>
+<select id="sort" name="sort">
+{{template "options" (index .Data.Options "sort")}}</select>
+</p>
+<p>
+<label for="sort_order">{{.T "order.label"}}</label>
+<select id="sort_order" name="sort_order">
+{{template "options" (index .Data.Options "sort_order")}}</select>
+</p>
+{{template "check" (dict "Name" "display_posts" "Label" (.T "settings.display-posts") "On" (index .Data.On "display_posts"))}}
+{{template "check" (dict "Name" "auto_load_more" "Label" (.T "settings.auto-load-more") "On" (index .Data.On "auto_load_more"))}}
+{{template "check" (dict "Name" "hide_read_feeds" "Label" (.T "settings.hide-read-feeds") "On" (index .Data.On "hide_read_feeds"))}}
+{{template "check" (dict "Name" "show_fav_unread" "Label" (.T "settings.show-fav-unread") "On" (index .Data.On "show_fav_unread"))}}
+</fieldset>
+<fieldset>
+<legend>{{.T "feed.reading"}}</legend>
+{{template "check" (dict "Name" "mark_article" "Label" (.T "settings.mark.article") "On" (index .Data.On "mark_article"))}}
+{{template "check" (dict "Name" "mark_reception" "Label" (.T "feed.read-upon-reception") "On" (index .Data.On "mark_reception"))}}
+{{template "check" (dict "Name" "mark_gone" "Label" (.T "feed.read-upon-gone") "On" (index .Data.On "mark_gone"))}}
+{{template "check" (dict "Name" "mark_updated_article_unread" "Label" (.T "feed.updated-unread") "On" (index .Data.On "mark_updated_article_unread"))}}
+{{template "check" (dict "Name" "max_n_unread_on" "Label" (.T "settings.mark.max-unread-on") "On" (index .Data.On "max_n_unread"))}}
+<p>
+<label for="max_n_unread">{{.T "settings.mark.max-unread"}}</label>
+<input type="number" id="max_n_unread" name="max_n_unread" min="0" value="{{index .Data.Text "max_n_unread"}}">
+</p>
+{{template "check" (dict "Name" "same_title_in_feed_on" "Label" (.T "settings.mark.same-title-on") "On" (index .Data.On "same_title_in_feed"))}}
+<p>
+<label for="same_title_in_feed">{{.T "category.among"}}</label>
+<input type="number" id="same_title_in_feed" name="same_title_in_feed" min="1" value="{{index .Data.Text "same_title_in_feed"}}">
+</p>
+</fieldset>
+<fieldset>
+<legend>{{.T "settings.filters"}}</legend>
+<p>
+<label for="filters_read">{{.T "form.filters-read"}}</label>
+<textarea id="filters_read" name="filters_read" rows="4" spellcheck="false" aria-describedby="filters-hint">{{index .Data.Text "filters_read"}}</textarea>
+</p>
+<p>
+<label for="filters_star">{{.T "settings.filters-star"}}</label>
+<textarea id="filters_star" name="filters_star" rows="4" spellcheck="false" aria-describedby="filters-hint">{{index .Data.Text "filters_star"}}</textarea>
+<span class="hint" id="filters-hint">{{.T "form.filters-hint"}}</span>
+</p>
+</fieldset>
+<p><button type="submit">{{.T "keys.save"}}</button></p>
+</form>
+{{end}}
