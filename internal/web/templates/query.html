@@ -1,0 +1,72 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p class="page-links"><a href="{{.URL "/queries"}}/{{.Data.N}}">{{.T "sub.read"}}</a> <a href="{{.URL "/settings/queries"}}">{{.T "settings.queries.heading"}}</a></p>
+{{template "problem" .Data.Problem}}
+<form method="post" action="{{.URL "/settings/queries"}}/{{.Data.N}}" class="form settings">
+<p>
+<label for="name">{{.T "form.name"}}</label>
+<input type="text" id="name" name="name" value="{{.Data.Query.Name}}" maxlength="191" required>
+</p>
+<p>
+<label for="get">{{.T "query.stream"}}</label>
+<select id="get" name="get">
+{{template "options" .Data.Streams}}</select>
+</p>
+<p>
+<label for="state">{{.T "state.label"}}</label>
+<select id="state" name="state">
+{{template "options" .Data.States}}</select>
+</p>
+<p>
+<label for="search">{{.T "search.label"}}</label>
+<input type="text" id="search" name="search" value="{{.Data.Query.Search}}" autocapitalize="off" spellcheck="false">
+</p>
+{{template "sorting" (dict "Sorts" .Data.Sorts "Orders" .Data.Orders "Page" .)}}
+<fieldset>
+<legend>{{.T "query.sharing"}}</legend>
+{{template "check" (dict "Name" "share_rss" "Label" (.T "query.share-rss") "On" .Data.Query.ShareRss)}}
+{{template "check" (dict "Name" "share_opml" "Label" (.T "query.share-opml") "On" .Data.Query.ShareOpml)}}
+<p>
+<label for="description">{{.T "feed.description"}}</label>
+<input type="text" id="description" name="description" value="{{.Data.Query.Description}}">
+</p>
+<p>
+<label for="image_url">{{.T "query.image"}}</label>
+<input type="text" id="image_url" name="image_url" value="{{.Data.Query.ImageURL}}" inputmode="url" autocapitalize="off" spellcheck="false">
+</p>
+{{template "check" (dict "Name" "include_labels" "Label" (.T "query.include-labels") "On" .Data.Query.IncludeUserLabels)}}
+<p>
+<label for="label_prefix">{{.T "query.label-prefix"}}</label>
+<input type="text" id="label_prefix" name="label_prefix" value="{{.Data.Query.UserLabelPrefix}}">
+</p>
+{{template "check" (dict "Name" "exclude_tags" "Label" (.T "query.exclude-tags") "On" .Data.Query.ExcludeArticleTags)}}
+</fieldset>
+<p><button type="submit">{{.T "keys.save"}}</button></p>
+</form>
+
+{{if .Data.Links}}
+<h2>{{.T "query.links"}}</h2>
+<p>{{.T "query.links.hint"}}</p>
+<ul class="feed-list">
+{{range .Data.Links}}<li>{{.Name}}: <a href="{{.URL}}">{{.URL}}</a></li>
+{{end}}</ul>
+{{end}}
+
+<h2>{{.T "form.actions"}}</h2>
+{{if .Data.Query.Token}}
+<details class="menu danger">
+<summary>{{.T "query.token"}}</summary>
+<form method="post" action="{{.URL "/settings/queries"}}/{{.Data.N}}">
+<p>{{.T "query.token.confirm"}}</p>
+<button type="submit" name="action" value="token">{{.T "query.token.submit"}}</button>
+</form>
+</details>
+{{end}}
+<details class="menu danger">
+<summary>{{.T "query.delete"}}</summary>
+<form method="post" action="{{.URL "/settings/queries"}}/{{.Data.N}}">
+<p>{{.T "query.delete.confirm"}}</p>
+<button type="submit" name="action" value="delete">{{.T "form.delete"}}</button>
+</form>
+</details>
+{{end}}

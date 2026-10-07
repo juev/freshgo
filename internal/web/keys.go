@@ -371,7 +371,7 @@ type place struct {
 // categories, feeds, labels and the pages of the interface.
 func (h *Handler) palette(w http.ResponseWriter, r *http.Request) {
 	who := state(r).who
-	lib, err := h.library(r.Context(), who.user.ID)
+	lib, err := h.library(r.Context(), who.user)
 	if err != nil {
 		h.broken(w, r, err)
 		return
@@ -390,6 +390,11 @@ func (h *Handler) palette(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, l := range lib.labels {
 		places = append(places, place{l.Name, h.url("/labels/" + strconv.FormatInt(l.ID, 10)), v.T("stream.label")})
+	}
+	for n, q := range lib.queries {
+		if _, ok := lib.queryStream(n, q); ok && q.Name != "" {
+			places = append(places, place{q.Name, h.url("/queries/" + strconv.Itoa(n)), v.T("palette.query")})
+		}
 	}
 	if !who.anonymous {
 		for _, c := range lib.categories {

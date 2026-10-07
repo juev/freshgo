@@ -91,6 +91,20 @@ func Parse(input string, opts Options) (*Query, error) {
 	return q, nil
 }
 
+// And returns a query that matches what both queries match. A nil query
+// makes no demands.
+func And(a, b *Query) *Query {
+	switch {
+	case a == nil:
+		return b
+	case b == nil:
+		return a
+	}
+	left, right := *a, *b
+	left.op, right.op = opAnd, opAnd
+	return &Query{parts: []*Query{&left, &right}}
+}
+
 // phpSpace is what PHP's trim removes.
 const phpSpace = " \n\r\t\v\x00"
 

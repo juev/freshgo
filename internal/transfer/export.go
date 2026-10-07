@@ -67,7 +67,7 @@ type media struct {
 
 // item is an entry as a document holds it.
 type item struct {
-	FreshRSSID    int64    `json:"frss:id"`
+	FreshRSSID    string   `json:"frss:id"`
 	ID            string   `json:"id"`
 	CrawlTimeMsec string   `json:"crawlTimeMsec"`
 	TimestampUsec string   `json:"timestampUsec"`
@@ -99,7 +99,7 @@ func withoutCredentials(raw string) string {
 
 func newItem(e *store.Entry, f *store.Feed, labels []string) item {
 	it := item{
-		FreshRSSID: e.ID,
+		FreshRSSID: strconv.FormatInt(e.ID, 10),
 		ID:         itemPrefix + fmt.Sprintf("%016x", e.ID),
 		// The identifier is the time the entry was added, in microseconds.
 		CrawlTimeMsec: strconv.FormatInt(e.ID/1000, 10),
@@ -176,6 +176,14 @@ type Document struct {
 	Title string
 	// Set picks the entries.
 	Set store.EntrySet
+	// Listing, when set, picks and orders the entries in place of Set: a
+	// document for the public lists them as a reader would see them.
+	Listing *store.Listing
+	// Limit bounds the number of entries; zero is no bound.
+	Limit int
+	// NoLabels leaves the labels of the user out: they are nobody else's
+	// business.
+	NoLabels bool
 }
 
 // Write writes the entries of a document of the user, oldest first. Handlers
@@ -204,18 +212,30 @@ func Write(ctx context.Context, w io.Writer, db *store.Store, registry *hooks.Re
 	encoder := json.NewEncoder(w)
 	encoder.SetEscapeHTML(false)
 	first := true
-	for after := ""; ; {
-		entries, next, err := db.ListPage(ctx, u.ID, store.Listing{Set: d.Set, Ascending: true, After: after, Limit: exportPage})
+	listing := store.Listing{Set: d.Set, Ascending: true}
+	if d.Listing != nil {
+		listing = *d.Listing
+	}
+	left := d.Limit
+	for {
+		listing.Limit = exportPage
+		if d.Limit > 0 {
+			listing.Limit = min(exportPage, left)
+		}
+		entries, next, err := db.ListPage(ctx, u.ID, listing)
 		if err != nil {
 			return err
 		}
+		left -= len(entries)
 		ids := make([]int64, len(entries))
 		for i, e := range entries {
 			ids[i] = e.ID
 		}
-		labels, err := db.EntryLabels(ctx, u.ID, ids)
-		if err != nil {
-			return err
+		labels := map[int64][]string{}
+		if !d.NoLabels {
+			if labels, err = db.EntryLabels(ctx, u.ID, ids); err != nil {
+				return err
+			}
 		}
 		for _, e := range entries {
 			e, ok := registry.EntryBeforeDisplay.Call(ctx, e)
@@ -233,10 +253,10 @@ func Write(ctx context.Context, w io.Writer, db *store.Store, registry *hooks.Re
 				return err
 			}
 		}
-		if next == "" {
+		if next == "" || d.Limit > 0 && left <= 0 {
 			break
 		}
-		after = next
+		listing.After = next
 	}
 	_, err = io.WriteString(w, "]}\n")
 	return err

@@ -40,6 +40,8 @@ const (
 	streamFeed     = "feed"
 	streamCategory = "category"
 	streamLabel    = "label"
+	// streamQuery is a view the user has saved.
+	streamQuery = "query"
 )
 
 // States a listing is narrowed to, as the state parameter spells them.
@@ -126,10 +128,13 @@ type library struct {
 	unread     map[int64]int
 	labelled   map[int64]int
 	starred    int
+	// queries are the views the user has saved.
+	queries []savedQuery
 }
 
-func (h *Handler) library(ctx context.Context, userID int64) (*library, error) {
-	lib := &library{feed: map[int64]*store.Feed{}, unread: map[int64]int{}, labelled: map[int64]int{}}
+func (h *Handler) library(ctx context.Context, user *store.User) (*library, error) {
+	userID := user.ID
+	lib := &library{feed: map[int64]*store.Feed{}, unread: map[int64]int{}, labelled: map[int64]int{}, queries: readQueries(user)}
 	var err error
 	if lib.categories, err = h.db.Categories(ctx, userID); err != nil {
 		return nil, err
@@ -189,6 +194,10 @@ type stream struct {
 	name   string
 	unread int
 	set    store.EntrySet
+	// base is what a saved query searches for, state the states it asks
+	// for, in the bits of FreshRSS; both empty for the other streams.
+	base  string
+	state int
 	sorting
 }
 
@@ -205,6 +214,8 @@ func (s stream) path() string {
 		return "/categories/" + strconv.FormatInt(s.id, 10)
 	case streamLabel:
 		return "/labels/" + strconv.FormatInt(s.id, 10)
+	case streamQuery:
+		return "/queries/" + strconv.FormatInt(s.id, 10)
 	}
 	return "/"
 }
@@ -250,6 +261,11 @@ func (lib *library) stream(kind string, id int64) (s stream, ok bool) {
 			}
 		}
 		return s, false
+	case streamQuery:
+		if id < 0 || id >= int64(len(lib.queries)) {
+			return s, false
+		}
+		return lib.queryStream(int(id), lib.queries[id])
 	default:
 		return s, false
 	}
@@ -258,7 +274,9 @@ func (lib *library) stream(kind string, id int64) (s stream, ok bool) {
 
 // streamAt finds the stream an address of the interface names.
 func (lib *library) streamAt(path string) (stream, bool) {
-	for prefix, kind := range map[string]string{"/feeds/": streamFeed, "/categories/": streamCategory, "/labels/": streamLabel} {
+	for prefix, kind := range map[string]string{
+		"/feeds/": streamFeed, "/categories/": streamCategory, "/labels/": streamLabel, "/queries/": streamQuery,
+	} {
 		if rest, ok := strings.CutPrefix(path, prefix); ok {
 			id, err := strconv.ParseInt(rest, 10, 64)
 			if err != nil {
@@ -303,6 +321,11 @@ func show(params url.Values, prefs reading, s stream) showing {
 		v.asked.Set("state", state)
 	default:
 		switch {
+		case s.kind == streamQuery:
+			// A saved query lists what it says, all when it does not say.
+			if v.state = stateOfBits(s.state); v.state == "" {
+				v.state = stateAll
+			}
 		case s.kind == streamAll, prefs.ShowFavUnread && (s.kind == streamStarred || s.kind == streamLabel):
 			v.state = stateAll
 		case prefs.DefaultView == "all":
@@ -440,6 +463,7 @@ type tree struct {
 	Streams    []branch
 	Categories []branch
 	Labels     []branch
+	Queries    []branch
 }
 
 func (h *Handler) tree(v *view, lib *library, current stream, state showing, hideRead bool) tree {
@@ -479,6 +503,15 @@ func (h *Handler) tree(v *view, lib *library, current stream, state showing, hid
 	for _, l := range lib.labels {
 		one, _ := lib.stream(streamLabel, l.ID)
 		t.Labels = append(t.Labels, at(one, ""))
+	}
+	for n := range lib.queries {
+		// A query whose feed, category or label is gone lists nothing.
+		if one, ok := lib.stream(streamQuery, int64(n)); ok && one.name != "" {
+			// A query brings its own state and order: those of the page stay behind.
+			t.Queries = append(t.Queries, branch{
+				Name: one.name, URL: h.url(one.path()), Current: current.kind == streamQuery && current.id == one.id,
+			})
+		}
 	}
 	return t
 }
@@ -666,14 +699,16 @@ type readerPage struct {
 func (h *Handler) reader(kind string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, who := r.Context(), state(r).who
-		lib, err := h.library(ctx, who.user.ID)
+		lib, err := h.library(ctx, who.user)
 		if err != nil {
 			h.broken(w, r, err)
 			return
 		}
-		id, _ := strconv.ParseInt(r.PathValue("id"), 10, 64)
+		id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
 		s, ok := lib.stream(kind, id)
-		if !ok {
+		// An address that names a stream by something that is no number
+		// names none.
+		if !ok || err != nil && r.PathValue("id") != "" {
 			h.fail(w, r, http.StatusNotFound)
 			return
 		}
@@ -716,7 +751,7 @@ func (h *Handler) reader(kind string) http.HandlerFunc {
 		}
 
 		status := http.StatusOK
-		query, err := h.parseSearch(showing.query, prefs)
+		query, err := h.streamSearch(s, showing.query, prefs)
 		if err != nil {
 			// A search that cannot be read finds nothing and says why.
 			status, page.Problem = http.StatusBadRequest, v.T(searchProblem(err))
@@ -785,7 +820,7 @@ func (h *Handler) entry(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	lib, err := h.library(ctx, who.user.ID)
+	lib, err := h.library(ctx, who.user)
 	if err != nil {
 		h.broken(w, r, err)
 		return
@@ -874,7 +909,7 @@ func (h *Handler) entryFragment(w http.ResponseWriter, r *http.Request, entryID 
 		h.broken(w, r, err)
 		return
 	}
-	lib, err := h.library(ctx, who.user.ID)
+	lib, err := h.library(ctx, who.user)
 	if err != nil {
 		h.broken(w, r, err)
 		return
@@ -1024,7 +1059,7 @@ func (h *Handler) markAll(w http.ResponseWriter, r *http.Request) {
 	if !h.form(w, r) {
 		return
 	}
-	lib, err := h.library(ctx, user.ID)
+	lib, err := h.library(ctx, user)
 	if err != nil {
 		h.broken(w, r, err)
 		return
@@ -1047,7 +1082,7 @@ func (h *Handler) markAll(w http.ResponseWriter, r *http.Request) {
 	}
 	prefs := readReading(user)
 	showing := show(r.PostForm, prefs, s)
-	query, err := h.parseSearch(showing.query, prefs)
+	query, err := h.streamSearch(s, showing.query, prefs)
 	if err != nil {
 		h.fail(w, r, http.StatusBadRequest)
 		return

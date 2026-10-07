@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8" ?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/" >
+	<channel>
+		<title>Unread or starred, oldest first</title>
+		<link>http://freshrss.freshgo.test/api/query.php?user=alice&amp;t=tokenmain2&amp;f=html</link>
+		<description>RSS feed of Unread or starred, oldest first</description>
+		<pubDate>Wed, 07 Oct 2026 08:38:05 +0000</pubDate>
+		<lastBuildDate>Wed, 07 Oct 2026 08:38:05 GMT</lastBuildDate>
+		<atom:link href="http://freshrss.freshgo.test/api/query.php?user=alice&amp;t=tokenmain2&amp;f=rss" rel="self" type="application/rss+xml" />
+				<item>
+			<title>Identifier with surrounding spaces</title>
+			<link>http://feeds.freshgo.test/atom/spaces</link>
+						<description><![CDATA[Plain text content]]></description>
+			<pubDate>Sun, 30 Aug 2026 10:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925390</guid>
+		</item>
+		<item>
+			<title>Plain entry</title>
+			<link>http://feeds.freshgo.test/atom/plain</link>
+						<dc:creator>Alice Author</dc:creator>
+			<category>go</category>
+			<category>rss readers</category>
+			<description><![CDATA[<p>First paragraph with an <a href="http://feeds.freshgo.test/atom/relative">relative link</a>.</p>]]></description>
+			<pubDate>Tue, 01 Sep 2026 08:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925392</guid>
+		</item>
+		<item>
+			<title>First scraped article</title>
+			<link>http://feeds.freshgo.test/page/one</link>
+						<dc:creator>Dora Scraper</dc:creator>
+			<category>alpha</category>
+			<category>beta</category>
+			<media:thumbnail url="http://feeds.freshgo.test/page/one.jpg" />
+			<media:content url="http://feeds.freshgo.test/page/one.jpg" medium="image"></media:content>
+			<description><![CDATA[<div data-sanitized-class="body"><p>Body of the <strong>first</strong> article.</p><p>Second paragraph.</p></div>]]></description>
+			<pubDate>Tue, 01 Sep 2026 10:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925393</guid>
+		</item>
+		<item>
+			<title>First XML record</title>
+			<link>http://feeds.freshgo.test/data/1</link>
+						<dc:creator>Fay Catalog</dc:creator>
+			<category>one</category>
+			<category>two</category>
+			<description><![CDATA[Text of the first record]]></description>
+			<pubDate>Tue, 01 Sep 2026 11:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925394</guid>
+		</item>
+		<item>
+			<title>First JSON Feed item</title>
+			<link>http://feeds.freshgo.test/jsonfeed/1</link>
+						<category>json</category>
+			<category>feed</category>
+			<media:thumbnail url="http://feeds.freshgo.test/jsonfeed/1.png" />
+			<media:content url="http://feeds.freshgo.test/jsonfeed/1.png" medium="image"></media:content>
+			<description><![CDATA[<p>HTML content of the <em>first</em> item.</p>]]></description>
+			<pubDate>Tue, 01 Sep 2026 13:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925396</guid>
+		</item>
+		<item>
+			<title>First embedded article</title>
+			<link>http://feeds.freshgo.test/embedded/1</link>
+						<dc:creator>Lu Embed</dc:creator>
+			<description><![CDATA[<p>Embedded body one.</p>]]></description>
+			<pubDate>Tue, 01 Sep 2026 15:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925397</guid>
+		</item>
+		<item>
+			<title>Identifier with an ampersand &amp; non-ASCII: Привет</title>
+			<link>http://feeds.freshgo.test/atom/query?a=1&amp;b=2</link>
+						<dc:creator>Иван Петров</dc:creator>
+			<dc:creator>O'Neil &amp; Sons</dc:creator>
+			<description><![CDATA[Summary with &lt;angle brackets&gt; &amp; &quot;quotes&quot;.]]></description>
+			<pubDate>Wed, 02 Sep 2026 05:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925398</guid>
+		</item>
+		<item>
+			<title>Opaque guid</title>
+			<link>http://feeds.freshgo.test/rss/opaque</link>
+						<dc:creator>carol@example.org (Carol)</dc:creator>
+			<media:content url="http://feeds.freshgo.test/rss/audio.mp3" type="audio/mpeg" length="12345"></media:content>
+			<description><![CDATA[<p>Escaped HTML description</p>]]></description>
+			<pubDate>Wed, 02 Sep 2026 10:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925400</guid>
+		</item>
+		<item>
+			<title>Second &amp; last</title>
+			<link>http://feeds.freshgo.test/page/two?a=1&amp;b=2</link>
+						<dc:creator>Ed Parser</dc:creator>
+			<category>gamma</category>
+			<description><![CDATA[<div data-sanitized-class="body"><p>Body of the second article.</p></div>]]></description>
+			<pubDate>Wed, 02 Sep 2026 10:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925401</guid>
+		</item>
+		<item>
+			<title>First API post</title>
+			<link>http://feeds.freshgo.test/api/1</link>
+						<dc:creator>Jo Api</dc:creator>
+			<category>x</category>
+			<category>y</category>
+			<media:thumbnail url="http://feeds.freshgo.test/api/1.jpg" />
+			<media:content url="http://feeds.freshgo.test/api/1.jpg" medium="image"></media:content>
+			<description><![CDATA[<p>Body of the first API post.</p>]]></description>
+			<pubDate>Wed, 02 Sep 2026 10:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925402</guid>
+		</item>
+		<item>
+			<title>Second XML record &amp; more</title>
+			<link>http://feeds.freshgo.test/data/2</link>
+						<dc:creator>Gus Catalog</dc:creator>
+			<category>three</category>
+			<description><![CDATA[Text of the second record]]></description>
+			<pubDate>Wed, 02 Sep 2026 11:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925403</guid>
+		</item>
+		<item>
+			<title>Second item with text content &amp; an ampersand</title>
+			<link>http://feeds.freshgo.test/jsonfeed/2?a=1&amp;b=2</link>
+						<description><![CDATA[]]></description>
+			<pubDate>Wed, 02 Sep 2026 11:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925404</guid>
+		</item>
+		<item>
+			<title>Second embedded article</title>
+			<link>http://feeds.freshgo.test/embedded/2</link>
+						<dc:creator>Mo Embed</dc:creator>
+			<description><![CDATA[<p>Embedded body two.</p>]]></description>
+			<pubDate>Wed, 02 Sep 2026 15:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925405</guid>
+		</item>
+		<item>
+			<title>Identifier on a force-https domain</title>
+			<link>https://github.com/juev/freshgo/issues/1</link>
+						<description><![CDATA[<p>XHTML <em>content</em> with an image <img src="https://github.com/juev/freshgo/issues/img/pic.png" alt="pic"></p>]]></description>
+			<pubDate>Thu, 03 Sep 2026 10:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925407</guid>
+		</item>
+		<item>
+			<title>Second API post</title>
+			<link>http://feeds.freshgo.test/api/2</link>
+						<dc:creator>Kit Api</dc:creator>
+			<category>z</category>
+			<description><![CDATA[<p>Body of the second API post.</p>]]></description>
+			<pubDate>Thu, 03 Sep 2026 10:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925408</guid>
+		</item>
+		<item>
+			<title>Guid with markup characters</title>
+			<link>http://feeds.freshgo.test/rss/markup</link>
+						<media:thumbnail url="http://feeds.freshgo.test/rss/thumb.jpg" />
+			<media:content url="http://feeds.freshgo.test/rss/thumb.jpg" medium="image"></media:content>
+			<description><![CDATA[Guid with characters that are HTML-encoded.]]></description>
+			<pubDate>Thu, 03 Sep 2026 12:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925409</guid>
+		</item>
+		<item>
+			<title>Guid on a force-https subdomain</title>
+			<link>https://blog.wordpress.com/post</link>
+						<description><![CDATA[Subdomain of a domain from the force-https list.]]></description>
+			<pubDate>Fri, 04 Sep 2026 12:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925410</guid>
+		</item>
+		<item>
+			<title>Guid on a domain from the custom force-https list</title>
+			<link>https://www.example.net/custom</link>
+						<description><![CDATA[The domain is listed in data/force-https.txt of the reference installation.]]></description>
+			<pubDate>Sat, 05 Sep 2026 12:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925411</guid>
+		</item>
+
+	</channel>
+</rss>

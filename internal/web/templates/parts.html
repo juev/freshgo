@@ -48,6 +48,12 @@
 {{end}}</ul>{{end}}
 </li>
 {{end}}</ul>
+{{if .Data.Tree.Queries}}
+<h2>{{.T "tree.queries"}}</h2>
+<ul>
+{{range .Data.Tree.Queries}}<li>{{template "branch" .}}</li>
+{{end}}</ul>
+{{end}}
 {{if .Data.Tree.Labels}}
 <h2>{{.T "tree.labels"}}</h2>
 <ul>

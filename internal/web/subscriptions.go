@@ -79,7 +79,7 @@ func (h *Handler) feedRow(f *store.Feed) feedRow {
 }
 
 func (h *Handler) subscriptions(w http.ResponseWriter, r *http.Request) {
-	lib, err := h.library(r.Context(), state(r).who.user.ID)
+	lib, err := h.library(r.Context(), state(r).who.user)
 	if err != nil {
 		h.broken(w, r, err)
 		return

@@ -222,9 +222,9 @@ func TestDocumentFormat(t *testing.T) {
 			t.Fatalf("document = %+v", document)
 		}
 		first := document.Items[0]
-		id := int64(first["frss:id"].(float64))
+		id, _ := strconv.ParseInt(first["frss:id"].(string), 10, 64)
 		want := map[string]any{
-			"frss:id": float64(id), "id": "tag:google.com,2005:reader/item/" + strings.Repeat("0", 16-len(hex(id))) + hex(id),
+			"frss:id": itoa(id), "id": "tag:google.com,2005:reader/item/" + strings.Repeat("0", 16-len(hex(id))) + hex(id),
 			"crawlTimeMsec": itoa(id / 1000), "timestampUsec": itoa(id), "published": 1791000000.0,
 			"title":     "Q&amp;A: &quot;1 &lt; 2&quot;",
 			"canonical": []any{map[string]any{"href": "https://blog.example/a?x=1&y=2"}},

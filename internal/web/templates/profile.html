@@ -13,6 +13,7 @@
 </p>
 <p><button type="submit">{{.T "keys.save"}}</button></p>
 </form>
+{{if .Data.Feed}}<p>{{.T "settings.token.links"}} <a href="{{.Data.Feed}}">RSS</a>, <a href="{{.Data.OPML}}">OPML</a>.</p>{{end}}
 
 <h2>{{.T "settings.password"}}</h2>
 <form method="post" action="{{.URL "/settings/profile/password"}}" class="form">

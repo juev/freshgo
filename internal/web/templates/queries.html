@@ -1,0 +1,23 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p>{{.T "query.intro"}}</p>
+{{if .Data.Queries}}
+<table class="data">
+<thead>
+<tr><th scope="col">{{.T "form.name"}}</th><th scope="col">{{.T "query.shared"}}</th><th scope="col">{{.T "query.place"}}</th></tr>
+</thead>
+<tbody>
+{{range .Data.Queries}}<tr>
+<th scope="row"><a href="{{.Settings}}">{{if .Name}}{{.Name}}{{else}}{{$.T "query.unnamed"}}{{end}}</a>{{if .Broken}} <span class="mark">{{$.T "query.broken"}}</span>{{else}} <a href="{{.Read}}">{{$.T "sub.read"}}</a>{{end}}</th>
+<td>{{if .Shared}}{{$.T "form.yes"}}{{else}}{{$.T "form.no"}}{{end}}</td>
+<td>
+<form method="post" action="{{.Settings}}" class="feed-actions">
+<button type="submit" name="action" value="up" class="link" aria-label="{{$.T "query.up" .Name}}">{{$.T "query.up.short"}}</button>
+<button type="submit" name="action" value="down" class="link" aria-label="{{$.T "query.down" .Name}}">{{$.T "query.down.short"}}</button>
+</form>
+</td>
+</tr>
+{{end}}</tbody>
+</table>
+{{else}}<p class="muted">{{.T "query.none"}}</p>{{end}}
+{{end}}

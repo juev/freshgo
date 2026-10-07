@@ -1,0 +1,6 @@
+[
+  {"name": "Blogs", "get": "c_2", "state": 3, "search": "", "token": "tokenblogs1", "shareRss": true, "shareOpml": true},
+  {"name": "Unread or starred, oldest first", "get": "a", "state": 66, "order": "ASC", "search": "", "token": "tokenmain2", "shareRss": true, "shareOpml": true},
+  {"name": "Labelled", "get": "T", "state": 3, "search": "", "token": "tokenlabels3", "shareRss": true, "shareOpml": true, "includeUserLabels": true, "userLabelPrefix": "label:", "excludeArticleTags": true},
+  {"name": "Scraped with a search", "get": "c_3", "state": 3, "search": "intitle:first OR intitle:second", "token": "tokensearch4", "shareRss": true, "shareOpml": true}
+]

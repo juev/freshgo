@@ -1,0 +1,383 @@
+{
+    "id": "user/alice/state/org.freshrss/query/tokensearch4",
+    "title": "Scraped with a search",
+    "author": "alice",
+    "items": [
+{
+    "frss:id": "1791274998925408",
+    "id": "tag:google.com,2005:reader/item/00065d27b6018860",
+    "crawlTimeMsec": "1791274998925",
+    "timestampUsec": "1791274998925408",
+    "published": 1788429600,
+    "title": "Second API post",
+    "canonical": [
+        {
+            "href": "http://feeds.freshgo.test/api/2"
+        }
+    ],
+    "alternate": [
+        {
+            "href": "http://feeds.freshgo.test/api/2",
+            "type": "text/html"
+        }
+    ],
+    "categories": [
+        "user/-/state/com.google/reading-list",
+        "user/-/state/org.freshrss/main",
+        "user/-/state/com.google/unread",
+        "z"
+    ],
+    "origin": {
+        "streamId": "feed/6",
+        "htmlUrl": "http://feeds.freshgo.test/api/",
+        "title": "JSON API",
+        "feedUrl": "http://feeds.freshgo.test/api.json"
+    },
+    "content": {
+        "content": "<p>Body of the second API post.</p>"
+    },
+    "guid": "api-2",
+    "author": "Kit Api"
+},
+{
+    "frss:id": "1791274998925405",
+    "id": "tag:google.com,2005:reader/item/00065d27b601885d",
+    "crawlTimeMsec": "1791274998925",
+    "timestampUsec": "1791274998925405",
+    "published": 1788361200,
+    "title": "Second embedded article",
+    "canonical": [
+        {
+            "href": "http://feeds.freshgo.test/embedded/2"
+        }
+    ],
+    "alternate": [
+        {
+            "href": "http://feeds.freshgo.test/embedded/2",
+            "type": "text/html"
+        }
+    ],
+    "categories": [
+        "user/-/state/com.google/reading-list",
+        "user/-/state/org.freshrss/main",
+        "user/-/state/com.google/unread"
+    ],
+    "origin": {
+        "streamId": "feed/7",
+        "htmlUrl": "http://feeds.freshgo.test/embedded.html",
+        "title": "Embedded JSON",
+        "feedUrl": "http://feeds.freshgo.test/embedded.html"
+    },
+    "content": {
+        "content": "<p>Embedded body two.</p>"
+    },
+    "guid": "emb-2",
+    "author": "Mo Embed"
+},
+{
+    "frss:id": "1791274998925404",
+    "id": "tag:google.com,2005:reader/item/00065d27b601885c",
+    "crawlTimeMsec": "1791274998925",
+    "timestampUsec": "1791274998925404",
+    "published": 1788346800,
+    "title": "Second item with text content &amp; an ampersand",
+    "canonical": [
+        {
+            "href": "http://feeds.freshgo.test/jsonfeed/2?a=1&b=2"
+        }
+    ],
+    "alternate": [
+        {
+            "href": "http://feeds.freshgo.test/jsonfeed/2?a=1&b=2",
+            "type": "text/html"
+        }
+    ],
+    "categories": [
+        "user/-/state/com.google/reading-list",
+        "user/-/state/org.freshrss/main",
+        "user/-/state/com.google/unread"
+    ],
+    "origin": {
+        "streamId": "feed/5",
+        "htmlUrl": "http://feeds.freshgo.test/jsonfeed/",
+        "title": "JSON Feed",
+        "feedUrl": "http://feeds.freshgo.test/feed.json"
+    },
+    "content": {
+        "content": ""
+    },
+    "guid": "http://feeds.freshgo.test/jsonfeed/2?a=1&amp;b=2"
+},
+{
+    "frss:id": "1791274998925403",
+    "id": "tag:google.com,2005:reader/item/00065d27b601885b",
+    "crawlTimeMsec": "1791274998925",
+    "timestampUsec": "1791274998925403",
+    "published": 1788346800,
+    "title": "Second XML record &amp; more",
+    "canonical": [
+        {
+            "href": "http://feeds.freshgo.test/data/2"
+        }
+    ],
+    "alternate": [
+        {
+            "href": "http://feeds.freshgo.test/data/2",
+            "type": "text/html"
+        }
+    ],
+    "categories": [
+        "user/-/state/com.google/reading-list",
+        "user/-/state/org.freshrss/main",
+        "user/-/state/com.google/unread",
+        "three"
+    ],
+    "origin": {
+        "streamId": "feed/4",
+        "htmlUrl": "http://feeds.freshgo.test/data/",
+        "title": "XML catalog",
+        "feedUrl": "http://feeds.freshgo.test/data.xml"
+    },
+    "content": {
+        "content": "Text of the second record"
+    },
+    "guid": "xml-2",
+    "author": "Gus Catalog"
+},
+{
+    "frss:id": "1791274998925402",
+    "id": "tag:google.com,2005:reader/item/00065d27b601885a",
+    "crawlTimeMsec": "1791274998925",
+    "timestampUsec": "1791274998925402",
+    "published": 1788343200,
+    "title": "First API post",
+    "canonical": [
+        {
+            "href": "http://feeds.freshgo.test/api/1"
+        }
+    ],
+    "alternate": [
+        {
+            "href": "http://feeds.freshgo.test/api/1",
+            "type": "text/html"
+        }
+    ],
+    "categories": [
+        "user/-/state/com.google/reading-list",
+        "user/-/state/org.freshrss/main",
+        "user/-/state/com.google/unread",
+        "x",
+        "y"
+    ],
+    "origin": {
+        "streamId": "feed/6",
+        "htmlUrl": "http://feeds.freshgo.test/api/",
+        "title": "JSON API",
+        "feedUrl": "http://feeds.freshgo.test/api.json"
+    },
+    "content": {
+        "content": "<p>Body of the first API post.</p>"
+    },
+    "guid": "api-1",
+    "enclosure": [
+        {
+            "href": "http://feeds.freshgo.test/api/1.jpg",
+            "type": "image"
+        }
+    ],
+    "author": "Jo Api"
+},
+{
+    "frss:id": "1791274998925401",
+    "id": "tag:google.com,2005:reader/item/00065d27b6018859",
+    "crawlTimeMsec": "1791274998925",
+    "timestampUsec": "1791274998925401",
+    "published": 1788343200,
+    "title": "Second &amp; last",
+    "canonical": [
+        {
+            "href": "http://feeds.freshgo.test/page/two?a=1&b=2"
+        }
+    ],
+    "alternate": [
+        {
+            "href": "http://feeds.freshgo.test/page/two?a=1&b=2",
+            "type": "text/html"
+        }
+    ],
+    "categories": [
+        "user/-/state/com.google/reading-list",
+        "user/-/state/org.freshrss/main",
+        "user/-/state/com.google/unread",
+        "gamma"
+    ],
+    "origin": {
+        "streamId": "feed/3",
+        "htmlUrl": "http://feeds.freshgo.test/page.html",
+        "title": "HTML page",
+        "feedUrl": "http://feeds.freshgo.test/page.html"
+    },
+    "content": {
+        "content": "<div data-sanitized-class=\"body\"><p>Body of the second article.</p></div>"
+    },
+    "guid": "html-2",
+    "author": "Ed Parser"
+},
+{
+    "frss:id": "1791274998925397",
+    "id": "tag:google.com,2005:reader/item/00065d27b6018855",
+    "crawlTimeMsec": "1791274998925",
+    "timestampUsec": "1791274998925397",
+    "published": 1788274800,
+    "title": "First embedded article",
+    "canonical": [
+        {
+            "href": "http://feeds.freshgo.test/embedded/1"
+        }
+    ],
+    "alternate": [
+        {
+            "href": "http://feeds.freshgo.test/embedded/1",
+            "type": "text/html"
+        }
+    ],
+    "categories": [
+        "user/-/state/com.google/reading-list",
+        "user/-/state/org.freshrss/main",
+        "user/-/state/com.google/unread"
+    ],
+    "origin": {
+        "streamId": "feed/7",
+        "htmlUrl": "http://feeds.freshgo.test/embedded.html",
+        "title": "Embedded JSON",
+        "feedUrl": "http://feeds.freshgo.test/embedded.html"
+    },
+    "content": {
+        "content": "<p>Embedded body one.</p>"
+    },
+    "guid": "emb-1",
+    "author": "Lu Embed"
+},
+{
+    "frss:id": "1791274998925396",
+    "id": "tag:google.com,2005:reader/item/00065d27b6018854",
+    "crawlTimeMsec": "1791274998925",
+    "timestampUsec": "1791274998925396",
+    "published": 1788267600,
+    "title": "First JSON Feed item",
+    "canonical": [
+        {
+            "href": "http://feeds.freshgo.test/jsonfeed/1"
+        }
+    ],
+    "alternate": [
+        {
+            "href": "http://feeds.freshgo.test/jsonfeed/1",
+            "type": "text/html"
+        }
+    ],
+    "categories": [
+        "user/-/state/com.google/reading-list",
+        "user/-/state/org.freshrss/main",
+        "user/-/state/com.google/unread",
+        "json",
+        "feed"
+    ],
+    "origin": {
+        "streamId": "feed/5",
+        "htmlUrl": "http://feeds.freshgo.test/jsonfeed/",
+        "title": "JSON Feed",
+        "feedUrl": "http://feeds.freshgo.test/feed.json"
+    },
+    "content": {
+        "content": "<p>HTML content of the <em>first</em> item.</p>"
+    },
+    "guid": "jsonfeed-1",
+    "enclosure": [
+        {
+            "href": "http://feeds.freshgo.test/jsonfeed/1.png",
+            "type": "image"
+        }
+    ]
+},
+{
+    "frss:id": "1791274998925394",
+    "id": "tag:google.com,2005:reader/item/00065d27b6018852",
+    "crawlTimeMsec": "1791274998925",
+    "timestampUsec": "1791274998925394",
+    "published": 1788260400,
+    "title": "First XML record",
+    "canonical": [
+        {
+            "href": "http://feeds.freshgo.test/data/1"
+        }
+    ],
+    "alternate": [
+        {
+            "href": "http://feeds.freshgo.test/data/1",
+            "type": "text/html"
+        }
+    ],
+    "categories": [
+        "user/-/state/com.google/reading-list",
+        "user/-/state/org.freshrss/main",
+        "user/-/state/com.google/unread",
+        "one",
+        "two"
+    ],
+    "origin": {
+        "streamId": "feed/4",
+        "htmlUrl": "http://feeds.freshgo.test/data/",
+        "title": "XML catalog",
+        "feedUrl": "http://feeds.freshgo.test/data.xml"
+    },
+    "content": {
+        "content": "Text of the first record"
+    },
+    "guid": "xml-1",
+    "author": "Fay Catalog"
+},
+{
+    "frss:id": "1791274998925393",
+    "id": "tag:google.com,2005:reader/item/00065d27b6018851",
+    "crawlTimeMsec": "1791274998925",
+    "timestampUsec": "1791274998925393",
+    "published": 1788256800,
+    "title": "First scraped article",
+    "canonical": [
+        {
+            "href": "http://feeds.freshgo.test/page/one"
+        }
+    ],
+    "alternate": [
+        {
+            "href": "http://feeds.freshgo.test/page/one",
+            "type": "text/html"
+        }
+    ],
+    "categories": [
+        "user/-/state/com.google/reading-list",
+        "user/-/state/org.freshrss/main",
+        "user/-/state/com.google/unread",
+        "alpha",
+        "beta"
+    ],
+    "origin": {
+        "streamId": "feed/3",
+        "htmlUrl": "http://feeds.freshgo.test/page.html",
+        "title": "HTML page",
+        "feedUrl": "http://feeds.freshgo.test/page.html"
+    },
+    "content": {
+        "content": "<div data-sanitized-class=\"body\"><p>Body of the <strong>first</strong> article.</p><p>Second paragraph.</p></div>"
+    },
+    "guid": "html-1",
+    "enclosure": [
+        {
+            "href": "http://feeds.freshgo.test/page/one.jpg",
+            "type": "image"
+        }
+    ],
+    "author": "Dora Scraper"
+}
+]}

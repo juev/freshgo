@@ -1,0 +1,23 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p>{{.Data.Description}} <a href="{{.Data.Feed}}">RSS</a></p>
+<form method="get" action="{{.URL .Data.Self}}" class="search" role="search">
+<label for="q">{{.T "search.label"}}</label>
+<input type="search" id="q" name="q" value="{{.Data.Query}}">
+<button type="submit">{{.T "search.submit"}}</button>
+</form>
+{{if not .Data.Entries}}<p class="muted">{{.T "stream.empty"}}</p>{{end}}
+{{range .Data.Entries}}
+<article class="entry single" id="e{{.ID}}">
+<h2>{{if .Link}}<a href="{{.Link}}" rel="noopener noreferrer">{{.Title}}</a>{{else}}{{.Title}}{{end}}</h2>
+<p class="entry-meta">
+<span>{{.Feed}}</span>
+{{if .Authors}}<span class="entry-authors">{{.Authors}}</span>{{end}}
+<time datetime="{{.DateTime}}">{{.Date}}</time>
+</p>
+<div class="entry-content">{{.Content}}</div>
+{{if $.Data.Tags}}{{if .Tags}}<p class="entry-tags">{{$.T "entry.tags"}} {{range $i, $tag := .Tags}}{{if $i}}, {{end}}{{$tag}}{{end}}</p>{{end}}{{end}}
+{{if $.Data.Labels}}{{if .Labels}}<p class="entry-labels">{{$.T "entry.labels"}} {{range $i, $label := .Labels}}{{if $i}}, {{end}}{{$label}}{{end}}</p>{{end}}{{end}}
+</article>
+{{end}}
+{{end}}

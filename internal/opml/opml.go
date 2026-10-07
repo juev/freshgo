@@ -210,6 +210,24 @@ const Title = "freshgo"
 // come in the order the user gave them, then by name; feeds by name, both
 // as the language of the user orders names.
 func Export(ctx context.Context, db *store.Store, u *store.User, created time.Time) ([]byte, error) {
+	return ExportPart(ctx, db, u, created, Part{})
+}
+
+// Part says which of the subscriptions of a user a document lists, and for whom.
+type Part struct {
+	// CategoryID and FeedID, when not zero, keep one category, or one feed
+	// without its category.
+	CategoryID int64
+	FeedID     int64
+	// Public is a document anybody may get: muted feeds are left out, and so
+	// is what a feed needs to be requested with, credentials in its address
+	// included.
+	Public bool
+}
+
+// ExportPart writes a part of the categories and feeds of the user as OPML,
+// in the order of Export.
+func ExportPart(ctx context.Context, db *store.Store, u *store.User, created time.Time, part Part) ([]byte, error) {
 	categories, err := db.Categories(ctx, u.ID)
 	if err != nil {
 		return nil, err
@@ -249,11 +267,36 @@ func Export(ctx context.Context, db *store.Store, u *store.User, created time.Ti
 	b.WriteString(`<opml xmlns:frss="` + namespace + `" version="2.0">` + "\n  <head>\n    <title>")
 	escape(&b, Title)
 	b.WriteString("</title>\n    <dateCreated>" + created.Format(time.RFC1123Z) + "</dateCreated>\n  </head>\n  <body>\n")
+	writeFeed := func(indent string, f *store.Feed) {
+		b.WriteString(indent + "<outline")
+		for _, a := range outline(f) {
+			if part.Public && (strings.HasPrefix(a.name, "frss:CURLOPT_") || a.name == "frss:ttl") {
+				continue
+			}
+			if part.Public && a.name == "xmlUrl" {
+				a.value = withoutCredentials(a.value)
+			}
+			b.WriteString(" " + a.name + `="`)
+			escape(&b, a.value)
+			b.WriteString(`"`)
+		}
+		b.WriteString("/>\n")
+	}
+	listed := func(f *store.Feed) bool {
+		if part.FeedID != 0 {
+			return f.ID == part.FeedID
+		}
+		// A muted feed is nobody else's business.
+		return !part.Public || f.TTL >= 0
+	}
 	for _, c := range categories {
+		if part.FeedID != 0 || part.CategoryID != 0 && c.ID != part.CategoryID {
+			continue
+		}
 		b.WriteString(`    <outline text="`)
 		escape(&b, c.Name)
 		b.WriteString(`"`)
-		if c.Kind == kindDynamicOPML {
+		if c.Kind == kindDynamicOPML && !part.Public {
 			if address := readAttributes(c.Attributes).text("opml_url"); address != "" {
 				b.WriteString(` frss:opmlUrl="`)
 				escape(&b, address)
@@ -262,21 +305,31 @@ func Export(ctx context.Context, db *store.Store, u *store.User, created time.Ti
 		}
 		b.WriteString(">\n")
 		for _, f := range feeds {
-			if f.CategoryID != c.ID {
-				continue
+			if f.CategoryID == c.ID && listed(f) {
+				writeFeed("      ", f)
 			}
-			b.WriteString("      <outline")
-			for _, a := range outline(f) {
-				b.WriteString(" " + a.name + `="`)
-				escape(&b, a.value)
-				b.WriteString(`"`)
-			}
-			b.WriteString("/>\n")
 		}
 		b.WriteString("    </outline>\n")
 	}
+	if part.FeedID != 0 {
+		for _, f := range feeds {
+			if listed(f) {
+				writeFeed("    ", f)
+			}
+		}
+	}
 	b.WriteString("  </body>\n</opml>\n")
 	return b.Bytes(), nil
+}
+
+// withoutCredentials returns an address without its user and password.
+func withoutCredentials(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.User == nil {
+		return raw
+	}
+	u.User = nil
+	return u.String()
 }
 
 func escape(w io.Writer, s string) {

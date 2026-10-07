@@ -42,6 +42,20 @@
 {{if .Data.Settings}}<a class="stream-settings" href="{{.URL .Data.Settings}}">{{.T "stream.settings"}}</a>{{end}}
 {{if .Data.CanChange}}
 <details class="menu">
+<summary>{{.T "query.save"}}</summary>
+<form method="post" action="{{.URL "/queries"}}">
+<input type="hidden" name="stream" value="{{.Data.Path}}">
+<input type="hidden" name="state" value="{{.Data.State}}">
+<input type="hidden" name="sort" value="{{.Data.Sort}}">
+<input type="hidden" name="order" value="{{if .Data.Asc}}asc{{else}}desc{{end}}">
+<input type="hidden" name="q" value="{{.Data.Query}}">
+<input type="hidden" name="next" value="{{.Data.Here}}">
+<label for="query-name">{{.T "form.name"}}</label>
+<input type="text" id="query-name" name="name" maxlength="191" required>
+<button type="submit">{{.T "query.save.submit"}}</button>
+</form>
+</details>
+<details class="menu">
 <summary>{{.T "mark-all.label"}}</summary>
 <form method="post" action="{{.URL "/read-all"}}">
 <input type="hidden" name="stream" value="{{.Data.Path}}">

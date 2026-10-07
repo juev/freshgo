@@ -50,6 +50,8 @@ type preferences struct {
 	// Enabled is false for a user who is kept out.
 	Enabled *bool `json:"enabled"`
 	IsAdmin bool  `json:"is_admin"`
+	// Token opens the entries of the user as a feed to whoever has it.
+	Token string `json:"token"`
 	// PasswordHash is the bcrypt hash of the password of the web interface.
 	PasswordHash string `json:"passwordHash"`
 }

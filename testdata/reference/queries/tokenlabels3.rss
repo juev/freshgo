@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8" ?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/" >
+	<channel>
+		<title>Labelled</title>
+		<link>http://freshrss.freshgo.test/api/query.php?user=alice&amp;t=tokenlabels3&amp;f=html</link>
+		<description>RSS feed of Labelled</description>
+		<pubDate>Wed, 07 Oct 2026 08:38:05 +0000</pubDate>
+		<lastBuildDate>Wed, 07 Oct 2026 08:38:05 GMT</lastBuildDate>
+		<atom:link href="http://freshrss.freshgo.test/api/query.php?user=alice&amp;t=tokenlabels3&amp;f=rss" rel="self" type="application/rss+xml" />
+				<item>
+			<title>Opaque guid</title>
+			<link>http://feeds.freshgo.test/rss/opaque</link>
+						<dc:creator>carol@example.org (Carol)</dc:creator>
+			<category>label:work &amp; play</category>
+			<media:content url="http://feeds.freshgo.test/rss/audio.mp3" type="audio/mpeg" length="12345"></media:content>
+			<description><![CDATA[<p>Escaped HTML description</p>]]></description>
+			<pubDate>Wed, 02 Sep 2026 10:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925400</guid>
+		</item>
+		<item>
+			<title>First JSON Feed item</title>
+			<link>http://feeds.freshgo.test/jsonfeed/1</link>
+						<category>label:later</category>
+			<media:thumbnail url="http://feeds.freshgo.test/jsonfeed/1.png" />
+			<media:content url="http://feeds.freshgo.test/jsonfeed/1.png" medium="image"></media:content>
+			<description><![CDATA[<p>HTML content of the <em>first</em> item.</p>]]></description>
+			<pubDate>Tue, 01 Sep 2026 13:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925396</guid>
+		</item>
+		<item>
+			<title>Plain entry</title>
+			<link>http://feeds.freshgo.test/atom/plain</link>
+						<dc:creator>Alice Author</dc:creator>
+			<category>label:later</category>
+			<description><![CDATA[<p>First paragraph with an <a href="http://feeds.freshgo.test/atom/relative">relative link</a>.</p>]]></description>
+			<pubDate>Tue, 01 Sep 2026 08:00:00 +0000</pubDate>
+			<guid isPermaLink="false">1791274998925392</guid>
+		</item>
+
+	</channel>
+</rss>

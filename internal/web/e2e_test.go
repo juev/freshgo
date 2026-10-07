@@ -204,15 +204,6 @@ func freshgoKeys(s *site) {
 	s.setting("alice", "keys", map[string]string{})
 }
 
-func (s *site) entry(name string, id int64) *store.Entry {
-	s.t.Helper()
-	e, err := s.db.EntryByID(context.Background(), s.user(name).ID, id)
-	if err != nil {
-		s.t.Fatal(err)
-	}
-	return e
-}
-
 func e(id int64) string { return "#e" + strconv.FormatInt(id, 10) }
 
 // current is true in the page when the entry is the one keys act on, has
@@ -630,6 +621,50 @@ func TestE2EDarkAndNarrow(t *testing.T) {
 				t.Errorf("%s scrolls sideways on a narrow screen", page)
 			}
 		}
+	})
+}
+
+// R7, R12: a view is saved, handed out and read at its public address with
+// the keyboard alone.
+func TestE2EQueries(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		freshgoKeys(s)
+		b := browse(t, s)
+		b.login("alice")
+		b.open("/feeds/1?state=all")
+		b.tabTo(`details.menu form[action$="/queries"] input[name="name"], details.menu:not([open]) summary`)
+		b.press(kb.Enter)
+		b.tabTo("#query-name")
+		b.press("Atom, all", kb.Enter)
+		b.until("the page of the saved query", `location.pathname === '/settings/queries/0' && document.querySelector('#messages').textContent.includes('Query saved.')`)
+		b.accessible("the page of a saved query")
+		b.tabTo("#share_rss")
+		b.press(" ")
+		b.tabTo(`form.settings button[type="submit"]`)
+		b.press(kb.Enter)
+		b.until("the public addresses", `document.querySelector('a[href$=".rss"]')`)
+		b.accessible("the page of a shared query")
+		address := b.text(`new URL(document.querySelector('a[href$=".html"]').href).pathname`)
+
+		// The query stands in the tree; K from the stream after it leads there.
+		b.open("/settings/queries")
+		b.accessible("the saved queries")
+		b.open("/queries/0")
+		b.until("the saved query in the tree", `document.querySelector('#tree a[aria-current="page"]').textContent === 'Atom, all'`)
+		b.accessible("the reading screen of a saved query")
+		b.press("j")
+		b.until("an entry of the query open", `document.querySelector('.entry.current details').open`)
+
+		// Its public page is read without a login.
+		b.tabTo(`form[action$="/logout"] button`)
+		b.press(kb.Enter)
+		b.until("logged out", `location.pathname === '/login'`)
+		b.open(address)
+		b.until("the public page", `document.querySelector('h1').textContent === 'Atom, all' && document.querySelectorAll('article').length > 0`)
+		b.accessible("the public page of a query")
+		b.tabTo("#q")
+		b.press("intitle:plain", kb.Enter)
+		b.until("the public page narrowed", `document.querySelectorAll('article').length === 1`)
 	})
 }
 

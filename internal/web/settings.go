@@ -23,7 +23,7 @@ const minPassword = 7
 // Pages of settings, in the order their menu lists them.
 var settingsTabs = []struct{ name, path string }{
 	{"display", "/settings/display"}, {"reading", "/settings/reading"}, {"archiving", "/settings/archiving"},
-	{"keys", "/settings/keys"}, {"privacy", "/settings/privacy"}, {"profile", "/settings/profile"}, {"log", "/log"},
+	{"queries", "/settings/queries"}, {"keys", "/settings/keys"}, {"privacy", "/settings/privacy"}, {"profile", "/settings/profile"}, {"log", "/log"},
 }
 
 // Pages of the administration.
@@ -366,6 +366,8 @@ func (h *Handler) savePrivacy(w http.ResponseWriter, r *http.Request) {
 // profilePage is what the page of the profile shows.
 type profilePage struct {
 	Email, Token string
+	// Feed and OPML are the addresses the token opens, empty without one.
+	Feed, OPML string
 	// HasPassword and HasAPI say which passwords the user has; CanDelete is
 	// false for the default user, who stays.
 	HasPassword, HasAPI, CanDelete bool
@@ -383,6 +385,10 @@ func (h *Handler) showProfile(w http.ResponseWriter, r *http.Request, status int
 	page := profilePage{
 		Email: email, Token: token, HasPassword: s.who.prefs.PasswordHash != "", HasAPI: s.who.user.APIPasswordHash != "",
 		CanDelete: s.who.user.Name != s.system.DefaultUser,
+	}
+	if stored := s.who.prefs.Token; stored != "" {
+		address := "?" + url.Values{"user": {s.who.user.Name}, "token": {stored}}.Encode()
+		page.Feed, page.OPML = h.public("/rss")+address, h.public("/opml")+address
 	}
 	if problem != "" {
 		page.Problem = v.T(problem)

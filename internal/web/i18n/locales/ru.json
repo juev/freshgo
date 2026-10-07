@@ -565,7 +565,7 @@
   "settings.width.medium": "Средняя",
   "settings.width.no_limit": "Во всё окно",
   "settings.width.thin": "Узкая",
-  "shared.feed-of": "Лента «%s»",
+  "shared.feed-of": "RSS-лента «%s»",
   "shared.heading": "Общий доступ",
   "sort.added": "времени поступления",
   "sort.feed": "фиду",

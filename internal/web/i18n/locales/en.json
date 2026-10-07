@@ -537,7 +537,7 @@
   "settings.width.medium": "Medium",
   "settings.width.no_limit": "As wide as the window",
   "settings.width.thin": "Narrow",
-  "shared.feed-of": "Feed of %s",
+  "shared.feed-of": "RSS feed of %s",
   "shared.heading": "Shared entries",
   "sort.added": "Time received",
   "sort.feed": "Feed",

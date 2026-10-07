@@ -82,6 +82,16 @@ func (s *site) asAlice() {
 	}
 }
 
+// entry returns an entry of a user as it is stored.
+func (s *site) entry(name string, id int64) *store.Entry {
+	s.t.Helper()
+	e, err := s.db.EntryByID(context.Background(), s.user(name).ID, id)
+	if err != nil {
+		s.t.Fatal(err)
+	}
+	return e
+}
+
 func ptr[T any](v T) *T { return &v }
 
 func mainStream() store.EntrySet { return store.EntrySet{MinPriority: ptr(priorityMain)} }
