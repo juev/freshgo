@@ -111,7 +111,7 @@ func TestReadingScreen(t *testing.T) {
 			`<a href="/categories/3">Scraped &amp; parsed</a> <span class="count" title="10 unread entries">10</span>`,
 			`<a href="/feeds/1">Atom corpus</a> <span class="count" title="4 unread entries">4</span>`,
 			`<a href="/labels/2">work &amp; play</a> <span class="count" title="1 unread entry">1</span>`,
-			`<h1 id="stream-heading">Unread</h1>`, `<input type="search" id="q" name="q" value="">`,
+			`<h1 id="stream-heading">Unread</h1>`, `<input type="search" id="q" name="q" value="" placeholder="Search">`,
 			`<a href="/?state=unread" aria-current="true">Unread</a>`, `<a href="/?state=all">All</a>`,
 			`<option value="added" selected>Time received</option>`, `<option value="desc" selected>`,
 			`action="/read-all"`, `>Mark as read</button>`, `>Star</button>`,

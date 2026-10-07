@@ -106,7 +106,7 @@ The reading screen has the tree of streams, categories, feeds, labels and saved 
 | `?` | help with the keys in force |
 | `Esc` | close a dialog |
 
-Keys are changed on the page "Keys" of the settings, where one checkbox switches off all keys pressed alone. A user imported from FreshRSS keeps the keys set there. Keys do nothing while the focus is in a field.
+Keys are changed on the page "Keys" of the settings, where one checkbox switches off all keys pressed alone. A user imported from FreshRSS keeps the keys they changed there; the keys FreshRSS gave by default make way for those above. Keys do nothing while the focus is in a field.
 
 ### How users log in
 

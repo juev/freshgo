@@ -7,31 +7,34 @@
 <section class="stream" aria-labelledby="stream-heading">
 <h1 id="stream-heading">{{.Heading}}</h1>
 
+<div class="toolbar">
 <form method="get" action="{{.URL .Data.Path}}" class="search" role="search">
 {{range $key, $values := .Data.Asked}}{{if ne $key "q"}}<input type="hidden" name="{{$key}}" value="{{index $values 0}}">{{end}}{{end}}
-<label for="q">{{.T "search.label"}}</label>
-<input type="search" id="q" name="q" value="{{.Data.Query}}"{{if .Data.Problem}} aria-invalid="true" aria-describedby="q-problem"{{end}}>
+<label for="q" class="visually-hidden">{{.T "search.label"}}</label>
+<input type="search" id="q" name="q" value="{{.Data.Query}}" placeholder="{{.T "search.label"}}"{{if .Data.Problem}} aria-invalid="true" aria-describedby="q-problem"{{end}}>
 <button type="submit">{{.T "search.submit"}}</button>
 </form>
-{{if .Data.Problem}}<p class="alert" role="alert" id="q-problem">{{.Data.Problem}}</p>{{end}}
-
-<div class="toolbar">
 <ul class="choices" aria-label="{{.T "state.label"}}">
 {{range .Data.States}}<li><a href="{{.URL}}"{{if .Current}} aria-current="true"{{end}}>{{.Name}}</a></li>
 {{end}}</ul>
 <form method="get" action="{{.URL .Data.Path}}" class="sorting">
 {{range $key, $values := .Data.Asked}}{{if and (ne $key "sort") (ne $key "order")}}<input type="hidden" name="{{$key}}" value="{{index $values 0}}">{{end}}{{end}}
-<label for="sort">{{.T "sort.label"}}</label>
+<label for="sort" class="visually-hidden">{{.T "sort.label"}}</label>
 <select id="sort" name="sort">
 {{range .Data.Sorts}}<option value="{{.URL}}"{{if .Current}} selected{{end}}>{{.Name}}</option>
 {{end}}</select>
-<label for="order">{{.T "order.label"}}</label>
+<label for="order" class="visually-hidden">{{.T "order.label"}}</label>
 <select id="order" name="order">
 <option value="desc"{{if not .Data.Asc}} selected{{end}}>{{.T "order.desc"}}</option>
 <option value="asc"{{if .Data.Asc}} selected{{end}}>{{.T "order.asc"}}</option>
 </select>
 <button type="submit">{{.T "sort.submit"}}</button>
 </form>
+{{if .Data.Settings}}<a class="stream-settings" href="{{.URL .Data.Settings}}">{{.T "stream.settings"}}</a>{{end}}
+{{if or .Data.CanRefresh .Data.CanChange}}
+<details class="menu more-actions">
+<summary aria-label="{{.T "toolbar.more"}}" title="{{.T "toolbar.more"}}">⋯</summary>
+<div class="menu-body">
 {{if .Data.CanRefresh}}
 <form method="post" action="{{.URL "/refresh"}}" class="refresh">
 <input type="hidden" name="stream" value="{{.Data.Path}}">
@@ -39,10 +42,20 @@
 <button type="submit">{{.T "refresh.submit"}}</button>
 </form>
 {{end}}
-{{if .Data.Settings}}<a class="stream-settings" href="{{.URL .Data.Settings}}">{{.T "stream.settings"}}</a>{{end}}
 {{if .Data.CanChange}}
-<details class="menu">
-<summary>{{.T "query.save"}}</summary>
+<form method="post" action="{{.URL "/read-all"}}">
+<input type="hidden" name="stream" value="{{.Data.Path}}">
+<input type="hidden" name="state" value="{{.Data.State}}">
+<input type="hidden" name="q" value="{{.Data.Query}}">
+<input type="hidden" name="before" value="{{.Data.Before}}">
+<input type="hidden" name="next" value="{{.Data.Here}}">
+<fieldset>
+<legend>{{.T "mark-all.label"}}</legend>
+<button type="submit" name="older" value="">{{.T "mark-all.shown"}}</button>
+<button type="submit" name="older" value="day">{{.T "mark-all.day"}}</button>
+<button type="submit" name="older" value="week">{{.T "mark-all.week"}}</button>
+</fieldset>
+</form>
 <form method="post" action="{{.URL "/queries"}}">
 <input type="hidden" name="stream" value="{{.Data.Path}}">
 <input type="hidden" name="state" value="{{.Data.State}}">
@@ -50,26 +63,19 @@
 <input type="hidden" name="order" value="{{if .Data.Asc}}asc{{else}}desc{{end}}">
 <input type="hidden" name="q" value="{{.Data.Query}}">
 <input type="hidden" name="next" value="{{.Data.Here}}">
+<fieldset>
+<legend>{{.T "query.save"}}</legend>
 <label for="query-name">{{.T "form.name"}}</label>
 <input type="text" id="query-name" name="name" maxlength="191" required>
 <button type="submit">{{.T "query.save.submit"}}</button>
+</fieldset>
 </form>
-</details>
-<details class="menu">
-<summary>{{.T "mark-all.label"}}</summary>
-<form method="post" action="{{.URL "/read-all"}}">
-<input type="hidden" name="stream" value="{{.Data.Path}}">
-<input type="hidden" name="state" value="{{.Data.State}}">
-<input type="hidden" name="q" value="{{.Data.Query}}">
-<input type="hidden" name="before" value="{{.Data.Before}}">
-<input type="hidden" name="next" value="{{.Data.Here}}">
-<button type="submit" name="older" value="">{{.T "mark-all.shown"}}</button>
-<button type="submit" name="older" value="day">{{.T "mark-all.day"}}</button>
-<button type="submit" name="older" value="week">{{.T "mark-all.week"}}</button>
-</form>
+{{end}}
+</div>
 </details>
 {{end}}
 </div>
+{{if .Data.Problem}}<p class="alert" role="alert" id="q-problem">{{.Data.Problem}}</p>{{end}}
 
 {{if not .Data.Entries}}{{if not .Data.Problem}}<p class="muted">{{.T "stream.empty"}}</p>{{end}}{{end}}
 <div class="entries"{{if .Data.Entries}} role="feed" aria-labelledby="stream-heading"{{end}}>

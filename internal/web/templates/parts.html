@@ -85,6 +85,7 @@
 {{template "entry-body" .Entry}}
 {{if .Entry.Tags}}<p class="entry-tags">{{.Page.T "entry.tags"}} {{range $i, $tag := .Entry.Tags}}{{if $i}}, {{end}}{{$tag}}{{end}}</p>{{end}}
 {{if .Entry.Labels}}<p class="entry-labels">{{.Page.T "entry.labels"}} {{range $i, $label := .Entry.Labels}}{{if $i}}, {{end}}{{$label}}{{end}}</p>{{end}}
+<p class="entry-fold"><button type="button" class="link" data-fold hidden>{{.Page.T "entry.fold"}}</button></p>
 </div>
 </details>
 <div class="entry-actions">

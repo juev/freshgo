@@ -83,15 +83,24 @@ func TestBindings(t *testing.T) {
 
 	imported(t, Options{}, func(t *testing.T, s *site) {
 		got := readKeyboard(s.user("alice")).bindings()
+		// alice never changed a key in FreshRSS: the keys it gave her by
+		// itself are not hers, and she has those of freshgo.
+		for _, a := range actions {
+			if got[a.id] != a.key {
+				t.Errorf("alice of FreshRSS has %q for %s, want %q", got[a.id], a.id, a.key)
+			}
+		}
+		// The keys she did change there are kept, and take the place of
+		// the keys of freshgo they are.
+		s.setting("alice", "shortcuts", map[string]string{
+			"mark_favorite": "f", "go_website": "space", "help": "F1", "actualize": "m", "next_entry": "j", "collapse_entry": "x",
+		})
+		got = readKeyboard(s.user("alice")).bindings()
 		for id, want := range map[string]string{
-			"refresh": "q", "read": "r", "star": "f", "original": "Space", "next": "j", "next-unread": "h", "prev": "k",
-			"skip-next": "n", "skip-prev": "p", "toggle": "c", "more": "m", "labels": "l", "search": "a", "help": "F1", "tree": "t",
-			// Of freshgo alone: the space bar is taken, the rest is free.
-			"page": "", "mark-all": "A", "next-node": "J", "prev-node": "K", "unread-node": "U", "palette": ":",
-			"go-unread": "g u", "go-all": "g a", "go-starred": "g s", "go-keys": "g k",
+			"read": "", "refresh": "m", "toggle": "x", "next": "j", "star": "s", "original": "v", "page": "Space", "help": "?", "search": "/",
 		} {
 			if got[id] != want {
-				t.Errorf("alice of FreshRSS has %q for %s, want %q", got[id], id, want)
+				t.Errorf("alice with keys of her own has %q for %s, want %q", got[id], id, want)
 			}
 		}
 		if len(got) != len(actions) {
@@ -113,18 +122,20 @@ func TestKeysPage(t *testing.T) {
 		if a := s.get("/settings/keys"); a.status != http.StatusSeeOther {
 			t.Errorf("the page of keys without a login: status %d", a.status)
 		}
+		// Keys alice chose in FreshRSS, among those it gave her by itself.
+		s.setting("alice", "shortcuts", map[string]string{"mark_read": "x", "mark_favorite": "b", "help": "f2", "go_website": "space", "next_entry": "j"})
 		s.asAlice()
 		body := s.page("/settings/keys")
 		for _, want := range []string{
-			`<h1>Keys</h1>`, `<label for="key-next">Open the next entry</label>`, `id="key-read" name="key-read" value="r"`,
-			`id="key-page" name="key-page" value=""`, `<input type="checkbox" id="single" name="single" value="1" checked>`,
+			`<h1>Keys</h1>`, `<label for="key-next">Open the next entry</label>`, `id="key-read" name="key-read" value="x"`,
+			`id="key-page" name="key-page" value="Space"`, `<input type="checkbox" id="single" name="single" value="1" checked>`,
 			`<a href="/settings/keys" aria-current="page">Keys</a>`,
 		} {
 			if !strings.Contains(body, want) {
 				t.Errorf("GET /settings/keys: no %q in\n%s", want, body)
 			}
 		}
-		if c := scriptConfigOf(t, body); c.Keys["r"] != "read" || c.Keys["Space"] != "original" || !c.SingleKeys || !c.MarkOnOpen || !c.AutoLoad ||
+		if c := scriptConfigOf(t, body); c.Keys["x"] != "read" || c.Keys["v"] != "original" || !c.SingleKeys || !c.MarkOnOpen || !c.AutoLoad ||
 			len(c.Actions) != len(actions) || c.Actions[0].Name != "Open the next entry" || c.Texts["js.close"] != "Close" || c.URLs["palette"] != "/palette" {
 			t.Errorf("settings for the script: %+v", c)
 		}
@@ -148,7 +159,7 @@ func TestKeysPage(t *testing.T) {
 			t.Errorf("after saving: no notice or no new key in\n%s", body)
 		}
 		c := scriptConfigOf(t, body)
-		if c.Keys["Ctrl+m"] != "read" || c.Keys["Shift+Space"] != "page" || c.Keys["r"] != "" || c.Keys["F1"] != "" || c.Keys["?"] != "" {
+		if c.Keys["Ctrl+m"] != "read" || c.Keys["Shift+Space"] != "page" || c.Keys["x"] != "" || c.Keys["F2"] != "" || c.Keys["?"] != "" {
 			t.Errorf("keys after saving: %v", c.Keys)
 		}
 
@@ -165,8 +176,8 @@ func TestKeysPage(t *testing.T) {
 				t.Errorf("%s: status %d\n%s", what, a.status, a.body)
 			}
 		}
-		if got := readKeyboard(s.user("alice")).bindings()["star"]; got != "f" {
-			t.Errorf("star has the key %q after refused forms, want f", got)
+		if got := readKeyboard(s.user("alice")).bindings()["star"]; got != "b" {
+			t.Errorf("star has the key %q after refused forms, want b", got)
 		}
 
 		v := form()
@@ -178,7 +189,7 @@ func TestKeysPage(t *testing.T) {
 
 		s.post("/settings/keys", url.Values{"reset": {"1"}})
 		c = scriptConfigOf(t, s.page("/"))
-		if !c.SingleKeys || c.Keys["r"] != "read" || c.Keys["F1"] != "help" || c.Keys["Ctrl+m"] != "" {
+		if !c.SingleKeys || c.Keys["x"] != "read" || c.Keys["F2"] != "help" || c.Keys["Ctrl+m"] != "" {
 			t.Errorf("after putting the defaults back: %+v", c.Keys)
 		}
 

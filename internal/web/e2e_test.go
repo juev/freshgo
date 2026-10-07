@@ -198,12 +198,6 @@ func (b *browser) accessible(what string) {
 	}
 }
 
-// freshgoKeys gives alice the keys of freshgo instead of those she had in
-// FreshRSS.
-func freshgoKeys(s *site) {
-	s.setting("alice", "keys", map[string]string{})
-}
-
 func e(id int64) string { return "#e" + strconv.FormatInt(id, 10) }
 
 // current is true in the page when the entry is the one keys act on, has
@@ -216,7 +210,6 @@ func current(id int64, open bool) string {
 // focus stays on the entry and the tree keeps count.
 func TestE2EReadingWithKeys(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
-		freshgoKeys(s)
 		ids := s.stored("alice", store.Listing{Set: mainStream(), Read: ptr(false)})
 		b := browse(t, s)
 		b.login("alice")
@@ -310,7 +303,6 @@ func TestE2EReadingWithKeys(t *testing.T) {
 // fields that take the focus and give it back.
 func TestE2EDialogs(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
-		freshgoKeys(s)
 		ids := s.stored("alice", store.Listing{Set: mainStream(), Read: ptr(false)})
 		b := browse(t, s)
 		b.login("alice")
@@ -384,7 +376,6 @@ func TestE2EDialogs(t *testing.T) {
 // the keyboard opens.
 func TestE2ELabelsAndMarkAll(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
-		freshgoKeys(s)
 		ids := s.stored("alice", store.Listing{Set: store.EntrySet{FeedID: 3}, Read: ptr(false)})
 		b := browse(t, s)
 		b.login("alice")
@@ -428,7 +419,6 @@ func TestE2ELabelsAndMarkAll(t *testing.T) {
 // R7, R8: the same reading with Tab, Enter and the space bar alone.
 func TestE2ETabOnly(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
-		freshgoKeys(s)
 		ids := s.stored("alice", store.Listing{Set: mainStream(), Read: ptr(false)})
 		b := browse(t, s)
 		b.login("alice")
@@ -488,20 +478,22 @@ func TestE2ETabOnly(t *testing.T) {
 }
 
 // R7, R8: keys are changed and turned off on their page; a user of
-// FreshRSS has the keys they had.
+// FreshRSS has the keys they chose there.
 func TestE2EKeysPage(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
 		ids := s.stored("alice", store.Listing{Set: mainStream(), Read: ptr(false)})
+		// What alice chose in FreshRSS; the keys it gave her by itself, like
+		// j, are not kept, and the help is where freshgo has it.
+		s.setting("alice", "shortcuts", map[string]string{"mark_read": "b", "mark_favorite": "z", "help": "f1", "next_entry": "j"})
 		b := browse(t, s)
 		b.login("alice")
 
-		// The keys of FreshRSS: r marks read, f stars, F1 is the help.
-		b.press("n", "r")
-		b.eventually("the entry read by the key of FreshRSS", func() bool { return s.entry("alice", ids[0]).IsRead })
-		b.press("f")
-		b.eventually("the entry starred by the key of FreshRSS", func() bool { return s.entry("alice", ids[0]).IsFavorite })
-		b.press(kb.F1)
-		b.until("the help by F1", `document.querySelector('dialog[open] table')`)
+		b.press("n", "b")
+		b.eventually("the entry read by the key chosen in FreshRSS", func() bool { return s.entry("alice", ids[0]).IsRead })
+		b.press("z")
+		b.eventually("the entry starred by the key chosen in FreshRSS", func() bool { return s.entry("alice", ids[0]).IsFavorite })
+		b.press("?")
+		b.until("the help by ?", `document.querySelector('dialog[open] table')`)
 		b.press(kb.Escape)
 
 		b.press("g", "k")
@@ -554,7 +546,6 @@ func TestE2EKeysPage(t *testing.T) {
 // with another layout presses the same keys.
 func TestE2EListGoesOn(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
-		freshgoKeys(s)
 		s.setting("alice", "posts_per_page", 5)
 		s.setting("alice", "mark_when", map[string]any{"article": false})
 		ids := s.stored("alice", store.Listing{Set: mainStream()})
@@ -585,7 +576,6 @@ func TestE2EListGoesOn(t *testing.T) {
 // R8: the dark theme and a narrow screen.
 func TestE2EDarkAndNarrow(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
-		freshgoKeys(s)
 		b := browse(t, s)
 		b.run(command(emulation.SetEmulatedMedia, emulation.SetEmulatedMediaParams{
 			Features: []*emulation.MediaFeature{{Name: "prefers-color-scheme", Value: "dark"}},
@@ -654,7 +644,6 @@ func TestE2ERegister(t *testing.T) {
 // R7, R13: an entry is passed on from the keyboard.
 func TestE2EShare(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
-		freshgoKeys(s)
 		b := browse(t, s)
 		b.login("alice")
 		b.press("j")
@@ -693,7 +682,6 @@ func TestE2EShare(t *testing.T) {
 // the keyboard alone.
 func TestE2EQueries(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
-		freshgoKeys(s)
 		b := browse(t, s)
 		b.login("alice")
 		b.open("/feeds/1?state=all")
@@ -737,7 +725,6 @@ func TestE2EQueries(t *testing.T) {
 // alone.
 func TestE2ESettings(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
-		freshgoKeys(s)
 		b := browse(t, s)
 		b.login("alice")
 
@@ -797,7 +784,6 @@ func TestE2ESettings(t *testing.T) {
 // keyboard alone.
 func TestE2ESubscriptions(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
-		freshgoKeys(s)
 		remote := newFeedSite(t)
 		remote.serve("/feed.xml", "application/rss+xml", rssOf(remote.URL, "The Blog", "one"))
 		remote.serve("/articles/one", "text/html", `<html><body><article>Text of one</article></body></html>`)
@@ -852,5 +838,28 @@ func TestE2ESubscriptions(t *testing.T) {
 		if n := len(s.feeds("alice")); n != 8 {
 			t.Errorf("alice has %d feeds after unsubscribing, want 8", n)
 		}
+	})
+}
+
+// R7, R8: the row above the entries: an order applies as it is chosen, an
+// open entry is folded by its button, and the focus stays with it.
+func TestE2EToolbar(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		ids := s.stored("alice", store.Listing{Set: mainStream(), Read: ptr(false)})
+		b := browse(t, s)
+		b.login("alice")
+		b.accessible("the reading screen with its row of controls")
+
+		b.press("j")
+		b.until("the first entry open", current(ids[0], true))
+		b.tabTo(e(ids[0]) + " button[data-fold]")
+		b.press(kb.Enter)
+		b.until("the entry folded, the focus on its title",
+			`!document.querySelector('`+e(ids[0])+` details').open && document.activeElement.matches('`+e(ids[0])+` summary')`)
+
+		b.tabTo("#sort")
+		b.press("T")
+		b.until("the entries by title", `new URLSearchParams(location.search).get('sort') === 'title' && document.getElementById('sort').value === 'title'`)
+		b.until("no button where the script sorts", `document.querySelector('form.sorting button').hidden`)
 	})
 }

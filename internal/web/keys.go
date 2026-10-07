@@ -20,40 +20,41 @@ type action struct {
 	// key is the key of the action unless the user chose another.
 	key string
 	// freshRSS is the name of the shortcut of FreshRSS that does the same,
-	// empty when FreshRSS has none.
-	freshRSS string
+	// empty when FreshRSS has none; freshDefault is the key FreshRSS gives
+	// that shortcut (config-user.default.php at commit 219eaf58).
+	freshRSS, freshDefault string
 }
 
 // actions are the actions in the order the help and the settings list them.
 var actions = []action{
-	{"next", "j", "next_entry"},
-	{"prev", "k", "prev_entry"},
-	{"next-unread", "h", "next_unread_entry"},
-	{"skip-next", "n", "skip_next_entry"},
-	{"skip-prev", "p", "skip_prev_entry"},
-	{"toggle", "o", "collapse_entry"},
-	{"page", "Space", ""},
-	{"original", "v", "go_website"},
-	{"read", "m", "mark_read"},
-	{"star", "s", "mark_favorite"},
-	{"labels", "l", "mylabels"},
-	{"share", "S", "auto_share"},
-	{"mark-all", "A", ""},
-	{"more", "", "load_more"},
-	{"refresh", "r", "actualize"},
-	{"search", "/", "focus_search"},
-	{"next-node", "J", ""},
-	{"prev-node", "K", ""},
-	{"unread-node", "U", ""},
-	{"tree", "t", "toggle_aside"},
-	{"go-unread", "g u", ""},
-	{"go-all", "g a", ""},
-	{"go-starred", "g s", ""},
-	{"go-subscriptions", "g f", ""},
-	{"go-keys", "g k", ""},
-	{"add-feed", "+", ""},
-	{"palette", ":", ""},
-	{"help", "?", "help"},
+	{"next", "j", "next_entry", "j"},
+	{"prev", "k", "prev_entry", "k"},
+	{"next-unread", "h", "next_unread_entry", "h"},
+	{"skip-next", "n", "skip_next_entry", "n"},
+	{"skip-prev", "p", "skip_prev_entry", "p"},
+	{"toggle", "o", "collapse_entry", "c"},
+	{"page", "Space", "", ""},
+	{"original", "v", "go_website", "space"},
+	{"read", "m", "mark_read", "r"},
+	{"star", "s", "mark_favorite", "f"},
+	{"labels", "l", "mylabels", "l"},
+	{"share", "S", "auto_share", "s"},
+	{"mark-all", "A", "", ""},
+	{"more", "", "load_more", "m"},
+	{"refresh", "r", "actualize", "q"},
+	{"search", "/", "focus_search", "a"},
+	{"next-node", "J", "", ""},
+	{"prev-node", "K", "", ""},
+	{"unread-node", "U", "", ""},
+	{"tree", "t", "toggle_aside", "t"},
+	{"go-unread", "g u", "", ""},
+	{"go-all", "g a", "", ""},
+	{"go-starred", "g s", "", ""},
+	{"go-subscriptions", "g f", "", ""},
+	{"go-keys", "g k", "", ""},
+	{"add-feed", "+", "", ""},
+	{"palette", ":", "", ""},
+	{"help", "?", "help", "f1"},
 }
 
 // namedKeys are the keys a binding names by a word, as KeyboardEvent.key
@@ -160,8 +161,10 @@ func readKeyboard(u *store.User) keyboard {
 }
 
 // bindings returns the key of every action: the one the user chose here,
-// else the one the user had for it in FreshRSS, else the default one unless
-// another action has taken it, which leaves the action without a key.
+// else the one the user chose for it in FreshRSS, else the default one
+// unless another action has taken it, which leaves the action without a
+// key. A key FreshRSS gave by itself is nobody's choice: import brings all
+// of them, and they would hide the keys of freshgo from everybody who moved.
 func (k keyboard) bindings() map[string]string {
 	out := make(map[string]string, len(actions))
 	// The first key of two cannot do something alone, though it may start
@@ -188,7 +191,10 @@ func (k keyboard) bindings() map[string]string {
 		}
 	} else {
 		for _, a := range actions {
-			if key, err := normalizeKey(k.Shortcuts[a.freshRSS]); a.freshRSS != "" && err == nil && key != "" && free(key) {
+			if a.freshRSS == "" || strings.EqualFold(strings.TrimSpace(k.Shortcuts[a.freshRSS]), a.freshDefault) {
+				continue
+			}
+			if key, err := normalizeKey(k.Shortcuts[a.freshRSS]); err == nil && key != "" && free(key) {
 				take(a.id, key)
 			}
 		}

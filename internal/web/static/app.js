@@ -225,6 +225,16 @@
 		}
 	}
 
+	// ---- Sorting ----
+
+	// The order applies as it is chosen; the button is for a page without
+	// the script.
+	const sorting = document.querySelector('form.sorting');
+	if (sorting) {
+		sorting.querySelector('button').hidden = true;
+		sorting.addEventListener('change', () => sorting.requestSubmit());
+	}
+
 	// ---- Sharing ----
 
 	// What a browser does itself to pass an entry on needs the script: the
@@ -245,6 +255,10 @@
 			const kind = button.dataset.share;
 			button.hidden = !(canShare[kind] && canShare[kind]());
 		}
+		// Folding an entry by its button needs the script as well.
+		for (const button of root.querySelectorAll('button[data-fold]')) {
+			button.hidden = false;
+		}
 	}
 	revealShares(document);
 
@@ -252,6 +266,15 @@
 		const button = event.target.closest('button[data-share]');
 		if (button && shareWith[button.dataset.share]) {
 			shareWith[button.dataset.share](button.dataset.link, button.dataset.title);
+		}
+		const fold = event.target.closest('button[data-fold]');
+		const folded = fold && fold.closest('article.entry');
+		if (folded) {
+			// The button goes with the text: the focus moves to the title,
+			// which is brought back into the window.
+			folded.querySelector('details').open = false;
+			folded.querySelector('summary').focus();
+			folded.scrollIntoView({ block: 'nearest' });
 		}
 	});
 
