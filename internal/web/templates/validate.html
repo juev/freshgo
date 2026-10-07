@@ -1,0 +1,10 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p>{{.T "validate.intro" .Data.Email}}</p>
+{{if .Data.CanSend}}
+<form method="post" action="{{.URL "/validate-email/resend"}}" class="form">
+<p><button type="submit">{{.T "validate.resend"}}</button></p>
+</form>
+{{end}}
+<p><a href="{{.URL "/settings/profile"}}">{{.T "validate.profile"}}</a></p>
+{{end}}

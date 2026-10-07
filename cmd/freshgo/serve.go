@@ -12,6 +12,7 @@ import (
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/greader"
 	"github.com/juev/freshgo/internal/hooks"
+	"github.com/juev/freshgo/internal/mail"
 	"github.com/juev/freshgo/internal/web"
 	"github.com/juev/freshgo/internal/websub"
 )
@@ -101,9 +102,18 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	// A nil sender must not become a mailer that is not nil.
+	var mailer web.Mailer
+	if conf.SMTPURL != "" {
+		sender, err := mail.New(conf.SMTPURL)
+		if err != nil {
+			return err
+		}
+		mailer = sender
+	}
 	pages, err := web.New(web.Options{
 		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL, Version: buildVersion(),
-		TrustedProxies: proxies, FetchAllowlist: conf.Allowlist(),
+		TrustedProxies: proxies, FetchAllowlist: conf.Allowlist(), Mailer: mailer,
 	})
 	if err != nil {
 		return err

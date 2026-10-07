@@ -1,0 +1,16 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<form method="get" action="{{.URL "/stats/repartition"}}" class="form inline">
+<label for="feed">{{.T "stream.feed"}}</label>
+<select id="feed" name="feed">
+{{template "options" .Data.Feeds}}</select>
+<button type="submit">{{.T "stats.show"}}</button>
+</form>
+{{template "totals" (dict "Page" . "Rows" (list (dict "Name" (.T "stats.total") "Totals" .Data.Totals)))}}
+{{template "chart" (dict "Title" .Data.Hours.Title "Unit" .Data.Hours.Unit "Bars" .Data.Hours.Bars "Width" .Data.Hours.Width "Page" .)}}
+<p>{{.T "stats.average-hour" .Data.Hourly}}</p>
+{{template "chart" (dict "Title" .Data.Days.Title "Unit" .Data.Days.Unit "Bars" .Data.Days.Bars "Width" .Data.Days.Width "Page" .)}}
+<p>{{.T "stats.average-weekday" .Data.Daily}}</p>
+{{template "chart" (dict "Title" .Data.Months.Title "Unit" .Data.Months.Unit "Bars" .Data.Months.Bars "Width" .Data.Months.Width "Page" .)}}
+<p>{{.T "stats.average-month" .Data.Monthy}}</p>
+{{end}}

@@ -415,6 +415,9 @@ func (h *Handler) palette(w http.ResponseWriter, r *http.Request) {
 		for _, tab := range settingsTabs {
 			places = append(places, place{v.T("settings." + tab.name + ".heading"), h.url(tab.path), v.T("palette.settings")})
 		}
+		for _, tab := range statsTabs[:3] {
+			places = append(places, place{v.T("stats." + tab.name + ".heading"), h.url(tab.path), v.T("palette.stats")})
+		}
 		if who.admin {
 			for _, tab := range adminTabs {
 				places = append(places, place{v.T("admin." + tab.name + ".heading"), h.url(tab.path), v.T("palette.admin")})

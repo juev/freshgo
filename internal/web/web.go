@@ -44,6 +44,9 @@ type Options struct {
 	BaseURL string
 	// Version is shown on the about page.
 	Version string
+	// Mailer sends letters; nil when the server was given no SMTP server,
+	// and then nothing that needs a letter is offered.
+	Mailer Mailer
 	// FetchAllowlist are the internal addresses feeds may be fetched from,
 	// shown to administrators.
 	FetchAllowlist []string
@@ -70,6 +73,7 @@ type Handler struct {
 	mux       *http.ServeMux
 	proxies   []netip.Prefix
 	allowlist []string
+	mailer    Mailer
 	// crossOrigin turns down requests that change something and come from
 	// another site.
 	crossOrigin *http.CrossOriginProtection
@@ -83,7 +87,7 @@ type Handler struct {
 func New(o Options) (*Handler, error) {
 	h := &Handler{
 		db: o.DB, log: o.Log, refresher: o.Refresher, baseURL: o.BaseURL, version: o.Version, assets: map[string]string{},
-		proxies: o.TrustedProxies, allowlist: o.FetchAllowlist, crossOrigin: http.NewCrossOriginProtection(), now: time.Now, hooks: o.Hooks,
+		proxies: o.TrustedProxies, allowlist: o.FetchAllowlist, mailer: o.Mailer, crossOrigin: http.NewCrossOriginProtection(), now: time.Now, hooks: o.Hooks,
 	}
 	if h.hooks == nil {
 		h.hooks = &hooks.Registry{}
@@ -190,6 +194,9 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("GET /subscriptions/labels/{id}", h.protect(members, h.labelPage))
 	h.mux.HandleFunc("POST /subscriptions/labels/{id}", h.protect(members, h.saveLabel))
 	h.mux.HandleFunc("POST /subscriptions/labels/{id}/delete", h.protect(members, h.deleteLabel))
+	h.mux.HandleFunc("GET /stats", h.protect(members, h.statsOverview))
+	h.mux.HandleFunc("GET /stats/repartition", h.protect(members, h.statsRepartition))
+	h.mux.HandleFunc("GET /stats/unread", h.protect(members, h.statsUnread))
 	h.mux.HandleFunc("GET /settings/display", h.protect(members, h.displayPage))
 	h.mux.HandleFunc("POST /settings/display", h.protect(members, h.saveDisplay))
 	h.mux.HandleFunc("GET /settings/reading", h.protect(members, h.readingPage))
@@ -221,6 +228,11 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("GET /settings/keys", h.protect(members, h.keysPage))
 	h.mux.HandleFunc("POST /settings/keys", h.protect(members, h.saveKeys))
 	h.mux.HandleFunc("GET /about", h.about)
+	h.mux.HandleFunc("GET /register", h.registerPage)
+	h.mux.HandleFunc("POST /register", h.register)
+	h.mux.HandleFunc("GET /validate-email", h.validateEmail)
+	h.mux.HandleFunc("POST /validate-email/resend", h.protect(members, h.resendValidation))
+	h.mux.HandleFunc("GET /tos", h.termsPage)
 	h.mux.HandleFunc("GET /login", h.loginPage)
 	h.mux.HandleFunc("POST /login", h.login)
 	h.mux.HandleFunc("POST /logout", h.logout)

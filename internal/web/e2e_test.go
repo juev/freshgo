@@ -614,13 +614,40 @@ func TestE2EDarkAndNarrow(t *testing.T) {
 		// The pages of settings, dark and narrow at once.
 		for _, page := range []string{"/subscriptions", "/subscriptions/add", "/subscriptions/feeds/3", "/subscriptions/categories/2", "/subscriptions/labels/1", "/subscriptions/problems", "/subscriptions/transfer",
 			"/settings/display", "/settings/queries", "/settings/integrations", "/settings/reading", "/settings/archiving", "/settings/privacy", "/settings/profile", "/log",
-			"/admin/users", "/admin/users/bob", "/admin/system", "/admin/authentication", "/log?all=1", "/reauth"} {
+			"/stats", "/stats/repartition", "/stats/unread", "/admin/users", "/admin/users/bob", "/admin/system", "/admin/authentication", "/log?all=1", "/reauth"} {
 			b.open(page)
 			b.accessible(page + ", dark and narrow")
 			if got := b.text(`document.documentElement.scrollWidth <= window.innerWidth`); got != "true" {
 				t.Errorf("%s scrolls sideways on a narrow screen", page)
 			}
 		}
+	})
+}
+
+// R7, R16: a visitor registers with the keyboard alone.
+func TestE2ERegister(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		s.system(func(system *store.System) { system.Limits.MaxRegistrations, system.TOS = 0, "<p>Be kind.</p>" })
+		b := browse(t, s)
+		b.open("/login")
+		b.tabTo(`a[href$="/register"]`)
+		b.press(kb.Enter)
+		b.until("the page of registration", `location.pathname === '/register'`)
+		b.accessible("the page of registration")
+		b.tabTo("#username")
+		b.press("carol")
+		b.tabTo("#password")
+		b.press("carol-password")
+		b.tabTo("#again")
+		b.press("carol-password")
+		b.tabTo("#accept_tos")
+		b.press(" ", kb.Enter)
+		b.until("logged in as the new user", `location.pathname === '/' && document.querySelector('.account-name').textContent === 'carol'`)
+		b.accessible("the reading screen of a user without subscriptions")
+		b.open("/tos")
+		b.accessible("the terms")
+		b.open("/stats")
+		b.accessible("the statistics of a user without entries")
 	})
 }
 

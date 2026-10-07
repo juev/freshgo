@@ -1,0 +1,14 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+<p>{{.T "stats.unread.intro"}}</p>
+<form method="get" action="{{.URL "/stats/unread"}}" class="form inline">
+<label for="by">{{.T "stats.by"}}</label>
+<select id="by" name="by">
+{{template "options" .Data.Granularities}}</select>
+<label for="field">{{.T "stats.field"}}</label>
+<select id="field" name="field">
+{{template "options" .Data.Fields}}</select>
+<button type="submit">{{.T "stats.show"}}</button>
+</form>
+{{template "chart" (dict "Title" .Data.Buckets.Title "Unit" .Data.Buckets.Unit "Bars" .Data.Buckets.Bars "Width" .Data.Buckets.Width "Page" .)}}
+{{end}}

@@ -335,14 +335,16 @@ type systemPage struct {
 	// Allowlist are the internal addresses feeds may be fetched from, which
 	// is set when the server starts.
 	Allowlist []string
-	Problem   string
+	// CanMail says the server has an SMTP server to send letters through.
+	CanMail bool
+	Problem string
 }
 
 func (h *Handler) showSystem(w http.ResponseWriter, r *http.Request, status int, tab string, system store.System, problem string) {
 	v := h.adminView(r, tab)
 	page := systemPage{
 		System: system, CookieDays: system.Limits.CookieDuration / 86400, ReauthMinutes: system.ReauthTime / 60,
-		Allowlist: h.allowlist,
+		Allowlist: h.allowlist, CanMail: h.mailer != nil,
 	}
 	for _, code := range h.texts.Languages() {
 		page.Languages = append(page.Languages, option{code, v.T("language." + code), code == system.Language})
@@ -419,6 +421,7 @@ func (h *Handler) saveSystem(w http.ResponseWriter, r *http.Request) {
 		number("cookie_days", &system.Limits.CookieDuration, 86400)
 		number("reauth_minutes", &system.ReauthTime, 60)
 		system.ClosedRegistrationMessage = strings.TrimSpace(form.Get("closed_registration_message"))
+		system.TOS = strings.TrimSpace(form.Get("tos"))
 		return problem
 	})
 }
@@ -434,6 +437,12 @@ func (h *Handler) saveAuthentication(w http.ResponseWriter, r *http.Request) {
 		system.AllowAnonymousRefresh = form.Get("allow_anonymous_refresh") != ""
 		system.APIEnabled = form.Get("api_enabled") != ""
 		system.HTTPAuthAutoRegister = form.Get("http_auth_auto_register") != ""
+		system.ForceEmailValidation = form.Get("force_email_validation") != ""
+		// Without a server to send letters through nobody could ever
+		// confirm an address.
+		if system.ForceEmailValidation && h.mailer == nil {
+			return "admin.problem.no-mail"
+		}
 		// A login by password nobody has would lock everybody out.
 		if system.AuthType == store.AuthForm && who.prefs.PasswordHash == "" {
 			return "admin.problem.no-password"

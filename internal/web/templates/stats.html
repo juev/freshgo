@@ -1,0 +1,12 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{template "totals" (dict "Page" . "Rows" (list (dict "Name" (.T "stats.main-stream") "Totals" .Data.Main) (dict "Name" (.T "stats.every-feed") "Totals" .Data.All)))}}
+{{template "chart" (dict "Title" .Data.PerDay.Title "Unit" .Data.PerDay.Unit "Bars" .Data.PerDay.Bars "Width" .Data.PerDay.Width "Page" .)}}
+<p>{{.T "stats.average-day" .Data.Average}}</p>
+<h2>{{.T "stats.feeds-by-category"}}</h2>
+{{template "counts" (dict "Name" (.T "stream.category") "Unit" (.T "admin.user.feeds") "Rows" .Data.FeedsByCategory)}}
+<h2>{{.T "stats.entries-by-category"}}</h2>
+{{template "counts" (dict "Name" (.T "stream.category") "Unit" (.T "stats.entries") "Rows" .Data.EntriesByCategory)}}
+<h2>{{.T "stats.top-feeds"}}</h2>
+{{template "counts" (dict "Name" (.T "stream.feed") "Unit" (.T "stats.entries") "Rows" .Data.TopFeeds)}}
+{{end}}

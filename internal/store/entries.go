@@ -387,3 +387,34 @@ func (s *Store) entryKeys(ctx context.Context, query string, limit int, args ...
 		return k, sc.Scan(&k.GUID, &k.Title)
 	})
 }
+
+// EntryFact is what statistics need to know of an entry.
+type EntryFact struct {
+	ID        int64
+	FeedID    int64
+	Published int64
+	Read      bool
+	Favorite  bool
+}
+
+// EntryFacts hands every entry of a user to each, in the order of their
+// identifiers.
+func (s *Store) EntryFacts(ctx context.Context, userID int64, each func(EntryFact)) error {
+	rows, err := s.query(ctx, `
+		SELECT id, feed_id, published, is_read, is_favorite FROM entries WHERE user_id = ? ORDER BY id`, userID)
+	if err != nil {
+		return fmt.Errorf("store: entry facts: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var f EntryFact
+		if err := rows.Scan(&f.ID, &f.FeedID, &f.Published, &f.Read, &f.Favorite); err != nil {
+			return fmt.Errorf("store: entry facts: %w", err)
+		}
+		each(f)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("store: entry facts: %w", err)
+	}
+	return nil
+}

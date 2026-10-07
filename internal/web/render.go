@@ -26,7 +26,7 @@ func loadPages() (pages, error) {
 	if err != nil {
 		return nil, err
 	}
-	layout, err := template.New("layout.html").Funcs(template.FuncMap{"dict": dict}).
+	layout, err := template.New("layout.html").Funcs(template.FuncMap{"dict": dict, "list": func(items ...any) []any { return items }}).
 		ParseFS(templateFiles, "templates/layout.html", "templates/parts.html")
 	if err != nil {
 		return nil, err

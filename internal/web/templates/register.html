@@ -1,0 +1,37 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{if .Data.Closed}}
+<p class="alert" role="alert">{{.Data.Closed}}</p>
+<p><a href="{{.URL "/login"}}">{{.T "login.heading"}}</a></p>
+{{else}}
+{{template "problem" .Data.Problem}}
+<form method="post" action="{{.URL "/register"}}" class="form">
+<p>
+<label for="username">{{.T "login.username"}}</label>
+<input type="text" id="username" name="username" value="{{.Data.Name}}" maxlength="39" required autocomplete="username" autocapitalize="none" spellcheck="false" aria-describedby="name-hint">
+<span class="hint" id="name-hint">{{.T "admin.user.name.hint"}}</span>
+</p>
+<p>
+<label for="email">{{.T "settings.email"}}</label>
+<input type="email" id="email" name="email" value="{{.Data.Email}}" autocomplete="email"{{if .Data.NeedsEmail}} required aria-describedby="email-hint"{{end}}>
+{{if .Data.NeedsEmail}}<span class="hint" id="email-hint">{{.T "register.email.hint"}}</span>{{end}}
+</p>
+<p>
+<label for="password">{{.T "login.password"}}</label>
+<input type="password" id="password" name="password" required minlength="7" autocomplete="new-password" aria-describedby="password-hint">
+<span class="hint" id="password-hint">{{.T "settings.password.hint"}}</span>
+</p>
+<p>
+<label for="again">{{.T "register.again"}}</label>
+<input type="password" id="again" name="again" required minlength="7" autocomplete="new-password">
+</p>
+{{if .Data.HasTerms}}
+<p class="check">
+<input type="checkbox" id="accept_tos" name="accept_tos" value="1" required>
+<label for="accept_tos">{{.T "register.accept"}} <a href="{{.URL "/tos"}}">{{.T "tos.heading"}}</a></label>
+</p>
+{{end}}
+<p><button type="submit">{{.T "register.submit"}}</button></p>
+</form>
+{{end}}
+{{end}}

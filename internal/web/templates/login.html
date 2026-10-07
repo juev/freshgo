@@ -17,4 +17,5 @@
 </p>
 <p><button type="submit">{{.T "login.submit"}}</button></p>
 </form>
+{{if .Data.CanRegister}}<p><a href="{{.URL "/register"}}">{{.T "register.heading"}}</a></p>{{end}}
 {{end}}

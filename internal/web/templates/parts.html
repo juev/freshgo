@@ -187,3 +187,41 @@
 {{end}}
 
 {{define "problem"}}{{if .}}<p class="alert" role="alert" id="form-problem">{{.}}</p>{{end}}{{end}}
+
+{{define "chart"}}
+<figure class="chart">
+<figcaption>{{.Title}}</figcaption>
+{{if .Bars}}
+<svg viewBox="0 0 {{.Width}} 120" width="{{.Width}}" height="120" role="img" aria-label="{{.Title}}">
+{{range .Bars}}<rect class="bar" x="{{.X}}" y="{{.Y}}" width="18" height="{{.Height}}"><title>{{.Label}}: {{.Value}}</title></rect>
+{{end}}</svg>
+<details>
+<summary>{{.Page.T "stats.numbers"}}</summary>
+<table class="data">
+<thead><tr><th scope="col">{{.Title}}</th><th scope="col">{{.Unit}}</th></tr></thead>
+<tbody>
+{{range .Bars}}<tr><th scope="row">{{.Label}}</th><td>{{.Value}}</td></tr>
+{{end}}</tbody>
+</table>
+</details>
+{{else}}<p class="muted">{{.Page.T "problems.none"}}</p>{{end}}
+</figure>
+{{end}}
+
+{{define "totals"}}
+<table class="data">
+<thead><tr><th scope="col">{{.Page.T "stats.set"}}</th><th scope="col">{{.Page.T "stats.total"}}</th><th scope="col">{{.Page.T "state.unread"}}</th><th scope="col">{{.Page.T "stats.read"}}</th><th scope="col">{{.Page.T "state.starred"}}</th></tr></thead>
+<tbody>
+{{range .Rows}}<tr><th scope="row">{{.Name}}</th><td>{{.Totals.Total}}</td><td>{{.Totals.Unread}}</td><td>{{.Totals.Read}}</td><td>{{.Totals.Favorites}}</td></tr>
+{{end}}</tbody>
+</table>
+{{end}}
+
+{{define "counts"}}
+<table class="data">
+<thead><tr><th scope="col">{{.Name}}</th><th scope="col">{{.Unit}}</th></tr></thead>
+<tbody>
+{{range .Rows}}<tr><th scope="row">{{.Name}}{{if .Category}} <span class="muted">{{.Category}}</span>{{end}}</th><td>{{.Count}}</td></tr>
+{{end}}</tbody>
+</table>
+{{end}}

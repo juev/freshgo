@@ -184,6 +184,10 @@ func readSystemConfig(dataDir string) (*systemConfig, error) {
 	}
 	c.db, _ = conf["db"].(map[string]any)
 	c.settings, c.unreadable = readSystemSettings(conf)
+	// The terms of use are a file of their own; most installations have none.
+	if terms, err := os.ReadFile(filepath.Join(dataDir, "tos.html")); err == nil {
+		c.settings.TOS = strings.ToValidUTF8(strings.ReplaceAll(string(terms), "\x00", ""), "\uFFFD")
+	}
 	return c, nil
 }
 

@@ -838,3 +838,23 @@ table.log td:last-child {
 .menu.share li {
 	padding: calc(var(--space) / 4) 0;
 }
+
+/* Numbers as bars; the table under each picture has the same numbers. */
+.chart {
+	margin: calc(var(--space) * 2) 0;
+	overflow-x: auto;
+}
+
+.chart figcaption {
+	font-weight: 600;
+	margin-bottom: var(--space);
+}
+
+.chart svg {
+	display: block;
+	border-bottom: 1px solid var(--border);
+}
+
+.chart .bar {
+	fill: var(--accent);
+}

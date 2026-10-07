@@ -31,6 +31,11 @@
 <label for="closed_registration_message">{{.T "admin.system.closed-message"}}</label>
 <textarea id="closed_registration_message" name="closed_registration_message" rows="2">{{.Data.System.ClosedRegistrationMessage}}</textarea>
 </p>
+<p>
+<label for="tos">{{.T "admin.system.tos"}}</label>
+<textarea id="tos" name="tos" rows="6" aria-describedby="tos-hint">{{.Data.System.TOS}}</textarea>
+<span class="hint" id="tos-hint">{{.T "admin.system.tos.hint"}}</span>
+</p>
 </fieldset>
 <fieldset>
 <legend>{{.T "admin.system.logins"}}</legend>

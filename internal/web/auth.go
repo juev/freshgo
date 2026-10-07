@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -50,6 +51,9 @@ type preferences struct {
 	// Enabled is false for a user who is kept out.
 	Enabled *bool `json:"enabled"`
 	IsAdmin bool  `json:"is_admin"`
+	// EmailValidationToken is the secret of the link that confirms the
+	// address of the user, empty once it is confirmed.
+	EmailValidationToken string `json:"email_validation_token"`
 	// Token opens the entries of the user as a feed to whoever has it.
 	Token string `json:"token"`
 	// PasswordHash is the bcrypt hash of the password of the web interface.
@@ -478,6 +482,8 @@ type loginForm struct {
 	Name, Next string
 	// Error is the message of a failed attempt, empty before the first.
 	Error string
+	// CanRegister says a visitor can make an account for themselves.
+	CanRegister bool
 }
 
 func (h *Handler) loginPage(w http.ResponseWriter, r *http.Request) {
@@ -488,7 +494,12 @@ func (h *Handler) loginPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := h.view(r, "login", "login.heading")
-	v.Data = loginForm{Next: next}
+	open, _, err := h.registrationOpen(r.Context(), s.system)
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	v.Data = loginForm{Next: next, CanRegister: open}
 	h.render(w, r, http.StatusOK, "login", v)
 }
 
@@ -535,13 +546,22 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	}
 	h.guard.succeeded(key)
 
-	token, err := newToken()
-	if err != nil {
+	if err := h.startSession(w, r, user, r.PostFormValue("remember") != ""); err != nil {
 		h.broken(w, r, err)
 		return
 	}
-	persistent := r.PostFormValue("remember") != ""
-	life := sessionLife(persistent, s.system)
+	http.Redirect(w, r, h.localTarget(next), http.StatusSeeOther)
+}
+
+// startSession logs a user in: a login is stored and its secret handed to
+// the browser.
+func (h *Handler) startSession(w http.ResponseWriter, r *http.Request, user *store.User, persistent bool) error {
+	now := h.now()
+	token, err := newToken()
+	if err != nil {
+		return err
+	}
+	life := sessionLife(persistent, state(r).system)
 	session := &store.Session{
 		TokenHash: tokenHash(token), UserID: user.ID,
 		Created: now.Unix(), Used: now.Unix(), Expires: now.Add(life).Unix(),
@@ -549,18 +569,16 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 	}
 	// Logging in is when the logins that have ended are cleared away.
 	if err := h.db.DeleteExpiredSessions(r.Context(), now.Unix()); err != nil {
-		h.broken(w, r, err)
-		return
+		return err
 	}
 	if err := h.db.CreateSession(r.Context(), session); err != nil {
-		h.broken(w, r, err)
-		return
+		return err
 	}
 	if !persistent {
 		life = 0
 	}
 	h.setSession(w, r, token, life)
-	http.Redirect(w, r, h.localTarget(next), http.StatusSeeOther)
+	return nil
 }
 
 func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
@@ -593,6 +611,18 @@ func (h *Handler) protect(level int, page http.HandlerFunc) http.HandlerFunc {
 		s := state(r)
 		allowed := level == everybody ||
 			s.who != nil && (level == readers || !s.who.anonymous)
+		// A user who has yet to confirm their address gets no further than
+		// the pages that let them do it.
+		if allowed && unconfirmed(s) && !slices.ContainsFunc(unconfirmedPaths, func(p string) bool {
+			return r.URL.Path == p || strings.HasPrefix(r.URL.Path, p+"/")
+		}) {
+			if r.Method == http.MethodGet || r.Method == http.MethodHead {
+				http.Redirect(w, r, h.url("/validate-email"), http.StatusSeeOther)
+			} else {
+				h.fail(w, r, http.StatusForbidden)
+			}
+			return
+		}
 		switch {
 		case allowed:
 			page(w, r)

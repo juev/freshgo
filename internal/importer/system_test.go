@@ -2,6 +2,8 @@ package importer
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -46,5 +48,26 @@ func TestReadSystemSettings(t *testing.T) {
 	}
 	if !reflect.DeepEqual(unreadable, []string{"reauth_time"}) {
 		t.Errorf("unreadable = %v, want only reauth_time", unreadable)
+	}
+}
+
+// The terms of use FreshRSS keeps in a file come along.
+func TestTermsAreImported(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS("../../testdata/reference/sqlite/data")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "tos.html"), []byte("<p>Be kind.</p>\x00"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	conf, err := readSystemConfig(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if conf.settings.TOS != "<p>Be kind.</p>" {
+		t.Errorf("terms = %q", conf.settings.TOS)
+	}
+	if plain, err := readSystemConfig("../../testdata/reference/sqlite/data"); err != nil || plain.settings.TOS != "" {
+		t.Errorf("terms of an installation without any = %q, %v", plain.settings.TOS, err)
 	}
 }

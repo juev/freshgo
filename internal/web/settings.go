@@ -403,8 +403,31 @@ func (h *Handler) profilePage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) saveProfile(w http.ResponseWriter, r *http.Request) {
+	st := state(r)
+	// The letter goes out once the settings are stored, not while the
+	// database waits for it.
+	var mailTo, secret string
+	defer func() {
+		if secret != "" {
+			h.sendValidation(r, h.view(r, "", "validate.heading"), st.who.user.Name, mailTo, secret)
+		}
+	}()
 	h.saveSettings(w, r, "/settings/profile", func(form url.Values, s attrs) string {
 		email, token := strings.TrimSpace(form.Get("email")), strings.TrimSpace(form.Get("token"))
+		mailTo, secret = "", ""
+		// Another address has to be confirmed like the first one, where
+		// addresses are confirmed at all.
+		if st.system.ForceEmailValidation && !st.who.admin && email != s.text("mail_login") && emailAddress.MatchString(email) && tokenText.MatchString(token) {
+			var err error
+			if secret, err = newQueryToken(); err != nil {
+				return "settings.problem.email"
+			}
+			mailTo = email
+			s.set("email_validation_token", secret)
+		}
+		if st.system.ForceEmailValidation && !st.who.admin && email == "" {
+			return "settings.problem.email"
+		}
 		s.set("mail_login", email)
 		s.set("token", token)
 		switch {

@@ -24,6 +24,8 @@ const (
 	EnvRefreshInterval = "FRESHGO_REFRESH_INTERVAL"
 	// EnvWebSub switches WebSub on with a value strconv.ParseBool takes for true.
 	EnvWebSub = "FRESHGO_WEBSUB"
+	// EnvSMTPURL names the server letters are sent through.
+	EnvSMTPURL = "FRESHGO_SMTP_URL"
 	// EnvTrustedProxies is read by the web interface.
 	EnvTrustedProxies = "FRESHGO_TRUSTED_PROXIES"
 )
@@ -70,6 +72,9 @@ type Config struct {
 	// ranges of the reverse proxies whose word is taken for who the user
 	// is, when users are told apart by the proxy.
 	TrustedProxies string
+	// SMTPURL is the server letters are sent through, empty for none:
+	// smtp://user:password@host:port?from=address, or smtps://.
+	SMTPURL string
 
 	// invalid is what was wrong with the environment, reported by Validate.
 	invalid error
@@ -110,6 +115,8 @@ func Bind(fs *flag.FlagSet, getenv func(string) string) *Config {
 		"subscribe to the WebSub hubs of feeds; needs a public -base-url ($"+EnvWebSub+")")
 	fs.StringVar(&c.TrustedProxies, "trusted-proxies", envOr(getenv, EnvTrustedProxies, defaultTrustedProxies),
 		"reverse proxies that may name the user, comma-separated addresses or CIDR ranges ($"+EnvTrustedProxies+")")
+	fs.StringVar(&c.SMTPURL, "smtp-url", getenv(EnvSMTPURL),
+		"SMTP server for the letters that confirm e-mail addresses: smtp[s]://user:password@host:port?from=address ($"+EnvSMTPURL+")")
 	return c
 }
 

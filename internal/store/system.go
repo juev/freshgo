@@ -55,6 +55,9 @@ type System struct {
 	// register any more.
 	ClosedRegistrationMessage string `json:"closed_registration_message"`
 	Limits                    Limits `json:"limits"`
+	// TOS are the terms a visitor has to accept to register, as HTML; empty
+	// for none. FreshRSS keeps them in the file data/tos.html.
+	TOS string `json:"tos"`
 }
 
 // Limits bound what users may take up.
