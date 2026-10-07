@@ -5,11 +5,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+
+	"github.com/juev/freshgo/internal/config"
 )
 
 // CreateUser adds a user together with the default category and sets u.ID.
 // A taken name gives ErrConflict. In an installation that has no default
 // user yet, the user becomes it.
+// LockUsers makes other transactions that add users wait until this one
+// ends, so that what it counts stays true while it adds one. It has to be
+// called inside InTx.
+func (s *Store) LockUsers(ctx context.Context) error {
+	// SQLite has a single writer anyway.
+	if s.driver != config.DriverPostgres {
+		return nil
+	}
+	if _, err := s.exec(ctx, `LOCK TABLE users IN SHARE ROW EXCLUSIVE MODE`); err != nil {
+		return fmt.Errorf("store: lock users: %w", err)
+	}
+	return nil
+}
+
 func (s *Store) CreateUser(ctx context.Context, u *User) error {
 	return s.InTx(ctx, func(tx *Store) error {
 		err := tx.queryRow(ctx, `

@@ -360,6 +360,7 @@
   "notice.category-limit": "У вас уже столько категорий, сколько разрешает эта установка.",
   "notice.email-confirmed": "Адрес подтверждён.",
   "notice.email-sent": "Письмо отправлено ещё раз.",
+  "notice.email-wait": "Письмо отправлено только что. Поищите его или попросите ещё раз позже.",
   "notice.feed-added": "Подписка добавлена.",
   "notice.feed-deleted": "Подписка удалена.",
   "notice.feed-emptied": {

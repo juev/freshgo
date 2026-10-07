@@ -350,6 +350,7 @@
   "notice.category-limit": "You have as many categories as this installation allows.",
   "notice.email-confirmed": "The address is confirmed.",
   "notice.email-sent": "The letter was sent again.",
+  "notice.email-wait": "A letter went out a moment ago. Look for it, or ask again later.",
   "notice.feed-added": "Subscribed.",
   "notice.feed-deleted": "Unsubscribed.",
   "notice.feed-emptied": {

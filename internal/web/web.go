@@ -78,8 +78,10 @@ type Handler struct {
 	// another site.
 	crossOrigin *http.CrossOriginProtection
 	guard       guard
-	decoys      decoys
-	now         func() time.Time
+	// letters holds back letters to one user after the first few.
+	letters guard
+	decoys  decoys
+	now     func() time.Time
 }
 
 // New returns the interface, or an error when what is built into the binary

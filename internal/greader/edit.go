@@ -308,7 +308,7 @@ func (h *Handler) subscriptionEdit(ctx context.Context, q *request) error {
 			categoryID = store.DefaultCategoryID
 		case c != nil:
 			categoryID = c.ID
-		case q.limits.MaxCategories > 0 && len(lib.categories) >= q.limits.MaxCategories:
+		case q.system.Limits.MaxCategories > 0 && len(lib.categories) >= q.system.Limits.MaxCategories:
 			// One category too many: the feed goes to the default one.
 			categoryID = store.DefaultCategoryID
 		default:

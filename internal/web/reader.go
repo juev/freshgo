@@ -92,7 +92,7 @@ type reading struct {
 	ToplineDate    *bool    `json:"topline_date"`
 	Referrers      []string `json:"send_referrer_allowlist"`
 	// Sharing are the services entries can be sent to.
-	Sharing []sharing `json:"sharing"`
+	Sharing json.RawMessage `json:"sharing"`
 }
 
 func readReading(u *store.User) reading {
@@ -631,7 +631,7 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 		if address, err := url.Parse(e.Link); err == nil && (address.Scheme == "http" || address.Scheme == "https") {
 			a.Link = e.Link
 		}
-		a.Share = shareLinks(prefs.Sharing, e.ID, e.Title, a.Link)
+		a.Share = shareLinks(phpList[sharing](prefs.Sharing), e.ID, e.Title, a.Link)
 		if a.Title == "" {
 			a.Title = v.T("entry.untitled")
 		}

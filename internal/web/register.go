@@ -149,6 +149,9 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	err = h.db.InTx(ctx, func(tx *store.Store) error {
 		// Counted again where no other registration can slip in between.
 		if limit := s.system.Limits.MaxRegistrations; limit > 0 {
+			if err := tx.LockUsers(ctx); err != nil {
+				return err
+			}
 			users, err := tx.Users(ctx)
 			if err != nil {
 				return err
@@ -182,17 +185,25 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 }
 
 // sendValidation writes the user the letter with the link that confirms
-// their address. A letter that cannot be sent is logged: the page that asks
-// for the confirmation sends it again.
-func (h *Handler) sendValidation(r *http.Request, v *view, name, email, token string) {
+// their address, and reports whether it did. A letter that cannot be sent is
+// logged: the page that asks for the confirmation sends it again. Letters to
+// one user are held back like failed logins, so that nobody has the server
+// write to address after address: the first few go out at once, further ones
+// after a pause that grows.
+func (h *Handler) sendValidation(r *http.Request, v *view, name, email, token string) bool {
 	if h.mailer == nil || email == "" {
-		return
+		return false
+	}
+	if h.letters.attempt(name, h.now()) > 0 {
+		h.log.Warn("letter was held back", "user", name)
+		return false
 	}
 	link := h.absolute(r, "/validate-email") + "?" + url.Values{"user": {name}, "token": {token}}.Encode()
 	site := state(r).system.Title
 	if err := h.mailer.Send(r.Context(), email, v.T("validate.mail.subject", site), v.T("validate.mail.body", name, site, link)); err != nil {
 		h.log.Warn("letter was not sent", "user", name, "error", err)
 	}
+	return true
 }
 
 // absolute is the address of a page with the scheme and the host a letter
@@ -261,8 +272,11 @@ func (h *Handler) resendValidation(w http.ResponseWriter, r *http.Request) {
 	}
 	if unconfirmed(s) {
 		v := h.view(r, "", "validate.heading")
-		h.sendValidation(r, v, s.who.user.Name, readAttrs(s.who.user.Settings).text("mail_login"), s.who.prefs.EmailValidationToken)
-		h.notify(w, r, "notice.email-sent", 0)
+		if h.sendValidation(r, v, s.who.user.Name, readAttrs(s.who.user.Settings).text("mail_login"), s.who.prefs.EmailValidationToken) {
+			h.notify(w, r, "notice.email-sent", 0)
+		} else {
+			h.notify(w, r, "notice.email-wait", 0)
+		}
 	}
 	http.Redirect(w, r, h.url("/validate-email"), http.StatusSeeOther)
 }

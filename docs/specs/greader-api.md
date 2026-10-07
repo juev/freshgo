@@ -65,6 +65,7 @@ Out of scope: the Fever API, the web interface, uploading a custom icon (importe
 - A35. `GET /favicon/<hash>` answers the stored image with its media type, `Last-Modified` and a cache lifetime of 14 days, and 304 to a conditional request. An unknown hash, or a feed without an icon, gets a built-in icon with a lifetime of 30 minutes. No request to a site is made while answering. An imported custom icon is served as stored.
 - A36. Extensions answer under `/api/misc.php/<name>` (or `?ext=<name>`): 400 without a name, 404 for a name no extension registered.
 - A37. While `api_enabled` of the system settings is off, every request of the API, `ClientLogin` included, is answered with 503 and `Service Unavailable!`, as in FreshRSS. A category a client names beyond `limits.max_categories` is not created: the feed goes to the default one. `limits.max_feeds` bounds subscriptions (`refresh.md`, F32) and both limits bound an OPML import. Verified by `TestSwitchAndLimits`.
+- A38. Where `force_email_validation` of the system settings is on, a user who has yet to confirm their e-mail address (`email_validation_token` of their settings) is answered with 401, at `ClientLogin` and with a token issued before; the default user and users with `is_admin` are not held up. See `web.md`, U80. Verified by `TestSwitchAndLimits`.
 
 ## Invariants and compatibility
 

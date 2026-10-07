@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -110,9 +111,30 @@ type sharing struct {
 }
 
 func readSharing(s attrs) []sharing {
-	var list []sharing
-	// A setting of another shape is no service at all.
-	_ = json.Unmarshal(s["sharing"], &list)
+	return phpList[sharing](s["sharing"])
+}
+
+// phpList reads a list FreshRSS keeps as a PHP array. Import makes a JSON
+// array of one whose keys count from zero and an object of any other, which
+// is what removing a service in FreshRSS leaves; the values of an object are
+// taken by ascending key. Anything else is an empty list.
+func phpList[T any](raw json.RawMessage) []T {
+	var list []T
+	if json.Unmarshal(raw, &list) == nil || len(list) > 0 {
+		return list
+	}
+	var keyed map[string]T
+	_ = json.Unmarshal(raw, &keyed)
+	keys := make([]int, 0, len(keyed))
+	for key := range keyed {
+		if n, err := strconv.Atoi(key); err == nil {
+			keys = append(keys, n)
+		}
+	}
+	slices.Sort(keys)
+	for _, n := range keys {
+		list = append(list, keyed[strconv.Itoa(n)])
+	}
 	return list
 }
 
@@ -218,8 +240,7 @@ func (h *Handler) saveIntegrations(w http.ResponseWriter, r *http.Request) {
 	h.saveSettings(w, r, "/settings/integrations", func(form url.Values, s attrs) string {
 		// The services are kept as objects: FreshRSS has fields freshgo
 		// does not show.
-		var stored []attrs
-		_ = json.Unmarshal(s["sharing"], &stored)
+		stored := phpList[attrs](s["sharing"])
 		problem := ""
 		kept := []attrs{}
 		add := func(one attrs, kind, name, address string) {

@@ -608,6 +608,37 @@ func TestSwitchAndLimits(t *testing.T) {
 				t.Errorf("GET %s with the API off: status %d, body %q", path, status, body)
 			}
 		}
+		// Where addresses have to be confirmed, a user who has yet to
+		// confirm theirs is let in nowhere, with the token they hold or a
+		// new one; alice, the default user, and an administrator are.
+		w.user("carol", `{"email_validation_token":"secret"}`)
+		w.user("dave", `{"email_validation_token":"secret","is_admin":true}`)
+		system(func(s *store.System) { s.APIEnabled = true })
+		carol, dave := w.login("carol"), w.login("dave")
+		err := w.db.UpdateUserSettings(ctx, w.alice.ID, func(settings map[string]json.RawMessage) error {
+			settings["email_validation_token"] = json.RawMessage(`"secret"`)
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		system(func(s *store.System) { s.ForceEmailValidation = true })
+		for auth, want := range map[string]int{carol: http.StatusUnauthorized, dave: http.StatusOK, w.auth: http.StatusOK} {
+			if status, _ := w.get(auth, "/reader/api/0/tag/list?output=json"); status != want {
+				t.Errorf("a request of %s where addresses are confirmed: status %d, want %d", auth, status, want)
+			}
+		}
+		if status, _ := w.post("", "/accounts/ClientLogin", "Email=carol&Passwd=carol-password"); status != http.StatusUnauthorized {
+			t.Errorf("a login before confirming the address: status %d", status)
+		}
+		if status, _ := w.post("", "/accounts/ClientLogin", "Email=dave&Passwd=dave-password"); status != http.StatusOK {
+			t.Errorf("a login of an administrator: status %d", status)
+		}
+		system(func(s *store.System) { s.ForceEmailValidation = false })
+		if status, _ := w.get(carol, "/reader/api/0/tag/list?output=json"); status != http.StatusOK {
+			t.Errorf("a request where addresses are not confirmed: status %d", status)
+		}
+
 		system(func(s *store.System) { s.APIEnabled, s.Limits.MaxCategories = true, 2 })
 		if status, _ := w.get(w.auth, "/reader/api/0/tag/list?output=json"); status != http.StatusOK {
 			t.Fatalf("the API switched on again: status %d", status)

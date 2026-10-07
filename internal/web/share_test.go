@@ -123,5 +123,31 @@ func TestSharing(t *testing.T) {
 		if got := s.settings("alice")["sharing"]; !reflect.DeepEqual(got, want) {
 			t.Errorf("sharing after a refused form = %v", got)
 		}
+
+		// What import makes of the setting after a service was removed in
+		// FreshRSS: the keys of the PHP array no longer count from zero.
+		s.setting("alice", "sharing", map[string]any{
+			"10": map[string]any{"type": "print", "name": "Paper"},
+			"0":  map[string]any{"type": "email", "name": "Email"},
+			"2":  map[string]any{"type": "mastodon", "name": "My Mastodon", "url": "https://social.example/", "method": "GET"},
+		})
+		body = s.page("/feeds/1?state=all")
+		email, mastodon, paper := strings.Index(body, `>Email</a>`), strings.Index(body, `>My Mastodon</a>`), strings.Index(body, `data-share="print"`)
+		if email < 0 || mastodon < email || paper < mastodon {
+			t.Errorf("services kept by key are offered at %d, %d, %d", email, mastodon, paper)
+		}
+		form = s.formAt("/settings/integrations", "/settings/integrations")
+		if form.Get("name-0") != "Email" || form.Get("name-1") != "My Mastodon" || form.Get("name-2") != "Paper" {
+			t.Errorf("form of services kept by key = %v", form)
+		}
+		form.Set("remove-0", "1")
+		s.follow("/settings/integrations", form)
+		want = []any{
+			map[string]any{"type": "mastodon", "name": "My Mastodon", "url": "https://social.example/", "method": "GET"},
+			map[string]any{"type": "print", "name": "Paper"},
+		}
+		if got := s.settings("alice")["sharing"]; !reflect.DeepEqual(got, want) {
+			t.Errorf("sharing kept by key after the form = %v\nwant %v", got, want)
+		}
 	})
 }

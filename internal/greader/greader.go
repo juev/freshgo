@@ -73,8 +73,8 @@ type request struct {
 	body string
 	form url.Values
 	user *store.User
-	// limits are what the installation lets a user have.
-	limits store.Limits
+	// system are the settings of the installation.
+	system store.System
 }
 
 // get returns a query parameter, post a form field, either the one found
@@ -175,7 +175,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		text(w, http.StatusServiceUnavailable, "Service Unavailable!")
 		return
 	}
-	q.limits = system.Limits
+	q.system = system
 	if q.parts[1] != "accounts" {
 		user, status, err := h.authenticate(ctx, r)
 		switch {
@@ -185,7 +185,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		case status == http.StatusBadRequest:
 			badRequest(w)
 			return
-		case status != 0:
+		case status != 0, user != nil && heldUp(system, user):
 			unauthorized(w)
 			return
 		}
@@ -471,6 +471,10 @@ func (h *Handler) clientLogin(ctx context.Context, q *request) {
 		unauthorized(q.w)
 		return
 	}
+	if heldUp(q.system, user) {
+		unauthorized(q.w)
+		return
+	}
 	secret, err := h.authToken(ctx, user)
 	if err != nil {
 		h.fail(q.w, err)
@@ -492,21 +496,35 @@ func (h *Handler) userInfo(q *request) error {
 	return writeJSON(q.w, info{name, name, name, readSettings(q.user.Settings).mail})
 }
 
+// heldUp reports whether the user has yet to confirm their e-mail address
+// where that is required: the web interface lets such a user no further than
+// the page that asks for it, and the API lets them nowhere. Administrators
+// are not held up, as there.
+func heldUp(system store.System, user *store.User) bool {
+	s := readSettings(user.Settings)
+	return system.ForceEmailValidation && s.unconfirmed && !s.admin && user.Name != system.DefaultUser
+}
+
 // settings are the keys of a user's settings the API depends on, under the
 // names FreshRSS gives them in the user's config.php.
 type settings struct {
-	enabled  bool
-	mail     string
-	language string
+	enabled bool
+	// unconfirmed says the user has an e-mail address yet to confirm;
+	// admin, that the settings make them an administrator.
+	unconfirmed, admin bool
+	mail               string
+	language           string
 }
 
 func readSettings(raw json.RawMessage) settings {
 	var s struct {
 		Enabled  *bool  `json:"enabled"`
+		Token    string `json:"email_validation_token"`
+		Admin    bool   `json:"is_admin"`
 		Mail     string `json:"mail_login"`
 		Language string `json:"language"`
 	}
 	// Settings of another shape are the defaults.
 	_ = json.Unmarshal(raw, &s)
-	return settings{enabled: s.Enabled == nil || *s.Enabled, mail: s.Mail, language: s.Language}
+	return settings{enabled: s.Enabled == nil || *s.Enabled, unconfirmed: s.Token != "", admin: s.Admin, mail: s.Mail, language: s.Language}
 }

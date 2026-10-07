@@ -415,19 +415,10 @@ func (h *Handler) saveProfile(w http.ResponseWriter, r *http.Request) {
 	h.saveSettings(w, r, "/settings/profile", func(form url.Values, s attrs) string {
 		email, token := strings.TrimSpace(form.Get("email")), strings.TrimSpace(form.Get("token"))
 		mailTo, secret = "", ""
-		// Another address has to be confirmed like the first one, where
-		// addresses are confirmed at all.
-		if st.system.ForceEmailValidation && !st.who.admin && email != s.text("mail_login") && emailAddress.MatchString(email) && tokenText.MatchString(token) {
-			var err error
-			if secret, err = newQueryToken(); err != nil {
-				return "settings.problem.email"
-			}
-			mailTo = email
-			s.set("email_validation_token", secret)
-		}
 		if st.system.ForceEmailValidation && !st.who.admin && email == "" {
 			return "settings.problem.email"
 		}
+		another := email != s.text("mail_login")
 		s.set("mail_login", email)
 		s.set("token", token)
 		switch {
@@ -435,6 +426,16 @@ func (h *Handler) saveProfile(w http.ResponseWriter, r *http.Request) {
 			return "settings.problem.email"
 		case !tokenText.MatchString(token):
 			return "settings.problem.token"
+		}
+		// Another address has to be confirmed like the first one, where
+		// addresses are confirmed at all.
+		if st.system.ForceEmailValidation && !st.who.admin && another {
+			fresh, err := newQueryToken()
+			if err != nil {
+				return "settings.problem.email"
+			}
+			mailTo, secret = email, fresh
+			s.set("email_validation_token", secret)
 		}
 		return ""
 	}, func(status int, s attrs, problem string) {

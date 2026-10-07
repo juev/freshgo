@@ -6,8 +6,11 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -199,4 +202,71 @@ func TestEmailValidation(t *testing.T) {
 // newPost is a form as a browser sends it, for a test that adds headers.
 func newPost(target string, form url.Values) *http.Request {
 	return httptest.NewRequest(http.MethodPost, target, strings.NewReader(form.Encode()))
+}
+
+// R16: the limit of registrations holds when visitors register at once.
+func TestRegistrationLimitHolds(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		s.system(func(system *store.System) { system.Limits.MaxRegistrations = 3 })
+		var visitors sync.WaitGroup
+		for n := range 12 {
+			visitors.Add(1)
+			go func() {
+				defer visitors.Done()
+				name := "visitor" + strconv.Itoa(n)
+				form := url.Values{"username": {name}, "password": {name + "-password"}, "again": {name + "-password"}}
+				(&site{t: t, db: s.db, h: s.h}).post("/register", form)
+			}()
+		}
+		visitors.Wait()
+		users, err := s.db.Users(context.Background())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(users) != 3 {
+			t.Errorf("%d users where three may be", len(users))
+		}
+	})
+}
+
+// R16: one user does not have the server write letter after letter, and a
+// form that is refused sends none.
+func TestLettersAreHeldBack(t *testing.T) {
+	smtp := mailtest.New(t)
+	sender, err := mail.New(smtp.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	imported(t, Options{Mailer: sender}, func(t *testing.T, s *site) {
+		now := s.clock()
+		before := len(smtp.Letters())
+		sent := func() int { return len(smtp.Letters()) - before }
+		s.system(func(system *store.System) { system.Limits.MaxRegistrations, system.ForceEmailValidation = 0, true })
+		form := url.Values{"username": {"carol"}, "password": {"carol-password"}, "again": {"carol-password"}, "email": {"carol@example.org"}}
+		if a := s.post("/register", form); a.status != http.StatusSeeOther {
+			t.Fatalf("registration: status %d", a.status)
+		}
+		// An address that cannot be one is not written to.
+		if a := s.post("/settings/profile", url.Values{"email": {strings.Repeat("a", 190) + "@example.org"}}); a.status != http.StatusBadRequest || sent() != 1 {
+			t.Errorf("a refused address: status %d, %d letters", a.status, sent())
+		}
+		for n := range 20 {
+			if n%2 == 0 {
+				s.post("/validate-email/resend", nil)
+			} else {
+				s.post("/settings/profile", url.Values{"email": {"victim" + strconv.Itoa(n) + "@example.org"}})
+			}
+		}
+		if sent() != 5 {
+			t.Errorf("%d letters to one user at once, want 5", sent())
+		}
+		if _, body := s.follow("/validate-email/resend", nil); !strings.Contains(notice(body), "went out a moment ago") || sent() != 5 {
+			t.Errorf("asking again at once: notice %q, %d letters", notice(body), sent())
+		}
+		// Later the letter can be asked for again.
+		*now = now.Add(time.Hour)
+		if _, body := s.follow("/validate-email/resend", nil); !strings.Contains(notice(body), "sent again") || sent() != 6 {
+			t.Errorf("asking again later: notice %q, %d letters", notice(body), sent())
+		}
+	})
 }
