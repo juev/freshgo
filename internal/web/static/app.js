@@ -38,6 +38,18 @@
 	// ask fetches a page or a part of one as the reader in front of it.
 	const ask = (url, options) => fetch(url, { credentials: 'same-origin', ...options });
 
+	// ---- The menu ----
+
+	// On a narrow screen the menu folds behind a button; without the script
+	// the button stays hidden and the menu in sight.
+	const menuToggle = document.querySelector('.menu-toggle');
+	if (menuToggle) {
+		menuToggle.hidden = false;
+		menuToggle.addEventListener('click', () => {
+			menuToggle.setAttribute('aria-expanded', String(menuToggle.getAttribute('aria-expanded') !== 'true'));
+		});
+	}
+
 	// ---- Entries ----
 
 	// current is the entry keys act on.
