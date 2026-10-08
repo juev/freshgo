@@ -277,7 +277,7 @@ An administrator sets one proxy for all feeds on the page "System" of the admini
 
 ### WebSub
 
-With `-websub` and a `-base-url` that hubs can reach, a feed that announces a hub is subscribed to at its next refresh, and new articles arrive when the hub pushes them; such a feed is then polled once a day. The path `/websub/` must be reachable from outside without authentication. Pushes are accepted only with a valid signature. Without a public address the server logs one warning and polls all feeds as usual.
+With `-websub` and a `-base-url` that hubs can reach, a feed that announces a hub, in its document or in the `Link` headers of the answer, is subscribed to at the next refresh, and new articles arrive when the hub pushes them; such a feed is then polled once a day. The path `/websub/` must be reachable from outside without authentication. Pushes are accepted only with a valid signature. Without a public address the server logs one warning and polls all feeds as usual.
 
 ### Paths the server answers
 

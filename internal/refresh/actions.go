@@ -46,7 +46,10 @@ func (r *Refresher) RefreshUser(ctx context.Context, u *store.User, o Options) (
 		return Stats{User: u.Name}, err
 	}
 	r.refreshOPMLs(ctx, j)
-	return r.refreshUser(ctx, j, o)
+	hubs := map[string]string{}
+	st, err := r.refreshUser(ctx, j, o, hubs)
+	r.subscribe(ctx, hubs)
+	return st, err
 }
 
 // roomForFeed gives ErrTooManyFeeds when the user may not have one more feed.
