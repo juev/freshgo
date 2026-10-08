@@ -695,6 +695,62 @@ func TestE2EDarkAndNarrow(t *testing.T) {
 	})
 }
 
+// U92: on a phone the width of the screen goes to the text of an open entry.
+func TestE2EPhoneText(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		words := strings.Repeat("word ", 40)
+		quoted := &store.Entry{FeedID: 1, GUID: "quoted", Title: "A title long enough to reach the star of its entry", Link: "https://example.org/quoted",
+			Content: "<p>" + words + "</p><blockquote><p>" + words + "</p></blockquote><figure><figcaption>" + words + "</figcaption></figure><ul><li>" + words + "</li></ul>"}
+		if err := s.db.InsertEntries(context.Background(), s.user("alice").ID, []*store.Entry{quoted}); err != nil {
+			t.Fatal(err)
+		}
+		b := browse(t, s)
+		b.run(command(emulation.SetDeviceMetricsOverride, emulation.SetDeviceMetricsOverrideParams{Width: 360, Height: 740, DeviceScaleFactor: 1, Mobile: true}))
+		b.login("alice")
+		id := strconv.FormatInt(quoted.ID, 10)
+		width := func(selector string) float64 {
+			return read[float64](b, `document.querySelector('`+selector+`').getBoundingClientRect().width`)
+		}
+		wide := func(where string) {
+			t.Helper()
+			for selector, least := range map[string]float64{".entry-content > p": 320, ".entry-content blockquote p": 300, ".entry-content figure": 320, ".entry-content li": 290} {
+				if got := width(selector); got < least {
+					t.Errorf("%s: %s is %.0f px wide on a screen of 360, want at least %.0f", where, selector, got, least)
+				}
+			}
+			if got := b.text(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`); got != "true" {
+				t.Errorf("%s scrolls sideways", where)
+			}
+		}
+		b.open("/feeds/1#e" + id)
+		b.until("the entry of the address current", current(quoted.ID, false))
+		b.press("o")
+		b.until("the entry open", current(quoted.ID, true))
+		for _, look := range looks {
+			b.run(chromedp.Evaluate[chromedp.Void](`document.documentElement.dataset.look = '` + look + `'`))
+			wide("an open entry, " + look)
+			// The star stays in the head of the card, on top of it and
+			// clear of the title.
+			if got := b.text(`(() => {
+				const star = document.querySelector('#e` + id + ` button.star').getBoundingClientRect();
+				const title = document.querySelector('#e` + id + ` .entry-title').getBoundingClientRect();
+				const card = document.querySelector('#e` + id + ` details').getBoundingClientRect();
+				const hit = document.elementFromPoint(star.left + star.width / 2, star.top + star.height / 2);
+				return hit && hit.matches('#e` + id + ` button.star') && star.left >= title.right && star.right <= card.right && star.top >= card.top && star.bottom <= title.bottom + star.height;
+			})()`); got != "true" {
+				t.Errorf("%s: the star of an open entry is not in the head of its card, clear of the title", look)
+			}
+		}
+		b.accessible("an entry with a quote open, narrow")
+		b.tabTo("#e" + id + " button.star")
+		b.press(kb.Enter)
+		b.eventually("the open entry starred by its star", func() bool { return s.entry("alice", quoted.ID).IsFavorite })
+		b.open("/entries/" + id)
+		wide("the page of an entry")
+		b.accessible("the page of an entry with a quote, narrow")
+	})
+}
+
 // R7, R16: a visitor registers with the keyboard alone.
 func TestE2ERegister(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
