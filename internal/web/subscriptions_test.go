@@ -690,6 +690,25 @@ func TestFeedActions(t *testing.T) {
 
 		// Fetched anew, the entries take their text from their pages.
 		form = s.feedForm(9)
+		// Saved without a change of how entries get their text: no page is asked for.
+		_, body = s.follow("/subscriptions/feeds/9", form)
+		if list := entries(); notice(body) != "Saved." || strings.Contains(list[0].Content, "Text of") {
+			t.Errorf("after saving the form as it was: notice %q, entries %v", notice(body), list)
+		}
+		// The unread entries take their text from their pages as soon as
+		// the form says so, and give it back when it no longer does.
+		form.Set("path_entries", "article")
+		_, body = s.follow("/subscriptions/feeds/9", form)
+		if list := entries(); notice(body) != "Saved. 2 unread entries got another text." ||
+			!strings.Contains(list[0].Content, "Text of") || !strings.Contains(list[1].Content, "Text of") {
+			t.Errorf("after turning full text on: notice %q, entries %v", notice(body), list)
+		}
+		form.Set("path_entries", "")
+		_, body = s.follow("/subscriptions/feeds/9", form)
+		if list := entries(); notice(body) != "Saved. 2 unread entries got another text." ||
+			strings.Contains(list[0].Content, "Text of") || strings.Contains(list[1].Content, "Text of") {
+			t.Errorf("after turning full text off: notice %q, entries %v", notice(body), list)
+		}
 		form.Set("path_entries", "article")
 		s.follow("/subscriptions/feeds/9", form)
 		_, body = s.follow("/subscriptions/feeds/9/reload", nil)

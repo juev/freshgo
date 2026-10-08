@@ -608,8 +608,23 @@ func sameParsing(a, b *store.Feed) bool {
 	if a.URL != b.URL || a.Kind != b.Kind || a.HTTPAuth != b.HTTPAuth || a.PathEntries != b.PathEntries {
 		return false
 	}
+	return sameAttributes(a, b, parsingKeys)
+}
+
+// fullTextKeys are the attributes of a feed that decide what text its
+// entries get, beside the selector.
+var fullTextKeys = []string{"path_entries_auto", "path_entries_conditions", "path_entries_filter", "content_action"}
+
+// sameFullText reports whether the entries of two feeds get their text
+// the same way.
+func sameFullText(a, b *store.Feed) bool {
+	return a.PathEntries == b.PathEntries && sameAttributes(a, b, fullTextKeys)
+}
+
+// sameAttributes reports whether two feeds have the same values under keys.
+func sameAttributes(a, b *store.Feed, keys []string) bool {
 	one, other := readAttrs(a.Attributes), readAttrs(b.Attributes)
-	for _, key := range parsingKeys {
+	for _, key := range keys {
 		var x, y any
 		_ = json.Unmarshal(one[key], &x)
 		_ = json.Unmarshal(other[key], &y)
@@ -700,7 +715,20 @@ func (h *Handler) saveFeed(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		h.broken(w, r, err)
 	default:
-		h.notify(w, r, "notice.saved", 0)
+		notice, n := "notice.saved", 0
+		// The entries not read yet get their text the way the feed has it
+		// now: the reader does not wait for new ones to see the change.
+		if !sameFullText(old, edited) {
+			n, err = h.refresher.CompleteUnread(ctx, user, old.ID)
+			if ctx.Err() != nil {
+				return
+			}
+			if err != nil {
+				h.log.Warn("texts of unread entries were not brought in line", "user", user.Name, "feed", old.ID, "error", err)
+			}
+			notice = "notice.feed-texts"
+		}
+		h.notify(w, r, notice, n)
 		http.Redirect(w, r, h.url("/subscriptions/feeds/"+strconv.FormatInt(old.ID, 10)), http.StatusSeeOther)
 	}
 }
