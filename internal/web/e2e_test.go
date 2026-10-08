@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -823,6 +824,42 @@ func TestE2EActionsInReach(t *testing.T) {
 				}
 			}
 		}
+	})
+}
+
+// U97: the text of an open entry is taken from its page by a key and put
+// back by the button that took its place.
+func TestE2EFullTextOfAnEntry(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		remote := newFeedSite(t)
+		paragraph := strings.Repeat("The harbour was quiet that morning, and the boats lay still on the water. ", 4)
+		remote.serve("/feed.xml", "application/rss+xml", rssOf(remote.URL, "The Blog", "one"))
+		remote.serve("/articles/one", "text/html", `<html><head><title>News</title></head><body><nav><a href="/">Home of the gazette</a></nav>`+
+			`<article><h1>Boats</h1><p>First. `+paragraph+`</p><p>Second. `+paragraph+`</p><p>Third. `+paragraph+`</p></article></body></html>`)
+		s.asAlice()
+		s.follow("/subscriptions/feeds", url.Values{"url": {remote.URL + "/feed.xml"}})
+		b := browse(t, s)
+		b.login("alice")
+		b.open("/feeds/9")
+		text := `document.querySelector('.entry.current .entry-content').textContent`
+		button := `document.querySelector('.entry.current form[action$="/fulltext"] button').textContent`
+		b.press("j")
+		b.until("the entry open with the text of the feed", `document.querySelector('.entry.current details').open && `+text+`.includes('Summary of one') && `+button+` === 'Full text'`)
+
+		b.press("f")
+		b.until("the text of the page in the open entry", text+`.includes('Second. The harbour') && !`+text+`.includes('Home of the gazette') && `+button+` === 'Text of the feed'`)
+		id := s.stored("alice", store.Listing{Set: store.EntrySet{FeedID: 9}})[0]
+		b.eventually("the text of the page stored", func() bool { return strings.Contains(s.entry("alice", id).Content, "Second. The harbour") })
+		b.accessible("an entry with the text of its page")
+
+		b.tabTo(`.entry.current form[action$="/fulltext"] button`)
+		b.press(kb.Enter)
+		b.until("the text of the feed back", text+`.includes('Summary of one') && `+button+` === 'Full text'`)
+		b.until("the focus on the button that took the place", `document.activeElement.matches('.entry.current form[action$="/fulltext"] button')`)
+
+		// The help names the action and its key.
+		b.press("?")
+		b.until("the help with the action", `[...document.querySelectorAll('dialog[open] tr')].some(row => row.textContent.includes('Take the text from the page') && row.textContent.includes('f'))`)
 	})
 }
 

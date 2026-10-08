@@ -108,7 +108,9 @@
   "category.repeats": "Repeated entries",
   "category.same-guid": "Mark an entry as read when another one of the category has its identifier",
   "category.same-title": "Mark an entry as read when another one of the category has its title",
+  "entry.feed-text": "Text of the feed",
   "entry.fold": "Collapse",
+  "entry.full-text": "Full text",
   "entry.labels": "Labels:",
   "entry.mark-read": "Mark as read",
   "entry.mark-unread": "Mark as unread",
@@ -277,6 +279,7 @@
   "js.palette.empty": "Nothing found.",
   "js.palette.hint": "Type to find a feed, a category, a label, a page or an action",
   "key.add-feed": "Add a feed",
+  "key.fulltext": "Take the text from the page of the entry, or put the text of the feed back",
   "key.go-all": "Go to all entries",
   "key.go-keys": "Go to the settings of keys",
   "key.go-starred": "Go to starred entries",
@@ -386,6 +389,7 @@
     "one": "Saved. %d unread entry got another text.",
     "other": "Saved. %d unread entries got another text."
   },
+  "notice.fulltext-failed": "The text could not be taken from the page of the entry. The log of the server says why.",
   "notice.imported": {
     "one": "Imported: %d feed or entry added or updated.",
     "other": "Imported: %d feeds and entries added or updated."

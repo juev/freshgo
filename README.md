@@ -8,7 +8,7 @@ A feed aggregator server in one binary that takes over an existing [FreshRSS](ht
 - imports a FreshRSS installation that ran on SQLite or PostgreSQL (not MySQL/MariaDB);
 - refreshes every feed kind of FreshRSS: RSS, Atom, JSON Feed, HTML and XML with XPath, JSON with dot notation, JSON embedded in HTML;
 - applies the retention settings, the auto-read rules and the filter actions of FreshRSS, with its search language;
-- fetches the full text of articles, by CSS selector or found on the page automatically;
+- fetches the full text of articles, by CSS selector or found on the page automatically, for a whole feed or for one article on request;
 - serves the Google Reader API, OPML import and export, and feed icons;
 - has a web interface of its own, in English and Russian, in which everything can be done from the keyboard and without JavaScript;
 - subscribes to WebSub hubs;
@@ -175,6 +175,7 @@ The reading screen has the tree of categories, feeds, saved queries and labels o
 | `o` or `Enter` | open or close the entry |
 | `Space` | page through the entry, then go to the next one |
 | `v` | open the original in a new tab |
+| `f` | take the text of the entry from its page, or put the text of the feed back |
 | `m` | mark read or unread |
 | `s` | star |
 | `l` | labels |

@@ -35,6 +35,7 @@ var actions = []action{
 	{"toggle", "o", "collapse_entry", "c"},
 	{"page", "Space", "", ""},
 	{"original", "v", "go_website", "space"},
+	{"fulltext", "f", "", ""},
 	{"read", "m", "mark_read", "r"},
 	{"star", "s", "mark_favorite", "f"},
 	{"labels", "l", "mylabels", "l"},

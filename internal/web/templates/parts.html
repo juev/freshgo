@@ -30,6 +30,11 @@
 <input type="hidden" name="starred" value="{{if .Entry.Starred}}0{{else}}1{{end}}">
 <button type="submit" class="link">{{if .Entry.Starred}}{{.Page.T "entry.unstar"}}{{else}}{{.Page.T "entry.star"}}{{end}}</button>
 </form>{{end}}
+{{if .Entry.Link}}<form method="post" action="{{.Entry.URL}}/fulltext" class="entry-action">
+<input type="hidden" name="next" value="{{.Here}}">
+<input type="hidden" name="full" value="{{if .Entry.Full}}0{{else}}1{{end}}">
+<button type="submit" class="link">{{if .Entry.Full}}{{.Page.T "entry.feed-text"}}{{else}}{{.Page.T "entry.full-text"}}{{end}}</button>
+</form>{{end}}
 {{end}}
 
 {{define "entry-star"}}
