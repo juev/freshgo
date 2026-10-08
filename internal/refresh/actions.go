@@ -97,29 +97,57 @@ func (r *Refresher) ReloadFeed(ctx context.Context, u *store.User, feedID int64,
 	if f, err = r.db.FeedByID(ctx, u.ID, feedID); err != nil {
 		return err
 	}
-	params, err := fetch.FeedParams(f.HTTPAuth, f.Attributes)
-	if err != nil {
-		return err
-	}
-	c := r.completion(j, f, readAttributes(f.Attributes), params)
-	if !c.pages() || limit <= 0 {
+	if limit <= 0 {
 		return nil
 	}
-	entries, _, err := r.db.ListPage(ctx, u.ID, store.Listing{Set: store.EntrySet{FeedID: feedID}, Limit: limit})
+	_, err = r.reread(ctx, j, u, f, store.Listing{Set: store.EntrySet{FeedID: feedID}, Limit: limit}, false)
+	return err
+}
+
+// CompleteUnread brings the unread entries of a feed in line with the way
+// the feed gets the text of its entries now, after that way was changed:
+// the text the feed gave is put back, then completed as for a new entry.
+// It returns how many entries got another text.
+func (r *Refresher) CompleteUnread(ctx context.Context, u *store.User, feedID int64) (int, error) {
+	j, err := r.userJob(ctx, u)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	now := r.now().Unix()
+	f, err := r.db.FeedByID(ctx, u.ID, feedID)
+	if err != nil {
+		return 0, err
+	}
+	unread := false
+	return r.reread(ctx, j, u, f, store.Listing{Set: store.EntrySet{FeedID: feedID}, Read: &unread}, true)
+}
+
+// reread gives the listed entries of a feed their text again and returns
+// how many of them it changed. A feed that reads no pages changes nothing,
+// unless bare is set: then its entries get the text of the feed back.
+func (r *Refresher) reread(ctx context.Context, j *job, u *store.User, f *store.Feed, listing store.Listing, bare bool) (int, error) {
+	params, err := fetch.FeedParams(f.HTTPAuth, f.Attributes)
+	if err != nil {
+		return 0, err
+	}
+	c := r.completion(j, f, readAttributes(f.Attributes), params)
+	if !c.pages() && !bare {
+		return 0, nil
+	}
+	entries, _, err := r.db.ListPage(ctx, u.ID, listing)
+	if err != nil {
+		return 0, err
+	}
+	now, changed := r.now().Unix(), 0
 	for _, e := range entries {
 		before := e.Content
 		restoreFeedText(e)
 		r.complete(ctx, j, f, c, e, now)
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return changed, ctx.Err()
 		}
 		// A page that was not read leaves the entry with the text it had:
 		// the text of the feed alone would be a loss.
-		if e.Content == before || !strings.Contains(e.Content, fullContentStart) {
+		if e.Content == before || (c.pages() && !strings.Contains(e.Content, fullContentStart)) {
 			continue
 		}
 		err := r.db.InTx(ctx, func(tx *store.Store) error {
@@ -135,10 +163,11 @@ func (r *Refresher) ReloadFeed(ctx context.Context, u *store.User, feedID int64,
 			return tx.UpdateEntry(ctx, fresh)
 		})
 		if err != nil {
-			return err
+			return changed, err
 		}
+		changed++
 	}
-	return nil
+	return changed, nil
 }
 
 // restoreFeedText puts back the text the feed gave an entry whose text was

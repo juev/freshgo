@@ -1117,7 +1117,8 @@ func TestE2ESubscriptions(t *testing.T) {
 		b.accessible("the settings of a feed with a preview")
 		b.tabTo(`form.settings button[type="submit"]:not([formaction])`)
 		b.press(kb.Enter)
-		b.until("the settings saved", `document.querySelector('#messages').textContent.includes('Saved.')`)
+		// The entry there is takes its text from its page at once.
+		b.until("the settings saved", `document.querySelector('#messages').textContent.includes('Saved. 1 unread entry got another text.')`)
 		if f := s.feed("alice", 9); f.PathEntries != "article" {
 			t.Errorf("selector of the feed after the form = %q", f.PathEntries)
 		}
@@ -1129,7 +1130,7 @@ func TestE2ESubscriptions(t *testing.T) {
 		remote.serve("/feed.xml", "application/rss+xml", rssOf(remote.URL, "The Blog", "one", "two"))
 		b.open("/feeds/9")
 		b.press("r")
-		b.until("the feed refreshed", `document.querySelector('#messages').textContent.includes('The feed was refreshed.') && document.querySelectorAll('.entries article').length === 2`)
+		b.until("the feed refreshed", `document.querySelector('#messages').textContent.includes('The feed was refreshed.') && document.querySelectorAll('.entries > article').length === 2`)
 
 		// The settings of what is being read are a Tab away; unsubscribing
 		// asks first.

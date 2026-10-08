@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -147,6 +148,75 @@ func TestReloadFeed(t *testing.T) {
 					t.Errorf("If-None-Match of the requests = %q, want the reload to send none", validators)
 				}
 			})
+		}
+	})
+}
+
+// T12: after the way a feed gets the text of its entries was changed, its
+// unread entries are brought in line with it, and the read ones left alone.
+func TestCompleteUnread(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		u := w.user("alice", `{}`)
+		w.serveBody("/articles/one", "text/html; charset=utf-8", articlePage)
+		link := func(page string) string { return w.server.URL + "/articles/" + page }
+		w.serveBody("/feed", rssType, rss("Blog",
+			item{guid: "gone", title: "Gone", link: link("gone"), body: "Summary"},
+			item{guid: "read", title: "Read", link: link("one"), body: "Summary"},
+			item{guid: "b", title: "Second", link: link("one"), body: "Summary"},
+			item{guid: "a", title: "First", link: link("one"), body: "Summary"}))
+		f := w.feed(u, "/feed", nil)
+		w.runOne()
+		if _, err := w.db.SetEntriesRead(ctx, u.ID, []int64{w.entry(f, "read").ID}, true, w.clock.Unix()); err != nil {
+			t.Fatal(err)
+		}
+		set := func(selector string) {
+			t.Helper()
+			stored := w.storedFeed(f)
+			stored.PathEntries = selector
+			if err := w.db.UpdateFeed(ctx, stored); err != nil {
+				t.Fatal(err)
+			}
+		}
+		contents := func() map[string]string {
+			got := map[string]string{}
+			for _, e := range w.entries(f) {
+				got[e.GUID] = e.Content
+			}
+			return got
+		}
+		full := fullContentStart + fmt.Sprintf(fullText, w.server.URL) + fullContentEnd
+
+		// Nothing changes for a feed that reads no pages and has read none.
+		if n, err := w.r.CompleteUnread(ctx, u, f.ID); err != nil || n != 0 || w.hitCount("/articles/one") != 0 {
+			t.Errorf("without full text: %d entries changed, %v, %d requests", n, err, w.hitCount("/articles/one"))
+		}
+
+		set("article .body")
+		w.later()
+		n, err := w.r.CompleteUnread(ctx, u, f.ID)
+		if err != nil || n != 2 {
+			t.Errorf("full text turned on: %d entries changed, %v; want 2", n, err)
+		}
+		want := map[string]string{"a": full, "b": full, "read": "Summary", "gone": "Summary"}
+		if got := contents(); !reflect.DeepEqual(got, want) {
+			t.Errorf("contents after full text was turned on:\n got %q\nwant %q", got, want)
+		}
+		if e := w.entry(f, "a"); e.LastModified != w.clock.Unix() {
+			t.Errorf("a completed entry was modified at %d, want now (%d)", e.LastModified, w.clock.Unix())
+		}
+
+		// Turned off again: the text of the feed comes back.
+		set("")
+		if n, err := w.r.CompleteUnread(ctx, u, f.ID); err != nil || n != 2 {
+			t.Errorf("full text turned off: %d entries changed, %v; want 2", n, err)
+		}
+		want = map[string]string{"a": "Summary", "b": "Summary", "read": "Summary", "gone": "Summary"}
+		if got := contents(); !reflect.DeepEqual(got, want) {
+			t.Errorf("contents after full text was turned off:\n got %q\nwant %q", got, want)
+		}
+		if _, kept := originalContent(t, w.entry(f, "a")); kept {
+			t.Error("the text of the feed is still kept aside after it was put back")
 		}
 	})
 }

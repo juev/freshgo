@@ -142,7 +142,7 @@ What it does not: the theme and the other settings of the FreshRSS pages that th
 - **Filter actions ignore case for all letters**, as FreshRSS does on PostgreSQL. On a FreshRSS that ran on SQLite, only ASCII letters were compared without case, so rules with other letters now match more.
 - **Regular expressions in filters are RE2.** Rules with backreferences or lookaround are skipped with a warning in the log; the import lists them.
 - **Old articles are cleaned up at every refresh of a feed**, not at a random one in thirty. The rules are the same.
-- **Full text and content filters apply to new and changed articles only.** Changing the selector of a feed, or the way its text is found, does not reload the articles already stored.
+- **Full text and content filters apply to new, changed and unread articles.** Changing how a feed gets its text brings its unread articles in line when the form is saved; articles already read keep the text they had.
 
 The full lists are in the Decisions sections of `docs/specs/`.
 
