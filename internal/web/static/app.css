@@ -1531,6 +1531,11 @@ table.log td:last-child {
 	table.data td {
 		padding-inline: calc(var(--space) / 2);
 		overflow-wrap: anywhere;
+		hyphens: auto;
+	}
+
+	table.data thead th {
+		font-size: 0.85em;
 	}
 
 	.form.inline input[type="text"],
