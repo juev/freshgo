@@ -457,10 +457,13 @@ func accept(kind int) string {
 // their own are read as RSS or Atom, as FreshRSS does.
 func parse(j *job, f *store.Feed, resp *fetch.Response) (*feed.Feed, error) {
 	contentType := resp.Header.Get("Content-Type")
+	// What relative links are resolved against: with the password of the
+	// feed in it, every such link would be stored and shown with it.
+	base := withoutCredentials(resp.URL)
 	switch f.Kind {
 	case scrape.KindHTMLXPath, scrape.KindXMLXPath, scrape.KindJSONFeed, scrape.KindJSONDotNotation, scrape.KindHTMLXPathJSON:
 		rss, err := scrape.RSS(resp.Body, scrape.Source{
-			Kind: f.Kind, URL: resp.URL, Name: f.Name, Attributes: f.Attributes,
+			Kind: f.Kind, URL: base, Name: f.Name, Attributes: f.Attributes,
 			ContentType: contentType, Location: j.conf.location,
 		})
 		if err != nil {
@@ -469,7 +472,7 @@ func parse(j *job, f *store.Feed, resp *fetch.Response) (*feed.Feed, error) {
 		return feed.Parse(rss, feed.Options{HTTPS: j.https, Location: j.conf.location})
 	default:
 		return feed.Parse(resp.Body, feed.Options{
-			ContentType: contentType, URL: resp.URL, HTTPS: j.https, Location: j.conf.location,
+			ContentType: contentType, URL: base, HTTPS: j.https, Location: j.conf.location,
 		})
 	}
 }
