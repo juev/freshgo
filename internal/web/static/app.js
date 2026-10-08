@@ -171,6 +171,9 @@
 				old.replaceWith(now);
 			} else if (old) {
 				old.remove();
+			} else if (now && part === '.entry-excerpt') {
+				// The row has it after the title.
+				article.querySelector('.entry-title').after(now);
 			} else if (now) {
 				(article.querySelector('.entry-body') || article).append(now);
 			}

@@ -833,7 +833,8 @@ func TestE2EFullTextOfAnEntry(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
 		remote := newFeedSite(t)
 		paragraph := strings.Repeat("The harbour was quiet that morning, and the boats lay still on the water. ", 4)
-		remote.serve("/feed.xml", "application/rss+xml", rssOf(remote.URL, "The Blog", "one"))
+		// The feed gives the entry no text at all: its row has no excerpt.
+		remote.serve("/feed.xml", "application/rss+xml", strings.Replace(rssOf(remote.URL, "The Blog", "one"), "Summary of one", "", 1))
 		remote.serve("/articles/one", "text/html", `<html><head><title>News</title></head><body><nav><a href="/">Home of the gazette</a></nav>`+
 			`<article><h1>Boats</h1><p>First. `+paragraph+`</p><p>Second. `+paragraph+`</p><p>Third. `+paragraph+`</p></article></body></html>`)
 		s.asAlice()
@@ -844,17 +845,19 @@ func TestE2EFullTextOfAnEntry(t *testing.T) {
 		text := `document.querySelector('.entry.current .entry-content').textContent`
 		button := `document.querySelector('.entry.current form[action$="/fulltext"] button').textContent`
 		b.press("j")
-		b.until("the entry open with the text of the feed", `document.querySelector('.entry.current details').open && `+text+`.includes('Summary of one') && `+button+` === 'Full text'`)
+		b.until("the entry open without a text", `document.querySelector('.entry.current details').open && `+text+`.trim() === '' && `+button+` === 'Full text'`)
 
 		b.press("f")
 		b.until("the text of the page in the open entry", text+`.includes('Second. The harbour') && !`+text+`.includes('Home of the gazette') && `+button+` === 'Text of the feed'`)
 		id := s.stored("alice", store.Listing{Set: store.EntrySet{FeedID: 9}})[0]
 		b.eventually("the text of the page stored", func() bool { return strings.Contains(s.entry("alice", id).Content, "Second. The harbour") })
+		// The row of the entry gets the beginning of the new text, in its place.
+		b.until("the excerpt in the row", `document.querySelector('.entry.current summary .entry-title + .entry-excerpt').textContent.includes('First. The harbour') && !document.querySelector('.entry.current .entry-body .entry-excerpt')`)
 		b.accessible("an entry with the text of its page")
 
 		b.tabTo(`.entry.current form[action$="/fulltext"] button`)
 		b.press(kb.Enter)
-		b.until("the text of the feed back", text+`.includes('Summary of one') && `+button+` === 'Full text'`)
+		b.until("the text of the feed back", text+`.trim() === '' && !document.querySelector('.entry.current .entry-excerpt') && `+button+` === 'Full text'`)
 		b.until("the focus on the button that took the place", `document.activeElement.matches('.entry.current form[action$="/fulltext"] button')`)
 
 		// The help names the action and its key.
