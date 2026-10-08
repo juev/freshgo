@@ -84,3 +84,73 @@ func TestAgainstFreshRSS(t *testing.T) {
 		})
 	}
 }
+
+// readablePage is a page as sites make them: the article among a menu, a
+// column of links and a footer.
+func readablePage(article string) string {
+	paragraph := strings.Repeat("The harbour was quiet that morning, and the boats lay still on the water. ", 4)
+	return `<html><head><title>Harbour news</title></head><body>
+<nav><ul><li><a href="/">Home</a></li><li><a href="/about">About the site</a></li></ul></nav>
+<div id="content"><article><h1>Boats at rest</h1>
+<p>First. ` + paragraph + `</p>
+<p>Second, with a <a href="more.html">link</a>. ` + paragraph + `</p>
+<div class="promo"><p>Subscribe to the newsletter of the harbour, every week in your mailbox.</p></div>
+<p>Third. ` + paragraph + `</p>` + article + `
+</article></div>
+<aside><h2>Most read</h2><ul><li><a href="/a">Tides of the week</a></li><li><a href="/b">Fish prices</a></li></ul></aside>
+<footer><p>Copyright of the harbour gazette.</p></footer>
+</body></html>`
+}
+
+// T11: without a selector the article is found on its page, cleaned, with
+// its addresses resolved and without what the filter names.
+func TestAutomatic(t *testing.T) {
+	mux := http.NewServeMux()
+	page := func(path, body string) {
+		mux.HandleFunc(path, func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write([]byte(body))
+		})
+	}
+	page("/news/boats", readablePage(`<script>track()</script>`))
+	page("/news/moved", `<html><head><meta http-equiv="refresh" content="0; url=boats"></head><body><p>Moved.</p></body></html>`)
+	page("/news/based", strings.Replace(readablePage(""), "<head>", `<head><base href="/elsewhere/">`, 1))
+	page("/news/bare", `<html><head><title>Bare</title></head><body></body></html>`)
+	server := httptest.NewServer(mux)
+	t.Cleanup(server.Close)
+	client := newClient(t, server)
+	article := func(path, filter string) (string, error) {
+		return Article(context.Background(), client, Request{URL: server.URL + path, Automatic: true, Selector: "p[", Filter: filter})
+	}
+
+	got, err := article("/news/boats", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"First. The harbour", "Third. The harbour", `<a href="` + server.URL + `/news/more.html">link</a>`, "Subscribe to the newsletter"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the article lacks %q:\n%s", want, got)
+		}
+	}
+	for _, unwanted := range []string{"About the site", "Tides of the week", "Copyright of the harbour", "track()", "<script"} {
+		if strings.Contains(got, unwanted) {
+			t.Errorf("the article holds %q:\n%s", unwanted, got)
+		}
+	}
+
+	if got, err = article("/news/boats", ".promo"); err != nil || strings.Contains(got, "Subscribe") || !strings.Contains(got, "Third. The harbour") {
+		t.Errorf("with a filter: %v\n%s", err, got)
+	}
+	if got, err = article("/news/moved", ""); err != nil || !strings.Contains(got, "First. The harbour") {
+		t.Errorf("a page that sends on: %v\n%s", err, got)
+	}
+	if got, err = article("/news/based", ""); err != nil || !strings.Contains(got, `<a href="`+server.URL+`/elsewhere/more.html">link</a>`) {
+		t.Errorf("a page with a base address: %v\n%s", err, got)
+	}
+	if got, err = article("/news/bare", ""); !errors.Is(err, ErrNoArticle) {
+		t.Errorf("a page without an article: %q, error = %v, want ErrNoArticle", got, err)
+	}
+	if _, err = article("/news/boats", "p["); !errors.Is(err, ErrSelector) {
+		t.Errorf("a filter that is not CSS: error = %v, want ErrSelector", err)
+	}
+}

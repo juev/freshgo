@@ -434,7 +434,7 @@ func TestFeedSettings(t *testing.T) {
 		for key, value := range map[string]string{
 			"url": "example.org/feed", "website": "https://example.org/", "description": " About ", "mute": "1",
 			"http_user": "me", "http_password": "secret:1", "path_entries": " article ", "path_entries_filter": ".ad",
-			"path_entries_conditions": "intitle:long\r\nauthor:x", "content_action": "append",
+			"path_entries_auto": "1", "path_entries_conditions": "intitle:long\r\nauthor:x", "content_action": "append",
 			"keep_own": "1", "keep_max_on": "1", "keep_max": "30", "keep_period_on": "1", "keep_period_count": "2",
 			"keep_period_unit": "P1W", "keep_min": "5", "keep_favourites": "1", "keep_unreads": "1",
 			"read_upon_gone": "1", "read_upon_reception": "0", "mark_updated_article_unread": "1",
@@ -454,7 +454,7 @@ func TestFeedSettings(t *testing.T) {
 		}
 		want := map[string]any{
 			"SimplePieHash": "2b6d159abc7f9d9421cd766b769de1e358077bb2", "path_entries_filter": ".ad",
-			"path_entries_conditions": []any{"intitle:long", "author:x"}, "content_action": "append",
+			"path_entries_auto": true, "path_entries_conditions": []any{"intitle:long", "author:x"}, "content_action": "append",
 			"archiving": map[string]any{
 				"keep_period": "P2W", "keep_max": 30.0, "keep_min": 5.0, "keep_favourites": true, "keep_labels": false, "keep_unreads": true,
 			},
@@ -479,6 +479,7 @@ func TestFeedSettings(t *testing.T) {
 			"read_upon_reception": "0", "read_when_same_title_in_feed": "0", "json-feedTitle": "meta.title", "proxy_type": "5",
 			"headers": "X-One: 1\nRemote-User: root\nContent-Type: application/json", "method": "POST", "redirects": "7",
 			"unicity": "sha1:link_published", "unicity_forced": "1", "default_sort": "rand", "content_action": "append",
+			"path_entries_auto": "1",
 		} {
 			if shown.Get(key) != want {
 				t.Errorf("form of feed 1 after the change: %s = %q, want %q", key, shown.Get(key), want)
@@ -496,7 +497,7 @@ func TestFeedSettings(t *testing.T) {
 		}
 
 		// Back to what the levels above say.
-		for _, key := range []string{"keep_own", "mute", "unicity_forced", "cookie_file"} {
+		for _, key := range []string{"keep_own", "mute", "unicity_forced", "cookie_file", "path_entries_auto"} {
 			shown.Del(key)
 		}
 		for key, value := range map[string]string{
@@ -669,10 +670,18 @@ func TestFeedActions(t *testing.T) {
 			!strings.Contains(a.body, `name="path_entries" value="article"`) || !strings.Contains(a.body, `value="Not stored"`) {
 			t.Errorf("preview: status %d\n%s", a.status, a.body)
 		}
-		if f := s.feed("alice", 9); f.PathEntries != "" || f.Name != "The Blog" {
+		// Without a selector the article is looked for when the form says so.
+		form.Set("path_entries", "")
+		form.Set("path_entries_auto", "1")
+		if a := s.post("/subscriptions/feeds/9/preview", form); a.status != http.StatusOK || strings.Contains(a.body, "There is no selector to try") ||
+			!strings.Contains(a.body, `name="path_entries_auto" value="1" checked`) {
+			t.Errorf("preview of the automatic way: status %d\n%s", a.status, a.body)
+		}
+		form.Del("path_entries_auto")
+		if f := s.feed("alice", 9); f.PathEntries != "" || f.Name != "The Blog" || decoded(t, f.Attributes)["path_entries_auto"] != nil {
 			t.Errorf("the preview stored the form: %+v", f)
 		}
-		for selector, want := range map[string]string{"": "There is no selector to try.", "p[": "could not be read", "section": "could not be read"} {
+		for selector, want := range map[string]string{"": "There is no selector to try,", "p[": "could not be read", "section": "could not be read"} {
 			form.Set("path_entries", selector)
 			if a := s.post("/subscriptions/feeds/9/preview", form); a.status != http.StatusOK || !strings.Contains(a.body, want) {
 				t.Errorf("preview with the selector %q: status %d, no %q", selector, a.status, want)

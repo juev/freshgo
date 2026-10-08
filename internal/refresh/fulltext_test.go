@@ -97,6 +97,80 @@ func TestFullText(t *testing.T) {
 	}
 }
 
+// readablePage is a page as sites make them: the article among a menu, a
+// column of links and a footer.
+var readablePage = func() string {
+	paragraph := strings.Repeat("The harbour was quiet that morning, and the boats lay still on the water. ", 4)
+	return `<html><head><title>Harbour news</title></head><body>
+<nav><ul><li><a href="/">Home</a></li><li><a href="/about">About the site</a></li></ul></nav>
+<div id="content"><article><h1>Boats at rest</h1>
+<p>First. ` + paragraph + `</p>
+<div class="promo"><p>Subscribe to the newsletter of the harbour, every week in your mailbox.</p></div>
+<p>Second. ` + paragraph + `</p>
+<p>Third. ` + paragraph + `</p>
+</article></div>
+<aside><h2>Most read</h2><ul><li><a href="/a">Tides of the week</a></li><li><a href="/b">Fish prices</a></li></ul></aside>
+<footer><p>Copyright of the harbour gazette.</p></footer>
+</body></html>`
+}()
+
+// T11: a feed set to find the article without a selector stores the text
+// of the page like a feed with a selector does, whatever its selector says.
+func TestFullTextAutomatic(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		u := w.user("alice", `{}`)
+		w.serveBody("/articles/one", "text/html; charset=utf-8", readablePage)
+		w.serveBody("/articles/bare", "text/html; charset=utf-8", `<html><head><title>Bare</title></head><body><nav></nav></body></html>`)
+		link := func(page string) string { return w.server.URL + "/articles/" + page }
+		w.serveBody("/feed", rssType, rss("Blog",
+			item{guid: "bare", title: "Bare", link: link("bare"), body: "Summary"},
+			item{guid: "nolink", title: "No link", body: "Summary"},
+			item{guid: "a", title: "First", link: link("one"), body: "Summary"}))
+		f := w.feed(u, "/feed", func(f *store.Feed) {
+			f.PathEntries, f.Attributes = "p[", json.RawMessage(`{"path_entries_auto":true,"path_entries_filter":".promo"}`)
+		})
+		if st := w.runOne(); st.NewEntries != 3 || st.Failed != 0 {
+			t.Fatalf("stats %+v", st)
+		}
+		e := w.entry(f, "a")
+		if !strings.HasPrefix(e.Content, fullContentStart) || !strings.HasSuffix(e.Content, fullContentEnd) {
+			t.Errorf("the text of the page is not between its markers: %q", e.Content)
+		}
+		for _, want := range []string{"First. The harbour", "Second. The harbour", "Third. The harbour"} {
+			if !strings.Contains(e.Content, want) {
+				t.Errorf("the content lacks %q: %q", want, e.Content)
+			}
+		}
+		for _, unwanted := range []string{"About the site", "Tides of the week", "Copyright of the harbour", "Subscribe"} {
+			if strings.Contains(e.Content, unwanted) {
+				t.Errorf("the content holds %q: %q", unwanted, e.Content)
+			}
+		}
+		if original, kept := originalContent(t, e); original != "Summary" || !kept {
+			t.Errorf("original content %q, kept %v; want the summary", original, kept)
+		}
+		// No article, no link: the text of the feed stays.
+		for _, guid := range []string{"bare", "nolink"} {
+			if got := w.entry(f, guid).Content; got != "Summary" {
+				t.Errorf("%s: content %q, want the summary", guid, got)
+			}
+		}
+
+		if logs := w.logs.String(); !strings.Contains(logs, "article page was not read") {
+			t.Errorf("a page without an article is not in the log: %s", logs)
+		}
+
+		// The feed has not changed: no page is read again.
+		w.later()
+		if st := w.runOne(); st.UpdatedEntries != 0 || st.NewEntries != 0 {
+			t.Errorf("second refresh: stats %+v", st)
+		}
+		if hits := w.hitCount("/articles/one"); hits != 1 {
+			t.Errorf("the page was requested %d times, want 1", hits)
+		}
+	})
+}
+
 // R12: pages are read only for the entries a condition asks for, and a page
 // that cannot be read leaves the text of the feed.
 func TestFullTextConditionsAndFailures(t *testing.T) {
