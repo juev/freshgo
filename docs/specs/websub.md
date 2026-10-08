@@ -12,12 +12,13 @@ Out of scope: subscriptions of an imported FreshRSS (its `PubSubHubbub/` directo
 ## Requirements
 
 - W1. WebSub works when it is switched on (`-websub`, `$FRESHGO_WEBSUB`) and the public address of the server (`-base-url`) can be reached by a hub: an http(s) URL whose host is not `localhost`, not a name without a dot, and not a loopback, private or link-local address. Otherwise the server says so once at start, subscribes to nothing, does not answer under `/websub/`, and polls every feed as without WebSub.
-- W2. A feed read as RSS or Atom that names a hub (`rel="hub"`) and itself (`rel="self"`) has that own address recorded as its topic after every successful poll; a feed that stops naming them loses the topic.
-- W3. After such a poll the hub is asked to push the topic with `hub.mode=subscribe`, `hub.topic`, `hub.callback` (`<base URL>/websub/<key>`), `hub.secret` and `hub.verify=sync`:
+- W2. A feed read as RSS or Atom that names a hub (`rel="hub"`) and itself (`rel="self"`) has that own address recorded as its topic, and the hub next to it, after every poll that brings its document, whether WebSub is on or not; a feed that stops naming them loses both. The links are those of the document and those of the `Link` headers of the answer, which overrule the document; an address of a header may be relative to the address of the feed.
+- W3. After such a poll, and at the end of every refresh for the topics recorded with the feeds it went through, muted feeds left out, the hub is asked to push the topic with `hub.mode=subscribe`, `hub.topic`, `hub.callback` (`<base URL>/websub/<key>`), `hub.secret` and `hub.verify=sync`:
   - the first time any feed announces the topic; key and secret are 32 random bytes each, and one subscription serves every feed and user that announces the topic;
   - when less than 23 hours of the lease are left, but no sooner than an hour after the last request to a hub in good standing;
   - 23 hours after the last request when the hub has failed, has not confirmed, has not pushed yet, or the feed now names another hub.
   Any 2xx answer of the hub counts as accepted. Another answer marks the subscription as failing.
+  So a subscription is made in the first refresh after WebSub is switched on, and renewed in time, for a feed that is not due or answers that nothing has changed.
 - W4. `GET /websub/<key>` is the hub asking whether a change is wanted. For `hub.mode=subscribe` the lease is recorded (`hub.lease_seconds` over 60, otherwise no end) and `hub.challenge` is echoed. `hub.mode=unsubscribe` is confirmed, and the subscription deleted, only when no feed announces the topic any more. `hub.mode=denied` marks the subscription as failing. An unknown key, a `hub.topic` that is not the topic of the key, or a subscription no feed needs is 404; an unknown mode is 400. Addresses are compared without regard to `http` or `https`.
 - W5. `POST /websub/<key>` is a push. Its body, at most 3 MiB, has to be signed: `X-Hub-Signature: <method>=<hexadecimal HMAC of the body under the secret>` with `sha1`, `sha256`, `sha384` or `sha512`. Without a valid signature the answer is 403 and nothing changes. An unknown key is 410. An empty body is 422; a larger one 413.
 - W6. The address the pushed document gives as its own, or the one with `rel="self"` in a `Link` header, which overrules it, has to be the topic; otherwise the answer is 422 and nothing changes.
@@ -38,6 +39,7 @@ Out of scope: subscriptions of an imported FreshRSS (its `PubSubHubbub/` directo
 - **A renewal is not repeated within an hour, and a failing hub is left alone for 23 hours even when the lease is running out.** FreshRSS asks on every refresh once less than 23 hours are left.
 - **A feed that names another hub is subscribed to there** after the usual pause. FreshRSS refuses to subscribe while the stored hub differs.
 - **A push without a valid signature is answered with 403**, although the recommendation allows a 2xx: a hub that sees its pushes refused stops sooner.
+- **Subscribing does not wait for the document of the feed.** FreshRSS subscribes and renews only when a refresh reads the feed, so a feed that answers 304 keeps its hub unasked.
 - **Nothing is unsubscribed actively.** When the last feed of a topic is gone, the next push is answered with 410, which tells the hub to stop.
 
 ## Verification scenarios
@@ -48,8 +50,10 @@ Out of scope: subscriptions of an imported FreshRSS (its `PubSubHubbub/` directo
 - R14, W5, W7: `TestWebSubPush` — a push stored for two users without a request to the feed, entries it does not list left unread under `read_upon_gone`, the time of the last poll unchanged, a muted feed and a disabled user passed over, SHA-1 and SHA-256 signatures.
 - R14, W5, W6: `TestWebSubRefusesPushes` — no signature, a wrong secret, a signature of another document, an unknown method, an unknown key (410), another feed in the document or in the `Link` header (422), an empty and an oversized body; the entries stay as they were.
 - R14, W3: `TestWebSubRenews` — a renewal under the same key with 22 hours left, one request to a failing hub and the next a day later.
+- W3: `TestWebSubSwitchedOn` — feeds read with WebSub off are subscribed in the first refresh with it on, although they answer 304, once, and not for a muted feed. `TestWebSubRenewsWithoutADocument` — a renewal for a feed that is not polled.
+- W2: `TestWebSubLinkHeaders` — a hub named in headers alone, relative to the feed, and an own address of a header that overrules the document.
 - W8, W9: `TestWebSubPollsLessOften`. W7, the end of a subscription: `TestWebSubEndsWithItsReaders`.
-- R14, W1: `TestWebSubOff`; `TestRoutes` in `cmd/freshgo` for the address without WebSub.
-- Storage: `TestWebSubSubscriptions` in `internal/store`.
+- R14, W1, W2: `TestWebSubOff`, which also has the topic and the hub recorded; `TestRoutes` in `cmd/freshgo` for the address without WebSub.
+- Storage: `TestWebSubSubscriptions` and `TestMigrationWebSubHub` in `internal/store`.
 
 No real hub took part: the request for a subscription and the push are those of the recommendation as read, not as observed.

@@ -18,6 +18,7 @@ import (
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/scrape"
 	"github.com/juev/freshgo/internal/store"
+	"github.com/juev/freshgo/internal/websub"
 )
 
 // forceFeedSuffix on a feed address tells FreshRSS to read the document as a
@@ -95,10 +96,11 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 		}
 		return result{}, r.fail(ctx, j, f, now, err)
 	}
-	// The topic to be pushed about, when the feed names a hub and itself.
-	topic := ""
-	if r.WebSub != nil && doc.HubURL != "" && doc.SelfURL != "" {
-		topic = doc.SelfURL
+	// The topic to be pushed about and the hub that pushes, when the feed
+	// names a hub and itself.
+	topic, hub := "", ""
+	if !pushed {
+		topic, hub = announced(doc, resp)
 	}
 	attrs := readAttributes(f.Attributes)
 	criteria, _ := get[string](attrs, "unicityCriteria")
@@ -295,7 +297,7 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 			fresh.Error = 0
 		} else {
 			succeeded(fresh, f, resp, now)
-			fresh.WebSubTopic = topic
+			fresh.WebSubTopic, fresh.WebSubHub = topic, hub
 		}
 		if used != criteria {
 			freshAttrs := readAttributes(fresh.Attributes)
@@ -316,14 +318,43 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 		}
 		return tx.UpdateFeed(ctx, fresh)
 	})
-	if err == nil && !pushed && topic != "" {
+	if err == nil && r.WebSub != nil && topic != "" {
 		// A hub that is trusted pushes every entry before a poll finds it.
 		if res.added > 0 && j.pushing[topic] {
 			r.WebSub.Distrust(ctx, topic)
 		}
-		r.WebSub.Ensure(ctx, topic, doc.HubURL)
+		r.WebSub.Ensure(ctx, topic, hub)
 	}
 	return res, err
+}
+
+// announced returns the address a fetched feed gives as its own and the
+// WebSub hub it names, or nothing unless it names both. The Link headers of
+// the answer overrule the document, as the recommendation has it.
+func announced(doc *feed.Feed, resp *fetch.Response) (topic, hub string) {
+	topic, hub = doc.SelfURL, doc.HubURL
+	if base, err := url.Parse(resp.URL); err == nil {
+		links := resp.Header.Values("Link")
+		topic = resolved(base, websub.Link(links, "self"), topic)
+		hub = resolved(base, websub.Link(links, "hub"), hub)
+	}
+	if topic == "" || hub == "" {
+		return "", ""
+	}
+	return topic, hub
+}
+
+// resolved returns the http(s) address a link of a header stands for, which
+// may be relative to base; otherwise when there is no such link.
+func resolved(base *url.URL, link, otherwise string) string {
+	if link == "" {
+		return otherwise
+	}
+	u, err := base.Parse(link)
+	if err != nil || u.Scheme != "http" && u.Scheme != "https" {
+		return otherwise
+	}
+	return u.String()
 }
 
 // storeUnchanged records a refresh that found the feed as it was: the

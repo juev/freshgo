@@ -456,6 +456,114 @@ func TestWebSubEndsWithItsReaders(t *testing.T) {
 	})
 }
 
+// unchanged makes the site answer that the feed is as it was.
+func (h *hubWorld) unchanged() {
+	h.serve("/feed.xml", func(rw http.ResponseWriter, _ *http.Request) { rw.WriteHeader(http.StatusNotModified) })
+}
+
+// W3: a server that read its feeds with WebSub off subscribes to their hubs
+// in the first refresh with WebSub on, although no feed is read whole; a
+// muted feed is not subscribed for.
+func TestWebSubSwitchedOn(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		h := newHubWorld(t, w)
+		w.r.WebSub = nil
+		u := w.user("alice", "")
+		w.feed(u, "/feed.xml", nil)
+		w.serveBody("/muted.xml", "application/atom+xml", h.document("http://blog.example/muted.xml", "m"))
+		muted := w.feed(u, "/muted.xml", nil)
+		w.runOne()
+		muted = w.storedFeed(muted)
+		muted.TTL = -3600
+		if err := w.db.UpdateFeed(context.Background(), muted); err != nil {
+			t.Fatal(err)
+		}
+
+		w.r.WebSub = h.service
+		h.unchanged()
+		w.later()
+		w.runOne()
+		asked := h.requests()
+		if len(asked) != 1 || asked[0].Get("hub.topic") != h.topic || asked[0].Get("hub.mode") != "subscribe" {
+			t.Fatalf("the hub was asked %v; want one subscription, to %s", asked, h.topic)
+		}
+		w.later()
+		w.runOne()
+		if n := len(h.requests()); n != 1 {
+			t.Errorf("the hub was asked %d times in two refreshes, want once", n)
+		}
+	})
+}
+
+// W3: a lease is renewed when it is about to run out, although the feed is
+// not due or answers that nothing has changed.
+func TestWebSubRenewsWithoutADocument(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		h := newHubWorld(t, w)
+		u := w.user("alice", "")
+		w.feed(u, "/feed.xml", nil)
+		w.runOne()
+		h.confirm(2 * 24 * 3600)
+		if status, body := h.push(h.document(h.topic, "c"), h.subscription().Secret); status != http.StatusOK {
+			t.Fatalf("push: status %d (%q)", status, body)
+		}
+		h.unchanged()
+
+		// The daily poll of a feed whose hub delivers.
+		w.clock = w.clock.Add(25 * time.Hour)
+		w.runOne()
+		polls := w.hitCount("/feed.xml")
+		if n := len(h.requests()); n != 1 || polls != 2 {
+			t.Fatalf("with 23 hours of lease left the hub was asked %d times and the feed polled %d times, want once and twice", n, polls)
+		}
+		w.clock = w.clock.Add(2 * time.Hour)
+		w.runOne()
+		if n := len(h.requests()); n != 2 || w.hitCount("/feed.xml") != polls {
+			t.Errorf("with 21 hours of lease left the hub was asked %d times and the feed polled %d times more; want a renewal without a poll",
+				n, w.hitCount("/feed.xml")-polls)
+		}
+	})
+}
+
+// W2: the hub and the own address of a feed are taken from the Link headers
+// of the answer, which overrule the document; an address there may be
+// relative to that of the feed.
+func TestWebSubLinkHeaders(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		h := newHubWorld(t, w)
+		u := w.user("alice", "")
+		plain := `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Blog</title>` +
+			`<entry><id>urn:a</id><title>a</title><updated>2026-10-06T10:00:00Z</updated></entry></feed>`
+		w.serve("/headers.xml", func(rw http.ResponseWriter, _ *http.Request) {
+			rw.Header().Set("Content-Type", "application/atom+xml")
+			rw.Header().Add("Link", `</hub>; rel="hub", <http://blog.example/headers.xml>; type="application/atom+xml"; rel=self`)
+			_, _ = io.WriteString(rw, plain)
+		})
+		w.serve("/overruled.xml", func(rw http.ResponseWriter, _ *http.Request) {
+			rw.Header().Set("Content-Type", "application/atom+xml")
+			rw.Header().Add("Link", `<http://blog.example/moved.xml>; rel="self"`)
+			rw.Header().Add("Link", `<http://blog.example/about>; rel="alternate"`)
+			_, _ = io.WriteString(rw, h.document("http://blog.example/overruled.xml", "a"))
+		})
+		fromHeaders, overruled := w.feed(u, "/headers.xml", nil), w.feed(u, "/overruled.xml", nil)
+		w.runOne()
+
+		if got := w.storedFeed(fromHeaders); got.WebSubTopic != "http://blog.example/headers.xml" || got.WebSubHub != h.server.URL+"/hub" {
+			t.Errorf("a feed that names its hub in headers: topic %q, hub %q", got.WebSubTopic, got.WebSubHub)
+		}
+		if got := w.storedFeed(overruled); got.WebSubTopic != "http://blog.example/moved.xml" || got.WebSubHub != h.server.URL+"/hub" {
+			t.Errorf("a feed whose header names another address: topic %q, hub %q", got.WebSubTopic, got.WebSubHub)
+		}
+		topics := map[string]bool{}
+		for _, form := range h.requests() {
+			topics[form.Get("hub.topic")] = true
+		}
+		if len(topics) != 2 || !topics["http://blog.example/headers.xml"] || !topics["http://blog.example/moved.xml"] {
+			t.Errorf("the hub was asked for %v; want the two topics of the headers", topics)
+		}
+	})
+}
+
 // R14: without WebSub, or with an address hubs cannot reach, nothing is
 // subscribed to and feeds are polled as always.
 func TestWebSubOff(t *testing.T) {
@@ -470,8 +578,10 @@ func TestWebSubOff(t *testing.T) {
 		if n := len(h.requests()); n != 0 {
 			t.Errorf("the hub was asked %d times with WebSub off", n)
 		}
-		if got := w.storedFeed(f).WebSubTopic; got != "" || w.hitCount("/feed.xml") != 2 {
-			t.Errorf("topic %q, %d requests; want no topic and a poll per period", got, w.hitCount("/feed.xml"))
+		// What the feed announces is recorded for the day WebSub is on.
+		if got := w.storedFeed(f); got.WebSubTopic != h.topic || got.WebSubHub != h.server.URL+"/hub" || w.hitCount("/feed.xml") != 2 {
+			t.Errorf("topic %q, hub %q, %d requests; want the topic and the hub recorded and a poll per period",
+				got.WebSubTopic, got.WebSubHub, w.hitCount("/feed.xml"))
 		}
 	})
 	for _, base := range []string{

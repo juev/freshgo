@@ -11,6 +11,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -90,6 +92,8 @@ func (r *Refresher) Run(ctx context.Context, o Options) ([]Stats, error) {
 		return nil, fmt.Errorf("refresh: %w", err)
 	}
 	var all []Stats
+	// hubs are the hubs of the topics the feeds of this run announce.
+	hubs := map[string]string{}
 	for _, u := range users {
 		conf := readUserSettings(u.Settings)
 		if !conf.enabled {
@@ -102,7 +106,7 @@ func (r *Refresher) Run(ctx context.Context, o Options) ([]Stats, error) {
 			return all, fmt.Errorf("refresh: user %s: %w", u.Name, err)
 		}
 		r.refreshOPMLs(ctx, j)
-		st, err := r.refreshUser(ctx, j, o)
+		st, err := r.refreshUser(ctx, j, o, hubs)
 		all = append(all, st)
 		if err != nil {
 			return all, fmt.Errorf("refresh: user %s: %w", u.Name, err)
@@ -110,7 +114,23 @@ func (r *Refresher) Run(ctx context.Context, o Options) ([]Stats, error) {
 		r.log.Info("feeds refreshed", "user", u.Name, "feeds", st.Refreshed, "failed", st.Failed,
 			"new", st.NewEntries, "updated", st.UpdatedEntries)
 	}
+	r.subscribe(ctx, hubs)
 	return all, nil
+}
+
+// subscribe makes sure the hubs of topics have been asked to push. It is
+// not left to the polls: a feed that answers 304 names no hub, and its
+// subscription is to be made and renewed all the same.
+func (r *Refresher) subscribe(ctx context.Context, hubs map[string]string) {
+	if r.WebSub == nil {
+		return
+	}
+	for _, topic := range slices.Sorted(maps.Keys(hubs)) {
+		if ctx.Err() != nil {
+			return
+		}
+		r.WebSub.Ensure(ctx, topic, hubs[topic])
+	}
 }
 
 // Schedule runs a refresh at once and then every interval until ctx is done.
@@ -173,7 +193,10 @@ func (r *Refresher) newJob(ctx context.Context, u *store.User, conf userSettings
 	return j, nil
 }
 
-func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options) (Stats, error) {
+// refreshUser refreshes the due feeds of the user of the job. Into hubs go
+// the topics and hubs the user's feeds announced when they were last read
+// whole, muted feeds left out: nothing is pushed into those.
+func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options, hubs map[string]string) (Stats, error) {
 	st := Stats{User: j.user.Name}
 	feeds, err := r.db.Feeds(ctx, j.user.ID)
 	if err != nil {
@@ -191,6 +214,9 @@ func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options) (Stats, 
 		now   = r.now().Unix()
 	)
 	for _, f := range feeds {
+		if f.TTL >= 0 && f.WebSubTopic != "" && f.WebSubHub != "" {
+			hubs[f.WebSubTopic] = f.WebSubHub
+		}
 		f, ok := r.hooks.FeedBeforeActualize.Call(ctx, f)
 		if !ok || !due(f, j.conf, now, o.Force, j.pushing[f.WebSubTopic]) {
 			continue

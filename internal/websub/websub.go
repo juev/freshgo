@@ -325,7 +325,7 @@ func (s *Service) push(ctx context.Context, w http.ResponseWriter, r *http.Reque
 	if doc, err := feed.Parse(body, feed.Options{ContentType: contentType}); err == nil {
 		self = doc.SelfURL
 	}
-	if fromHeader := linkSelf(r.Header.Values("Link")); fromHeader != "" {
+	if fromHeader := Link(r.Header.Values("Link"), "self"); fromHeader != "" {
 		self = fromHeader
 	}
 	if self != "" && !sameTopic(self, sub.Topic) {
@@ -380,19 +380,29 @@ func signed(body []byte, secret, header string) bool {
 	return hmac.Equal(sent, mac.Sum(nil))
 }
 
-var linkValue = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
+// A link of a Link header with its parameters, and the relations among them.
+var (
+	linkValue = regexp.MustCompile(`<([^>]*)>([^<]*)`)
+	linkRel   = regexp.MustCompile(`(?i);\s*rel\s*=\s*(?:"([^"]*)"|([^\s";,]+))`)
+)
 
-// linkSelf returns the address with rel="self" in Link headers, or "".
-func linkSelf(headers []string) string {
-	self := ""
+// Link returns the first address Link headers give with the relation, such
+// as "hub" or "self", or "".
+func Link(headers []string, rel string) string {
 	for _, header := range headers {
-		for _, m := range linkValue.FindAllStringSubmatch(header, -1) {
-			if m[2] == "self" {
-				self = strings.TrimSpace(m[1])
+		for _, link := range linkValue.FindAllStringSubmatch(header, -1) {
+			m := linkRel.FindStringSubmatch(link[2])
+			if m == nil {
+				continue
+			}
+			for _, r := range strings.Fields(m[1] + m[2]) {
+				if strings.EqualFold(r, rel) {
+					return strings.TrimSpace(link[1])
+				}
 			}
 		}
 	}
-	return self
+	return ""
 }
 
 var scheme = regexp.MustCompile(`(?i)^https?://`)
