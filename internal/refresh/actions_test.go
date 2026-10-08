@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/juev/freshgo/internal/fulltext"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -217,6 +218,77 @@ func TestCompleteUnread(t *testing.T) {
 		}
 		if _, kept := originalContent(t, w.entry(f, "a")); kept {
 			t.Error("the text of the feed is still kept aside after it was put back")
+		}
+	})
+}
+
+// T13: one entry takes the article of its page on request, whatever its
+// feed says about full text, and gives the text of the feed back.
+func TestCompleteEntry(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		u := w.user("alice", `{}`)
+		w.serveBody("/articles/one", "text/html; charset=utf-8", readablePage)
+		w.serveBody("/articles/bare", "text/html; charset=utf-8", `<html><head><title>Bare</title></head><body><nav></nav></body></html>`)
+		link := func(page string) string { return w.server.URL + "/articles/" + page }
+		w.serveBody("/feed", rssType, rss("Blog",
+			item{guid: "bare", title: "Bare", link: link("bare"), body: "Summary"},
+			item{guid: "nolink", title: "No link", body: "Summary"},
+			item{guid: "a", title: "First", link: link("one"), body: "Summary"}))
+		f := w.feed(u, "/feed", func(f *store.Feed) {
+			f.Attributes = json.RawMessage(`{"path_entries_filter":".promo","content_action":"append"}`)
+		})
+		w.runOne()
+		id := func(guid string) int64 { return w.entry(f, guid).ID }
+
+		w.later()
+		if err := w.r.CompleteEntry(ctx, u, id("a"), true); err != nil {
+			t.Fatalf("CompleteEntry: %v", err)
+		}
+		e := w.entry(f, "a")
+		if !HasPageText(e) || !strings.HasPrefix(e.Content, fullContentStart) || !strings.HasSuffix(e.Content, fullContentEnd) ||
+			!strings.Contains(e.Content, "First. The harbour") || strings.Contains(e.Content, "Subscribe") || strings.Contains(e.Content, "Summary") ||
+			e.LastModified != w.clock.Unix() {
+			t.Errorf("the entry after its page was read: modified %d (now %d), content %q", e.LastModified, w.clock.Unix(), e.Content)
+		}
+		if original, kept := originalContent(t, e); !kept || original != "Summary" {
+			t.Errorf("text of the feed kept aside = %q, %v", original, kept)
+		}
+		// Asked again, the page is read again and the text of the feed is
+		// still the one kept aside.
+		if err := w.r.CompleteEntry(ctx, u, id("a"), true); err != nil {
+			t.Fatalf("CompleteEntry, again: %v", err)
+		}
+		if original, _ := originalContent(t, w.entry(f, "a")); original != "Summary" || w.hitCount("/articles/one") != 2 {
+			t.Errorf("asked twice: text of the feed %q, %d requests for the page", original, w.hitCount("/articles/one"))
+		}
+		// A refresh of the unchanged feed leaves the text of the page.
+		w.later()
+		if st := w.runOne(); st.UpdatedEntries != 0 || !HasPageText(w.entry(f, "a")) {
+			t.Errorf("after a refresh of the unchanged feed: stats %+v, content %q", st, w.entry(f, "a").Content)
+		}
+
+		if err := w.r.CompleteEntry(ctx, u, id("a"), false); err != nil {
+			t.Fatalf("CompleteEntry, back: %v", err)
+		}
+		e = w.entry(f, "a")
+		if _, kept := originalContent(t, e); kept || e.Content != "Summary" || HasPageText(e) {
+			t.Errorf("the entry after the text of the feed was put back: %q, kept aside %v", e.Content, kept)
+		}
+
+		// What cannot be done leaves the entry alone.
+		if err := w.r.CompleteEntry(ctx, u, id("bare"), true); !errors.Is(err, fulltext.ErrNoArticle) || w.entry(f, "bare").Content != "Summary" {
+			t.Errorf("a page without an article: error = %v, content %q", err, w.entry(f, "bare").Content)
+		}
+		if err := w.r.CompleteEntry(ctx, u, id("nolink"), true); !errors.Is(err, ErrNoLink) {
+			t.Errorf("an entry without a link: error = %v, want ErrNoLink", err)
+		}
+		if err := w.r.CompleteEntry(ctx, u, 12345, true); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("an entry there is not: error = %v, want ErrNotFound", err)
+		}
+		other := w.user("bob", `{}`)
+		if err := w.r.CompleteEntry(ctx, other, id("a"), true); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("the entry of another user: error = %v, want ErrNotFound", err)
 		}
 	})
 }

@@ -150,8 +150,9 @@
 	};
 
 	// sync brings an entry of the page up to date with what the server
-	// says it is now, without touching the text being read.
-	const sync = (article, fresh) => {
+	// says it is now, without touching the text being read, unless it is
+	// the text that was asked for.
+	const sync = (article, fresh, text) => {
 		const focused = article.contains(document.activeElement) ? document.activeElement : null;
 		const form = focused && focused.closest('form.entry-action');
 		const action = form && form.getAttribute('action');
@@ -162,7 +163,8 @@
 		const shared = Boolean(menu && menu.open);
 		const ways = 'a, button:not([hidden])';
 		const way = menu && menu.contains(focused) ? Array.from(menu.querySelectorAll(ways)).indexOf(focused) : -1;
-		for (const part of ['.entry-state', '.entry-star', '.entry-labels', '.entry-actions']) {
+		const parts = ['.entry-state', '.entry-star', '.entry-labels', '.entry-actions'];
+		for (const part of text ? [...parts, '.entry-excerpt', '.entry-content'] : parts) {
 			const old = article.querySelector(part);
 			const now = fresh.querySelector(part);
 			if (old && now) {
@@ -216,7 +218,7 @@
 			say(t('js.failed'));
 			return false;
 		}
-		sync(article, fresh);
+		sync(article, fresh, form.getAttribute('action').endsWith('/fulltext'));
 		const notice = response.headers.get('X-Notice');
 		if (notice) {
 			say(decodeURIComponent(notice));
@@ -800,6 +802,7 @@
 			const link = current && current.querySelector('.entry-actions a.original');
 			return link && window.open(link.href, '_blank', 'noopener');
 		}
+		case 'fulltext': return current && act(current, 'fulltext');
 		case 'read': return current && act(current, 'read');
 		case 'star': return current && act(current, 'star');
 		case 'labels': return current && current.querySelector('form.entry-action') && showLabels(current);

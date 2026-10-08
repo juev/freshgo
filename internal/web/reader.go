@@ -20,6 +20,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 
 	"github.com/juev/freshgo/internal/hooks"
+	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/sanitize"
 	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
@@ -586,6 +587,8 @@ type article struct {
 	Labels      []string
 	Read        bool
 	Starred     bool
+	// Full says that the text is that of the page of the entry.
+	Full bool
 	// ShowFeed and ShowDate say what the row of the entry in a list names.
 	ShowFeed, ShowDate bool
 	// Share are the ways the entry can be sent on.
@@ -626,6 +629,7 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 			// freshgo: an import brings what FreshRSS let through.
 			Content:     template.HTML(throughServer(withReferrers(sanitize.HTML(e.Content, e.Link, nil), prefs.Referrers))), //nolint:gosec // cleaned on this line
 			Attachments: attachments(e), Tags: e.Tags, Labels: labels[e.ID], Read: e.IsRead, Starred: e.IsFavorite,
+			Full:     refresh.HasPageText(e),
 			ShowFeed: prefs.ToplineWebsite != "none", ShowDate: prefs.ToplineDate == nil || *prefs.ToplineDate,
 		}
 		a.Excerpt = sanitize.Text(string(a.Content), excerptLength)
@@ -1019,6 +1023,29 @@ func (h *Handler) starEntry(w http.ResponseWriter, r *http.Request) {
 	}
 	h.hooks.EntriesFavorite.Call(ctx, hooks.EntriesFavorite{UserID: user.ID, IDs: []int64{e.ID}, IsFavorite: starred})
 	h.back(w, r, e.ID, "")
+}
+
+// fullTextEntry gives an entry the text of its page, or the text of the
+// feed back.
+func (h *Handler) fullTextEntry(w http.ResponseWriter, r *http.Request) {
+	ctx, user := r.Context(), state(r).who.user
+	e, ok := h.ownEntry(w, r)
+	if !ok || !h.form(w, r) {
+		return
+	}
+	err := h.refresher.CompleteEntry(ctx, user, e.ID, r.PostForm.Get("full") != "0")
+	notice := ""
+	switch {
+	case ctx.Err() != nil:
+		return
+	case errors.Is(err, store.ErrNotFound):
+		h.fail(w, r, http.StatusNotFound)
+		return
+	case err != nil:
+		h.log.Warn("page of an entry gave no text", "user", user.Name, "entry", e.ID, "error", err)
+		notice = "notice.fulltext-failed"
+	}
+	h.back(w, r, e.ID, notice)
 }
 
 var errLabelLong = errors.New("web: the name of the label is too long")

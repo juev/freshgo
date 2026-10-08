@@ -660,12 +660,42 @@ func TestFeedActions(t *testing.T) {
 			t.Errorf("after a refresh: at %q, notice %q, %d entries", location, notice(body), len(entries()))
 		}
 
+		// U97: one entry takes the article of its page on request and gives
+		// the text of the feed back; a page without an article says so.
+		two := entries()[0]
+		if !strings.HasSuffix(two.Link, "/articles/two") {
+			two = entries()[1]
+		}
+		path := fmt.Sprintf("/entries/%d", two.ID)
+		if page := s.page(path); !strings.Contains(page, `action="`+path+`/fulltext"`) || !strings.Contains(page, `name="full" value="1"`) || !strings.Contains(page, ">Full text</button>") {
+			t.Errorf("the page of an entry does not offer its full text:\n%s", page)
+		}
+		paragraph := strings.Repeat("The harbour was quiet that morning, and the boats lay still on the water. ", 4)
+		remote.serve("/articles/two", "text/html", `<html><head><title>News</title></head><body><nav><a href="/">Home of the gazette</a></nav>`+
+			`<article><h1>Boats</h1><p>First. `+paragraph+`</p><p>Second. `+paragraph+`</p><p>Third. `+paragraph+`</p></article></body></html>`)
+		a := s.part(http.MethodPost, path+"/fulltext", "entry", url.Values{"full": {"1"}, "next": {"/"}})
+		if a.status != http.StatusOK || !strings.Contains(a.body, "Second. The harbour") || strings.Contains(a.body, "Home of the gazette") ||
+			!strings.Contains(a.body, `name="full" value="0"`) || !strings.Contains(a.body, ">Text of the feed</button>") || a.header.Get(noticeHeader) != "" {
+			t.Errorf("full text for the script: status %d, notice %q\n%s", a.status, a.header.Get(noticeHeader), a.body)
+		}
+		location, body = s.follow(path+"/fulltext", url.Values{"full": {"0"}, "next": {"/feeds/9?state=all"}})
+		if stored := s.entry("alice", two.ID); location != fmt.Sprintf("/feeds/9?state=all#e%d", two.ID) || stored.Content != "Summary of two" || !strings.Contains(body, ">Full text</button>") {
+			t.Errorf("the text of the feed put back: at %q, content %q", location, stored.Content)
+		}
+		remote.serve("/articles/two", "text/html", `<html><head><title>Bare</title></head><body><nav></nav></body></html>`)
+		a = s.part(http.MethodPost, path+"/fulltext", "entry", url.Values{"full": {"1"}, "next": {"/"}})
+		if said, _ := url.PathUnescape(a.header.Get(noticeHeader)); a.status != http.StatusOK || !strings.Contains(said, "could not be taken from the page") ||
+			s.entry("alice", two.ID).Content != "Summary of two" {
+			t.Errorf("a page without an article: status %d, notice %q, content %q", a.status, said, s.entry("alice", two.ID).Content)
+		}
+		remote.serve("/articles/two", "text/html", `<html><body><article>Text of two<i class="ad">Buy</i></article></body></html>`)
+
 		// The selector is tried before it is stored.
 		form := s.feedForm(9)
 		form.Set("path_entries", "article")
 		form.Set("path_entries_filter", ".ad")
 		form.Set("name", "Not stored")
-		a := s.post("/subscriptions/feeds/9/preview", form)
+		a = s.post("/subscriptions/feeds/9/preview", form)
 		if a.status != http.StatusOK || !strings.Contains(a.body, `<div class="entry-content"><article>Text of two</article></div>`) ||
 			!strings.Contains(a.body, `name="path_entries" value="article"`) || !strings.Contains(a.body, `value="Not stored"`) {
 			t.Errorf("preview: status %d\n%s", a.status, a.body)

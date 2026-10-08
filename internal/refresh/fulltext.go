@@ -131,3 +131,65 @@ func setOriginalContent(e *store.Entry, content string) {
 	attrs.set("original_content", content)
 	e.Attributes = attrs.raw()
 }
+
+// ErrNoLink is returned for an entry without the address of a page.
+var ErrNoLink = errors.New("refresh: the entry has no link")
+
+// HasPageText reports whether the text of an entry holds the text of its
+// page.
+func HasPageText(e *store.Entry) bool {
+	return strings.Contains(e.Content, fullContentStart)
+}
+
+// CompleteEntry gives one entry the article of its page in place of the
+// text of the feed, found without a selector whatever the feed says, and
+// without what the filter of the feed names. With page false it puts the
+// text of the feed back. A page that gives no article leaves the entry as
+// it is and is an error.
+func (r *Refresher) CompleteEntry(ctx context.Context, u *store.User, entryID int64, page bool) error {
+	e, err := r.db.EntryByID(ctx, u.ID, entryID)
+	if err != nil {
+		return err
+	}
+	before := e.Content
+	restoreFeedText(e)
+	if page {
+		if e.Link == "" {
+			return ErrNoLink
+		}
+		f, err := r.db.FeedByID(ctx, u.ID, e.FeedID)
+		if err != nil {
+			return err
+		}
+		params, err := fetch.FeedParams(f.HTTPAuth, f.Attributes)
+		if err != nil {
+			return err
+		}
+		https, err := r.httpsDomains(ctx)
+		if err != nil {
+			return err
+		}
+		filter, _ := get[string](readAttributes(f.Attributes), "path_entries_filter")
+		article, err := fulltext.Article(ctx, r.client, fulltext.Request{
+			URL: e.Link, Params: params, Automatic: true, Filter: filter, ForceHTTPS: https.URL,
+		})
+		if err != nil {
+			return err
+		}
+		setOriginalContent(e, e.Content)
+		e.Content = fullContentStart + article + fullContentEnd
+	}
+	if e.Content == before {
+		return nil
+	}
+	now := r.now().Unix()
+	return r.db.InTx(ctx, func(tx *store.Store) error {
+		// What the reader did to the entry meanwhile stands.
+		fresh, err := tx.EntryByID(ctx, u.ID, e.ID)
+		if err != nil {
+			return err
+		}
+		fresh.Content, fresh.Attributes, fresh.LastModified = e.Content, e.Attributes, now
+		return tx.UpdateEntry(ctx, fresh)
+	})
+}
