@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"embed"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"log/slog"
@@ -246,6 +247,7 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("GET /settings/keys", h.protect(members, h.keysPage))
 	h.mux.HandleFunc("POST /settings/keys", h.protect(members, h.saveKeys))
 	h.mux.HandleFunc("GET /about", h.about)
+	h.mux.HandleFunc("GET "+manifestPath, h.manifest)
 	h.mux.HandleFunc("GET /register", h.registerPage)
 	h.mux.HandleFunc("POST /register", h.register)
 	h.mux.HandleFunc("GET /validate-email", h.validateEmail)
@@ -344,6 +346,54 @@ func (h *Handler) about(w http.ResponseWriter, r *http.Request) {
 	}
 	v.Data = struct{ Version, API string }{h.version, api}
 	h.render(w, r, http.StatusOK, "about", v)
+}
+
+// manifestPath is where the web application manifest is served.
+const manifestPath = "/manifest.webmanifest"
+
+// manifestIcons are the icons a phone or a desktop takes for the installed
+// application: the ones it shows as they are, and one it cuts to the shape
+// of its own icons.
+var manifestIcons = []struct{ file, sizes, purpose string }{
+	{"icon-192.png", "192x192", "any"},
+	{"icon-512.png", "512x512", "any"},
+	{"icon-maskable-512.png", "512x512", "maskable"},
+}
+
+// manifest tells a browser how freshgo is installed as an application of
+// its own: under the name of the installation, in a window without the
+// bars of a browser, opening the reading screen. It asks for no login: a
+// browser fetches it before anybody has logged in, and it says no more than
+// the login page does.
+func (h *Handler) manifest(w http.ResponseWriter, r *http.Request) {
+	type icon struct {
+		Src     string `json:"src"`
+		Sizes   string `json:"sizes"`
+		Type    string `json:"type"`
+		Purpose string `json:"purpose"`
+	}
+	start := h.url("/")
+	m := struct {
+		ID        string `json:"id"`
+		Name      string `json:"name"`
+		ShortName string `json:"short_name"`
+		StartURL  string `json:"start_url"`
+		Scope     string `json:"scope"`
+		Display   string `json:"display"`
+		Icons     []icon `json:"icons"`
+	}{ID: start, Name: state(r).system.Title, ShortName: state(r).system.Title, StartURL: start, Scope: start, Display: "standalone"}
+	for _, i := range manifestIcons {
+		m.Icons = append(m.Icons, icon{Src: h.asset(i.file), Sizes: i.sizes, Type: "image/png", Purpose: i.purpose})
+	}
+	data, err := json.Marshal(m)
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/manifest+json")
+	// The name is the administrator's to change.
+	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = w.Write(data)
 }
 
 // fail answers with the page of an HTTP error.

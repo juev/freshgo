@@ -38,6 +38,20 @@
 	// ask fetches a page or a part of one as the reader in front of it.
 	const ask = (url, options) => fetch(url, { credentials: 'same-origin', ...options });
 
+	// ---- The colour of the window ----
+
+	// A phone and the window of the installed application take the colour
+	// of the header for their own bars. It is read off the page, where the
+	// look and the theme have set it, also when the system goes dark.
+	const header = document.querySelector('.site-header');
+	if (header) {
+		const tint = el('meta', { name: 'theme-color' });
+		const paint = () => tint.setAttribute('content', getComputedStyle(header).backgroundColor);
+		paint();
+		document.head.append(tint);
+		window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paint);
+	}
+
 	// ---- The menu ----
 
 	// On a narrow screen the menu folds behind a button; without the script
