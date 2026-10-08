@@ -1,13 +1,15 @@
 {{define "content"}}
 <article class="entry single{{if .Data.Entry.Read}} read{{end}}" id="e{{.Data.Entry.ID}}">
 <h1>{{if .Data.Entry.Link}}<a href="{{.Data.Entry.Link}}" rel="noopener noreferrer">{{.Heading}}</a>{{else}}{{.Heading}}{{end}}</h1>
-{{template "entry-body" .Data.Entry}}
-{{if .Data.Entry.Tags}}<p class="entry-tags">{{.T "entry.tags"}} {{range $i, $tag := .Data.Entry.Tags}}{{if $i}}, {{end}}{{$tag}}{{end}}</p>{{end}}
 {{if .Data.CanChange}}
 <div class="entry-actions">
 {{template "entry-actions" (dict "Entry" .Data.Entry "Here" .Data.Here "Page" .)}}
 </div>
 {{template "share" (dict "Entry" .Data.Entry "Page" .)}}
+{{end}}
+{{template "entry-body" .Data.Entry}}
+{{if .Data.Entry.Tags}}<p class="entry-tags">{{.T "entry.tags"}} {{range $i, $tag := .Data.Entry.Tags}}{{if $i}}, {{end}}{{$tag}}{{end}}</p>{{end}}
+{{if .Data.CanChange}}
 <form method="post" action="{{.Data.Entry.URL}}/labels" class="form labels" id="labels">
 <input type="hidden" name="next" value="{{.Data.Here}}">
 <fieldset>
