@@ -1518,6 +1518,60 @@ table.log td:last-child {
 
 	.page.wide {
 		padding-bottom: calc(var(--space) * 10);
+		padding-inline: max(var(--space), env(safe-area-inset-left)) max(var(--space), env(safe-area-inset-right));
+	}
+
+	/* The screen goes to the text of an open entry: the card is as wide as
+	   the list, and the star stands in its corner, not in a column beside
+	   the text. */
+	.entry:has(> details[open]) {
+		grid-template-columns: minmax(0, 1fr) auto;
+	}
+
+	.entry > details[open] {
+		grid-column: 1 / -1;
+		grid-row: 1;
+	}
+
+	.entry:has(> details[open]) > .entry-star {
+		grid-column: 2;
+		grid-row: 1;
+		z-index: 1;
+		margin-top: var(--space);
+	}
+
+	.entry-star + details[open] > summary {
+		padding-right: 3rem;
+	}
+
+	.entry-body {
+		padding: 0 var(--space);
+	}
+
+	.entry-actions {
+		margin-inline: calc(var(--space) * -1);
+		padding-inline: var(--space);
+	}
+
+	/* A quote is told by a line on its left, and nothing of an article is
+	   indented as far as a browser would. */
+	.entry-content blockquote {
+		margin-inline: 0;
+		padding-left: calc(var(--space) * 1.5);
+		border-left: 0.1875rem solid var(--border);
+	}
+
+	.entry-content figure {
+		margin-inline: 0;
+	}
+
+	.entry-content ul,
+	.entry-content ol {
+		padding-left: calc(var(--space) * 3);
+	}
+
+	.entry-content dd {
+		margin-left: calc(var(--space) * 2);
 	}
 
 	/* What an article brings wider than the screen scrolls inside itself. */
