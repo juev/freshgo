@@ -68,8 +68,10 @@ type Feed struct {
 	HTTPETag         string
 	HTTPLastModified string
 	// WebSubTopic is the address the feed gave as its own the last time it
-	// also named a WebSub hub; empty when it names none.
+	// also named a WebSub hub, and WebSubHub that hub; empty when it names
+	// none. They are recorded whether WebSub is on or not.
 	WebSubTopic string
+	WebSubHub   string
 }
 
 // Entry is an article of a feed.
