@@ -611,22 +611,36 @@ func TestE2EDarkAndNarrow(t *testing.T) {
 		b.press(kb.Escape)
 
 		// On a narrow screen the tree is folded; t unfolds it and goes there.
-		b.run(command(emulation.SetDeviceMetricsOverride, emulation.SetDeviceMetricsOverrideParams{Width: 400, Height: 800, DeviceScaleFactor: 1, Mobile: true}))
+		// A phone widens its window with a page that is wider than the
+		// screen, so the width of a page is held against that of the
+		// document, which stays that of the screen.
+		b.run(command(emulation.SetDeviceMetricsOverride, emulation.SetDeviceMetricsOverrideParams{Width: 360, Height: 740, DeviceScaleFactor: 1, Mobile: true}))
 		b.open("/")
 		b.until("the tree folded", `!document.querySelector('#tree details').open`)
 		b.accessible("the reading screen, narrow")
+		// The menu is behind its button.
+		if got := b.text(`document.querySelector('.site-nav').getClientRects().length`); got != "0" {
+			t.Error("the menu is in sight on a narrow screen before its button is pressed")
+		}
+		b.tabTo(".menu-toggle")
+		b.press(kb.Enter)
+		b.until("the menu open", `document.querySelector('.menu-toggle').getAttribute('aria-expanded') === 'true' && document.querySelector('.site-nav a').getClientRects().length`)
+		b.accessible("the menu, narrow")
+		b.press(kb.Enter)
+		b.until("the menu folded", `!document.querySelector('.site-nav').getClientRects().length`)
 		b.press("t")
 		b.until("the tree unfolded, in focus", `document.querySelector('#tree details').open && document.activeElement.matches('#tree summary')`)
-		if got := b.text(`document.documentElement.scrollWidth <= window.innerWidth`); got != "true" {
+		if got := b.text(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`); got != "true" {
 			t.Error("the narrow page scrolls sideways")
 		}
 		// The pages of settings, dark and narrow at once.
 		for _, page := range []string{"/subscriptions", "/subscriptions/add", "/subscriptions/feeds/3", "/subscriptions/categories/2", "/subscriptions/labels/1", "/subscriptions/problems", "/subscriptions/transfer",
 			"/settings/display", "/settings/queries", "/settings/integrations", "/settings/reading", "/settings/archiving", "/settings/privacy", "/settings/profile", "/log",
-			"/stats", "/stats/repartition", "/stats/unread", "/admin/users", "/admin/users/bob", "/admin/system", "/admin/authentication", "/log?all=1", "/reauth"} {
+			"/stats", "/stats/repartition", "/stats/unread", "/admin/users", "/admin/users/bob", "/admin/system", "/admin/authentication", "/log?all=1", "/reauth",
+			"/settings/keys", "/about"} {
 			b.open(page)
 			b.accessible(page + ", dark and narrow")
-			if got := b.text(`document.documentElement.scrollWidth <= window.innerWidth`); got != "true" {
+			if got := b.text(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`); got != "true" {
 				t.Errorf("%s scrolls sideways on a narrow screen", page)
 			}
 		}

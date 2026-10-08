@@ -2,7 +2,7 @@
 <html lang="{{.Lang}}" data-theme="{{.Theme}}" data-look="{{.Look}}"{{if .Width}} data-width="{{.Width}}"{{end}}>
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="referrer" content="same-origin">
 <title>{{if .Heading}}{{.Heading}} · {{end}}{{.Site}}</title>
 <link rel="icon" type="image/svg+xml" href="{{.Asset "icon.svg"}}">
@@ -14,6 +14,8 @@
 <a class="skip" href="#content">{{.T "nav.skip"}}</a>
 <header class="site-header">
 <a class="site-title" href="{{.URL "/"}}">{{.Site}}</a>
+<button type="button" class="menu-toggle" aria-expanded="false" aria-controls="site-menu" hidden>{{.T "nav.menu"}}</button>
+<div class="site-menu" id="site-menu">
 <nav class="site-nav" aria-label="{{.T "nav.main"}}">
 <ul>
 <li><a href="{{.URL "/"}}"{{if eq .Section "reader"}} aria-current="page"{{end}}>{{.T "nav.reader"}}</a></li>
@@ -29,6 +31,7 @@
 {{if .User}}<span class="account-name">{{.User}}</span>{{end}}
 {{if .CanLogout}}<form method="post" action="{{.URL "/logout"}}"><button type="submit" class="link">{{.T "nav.logout"}}</button></form>{{end}}
 {{if .CanLogin}}<a href="{{.URL "/login"}}"{{if eq .Section "login"}} aria-current="page"{{end}}>{{.T "nav.login"}}</a>{{end}}
+</div>
 </div>
 </header>
 <div class="messages" id="messages" role="status" aria-live="polite">{{if .Notice}}<p>{{.Notice}}</p>{{end}}</div>
