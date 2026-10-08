@@ -763,6 +763,69 @@ func TestE2EPhoneText(t *testing.T) {
 	})
 }
 
+// U95: the actions of an open entry stand before its text and stay on the
+// screen while a long text is read.
+func TestE2EActionsInReach(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		long := &store.Entry{FeedID: 1, GUID: "long", Title: "A long entry", Link: "https://example.org/long",
+			Content: strings.Repeat("<p>"+strings.Repeat("word ", 60)+"</p>", 40)}
+		if err := s.db.InsertEntries(context.Background(), s.user("alice").ID, []*store.Entry{long}); err != nil {
+			t.Fatal(err)
+		}
+		id := strconv.FormatInt(long.ID, 10)
+		b := browse(t, s)
+		b.login("alice")
+		// reach scrolls to the middle of the text and says what is wrong
+		// with the actions there.
+		reach := func(article string) string {
+			return b.text(`(() => {
+				const article = document.querySelector('` + article + `');
+				const actions = article.querySelector('.entry-actions');
+				const content = article.querySelector('.entry-content');
+				if (article.querySelectorAll('.entry-actions').length !== 1) return 'not one block of actions';
+				if (!(actions.compareDocumentPosition(content) & Node.DOCUMENT_POSITION_FOLLOWING)) return 'the actions follow the text';
+				const text = content.getBoundingClientRect();
+				if (text.height < innerHeight * 2) return 'the text is too short to tell';
+				scrollBy({ top: text.top + text.height / 2, behavior: 'instant' });
+				if (content.getBoundingClientRect().top >= 0) return 'the page did not scroll';
+				const box = actions.getBoundingClientRect();
+				if (box.top < 0 || box.bottom > innerHeight) return 'the actions are off the screen';
+				const bar = document.querySelector('.reader-bar');
+				if (bar && getComputedStyle(bar).display !== 'none' && box.bottom > bar.getBoundingClientRect().top) return 'the actions are under the toolbar';
+				for (const control of actions.querySelectorAll('a, button:not([hidden]), summary')) {
+					const at = control.getBoundingClientRect();
+					const hit = document.elementFromPoint(at.left + at.width / 2, at.top + at.height / 2);
+					if (!hit || !control.contains(hit)) return 'covered: ' + control.textContent.trim();
+				}
+				return '';
+			})()`)
+		}
+		for _, screen := range []struct {
+			name          string
+			width, height int64
+			mobile        bool
+		}{{"a wide screen", 1280, 800, false}, {"a phone", 360, 740, true}} {
+			b.run(command(emulation.SetDeviceMetricsOverride, emulation.SetDeviceMetricsOverrideParams{Width: screen.width, Height: screen.height, DeviceScaleFactor: 1, Mobile: screen.mobile}))
+			for _, look := range looks {
+				b.open("/feeds/1?state=all#e" + id)
+				b.until("the entry of the address current", current(long.ID, false))
+				b.run(chromedp.Evaluate[chromedp.Void](`document.documentElement.dataset.look = '` + look + `'`))
+				b.press("o")
+				b.until("the entry open", current(long.ID, true))
+				if got := reach("#e" + id); got != "" {
+					t.Errorf("%s, %s, in a stream: %s", screen.name, look, got)
+				}
+				b.accessible("a long entry read halfway, " + screen.name + ", " + look)
+				b.open("/entries/" + id)
+				b.run(chromedp.Evaluate[chromedp.Void](`document.documentElement.dataset.look = '` + look + `'`))
+				if got := reach("article.entry.single"); got != "" {
+					t.Errorf("%s, %s, on the page of the entry: %s", screen.name, look, got)
+				}
+			}
+		}
+	})
+}
+
 // U93, U94: on a phone a reader goes through the entries by their rows, one
 // open at a time, and the controls of a stream wait behind a button.
 func TestE2EPhoneRows(t *testing.T) {

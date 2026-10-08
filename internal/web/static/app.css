@@ -704,7 +704,7 @@ button.link {
 }
 
 /* An entry is a row: the star, then the line that opens it. Opened, it is
-   a card with its actions at the foot. */
+   a card with its actions under its title. */
 .entry {
 	display: grid;
 	grid-template-columns: auto minmax(0, 1fr);
@@ -896,14 +896,19 @@ button.star[aria-pressed="true"] {
 	font-size: 0.9em;
 }
 
+/* The actions stand before the text and stay at the top of the screen
+   while the text is read. */
 .entry-actions {
+	position: sticky;
+	top: 0;
+	z-index: 1;
 	display: flex;
 	flex-wrap: wrap;
 	align-items: baseline;
 	gap: calc(var(--space) / 2) calc(var(--space) * 2.5);
-	margin: var(--space) calc(var(--space) * -1.5) 0;
+	margin: var(--space) calc(var(--space) * -1.5);
 	padding: calc(var(--space) * 0.75) calc(var(--space) * 1.5);
-	border-top: 1px solid var(--row-border);
+	border-block: 1px solid var(--row-border);
 	background: var(--bg-raised);
 	font-size: 0.9em;
 }
@@ -1365,8 +1370,9 @@ table.log td:last-child {
 	font-size: 1.5em;
 }
 
+/* Not see-through: the text passes under it. */
 :root[data-look="modern"] .entry-actions {
-	background: none;
+	background: var(--bg);
 }
 
 :root[data-look="modern"] .tabs ul {

@@ -101,9 +101,6 @@
 <span class="entry-state visually-hidden">{{if not .Entry.Read}}{{.Page.T "entry.unread"}}{{end}}{{if .Entry.Starred}} {{.Page.T "entry.starred"}}{{end}}</span>
 </summary>
 <div class="entry-body">
-{{template "entry-body" .Entry}}
-{{if .Entry.Tags}}<p class="entry-tags">{{.Page.T "entry.tags"}} {{range $i, $tag := .Entry.Tags}}{{if $i}}, {{end}}{{$tag}}{{end}}</p>{{end}}
-{{if .Entry.Labels}}<p class="entry-labels">{{.Page.T "entry.labels"}} {{range $i, $label := .Entry.Labels}}{{if $i}}, {{end}}{{$label}}{{end}}</p>{{end}}
 <div class="entry-actions">
 {{if .CanChange}}{{template "entry-actions" (dict "Entry" .Entry "Here" .Here "Page" .Page "Row" true)}}{{end}}
 {{if .Entry.Link}}<a class="original" href="{{.Entry.Link}}" rel="noopener noreferrer">{{.Page.T "entry.original"}}</a>{{end}}
@@ -111,6 +108,9 @@
 {{template "share" (dict "Entry" .Entry "Page" .Page)}}
 <button type="button" class="link" data-fold hidden>{{.Page.T "entry.fold"}}</button>
 </div>
+{{template "entry-body" .Entry}}
+{{if .Entry.Tags}}<p class="entry-tags">{{.Page.T "entry.tags"}} {{range $i, $tag := .Entry.Tags}}{{if $i}}, {{end}}{{$tag}}{{end}}</p>{{end}}
+{{if .Entry.Labels}}<p class="entry-labels">{{.Page.T "entry.labels"}} {{range $i, $label := .Entry.Labels}}{{if $i}}, {{end}}{{$label}}{{end}}</p>{{end}}
 </div>
 </details>
 </article>

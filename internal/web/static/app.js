@@ -170,7 +170,7 @@
 			} else if (old) {
 				old.remove();
 			} else if (now) {
-				article.querySelector('.entry-actions').before(now);
+				(article.querySelector('.entry-body') || article).append(now);
 			}
 		}
 		revealShares(article);
