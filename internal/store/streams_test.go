@@ -471,7 +471,7 @@ func TestWebSubSubscriptions(t *testing.T) {
 		// Feeds of every user that announce a topic.
 		alice, bob := mustUser(t, s, "alice"), mustUser(t, s, "bob")
 		for _, f := range []*Feed{
-			{UserID: bob.ID, URL: "https://example.org/1", WebSubTopic: "https://example.org/feed"},
+			{UserID: bob.ID, URL: "https://example.org/1", WebSubTopic: "https://example.org/feed", WebSubHub: "https://hub.example.org/"},
 			{UserID: alice.ID, URL: "https://example.org/1", WebSubTopic: "https://example.org/feed"},
 			{UserID: alice.ID, URL: "https://example.org/2", WebSubTopic: "https://example.org/other"},
 			{UserID: alice.ID, URL: "https://example.org/3"},
@@ -487,6 +487,16 @@ func TestWebSubSubscriptions(t *testing.T) {
 		}
 		if feeds, err := s.FeedsByTopic(ctx, ""); err != nil || len(feeds) != 1 {
 			t.Errorf("FeedsByTopic(no topic) = %d feeds, %v", len(feeds), err)
+		}
+		if feeds[0].WebSubHub != "" || feeds[1].WebSubHub != "https://hub.example.org/" {
+			t.Errorf("hubs of the feeds = %q, %q; want that of bob only", feeds[0].WebSubHub, feeds[1].WebSubHub)
+		}
+		feeds[1].WebSubHub = "https://other.example.org/"
+		if err := s.UpdateFeed(ctx, feeds[1]); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := s.FeedByID(ctx, bob.ID, feeds[1].ID); err != nil || got.WebSubHub != "https://other.example.org/" {
+			t.Errorf("the feed after its hub changed = %+v, %v", got, err)
 		}
 		feeds[0].WebSubTopic = ""
 		if err := s.UpdateFeed(ctx, feeds[0]); err != nil {

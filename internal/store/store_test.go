@@ -86,6 +86,61 @@ func TestOpenTwiceKeepsData(t *testing.T) {
 	}
 }
 
+// The migration that adds the hub of a feed: a feed that is subscribed to
+// gets the hub of its subscription, and every feed loses the validators
+// that would keep it from being read whole.
+func TestMigrationWebSubHub(t *testing.T) {
+	ctx := context.Background()
+	for _, e := range storetest.Engines() {
+		t.Run(e.Name, func(t *testing.T) {
+			driver, dsn := e.New(t)
+			s, err := Open(ctx, driver, dsn)
+			if err != nil {
+				t.Fatalf("Open: %v", err)
+			}
+			u := mustUser(t, s, "alice")
+			subscribed := &Feed{UserID: u.ID, URL: "https://example.org/1", WebSubTopic: "https://example.org/feed", HTTPETag: `"1"`, HTTPLastModified: "yesterday"}
+			plain := &Feed{UserID: u.ID, URL: "https://example.org/2", HTTPETag: `"2"`}
+			for _, f := range []*Feed{subscribed, plain} {
+				if err := s.CreateFeed(ctx, f); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := s.PutWebSub(ctx, &WebSub{Topic: "https://example.org/feed", Hub: "https://hub.example.org/", Key: "k", Secret: "s"}); err != nil {
+				t.Fatal(err)
+			}
+			// Back to the schema before the migration.
+			for _, q := range []string{"ALTER TABLE feeds DROP COLUMN websub_hub", "DELETE FROM schema_migrations WHERE version = 8"} {
+				if _, err := s.exec(ctx, q); err != nil {
+					t.Fatalf("%s: %v", q, err)
+				}
+			}
+			if err := s.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			s, err = Open(ctx, driver, dsn)
+			if err != nil {
+				t.Fatalf("Open again: %v", err)
+			}
+			t.Cleanup(func() { _ = s.Close() })
+			for _, want := range []struct {
+				feed *Feed
+				hub  string
+			}{{subscribed, "https://hub.example.org/"}, {plain, ""}} {
+				got, err := s.FeedByID(ctx, u.ID, want.feed.ID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got.WebSubHub != want.hub || got.HTTPETag != "" || got.HTTPLastModified != "" {
+					t.Errorf("feed %s: hub %q, validators %q and %q; want the hub %q and no validators",
+						got.URL, got.WebSubHub, got.HTTPETag, got.HTTPLastModified, want.hub)
+				}
+			}
+		})
+	}
+}
+
 func TestOpenRefusesNewerSchema(t *testing.T) {
 	ctx := context.Background()
 	for _, e := range storetest.Engines() {
