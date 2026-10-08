@@ -8,6 +8,7 @@
 <div class="stream-head">
 <h1 id="stream-heading">{{.Heading}}</h1>
 {{template "stream-unread" .}}
+<button type="button" class="filters-toggle" aria-expanded="{{if .Data.Asked}}true{{else}}false{{end}}" aria-controls="stream-controls" hidden>{{.T "toolbar.filters"}}</button>
 {{if .Data.Views}}<ul class="choices views" aria-label="{{.T "view.label"}}">
 {{range .Data.Views}}<li><a href="{{.URL}}"{{if .Current}} aria-current="true"{{end}}>{{.Name}}</a></li>
 {{end}}</ul>{{else}}
@@ -18,7 +19,7 @@
 </form>{{end}}
 </div>
 
-<div class="toolbar">
+<div class="toolbar" id="stream-controls">
 <form method="get" action="{{.URL .Data.Path}}" class="search" role="search">
 {{range $key, $values := .Data.Asked}}{{if ne $key "q"}}<input type="hidden" name="{{$key}}" value="{{index $values 0}}">{{end}}{{end}}
 <label for="q" class="visually-hidden">{{.T "search.label"}}</label>

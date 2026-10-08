@@ -56,11 +56,11 @@
 
 	// On a narrow screen the menu folds behind a button; without the script
 	// the button stays hidden and the menu in sight.
-	const menuToggle = document.querySelector('.menu-toggle');
-	if (menuToggle) {
-		menuToggle.hidden = false;
-		menuToggle.addEventListener('click', () => {
-			menuToggle.setAttribute('aria-expanded', String(menuToggle.getAttribute('aria-expanded') !== 'true'));
+	// So do the controls of a stream.
+	for (const fold of document.querySelectorAll('.menu-toggle, .filters-toggle')) {
+		fold.hidden = false;
+		fold.addEventListener('click', () => {
+			fold.setAttribute('aria-expanded', String(fold.getAttribute('aria-expanded') !== 'true'));
 		});
 	}
 
@@ -90,19 +90,23 @@
 		}
 	};
 
-	const select = (article, open) => {
-		if (open) {
-			// Among rows one entry is open at a time, whoever opened the
-			// others, a key or the reader by the row; where every entry is
-			// listed open, they stay so.
-			if (entries.dataset.view !== 'expanded') {
-				for (const other of listed()) {
-					if (other !== article && isOpen(other)) {
-						detailsOf(other).open = false;
-					}
+	// Among rows one entry is open at a time, whoever opened the others, a
+	// key or the reader by the row; where every entry is listed open, they
+	// stay so.
+	const unfold = (article) => {
+		if (entries.dataset.view !== 'expanded') {
+			for (const other of listed()) {
+				if (other !== article && isOpen(other)) {
+					detailsOf(other).open = false;
 				}
 			}
-			detailsOf(article).open = true;
+		}
+		detailsOf(article).open = true;
+	};
+
+	const select = (article, open) => {
+		if (open) {
+			unfold(article);
 		}
 		setCurrent(article);
 		article.focus({ preventScroll: true });
@@ -257,9 +261,17 @@
 		entries.addEventListener('click', (event) => {
 			const summary = event.target.closest('summary');
 			const article = summary && summary.closest('article.entry');
-			if (article) {
-				// The entry opens after this event.
-				setTimeout(() => wasOpened(article));
+			if (article && !isOpen(article)) {
+				// The row opens its entry the way a key does, and the title
+				// comes to the top: the entries closed above it took the
+				// place it had. The focus stays where the reader put it.
+				event.preventDefault();
+				unfold(article);
+				setCurrent(article);
+				article.scrollIntoView({ block: 'start' });
+				wasOpened(article);
+			} else if (article) {
+				setCurrent(article);
 			}
 		});
 		const named = location.hash.startsWith('#e') && document.getElementById(location.hash.slice(1));
@@ -802,6 +814,11 @@
 		case 'search': {
 			const search = document.getElementById('q');
 			if (search) {
+				// The field may be folded away on a narrow screen.
+				const fold = document.querySelector('.filters-toggle');
+				if (fold) {
+					fold.setAttribute('aria-expanded', 'true');
+				}
 				search.focus();
 				search.select();
 			}

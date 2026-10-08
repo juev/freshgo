@@ -693,6 +693,7 @@
   "sub.problem.name-taken": "A category or a label has this name already.",
   "sub.problem.refused": "An extension of this installation refused the feed.",
   "sub.read": "Read its entries",
+  "toolbar.filters": "Filters",
   "toolbar.more": "More actions",
   "tos.heading": "Terms of use",
   "transfer.export": "Export",

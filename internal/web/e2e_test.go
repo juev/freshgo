@@ -751,6 +751,101 @@ func TestE2EPhoneText(t *testing.T) {
 	})
 }
 
+// U93, U94: on a phone a reader goes through the entries by their rows, one
+// open at a time, and the controls of a stream wait behind a button.
+func TestE2EPhoneRows(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		ids := s.stored("alice", store.Listing{Set: mainStream(), Read: ptr(false)})
+		b := browse(t, s)
+		b.login("alice")
+		shown := func(selector string) bool {
+			return read[bool](b, `document.querySelector('`+selector+`').getClientRects().length > 0`)
+		}
+		// A wide screen has the controls in sight and no button for them.
+		if shown(".filters-toggle") || !shown(".toolbar") || !shown(".stream-head .views") {
+			t.Error("on a wide screen the controls of a stream are not in sight, or their button is")
+		}
+
+		b.run(command(emulation.SetDeviceMetricsOverride, emulation.SetDeviceMetricsOverrideParams{Width: 360, Height: 740, DeviceScaleFactor: 1, Mobile: true}))
+		b.open("/")
+		b.until("the tree folded", `!document.querySelector('#tree details').open`)
+		if !shown(".filters-toggle") || shown(".toolbar") || shown(".stream-head .views") {
+			t.Error("on a narrow screen the controls of a stream are in sight before their button is pressed")
+		}
+		if top := read[float64](b, `document.querySelector('article.entry').getBoundingClientRect().top`); top > 370 {
+			t.Errorf("the first entry stands %.0f px down a screen of 740, want the upper half", top)
+		}
+		b.accessible("the reading screen with its controls folded, narrow")
+
+		// A row opens its entry as a key does: the one open before closes,
+		// and the title comes to the top.
+		row := func(id int64) string { return e(id) + " summary" }
+		open := func(id int64, is bool) string {
+			return fmt.Sprintf(`document.querySelector('#e%d details').open === %t`, id, is)
+		}
+		b.tabTo(row(ids[0]))
+		b.press(kb.Enter)
+		b.until("the first entry open by its row", open(ids[0], true)+` && document.querySelector('#e`+strconv.FormatInt(ids[0], 10)+`').classList.contains('current')`)
+		b.eventually("the entry read", func() bool { return s.entry("alice", ids[0]).IsRead })
+		if got := b.focus(); !strings.HasPrefix(got, "summary") {
+			t.Errorf("the focus left the row for %s", got)
+		}
+		b.tabTo(row(ids[2]))
+		b.press(kb.Enter)
+		b.until("the third entry open and the first closed", open(ids[2], true)+" && "+open(ids[0], false))
+		b.until("the title of the entry at the top of the screen", `(top => top >= 0 && top < 80)(document.querySelector('#e`+strconv.FormatInt(ids[2], 10)+`').getBoundingClientRect().top)`)
+		b.eventually("the third entry read", func() bool { return s.entry("alice", ids[2]).IsRead })
+		if s.entry("alice", ids[1]).IsRead {
+			t.Error("the entry between the two rows pressed was read")
+		}
+		// The button of the bar goes on from the entry of the row. A finger
+		// presses it: Tab would pass other entries on its way to the bar,
+		// and the entry in focus is the current one.
+		b.run(chromedp.Evaluate[chromedp.Void](`document.querySelector('.reader-bar button[data-run="next"]').click()`))
+		b.until("the fourth entry open by the bar", current(ids[3], true)+" && "+open(ids[2], false))
+		// The head of an open entry folds it.
+		b.tabTo(row(ids[3]))
+		b.press(kb.Enter)
+		b.until("the entry folded by its head", open(ids[3], false))
+
+		// The controls come from behind their button and go back.
+		b.tabTo(".filters-toggle")
+		b.press(kb.Enter)
+		b.until("the controls in sight", `document.querySelector('.filters-toggle').getAttribute('aria-expanded') === 'true' && document.querySelector('#q').getClientRects().length`)
+		if !shown(".stream-head .views") {
+			t.Error("the choice between a list and open entries is not among the controls")
+		}
+		b.accessible("the controls of a stream open, narrow")
+		if got := b.text(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`); got != "true" {
+			t.Error("the controls of a stream make the page scroll sideways")
+		}
+		b.press(kb.Enter)
+		b.until("the controls folded", `!document.querySelector('.toolbar').getClientRects().length`)
+		// The key of the search finds its field behind the button.
+		b.press("/")
+		b.until("the search field in focus and in sight", `document.activeElement.id === 'q' && document.activeElement.getClientRects().length`)
+
+		// What is asked of a stream is in sight when the page opens.
+		for _, asked := range []string{"/?state=all", "/?q=the", "/?order=asc"} {
+			b.open(asked)
+			if !shown(".toolbar") {
+				t.Errorf("%s: the controls are folded though the stream is asked something", asked)
+			}
+		}
+		// Where every entry is listed open, a row closes nothing.
+		b.open("/?view=expanded")
+		if n := read[int](b, `document.querySelectorAll('.entries details:not([open])').length`); n != 0 {
+			t.Fatalf("%d entries are closed where all are listed open", n)
+		}
+		rest := s.stored("alice", store.Listing{Set: mainStream(), Read: ptr(false)})
+		b.tabTo(row(rest[0]))
+		b.press(kb.Enter)
+		b.until("an entry folded among open ones", open(rest[0], false))
+		b.press(kb.Enter)
+		b.until("the entry open again and the next one still open", open(rest[0], true)+" && "+open(rest[1], true))
+	})
+}
+
 // R7, R16: a visitor registers with the keyboard alone.
 func TestE2ERegister(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
