@@ -126,6 +126,11 @@ func Bind(fs *flag.FlagSet, getenv func(string) string) *Config {
 		"SMTP server for the letters that confirm e-mail addresses: smtp[s]://user:password@host:port?from=address ($"+EnvSMTPURL+")")
 	fs.StringVar(&c.OIDCClientSecret, "oidc-client-secret", getenv(EnvOIDCClientSecret),
 		"secret of the OpenID Connect client set up on the page of authentication ($"+EnvOIDCClientSecret+")")
+	// The help of a command prints the default of every flag, and these
+	// variables carry passwords: it shows what is built in instead.
+	fs.Lookup("database-url").DefValue = defaultDatabaseURL
+	fs.Lookup("smtp-url").DefValue = ""
+	fs.Lookup("oidc-client-secret").DefValue = ""
 	return c
 }
 
