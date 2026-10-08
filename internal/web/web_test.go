@@ -2,6 +2,9 @@ package web
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"image/png"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -240,6 +243,59 @@ func TestErrorPages(t *testing.T) {
 			}
 		}
 	})
+}
+
+// U91: a browser is told how to install freshgo as an application, before
+// anybody has logged in.
+func TestManifest(t *testing.T) {
+	for _, public := range []string{"", "/reader"} {
+		o := Options{}
+		if public != "" {
+			o.BaseURL = "https://example.org" + public
+		}
+		eachEngine(t, o, func(t *testing.T, s *site) {
+			s.system(func(system *store.System) { system.Title = "News of the house" })
+			link := `<link rel="manifest" href="` + public + `/manifest.webmanifest" crossorigin="use-credentials">`
+			if page := s.get("/about").body; !strings.Contains(page, link) {
+				t.Fatalf("no %s in\n%s", link, page)
+			}
+			a := s.get("/manifest.webmanifest")
+			if a.status != http.StatusOK || a.header.Get("Content-Type") != "application/manifest+json" || a.header.Get("Cache-Control") != "no-cache" {
+				t.Fatalf("GET /manifest.webmanifest: status %d, headers %v", a.status, a.header)
+			}
+			var m struct {
+				ID, Name, Scope, Display string
+				ShortName                string `json:"short_name"`
+				StartURL                 string `json:"start_url"`
+				Icons                    []struct{ Src, Sizes, Type, Purpose string }
+			}
+			if err := json.Unmarshal([]byte(a.body), &m); err != nil {
+				t.Fatalf("the manifest is not JSON: %v\n%s", err, a.body)
+			}
+			home := public + "/"
+			if m.Name != "News of the house" || m.ShortName != m.Name || m.StartURL != home || m.Scope != home || m.ID != home || m.Display != "standalone" {
+				t.Errorf("the manifest says %+v", m)
+			}
+			// What a browser asks of an application it offers to install:
+			// an icon of 192 and one of 512 px to show as they are; and one
+			// to cut to shape. Each is the picture it is said to be.
+			sizes := map[string]bool{}
+			for _, icon := range m.Icons {
+				sizes[icon.Purpose+" "+icon.Sizes] = true
+				picture := s.get(strings.TrimPrefix(icon.Src, public))
+				config, err := png.DecodeConfig(strings.NewReader(picture.body))
+				if picture.status != http.StatusOK || err != nil || icon.Type != "image/png" || icon.Sizes != fmt.Sprintf("%dx%d", config.Width, config.Height) ||
+					picture.header.Get("Cache-Control") != "public, max-age=31536000, immutable" {
+					t.Errorf("icon %+v: status %d, %v, %dx%d, Cache-Control %q", icon, picture.status, err, config.Width, config.Height, picture.header.Get("Cache-Control"))
+				}
+			}
+			for _, want := range []string{"any 192x192", "any 512x512", "maskable 512x512"} {
+				if !sizes[want] {
+					t.Errorf("the manifest has no icon %s: %+v", want, m.Icons)
+				}
+			}
+		})
+	}
 }
 
 // Behind a reverse proxy that serves the interface under a path, links carry

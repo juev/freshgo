@@ -16,6 +16,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/input"
+	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
 
@@ -605,6 +606,28 @@ func TestE2EDarkAndNarrow(t *testing.T) {
 		b.press("j")
 		b.until("an entry open", `document.querySelector('.entry.current details').open`)
 		b.accessible("the reading screen, dark")
+		// U91: the browser has nothing against installing freshgo as an
+		// application, and its window takes the colour of the header.
+		b.run(chromedp.Func(func(ctx context.Context, target *chromedp.Target) error {
+			manifest, err := cdp.Call(ctx, target, page.GetAppManifest, page.GetAppManifestParams{})
+			if err != nil {
+				return err
+			}
+			if !strings.HasSuffix(manifest.URL, manifestPath) || len(manifest.Errors) > 0 {
+				t.Errorf("the manifest of the page is %q, with errors %+v", manifest.URL, manifest.Errors)
+			}
+			problems, err := cdp.Call(ctx, target, page.GetInstallabilityErrors, cdp.Empty{})
+			if err != nil {
+				return err
+			}
+			for _, problem := range problems.InstallabilityErrors {
+				t.Errorf("the browser does not install freshgo: %s %+v", problem.ErrorID, problem.ErrorArguments)
+			}
+			return nil
+		}))
+		if got := b.text(`document.querySelector('meta[name="theme-color"]').content === getComputedStyle(document.querySelector('.site-header')).backgroundColor`); got != "true" {
+			t.Error("the colour of the window is not that of the header")
+		}
 		b.press("?")
 		b.until("the help", `document.querySelector('dialog[open] table')`)
 		b.accessible("the help, dark")
