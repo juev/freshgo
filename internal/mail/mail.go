@@ -44,11 +44,12 @@ type Sender struct {
 // New returns a sender for the server an address names:
 // smtp://user:password@host:587?from=reader@example.org, or smtps:// for a
 // server that speaks TLS from the start. Without a port it is 587, or 465
-// for smtps; without from the letters come from freshgo@ the host.
+// for smtps; without from the letters come from freshgo@ the host. The error
+// does not repeat the address: it may carry a password.
 func New(address string) (*Sender, error) {
 	u, err := url.Parse(address)
 	if err != nil || u.Hostname() == "" || u.Scheme != "smtp" && u.Scheme != "smtps" {
-		return nil, fmt.Errorf("%w: %q", ErrURL, address)
+		return nil, fmt.Errorf("%w: want smtp[s]://user:password@host:port?from=address", ErrURL)
 	}
 	s := &Sender{implicitTLS: u.Scheme == "smtps", from: u.Query().Get("from"), now: time.Now}
 	port := u.Port()

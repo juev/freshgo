@@ -191,11 +191,12 @@ func (c *Config) Validate() error {
 }
 
 // Database splits DatabaseURL into the engine and the value its driver wants:
-// a file path for SQLite, the URL itself for PostgreSQL.
+// a file path for SQLite, the URL itself for PostgreSQL. The errors do not
+// repeat the URL: it may carry a password.
 func (c *Config) Database() (Driver, string, error) {
 	scheme, rest, ok := strings.Cut(c.DatabaseURL, "://")
 	if !ok {
-		return "", "", fmt.Errorf("database URL %q: want sqlite://<path> or postgres://<dsn>", c.DatabaseURL)
+		return "", "", errors.New("database URL: want sqlite://<path> or postgres://<dsn>")
 	}
 	switch scheme {
 	case "sqlite":
@@ -206,7 +207,7 @@ func (c *Config) Database() (Driver, string, error) {
 	case "postgres", "postgresql":
 		return DriverPostgres, c.DatabaseURL, nil
 	default:
-		return "", "", fmt.Errorf("database URL %q: unknown scheme %q", c.DatabaseURL, scheme)
+		return "", "", fmt.Errorf("database URL: unknown scheme %q", scheme)
 	}
 }
 
