@@ -1397,12 +1397,23 @@ table.log td:last-child {
 	border-color: var(--border);
 }
 
-/* A phone. The menu folds, text is of the size a phone shows text in (iOS
-   zooms into a field with smaller text), and nothing is wider than the
-   screen. */
+/* A phone. The menu folds, text is a little larger than on a wide screen, a
+   field keeps 1rem (iOS zooms into a field with smaller text), and nothing
+   is wider than the screen. */
 @media (max-width: 48rem) {
 	:root[data-look] {
-		--text-size: 1rem;
+		--text-size: 0.9375rem;
+	}
+
+	input[type="text"],
+	input[type="password"],
+	input[type="email"],
+	input[type="url"],
+	input[type="search"],
+	input[type="number"],
+	select,
+	textarea {
+		font-size: 1rem;
 	}
 
 	html {

@@ -695,7 +695,8 @@ func TestE2EDarkAndNarrow(t *testing.T) {
 	})
 }
 
-// U92: on a phone the width of the screen goes to the text of an open entry.
+// U89, U92: on a phone the width of the screen goes to the text of an open
+// entry, and text is smaller than a field.
 func TestE2EPhoneText(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
 		words := strings.Repeat("word ", 40)
@@ -729,6 +730,17 @@ func TestE2EPhoneText(t *testing.T) {
 		for _, look := range looks {
 			b.run(chromedp.Evaluate[chromedp.Void](`document.documentElement.dataset.look = '` + look + `'`))
 			wide("an open entry, " + look)
+			// Text is smaller than a field, which keeps the size under
+			// which iOS zooms into it.
+			if got := read[float64](b, `parseFloat(getComputedStyle(document.querySelector('.entry:not(#e`+id+`) .entry-title')).fontSize)`); got != 15 {
+				t.Errorf("%s: the title of a row is %v px on a phone, want 15", look, got)
+			}
+			if got := read[float64](b, `parseFloat(getComputedStyle(document.querySelector('#e`+id+` .entry-content')).fontSize)`); got < 15.5 || got > 16 {
+				t.Errorf("%s: the text of an open entry is %v px on a phone, want about 15.9", look, got)
+			}
+			if got := b.text(`[...document.querySelectorAll('input:not([type=checkbox], [type=radio], [type=hidden]), select, textarea')].filter(f => parseFloat(getComputedStyle(f).fontSize) < 16).map(f => f.name || f.id).join(' ')`); got != "" {
+				t.Errorf("%s: fields with text under 16 px on a phone: %s", look, got)
+			}
 			// The star stays in the head of the card, on top of it and
 			// clear of the title.
 			if got := b.text(`(() => {
