@@ -270,12 +270,14 @@ code {
 }
 
 /* The menu and the account stand in the header itself; on a narrow screen
-   they fold behind a button, which the script shows. */
+   they fold behind a button, which the script shows. So do the controls of
+   a stream. */
 .site-menu {
 	display: contents;
 }
 
-.menu-toggle {
+.menu-toggle,
+.filters-toggle {
 	display: none;
 	margin-left: auto;
 	color: var(--text);
@@ -1439,8 +1441,21 @@ table.log td:last-child {
 		justify-content: space-between;
 	}
 
-	.menu-toggle:not([hidden]) {
+	.menu-toggle:not([hidden]),
+	.filters-toggle:not([hidden]) {
 		display: block;
+	}
+
+	/* The button keeps its place when it is pressed: the choice of a view
+	   comes in under the name of the stream. */
+	.filters-toggle:not([hidden]) ~ .views {
+		flex: 1 1 100%;
+		margin-left: 0;
+	}
+
+	.stream-head:has(.filters-toggle:not([hidden])[aria-expanded="false"]) .views,
+	.stream-head:has(.filters-toggle:not([hidden])[aria-expanded="false"]) + .toolbar {
+		display: none;
 	}
 
 	.menu-toggle:not([hidden])[aria-expanded="false"] + .site-menu {
