@@ -628,6 +628,31 @@ func TestE2EDarkAndNarrow(t *testing.T) {
 		b.accessible("the menu, narrow")
 		b.press(kb.Enter)
 		b.until("the menu folded", `!document.querySelector('.site-nav').getClientRects().length`)
+		// What keys do to entries is at the foot of the screen as buttons.
+		ids := s.stored("alice", store.Listing{Set: mainStream(), Read: ptr(false)})
+		b.tabTo(`.reader-bar button[data-run="next"]`)
+		b.press(kb.Enter)
+		b.until("the first entry open by the button", current(ids[0], true))
+		b.eventually("the entry read", func() bool { return s.entry("alice", ids[0]).IsRead })
+		b.accessible("an entry open above the bar, narrow")
+		// The bar stands before the entries: Shift+Tab goes back to it.
+		for range 10 {
+			if b.chord(kb.Tab, kb.ModifierShift); read[bool](b, `document.activeElement.dataset.run === 'star'`) {
+				break
+			}
+		}
+		if got := b.focus(); got != "button" {
+			t.Fatalf("Shift+Tab does not reach the bar from the entry; the focus is on %s", got)
+		}
+		b.press(kb.Enter)
+		b.eventually("the entry starred by the button", func() bool { return s.entry("alice", ids[0]).IsFavorite })
+		// The focus stays on the button: the next one follows it.
+		b.tabTo(`.reader-bar button[data-run="next"]`)
+		b.press(kb.Enter)
+		b.until("the second entry open by the button", current(ids[1], true))
+		if got := b.text(`document.querySelector('.entry.current').getBoundingClientRect().top < document.querySelector('.reader-bar').getBoundingClientRect().top`); got != "true" {
+			t.Error("the entry the button opened is under the bar")
+		}
 		b.press("t")
 		b.until("the tree unfolded, in focus", `document.querySelector('#tree details').open && document.activeElement.matches('#tree summary')`)
 		if got := b.text(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`); got != "true" {

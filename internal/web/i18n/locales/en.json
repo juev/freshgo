@@ -87,6 +87,7 @@
   "admin.user.protected": "Your own account and that of the default user cannot be kept out, demoted or deleted here.",
   "admin.user.role": "Role",
   "admin.users.heading": "Users",
+  "bar.label": "Actions on entries",
   "category.among": "Among how many of the newest entries",
   "category.among.hint": "0 stands for every entry of the category.",
   "category.default": "The category of feeds without one cannot be renamed.",

@@ -291,11 +291,19 @@
 		}
 	}
 	revealShares(document);
+	for (const bar of document.querySelectorAll('.reader-bar')) {
+		bar.hidden = false;
+	}
 
 	document.addEventListener('click', (event) => {
 		const button = event.target.closest('button[data-share]');
 		if (button && shareWith[button.dataset.share]) {
 			shareWith[button.dataset.share](button.dataset.link, button.dataset.title);
+		}
+		// A button that does what a key does.
+		const ran = event.target.closest('button[data-run]');
+		if (ran) {
+			run(ran.dataset.run);
 		}
 		const fold = event.target.closest('button[data-fold]');
 		const folded = fold && fold.closest('article.entry');
