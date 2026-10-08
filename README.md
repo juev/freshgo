@@ -237,7 +237,7 @@ freshrss-password "…"
 
 ## Settings
 
-Every setting is a flag and an environment variable; the flag wins.
+Every setting is a flag and an environment variable; the flag wins. The help of a command shows a value of the environment as the default of its flag, except for the three that carry passwords: `-database-url`, `-smtp-url` and `-oidc-client-secret`.
 
 | Flag | Variable | Default | Meaning |
 |---|---|---|---|

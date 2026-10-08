@@ -1,9 +1,11 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"io"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -129,6 +131,35 @@ func TestOIDCClientSecret(t *testing.T) {
 	}
 	if got := parse(t, map[string]string{EnvOIDCClientSecret: "from the environment"}, "-oidc-client-secret", "from the flag").OIDCClientSecret; got != "from the flag" {
 		t.Errorf("the secret with a flag = %q, want that of the flag", got)
+	}
+}
+
+func TestHelpKeepsSecrets(t *testing.T) {
+	env := map[string]string{
+		EnvDatabaseURL:      "postgres://freshgo:database-password@db/freshgo",
+		EnvSMTPURL:          "smtp://freshgo:smtp-password@mail:587?from=a@example.org",
+		EnvOIDCClientSecret: "oidc-password",
+		EnvListen:           "0.0.0.0:9000",
+	}
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	var help strings.Builder
+	fs.SetOutput(&help)
+	c := Bind(fs, func(k string) string { return env[k] })
+	if err := fs.Parse([]string{"-h"}); !errors.Is(err, flag.ErrHelp) {
+		t.Fatalf("parse -h: %v", err)
+	}
+	for _, secret := range []string{"database-password", "smtp-password", "oidc-password"} {
+		if strings.Contains(help.String(), secret) {
+			t.Errorf("the help shows %q:\n%s", secret, help.String())
+		}
+	}
+	for _, shown := range []string{defaultDatabaseURL, "0.0.0.0:9000"} {
+		if !strings.Contains(help.String(), shown) {
+			t.Errorf("the help does not show %q:\n%s", shown, help.String())
+		}
+	}
+	if c.DatabaseURL != env[EnvDatabaseURL] || c.SMTPURL != env[EnvSMTPURL] || c.OIDCClientSecret != env[EnvOIDCClientSecret] {
+		t.Errorf("the values of the environment are not taken: %+v", c)
 	}
 }
 
