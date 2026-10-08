@@ -40,9 +40,12 @@ func TestSend(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
-	for _, address := range []string{"", "http://mail.example", "smtp://", "smtp://mail.example?from=nobody", "mail.example:25"} {
-		if _, err := mail.New(address); !errors.Is(err, mail.ErrURL) {
+	for _, address := range []string{"", "http://mail.example", "smtp://", "smtp://mail.example?from=nobody", "mail.example:25", "smtp//user:secret@mail.example", "stmp://user:secret@mail.example"} {
+		_, err := mail.New(address)
+		if !errors.Is(err, mail.ErrURL) {
 			t.Errorf("New(%q): error = %v, want ErrURL", address, err)
+		} else if strings.Contains(err.Error(), "secret") {
+			t.Errorf("New(%q) shows the password: %v", address, err)
 		}
 	}
 	for _, address := range []string{"smtp://mail.example", "smtps://user:pass@mail.example:465?from=me@example.org", "smtp://127.0.0.1:2525"} {

@@ -49,6 +49,9 @@ func TestDatabase(t *testing.T) {
 		{url: "sqlite://", wantErr: true},
 		{url: "mysql://localhost/freshgo", wantErr: true},
 		{url: "freshgo.sqlite", wantErr: true},
+		{url: "postgress://u:secret@localhost/freshgo", wantErr: true},
+		{url: "postgres:/u:secret@localhost/freshgo", wantErr: true},
+		{url: "host=localhost user=u password=secret", wantErr: true},
 	}
 	for _, tt := range tests {
 		c := &Config{DatabaseURL: tt.url}
@@ -56,6 +59,9 @@ func TestDatabase(t *testing.T) {
 		if (err != nil) != tt.wantErr {
 			t.Errorf("Database(%q) error = %v, wantErr %v", tt.url, err, tt.wantErr)
 			continue
+		}
+		if err != nil && strings.Contains(err.Error(), "secret") {
+			t.Errorf("Database(%q) shows the password: %v", tt.url, err)
 		}
 		if driver != tt.driver || dsn != tt.dsn {
 			t.Errorf("Database(%q) = %q, %q; want %q, %q", tt.url, driver, dsn, tt.driver, tt.dsn)
