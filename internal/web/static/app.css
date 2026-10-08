@@ -695,6 +695,12 @@ button.link {
 	margin-top: var(--space);
 }
 
+/* What keys do to entries, as buttons at the foot of a narrow screen; the
+   script shows them. */
+.reader-bar {
+	display: none;
+}
+
 /* An entry is a row: the star, then the line that opens it. Opened, it is
    a card with its actions at the foot. */
 .entry {
@@ -1483,6 +1489,35 @@ table.log td:last-child {
 		left: 0;
 		right: 0;
 		min-width: 0;
+	}
+
+	.reader-bar:not([hidden]) {
+		position: fixed;
+		inset: auto 0 0;
+		z-index: 1;
+		display: flex;
+		padding-bottom: env(safe-area-inset-bottom);
+		border-top: 1px solid var(--border);
+		background: var(--bg-raised);
+	}
+
+	.reader-bar button {
+		flex: 1;
+		padding: var(--space) 0;
+		border: 0;
+		border-radius: 0;
+		background: none;
+		color: var(--text);
+		font-size: 1.25rem;
+	}
+
+	/* The last entry and the one keys move to stay clear of the bar. */
+	html {
+		scroll-padding-bottom: 4rem;
+	}
+
+	.page.wide {
+		padding-bottom: calc(var(--space) * 10);
 	}
 
 	/* What an article brings wider than the screen scrolls inside itself. */

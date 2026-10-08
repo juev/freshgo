@@ -89,6 +89,12 @@
 {{if .Data.Problem}}<p class="alert" role="alert" id="q-problem">{{.Data.Problem}}</p>{{end}}
 
 {{if not .Data.Entries}}{{if not .Data.Problem}}<p class="muted">{{.T "stream.empty"}}</p>{{end}}{{end}}
+<div class="reader-bar" role="toolbar" aria-label="{{.T "bar.label"}}" hidden>
+<button type="button" data-run="prev" aria-label="{{.T "key.prev"}}" title="{{.T "key.prev"}}">↑</button>
+{{if .Data.CanChange}}<button type="button" data-run="read" aria-label="{{.T "key.read"}}" title="{{.T "key.read"}}">✓</button>
+<button type="button" data-run="star" aria-label="{{.T "key.star"}}" title="{{.T "key.star"}}">★</button>
+{{end}}<button type="button" data-run="next" aria-label="{{.T "key.next"}}" title="{{.T "key.next"}}">↓</button>
+</div>
 <div class="entries" data-view="{{if .Data.Expanded}}expanded{{else}}list{{end}}"{{if .Data.Entries}} role="feed" aria-labelledby="stream-heading"{{end}}>
 {{range .Data.Entries}}{{template "article" (dict "Entry" . "Here" $.Data.Here "Page" $ "Expanded" $.Data.Expanded "CanChange" $.Data.CanChange)}}{{end}}
 </div>
