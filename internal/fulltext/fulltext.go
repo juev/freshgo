@@ -1,8 +1,9 @@
 // Package fulltext gets the text of an article from its web page, for feeds
-// that carry only a summary: the elements a CSS selector picks, without
-// those another selector rules out, cleaned like feed content.
+// that carry only a summary: the elements a CSS selector picks, or the
+// article a readability extraction finds, without the elements another
+// selector rules out, cleaned like feed content.
 //
-// The behaviour follows FreshRSS_Entry::getContentByParsing of FreshRSS at
+// With a selector the behaviour follows FreshRSS_Entry::getContentByParsing of FreshRSS at
 // commit 219eaf58. See docs/specs/fulltext.md.
 package fulltext
 
@@ -15,6 +16,7 @@ import (
 	"regexp"
 	"strings"
 
+	"codeberg.org/readeck/go-readability/v2"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/andybalholm/cascadia"
 	"golang.org/x/net/html"
@@ -34,6 +36,8 @@ var (
 	ErrSelector = errors.New("fulltext: invalid CSS selector")
 	// ErrNoElements is returned when the selector picks nothing on the page.
 	ErrNoElements = errors.New("fulltext: the selector matched no elements")
+	// ErrNoArticle is returned when no article is found on the page.
+	ErrNoArticle = errors.New("fulltext: no article was found on the page")
 	// ErrEmptyPage is returned for a page without a body.
 	ErrEmptyPage = errors.New("fulltext: the page is empty")
 )
@@ -46,6 +50,9 @@ type Request struct {
 	Params fetch.Params
 	// Selector picks the elements that make up the article.
 	Selector string
+	// Automatic has the article found on the page without a selector, which
+	// is then not looked at.
+	Automatic bool
 	// Filter picks, inside them, the elements to leave out. May be empty.
 	Filter string
 	// ForceHTTPS, when not nil, gets every URL of the result and returns the
@@ -68,13 +75,16 @@ func matcher(selector string) (goquery.Matcher, error) {
 // refresh meta element: "5; url=".
 var refreshTarget = regexp.MustCompile(`(?i)^[0-9.; ]*\s*(url\s*=)?\s*`)
 
-// Article downloads the page and returns the HTML of the selected elements.
+// Article downloads the page and returns the HTML of the selected elements,
+// or of the article found there.
 func Article(ctx context.Context, client *fetch.Client, req Request) (string, error) {
-	pick, err := matcher(strings.Trim(req.Selector, selectorPadding))
-	if err != nil {
-		return "", err
+	var pick, drop goquery.Matcher
+	var err error
+	if !req.Automatic {
+		if pick, err = matcher(strings.Trim(req.Selector, selectorPadding)); err != nil {
+			return "", err
+		}
 	}
-	var drop goquery.Matcher
 	if filter := strings.Trim(req.Filter, selectorPadding); filter != "" {
 		if drop, err = matcher(filter); err != nil {
 			return "", err
@@ -119,9 +129,22 @@ func Article(ctx context.Context, client *fetch.Client, req Request) (string, er
 		}
 	}
 
+	var elements *goquery.Selection
+	if req.Automatic {
+		// The search for the article drops classes and identifiers, so
+		// the filter looks at the page before it.
+		if drop != nil {
+			doc.FindMatcher(drop).Remove()
+		}
+		if elements, err = readable(doc, base); err != nil {
+			return "", err
+		}
+	} else {
+		elements = doc.FindMatcher(pick)
+	}
 	var picked strings.Builder
 	found := 0
-	doc.FindMatcher(pick).Each(func(_ int, s *goquery.Selection) {
+	elements.Each(func(_ int, s *goquery.Selection) {
 		found++
 		node := s.Get(0)
 		if drop != nil {
@@ -146,7 +169,28 @@ func Article(ctx context.Context, client *fetch.Client, req Request) (string, er
 		// And after it, so that the filter sees the cleaned markup too.
 		content, _ = strip(content, drop)
 	}
-	return strings.TrimSpace(content), nil
+	content = strings.TrimSpace(content)
+	if req.Automatic && content == "" {
+		return "", ErrNoArticle
+	}
+	return content, nil
+}
+
+// readable finds the article of a page the way the reader view of a browser
+// does.
+func readable(doc *goquery.Document, base string) (*goquery.Selection, error) {
+	address, err := url.Parse(base)
+	if err != nil {
+		return nil, fmt.Errorf("fulltext: %w", err)
+	}
+	article, err := readability.FromDocument(doc.Get(0), address)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrNoArticle, err)
+	}
+	if article.Node == nil {
+		return nil, ErrNoArticle
+	}
+	return goquery.NewDocumentFromNode(article.Node).Selection, nil
 }
 
 // refreshedTo returns the address a refresh meta element of the page sends

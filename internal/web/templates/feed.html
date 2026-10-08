@@ -80,6 +80,11 @@
 
 <fieldset>
 <legend>{{.T "feed.fulltext"}}</legend>
+<p class="check">
+<input type="checkbox" id="path_entries_auto" name="path_entries_auto" value="1"{{if .Data.Automatic}} checked{{end}} aria-describedby="auto-hint">
+<label for="path_entries_auto">{{.T "feed.fulltext.auto"}}</label>
+<span class="hint" id="auto-hint">{{.T "feed.fulltext.auto.hint"}}</span>
+</p>
 <p>
 <label for="path_entries">{{.T "feed.selector"}}</label>
 <input type="text" id="path_entries" name="path_entries" value="{{.Data.Feed.PathEntries}}" autocapitalize="off" spellcheck="false" aria-describedby="selector-hint">

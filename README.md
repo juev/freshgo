@@ -8,7 +8,7 @@ A feed aggregator server in one binary that takes over an existing [FreshRSS](ht
 - imports a FreshRSS installation that ran on SQLite or PostgreSQL (not MySQL/MariaDB);
 - refreshes every feed kind of FreshRSS: RSS, Atom, JSON Feed, HTML and XML with XPath, JSON with dot notation, JSON embedded in HTML;
 - applies the retention settings, the auto-read rules and the filter actions of FreshRSS, with its search language;
-- fetches the full text of articles by CSS selector;
+- fetches the full text of articles, by CSS selector or found on the page automatically;
 - serves the Google Reader API, OPML import and export, and feed icons;
 - has a web interface of its own, in English and Russian, in which everything can be done from the keyboard and without JavaScript;
 - subscribes to WebSub hubs;
@@ -142,7 +142,7 @@ What it does not: the theme and the other settings of the FreshRSS pages that th
 - **Filter actions ignore case for all letters**, as FreshRSS does on PostgreSQL. On a FreshRSS that ran on SQLite, only ASCII letters were compared without case, so rules with other letters now match more.
 - **Regular expressions in filters are RE2.** Rules with backreferences or lookaround are skipped with a warning in the log; the import lists them.
 - **Old articles are cleaned up at every refresh of a feed**, not at a random one in thirty. The rules are the same.
-- **Full text and content filters apply to new and changed articles only.** Changing the selector of a feed does not reload the articles already stored.
+- **Full text and content filters apply to new and changed articles only.** Changing the selector of a feed, or the way its text is found, does not reload the articles already stored.
 
 The full lists are in the Decisions sections of `docs/specs/`.
 

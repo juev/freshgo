@@ -106,6 +106,7 @@ type feedPage struct {
 	// Full text.
 	Conditions    string
 	Filter        string
+	Automatic     bool
 	ContentAction []option
 	Preview       template.HTML
 	PreviewNote   string
@@ -245,6 +246,7 @@ func (h *Handler) showFeed(w http.ResponseWriter, r *http.Request, status int, f
 	var conditions []string
 	_ = json.Unmarshal(a["path_entries_conditions"], &conditions)
 	page.Conditions, page.Filter = strings.Join(conditions, "\n"), a.text("path_entries_filter")
+	_ = json.Unmarshal(a["path_entries_auto"], &page.Automatic)
 	action := a.text("content_action")
 	if action != "prepend" && action != "append" {
 		action = "replace"
@@ -416,6 +418,11 @@ func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, ttl
 	f.PathEntries = get("path_entries")
 
 	a := readAttrs(f.Attributes)
+	if get("path_entries_auto") != "" {
+		a.set("path_entries_auto", true)
+	} else {
+		delete(a, "path_entries_auto")
+	}
 	if conditions := lines(form.Get("path_entries_conditions")); len(conditions) > 0 {
 		a.set("path_entries_conditions", conditions)
 	} else {
@@ -592,7 +599,8 @@ var errFormProblem = errors.New("web: the form cannot be stored as it is")
 // and read.
 var parsingKeys = []string{
 	"xpath", "json_dotnotation", "xPathToJson", "curl_params", "ssl_verify", "timeout", "unicityCriteria",
-	"unicityCriteriaForced", "hasBadGuids", "path_entries_conditions", "path_entries_filter", "content_action",
+	"unicityCriteriaForced", "hasBadGuids", "path_entries_auto", "path_entries_conditions", "path_entries_filter",
+	"content_action",
 }
 
 // sameParsing reports whether two feeds are fetched and read alike.
@@ -697,8 +705,8 @@ func (h *Handler) saveFeed(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// previewFeed shows what the selector of the form takes from the page of
-// the newest entry of the feed. Nothing is stored.
+// previewFeed shows what the selector of the form, or the automatic way,
+// takes from the page of the newest entry of the feed. Nothing is stored.
 func (h *Handler) previewFeed(w http.ResponseWriter, r *http.Request) {
 	ctx, user := r.Context(), state(r).who.user
 	old, ok := h.ownFeed(w, r)
@@ -712,18 +720,18 @@ func (h *Handler) previewFeed(w http.ResponseWriter, r *http.Request) {
 	}
 	v := h.view(r, "", "feed.heading")
 	page := feedPage{}
-	selector := strings.TrimSpace(r.PostForm.Get("path_entries"))
-	if selector == "" {
+	selector, automatic := strings.TrimSpace(r.PostForm.Get("path_entries")), r.PostForm.Get("path_entries_auto") != ""
+	if selector == "" && !automatic {
 		page.PreviewNote = v.T("feed.preview.no-selector")
 	} else {
-		article, err := h.refresher.PreviewArticle(ctx, user, old.ID, selector, r.PostForm.Get("path_entries_filter"))
+		article, err := h.refresher.PreviewArticle(ctx, user, old.ID, selector, automatic, r.PostForm.Get("path_entries_filter"))
 		switch {
 		case ctx.Err() != nil:
 			return
 		case errors.Is(err, refresh.ErrNoEntries):
 			page.PreviewNote = v.T("feed.preview.no-entries")
 		case err != nil:
-			h.log.Warn("selector preview failed", "user", user.Name, "feed", old.ID, "error", err)
+			h.log.Warn("full text preview failed", "user", user.Name, "feed", old.ID, "error", err)
 			page.PreviewNote = v.T("feed.preview.failed")
 		case article == "":
 			page.PreviewNote = v.T("feed.preview.empty")

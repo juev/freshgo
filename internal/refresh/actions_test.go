@@ -267,19 +267,28 @@ func TestPreviewArticle(t *testing.T) {
 		w.serveBody("/articles/one", "text/html; charset=utf-8", articlePage)
 		w.serveBody("/feed", rssType, rss("Blog", item{guid: "a", title: "First", link: w.server.URL + "/articles/one", body: "Summary"}))
 		f := w.feed(u, "/feed", nil)
-		if _, err := w.r.PreviewArticle(ctx, u, f.ID, "article", ""); !errors.Is(err, ErrNoEntries) {
+		if _, err := w.r.PreviewArticle(ctx, u, f.ID, "article", false, ""); !errors.Is(err, ErrNoEntries) {
 			t.Errorf("PreviewArticle of a feed without entries: error = %v, want ErrNoEntries", err)
 		}
 		w.runOne()
-		got, err := w.r.PreviewArticle(ctx, u, f.ID, "article .body", ".ad")
+		got, err := w.r.PreviewArticle(ctx, u, f.ID, "article .body", false, ".ad")
 		if want := fmt.Sprintf(fullTextFiltered, w.server.URL); err != nil || got != want {
 			t.Errorf("PreviewArticle = %q, %v; want %q", got, err, want)
 		}
 		if e := w.entry(f, "a"); e.Content != "Summary" {
 			t.Errorf("the entry was changed by the preview: %q", e.Content)
 		}
-		if _, err := w.r.PreviewArticle(ctx, u, f.ID, "p[", ""); err == nil {
+		if _, err := w.r.PreviewArticle(ctx, u, f.ID, "p[", false, ""); err == nil {
 			t.Error("PreviewArticle with a selector that is not CSS: no error")
+		}
+		// Without a selector, the automatic way.
+		w.serveBody("/articles/one", "text/html; charset=utf-8", readablePage)
+		got, err = w.r.PreviewArticle(ctx, u, f.ID, "", true, ".promo")
+		if err != nil || !strings.Contains(got, "First. The harbour") || strings.Contains(got, "Subscribe") || strings.Contains(got, "Tides of the week") {
+			t.Errorf("PreviewArticle, automatic = %q, %v", got, err)
+		}
+		if e := w.entry(f, "a"); e.Content != "Summary" {
+			t.Errorf("the entry was changed by the automatic preview: %q", e.Content)
 		}
 	})
 }

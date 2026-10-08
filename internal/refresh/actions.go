@@ -102,7 +102,7 @@ func (r *Refresher) ReloadFeed(ctx context.Context, u *store.User, feedID int64,
 		return err
 	}
 	c := r.completion(j, f, readAttributes(f.Attributes), params)
-	if c.selector == "" || limit <= 0 {
+	if !c.pages() || limit <= 0 {
 		return nil
 	}
 	entries, _, err := r.db.ListPage(ctx, u.ID, store.Listing{Set: store.EntrySet{FeedID: feedID}, Limit: limit})
@@ -158,10 +158,10 @@ func restoreFeedText(e *store.Entry) {
 	}
 }
 
-// PreviewArticle returns what a selector, and a filter if there is one,
-// take from the page of the newest entry of a feed: the text the entry
-// would get. Nothing is stored.
-func (r *Refresher) PreviewArticle(ctx context.Context, u *store.User, feedID int64, selector, filter string) (string, error) {
+// PreviewArticle returns what a selector, or the automatic way without
+// one, and a filter if there is one, take from the page of the newest entry
+// of a feed: the text the entry would get. Nothing is stored.
+func (r *Refresher) PreviewArticle(ctx context.Context, u *store.User, feedID int64, selector string, automatic bool, filter string) (string, error) {
 	f, err := r.db.FeedByID(ctx, u.ID, feedID)
 	if err != nil {
 		return "", err
@@ -182,7 +182,7 @@ func (r *Refresher) PreviewArticle(ctx context.Context, u *store.User, feedID in
 		return "", err
 	}
 	return fulltext.Article(ctx, r.client, fulltext.Request{
-		URL: entries[0].Link, Params: params, Selector: selector, Filter: filter, ForceHTTPS: https.URL,
+		URL: entries[0].Link, Params: params, Selector: selector, Automatic: automatic, Filter: filter, ForceHTTPS: https.URL,
 	})
 }
 

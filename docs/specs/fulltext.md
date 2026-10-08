@@ -1,11 +1,11 @@
 # Full text of articles
 
 Status: implemented.
-Sources: user request of 2026-10-06 and the decisions recorded in `plan.md`; `FreshRSS_Entry::loadCompleteContent`, `getContentByParsing`, `originalContent` and `FreshRSS_http_Util::httpGet` of FreshRSS at commit `219eaf58`.
+Sources: user requests of 2026-10-06 and 2026-10-08 (issue #29) and the decisions recorded in `plan.md`; `FreshRSS_Entry::loadCompleteContent`, `getContentByParsing`, `originalContent` and `FreshRSS_http_Util::httpGet` of FreshRSS at commit `219eaf58`.
 
 ## Purpose and scope
 
-For a feed that carries summaries, freshgo takes the text of each article from its web page: the elements a CSS selector picks. `internal/fulltext` reads a page; `internal/refresh` decides for which entries and where the text goes. Covers plan requirement R12.
+For a feed that carries summaries, freshgo takes the text of each article from its web page: the elements a CSS selector picks, or the article a readability extraction finds without a selector. `internal/fulltext` reads a page; `internal/refresh` decides for which entries and where the text goes. Covers plan requirement R12.
 
 ## Requirements
 
@@ -18,12 +18,16 @@ For a feed that carries summaries, freshgo takes the text of each article from i
 - T7. The text is stored between the markers `<!-- FULLCONTENT start //-->` and `<!-- FULLCONTENT end //-->`. By `content_action` of the feed it replaces the text of the feed (`replace`, also when the attribute is absent), which then goes to `original_content` in the attributes of the entry, or stands before it (`prepend`) or after it (`append`).
 - T8. Whatever goes wrong, an unusable selector, a failed request, an empty page, no element matched, leaves the text of the feed, is reported in the log and does not fail the refresh of the feed.
 - T9. A feed without `pathEntries` and with `path_entries_filter` has the matching elements cut out of the text the feed gives. When something was cut, the text as it came goes to `original_content`.
+- T11. A feed with `path_entries_auto` set to true in its attributes has the pages of its entries read without a selector: the article is the one a readability extraction finds on the page, as the reader view of a browser does. `pathEntries` is then not looked at, not even for whether it can be read. Everything else is as with a selector: T1–T4, the cleaning and the base address of T5, T7, T8, T10. The filter of T6 is applied to the page before the article is looked for, since the extraction drops classes and identifiers, and to the cleaned markup after it. A page on which no article is found is a failure of T8.
 - T10. The change hash of an entry covers the text the feed gave, not the text of the page: an entry is not taken as changed because its stored text is the page's.
 
 ## Decisions
 
 - **CSS selectors are applied by `goquery`** (`cascadia`), not translated to XPath as FreshRSS does with `phpgt/cssxpath`. The result is compared with FreshRSS for the kinds of selectors listed under verification.
 - **Pages are read before anything else looks at the entry**: hooks, auto-read rules and filter actions see the completed text, for new and for changed entries alike. FreshRSS does so for new entries.
+- **The automatic extraction is `codeberg.org/readeck/go-readability/v2`**, the maintained fork of `go-shiori/go-readability`, a port of Readability.js of Mozilla. It brings three modules into the build: `go-shiori/dom`, `itlightning/dateparse` and `gogs/chardet`. What it returns is cleaned by the sanitizer of feed content like any other text of a page.
+- **The automatic way is an attribute of its own**, not a reserved value of the selector: a selector the user wrote stays in the form while the automatic way is on.
+- **Turning full text off does not put the text of the feed back** into the entries already stored, for either way; fetching the feed anew does so only while pages are read.
 - **Pages are not cached.** FreshRSS keeps a fetched page on disk for the cache duration; here a page is read at most once per new or changed entry.
 - **A relative `<base href>` is resolved against the address of the page.**
 - **The request settings of the feed go with the request for the page whatever host the page is on**, as in FreshRSS: credentials, cookies and headers, and the POST body of a feed that is fetched with POST. Cookies for a site whose feed lives on another host are what the setting is used for; the other side of it is that a feed decides, by its links, where the credentials set for it are sent.
@@ -40,3 +44,4 @@ For a feed that carries summaries, freshgo takes the text of each article from i
 - R12, T1, T2, T7, T10: `TestFullText` in `internal/refresh`, for each `content_action` and with a filter: the stored content, `original_content`, no request and no change on a refresh of the unchanged feed, a new request when the entry changes.
 - T3, T4, T8, T2: `TestFullTextConditionsAndFailures`: conditions, among them one that cannot be used, alone and next to a usable one; a page that is gone, one without the element, one that sends on, an entry without a link.
 - T9: `TestContentFilterWithoutFullText`.
+- T11: `TestAutomatic` in `internal/fulltext` (the article without the menu, the column and the footer of its page, without scripts, addresses resolved, a filter, a meta refresh, a `<base>` element, a page without an article, a selector that is not CSS passed over); `TestFullTextAutomatic` in `internal/refresh` (the stored content between its markers, `original_content`, a page without an article and an entry without a link, the log, no request on a refresh of the unchanged feed); `TestPreviewArticle`. Not automated: the extraction was tried by hand on three articles of real sites (go.dev, simonwillison.net, theverge.com) and gave their text.

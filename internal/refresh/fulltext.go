@@ -19,8 +19,10 @@ const (
 
 // completion is how a feed completes the text of its entries.
 type completion struct {
-	// selector picks the article on its page; empty when pages are not read.
+	// selector picks the article on its page.
 	selector string
+	// automatic has the article found on its page without a selector.
+	automatic bool
 	// filter picks what to leave out, of the page or else of the feed's text.
 	filter string
 	// conditions limit the reading of pages to the entries one of them matches.
@@ -30,9 +32,14 @@ type completion struct {
 	params fetch.Params
 }
 
+// pages reports that the pages of entries are read.
+func (c *completion) pages() bool {
+	return c.automatic || c.selector != ""
+}
+
 // off reports that the feed's text is stored as it comes.
 func (c *completion) off() bool {
-	return c.selector == "" && c.filter == ""
+	return !c.pages() && c.filter == ""
 }
 
 func (r *Refresher) completion(j *job, f *store.Feed, attrs attributes, params fetch.Params) *completion {
@@ -40,7 +47,8 @@ func (r *Refresher) completion(j *job, f *store.Feed, attrs attributes, params f
 	c.filter, _ = get[string](attrs, "path_entries_filter")
 	c.filter = strings.TrimSpace(c.filter)
 	c.action, _ = get[string](attrs, "content_action")
-	if c.selector == "" {
+	c.automatic, _ = get[bool](attrs, "path_entries_auto")
+	if !c.pages() {
 		return c
 	}
 	conditions, _ := get[[]string](attrs, "path_entries_conditions")
@@ -64,7 +72,7 @@ func (r *Refresher) completion(j *job, f *store.Feed, attrs attributes, params f
 // article from its page, or cuts the unwanted elements out of the feed's
 // text. Whatever fails leaves the text the feed gave.
 func (r *Refresher) complete(ctx context.Context, j *job, f *store.Feed, c *completion, e *store.Entry, now int64) {
-	if c.selector == "" {
+	if !c.pages() {
 		stripped, changed, err := fulltext.Strip(e.Content, c.filter)
 		if err != nil {
 			r.log.Warn("content filter is not usable", "user", j.user.Name, "feed", f.ID, "error", err)
@@ -93,7 +101,7 @@ func (r *Refresher) complete(ctx context.Context, j *job, f *store.Feed, c *comp
 		}
 	}
 	article, err := fulltext.Article(ctx, r.client, fulltext.Request{
-		URL: e.Link, Params: c.params, Selector: c.selector, Filter: c.filter, ForceHTTPS: j.https.URL,
+		URL: e.Link, Params: c.params, Selector: c.selector, Automatic: c.automatic, Filter: c.filter, ForceHTTPS: j.https.URL,
 	})
 	if err != nil {
 		if ctx.Err() == nil && !errors.Is(err, context.Canceled) {
