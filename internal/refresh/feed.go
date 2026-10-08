@@ -341,7 +341,9 @@ func announced(doc *feed.Feed, resp *fetch.Response) (topic, hub string) {
 	if topic == "" || hub == "" {
 		return "", ""
 	}
-	return topic, hub
+	// A relative address takes the password of the address the feed is
+	// read by, which is not for the hub, nor for the log.
+	return withoutCredentials(topic), withoutCredentials(hub)
 }
 
 // resolved returns the http(s) address a link of a header stands for, which

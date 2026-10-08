@@ -12,7 +12,7 @@ Out of scope: subscriptions of an imported FreshRSS (its `PubSubHubbub/` directo
 ## Requirements
 
 - W1. WebSub works when it is switched on (`-websub`, `$FRESHGO_WEBSUB`) and the public address of the server (`-base-url`) can be reached by a hub: an http(s) URL whose host is not `localhost`, not a name without a dot, and not a loopback, private or link-local address. Otherwise the server says so once at start, subscribes to nothing, does not answer under `/websub/`, and polls every feed as without WebSub.
-- W2. A feed read as RSS or Atom that names a hub (`rel="hub"`) and itself (`rel="self"`) has that own address recorded as its topic, and the hub next to it, after every poll that brings its document, whether WebSub is on or not; a feed that stops naming them loses both. The links are those of the document and those of the `Link` headers of the answer, which overrule the document; an address of a header may be relative to the address of the feed.
+- W2. A feed read as RSS or Atom that names a hub (`rel="hub"`) and itself (`rel="self"`) has that own address recorded as its topic, and the hub next to it, after every poll that brings its document, whether WebSub is on or not; a feed that stops naming them loses both. The links are those of the document and those of the `Link` headers of the answer, which overrule the document; an address of a header may be relative to the address of the feed. Neither the topic nor the hub keeps a user name or password in the address.
 - W3. After such a poll, and at the end of every refresh for the topics recorded with the feeds it went through, muted feeds left out, the hub is asked to push the topic with `hub.mode=subscribe`, `hub.topic`, `hub.callback` (`<base URL>/websub/<key>`), `hub.secret` and `hub.verify=sync`:
   - the first time any feed announces the topic; key and secret are 32 random bytes each, and one subscription serves every feed and user that announces the topic;
   - when less than 23 hours of the lease are left, but no sooner than an hour after the last request to a hub in good standing;
@@ -51,7 +51,7 @@ Out of scope: subscriptions of an imported FreshRSS (its `PubSubHubbub/` directo
 - R14, W5, W6: `TestWebSubRefusesPushes` — no signature, a wrong secret, a signature of another document, an unknown method, an unknown key (410), another feed in the document or in the `Link` header (422), an empty and an oversized body; the entries stay as they were.
 - R14, W3: `TestWebSubRenews` — a renewal under the same key with 22 hours left, one request to a failing hub and the next a day later.
 - W3: `TestWebSubSwitchedOn` — feeds read with WebSub off are subscribed in the first refresh with it on, although they answer 304, once, and not for a muted feed. `TestWebSubRenewsWithoutADocument` — a renewal for a feed that is not polled.
-- W2: `TestWebSubLinkHeaders` — a hub named in headers alone, relative to the feed, and an own address of a header that overrules the document.
+- W2: `TestWebSubLinkHeaders` — a hub named in headers alone, relative to the feed, and an own address of a header that overrules the document. `TestWebSubWithoutCredentials` — no password of the address of the feed in the topic or the hub.
 - W8, W9: `TestWebSubPollsLessOften`. W7, the end of a subscription: `TestWebSubEndsWithItsReaders`.
 - R14, W1, W2: `TestWebSubOff`, which also has the topic and the hub recorded; `TestRoutes` in `cmd/freshgo` for the address without WebSub.
 - Storage: `TestWebSubSubscriptions` and `TestMigrationWebSubHub` in `internal/store`.

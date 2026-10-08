@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/juev/freshgo/internal/feed"
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/websub"
@@ -562,6 +563,30 @@ func TestWebSubLinkHeaders(t *testing.T) {
 			t.Errorf("the hub was asked for %v; want the two topics of the headers", topics)
 		}
 	})
+}
+
+// W2: the topic and the hub do not carry the password of the address the
+// feed is read by, which relative addresses of the headers and of the
+// document take.
+func TestWebSubWithoutCredentials(t *testing.T) {
+	const address = "https://alice:secret@example.org/private/feed.xml"
+	inDocument, err := feed.Parse([]byte(`<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Blog</title>`+
+		`<link rel="hub" href="/hub"/><link rel="self" href="/private/feed.xml"/></feed>`), feed.Options{URL: address})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, tt := range map[string]struct {
+		doc    *feed.Feed
+		header http.Header
+	}{
+		"headers":  {&feed.Feed{}, http.Header{"Link": {`</private/feed.xml>; rel="self", </hub>; rel="hub"`}}},
+		"document": {inDocument, http.Header{}},
+	} {
+		topic, hub := announced(tt.doc, &fetch.Response{URL: address, Header: tt.header})
+		if topic != "https://example.org/private/feed.xml" || hub != "https://example.org/hub" {
+			t.Errorf("%s: announced = %q, %q; want the addresses without the password", name, topic, hub)
+		}
+	}
 }
 
 // R14: without WebSub, or with an address hubs cannot reach, nothing is
