@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
@@ -860,6 +861,32 @@ func TestE2EFullTextOfAnEntry(t *testing.T) {
 		b.press(kb.Enter)
 		b.until("the text of the feed back", text+`.trim() === '' && !document.querySelector('.entry.current .entry-excerpt') && `+button+` === 'Full text'`)
 		b.until("the focus on the button that took the place", `document.activeElement.matches('.entry.current form[action$="/fulltext"] button')`)
+
+		// U100: a page that is slow and then has no article. While it is
+		// waited for the button shows it; then the entry says, beside its
+		// actions, that the text could not be taken.
+		slow := make(chan struct{})
+		remote.mu.Lock()
+		remote.pages["/articles/one"] = func(w http.ResponseWriter, r *http.Request) {
+			select {
+			case <-slow:
+			case <-r.Context().Done():
+			}
+			w.Header().Set("Content-Type", "text/html")
+			_, _ = w.Write([]byte(`<html><head><title>Bare</title></head><body><nav></nav></body></html>`))
+		}
+		remote.mu.Unlock()
+		waits := `document.querySelector('.entry.current form[action$="/fulltext"] button')`
+		b.press("f")
+		b.until("the button waiting for the page", waits+`.getAttribute('aria-busy') === 'true'`)
+		close(slow)
+		b.until("the entry saying beside its actions that there is no text, the button no longer waiting",
+			`document.querySelector('.entry.current .entry-actions .entry-notice').textContent.includes('could not be taken from the page') && `+
+				`document.getElementById('messages').textContent.includes('could not be taken from the page') && !`+waits+`.hasAttribute('aria-busy') && `+button+` === 'Full text'`)
+		b.accessible("an entry that says what its action came to")
+		// The next action takes the words away.
+		b.press("m")
+		b.until("the notice gone with the next action", `!document.querySelector('.entry.current .entry-notice')`)
 
 		// The help names the action and its key.
 		b.press("?")

@@ -203,8 +203,34 @@
 		return turn;
 	};
 
+	// tell says what an action on an entry has to say: to screen readers,
+	// and in the entry beside its actions, where the reader pressed and
+	// looks. The next action on the entry takes it away.
+	const tell = (article, text) => {
+		say(text);
+		const actions = article.querySelector('.entry-actions');
+		if (actions) {
+			for (const old of actions.querySelectorAll('.entry-notice')) {
+				old.remove();
+			}
+			actions.append(el('p', { class: 'entry-notice' }, text));
+		}
+	};
+
 	// post submits a form about an entry and puts the answer in place.
+	// Meanwhile the button of the form shows that it waits.
 	const post = async (form, article) => {
+		const button = form.closest('.entry-actions') && form.querySelector('button');
+		if (button) {
+			button.setAttribute('aria-busy', 'true');
+		}
+		const failed = () => {
+			if (button) {
+				button.removeAttribute('aria-busy');
+			}
+			tell(article, t('js.failed'));
+			return false;
+		};
 		let response;
 		try {
 			response = await ask(form.action, {
@@ -213,18 +239,16 @@
 				headers: { 'X-Fragment': 'entry' },
 			});
 		} catch {
-			say(t('js.failed'));
-			return false;
+			return failed();
 		}
 		const fresh = response.ok ? parse(await response.text()).querySelector('article.entry') : null;
 		if (!fresh) {
-			say(t('js.failed'));
-			return false;
+			return failed();
 		}
 		sync(article, fresh, /\/(fulltext|translate)$/.test(form.getAttribute('action')));
 		const notice = response.headers.get('X-Notice');
 		if (notice) {
-			say(decodeURIComponent(notice));
+			tell(article, decodeURIComponent(notice));
 		}
 		refreshTree();
 		return response.headers.get('X-Progress') || true;
