@@ -106,6 +106,9 @@ const (
 	// batchUnits and batchBytes bound what goes into one request.
 	batchUnits = 40
 	batchBytes = 3000
+	// openingBytes bounds the first request of a text: its answer is what
+	// a reader waits for before anything is translated.
+	openingBytes = 800
 )
 
 func rules(language string) string {
@@ -116,10 +119,11 @@ func rules(language string) string {
 
 var numbered = regexp.MustCompile(`(?m)^\s*\[\[(\d+)\]\][ \t]*`)
 
-// first returns how many of the units make the next request.
-func first(all []*unit) int {
+// first returns how many of the units make the next request, of about the
+// given number of bytes.
+func first(all []*unit, bytes int) int {
 	n, size := 0, 0
-	for n < len(all) && n < batchUnits && (n == 0 || size+len(all[n].marked) <= batchBytes) {
+	for n < len(all) && n < batchUnits && (n == 0 || size+len(all[n].marked) <= bytes) {
 		size += len(all[n].marked)
 		n++
 	}
@@ -203,7 +207,7 @@ func (c *Client) Blocks(ctx context.Context, fragment, language string) (string,
 	}
 	var st Stats
 	for all := units(root); len(all) > 0; {
-		n := first(all)
+		n := first(all, batchBytes)
 		if err := c.translate(ctx, all[:n], language, &st); err != nil {
 			return "", st, err
 		}

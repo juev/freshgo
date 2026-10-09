@@ -206,14 +206,15 @@ func TestSteps(t *testing.T) {
 			if state := Of(stored(), "ru"); state.Exists || state.Content != long || state.Title != "Hello, reader" {
 				t.Errorf("before anything: %+v", state)
 			}
-			// The first step asks for the language, the title and two paragraphs.
+			// The first step asks for the language and the title, and for one
+			// paragraph: its first request is a small one.
 			state, err := tr.Step(ctx, u.ID, id, russian)
-			if err != nil || !state.Exists || !state.Shown || state.Done != 2 || state.Total != 5 || state.Complete() || state.Title != "Привет, читатель" ||
-				strings.Count(state.Content, "Привет") != 2 || strings.Count(state.Content, "Hello") != 3 || s.requests() != 3 {
+			if err != nil || !state.Exists || !state.Shown || state.Done != 1 || state.Total != 5 || state.Complete() || state.Title != "Привет, читатель" ||
+				strings.Count(state.Content, "Привет") != 1 || strings.Count(state.Content, "Hello") != 4 || s.requests() != 3 {
 				t.Errorf("after one step: %+v, %v, %d requests", state, err, s.requests())
 			}
-			if !strings.Contains(s.asked[0], "written in Russian") {
-				t.Errorf("the language was asked for as %q", s.asked[0])
+			if all := strings.Join(s.asked, "\n"); !strings.Contains(all, "written in Russian") {
+				t.Errorf("the language was not asked for: %.300q", all)
 			}
 			e := stored()
 			if e.Content != long || e.Title != "Hello, reader" || !strings.Contains(string(e.Attributes), `"original_content":"kept"`) {
@@ -228,10 +229,10 @@ func TestSteps(t *testing.T) {
 
 			// The original and the translation, without a request.
 			before := s.requests()
-			if state, err = tr.Show(ctx, u.ID, id, russian, false); err != nil || !state.Exists || state.Shown || state.Content != long || state.Title != "Hello, reader" || state.Done != 2 {
+			if state, err = tr.Show(ctx, u.ID, id, russian, false); err != nil || !state.Exists || state.Shown || state.Content != long || state.Title != "Hello, reader" || state.Done != 1 {
 				t.Errorf("the original shown: %+v, %v", state, err)
 			}
-			if state, err = tr.Show(ctx, u.ID, id, russian, true); err != nil || !state.Shown || strings.Count(state.Content, "Привет") != 2 || s.requests() != before {
+			if state, err = tr.Show(ctx, u.ID, id, russian, true); err != nil || !state.Shown || strings.Count(state.Content, "Привет") != 1 || s.requests() != before {
 				t.Errorf("the translation shown again: %+v, %v, %d requests more", state, err, s.requests()-before)
 			}
 
@@ -260,9 +261,10 @@ func TestSteps(t *testing.T) {
 				t.Error("the translation of the old text is still stored")
 			}
 
-			// A text in the language already costs one request and stores nothing.
+			// A text in the language already costs the two questions of the
+			// first step and stores nothing.
 			before = s.requests()
-			if state, err = tr.Step(ctx, u.ID, own, russian); !errors.Is(err, ErrSameLanguage) || state.Exists || s.requests() != before+1 {
+			if state, err = tr.Step(ctx, u.ID, own, russian); !errors.Is(err, ErrSameLanguage) || state.Exists || s.requests() != before+2 {
 				t.Errorf("a text in Russian: %+v, %v, %d requests", state, err, s.requests()-before)
 			}
 			// A translation of one letter does not make the steps lose count:
@@ -288,7 +290,7 @@ func TestSteps(t *testing.T) {
 			if err := db.InsertEntries(ctx, u.ID, []*store.Entry{fresh}); err != nil {
 				t.Fatal(err)
 			}
-			if state, err = tr.Step(ctx, u.ID, fresh.ID, russian); err != nil || state.Done != 2 {
+			if state, err = tr.Step(ctx, u.ID, fresh.ID, russian); err != nil || state.Done != 1 {
 				t.Fatalf("the first step: %+v, %v", state, err)
 			}
 			key := s.Key
@@ -299,7 +301,7 @@ func TestSteps(t *testing.T) {
 				}
 			}
 			e, _ = db.EntryByID(ctx, u.ID, fresh.ID)
-			if state = Of(e, "ru"); state.Done != 2 || state.Failed != 0 || state.Complete() {
+			if state = Of(e, "ru"); state.Done != 1 || state.Failed != 0 || state.Complete() {
 				t.Errorf("after the service refused: %+v", state)
 			}
 			s.Key = key

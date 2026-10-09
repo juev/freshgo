@@ -22,8 +22,9 @@ type interpreter struct {
 	mu sync.Mutex
 	// asked are the messages of the user; systems the instructions.
 	asked, systems []string
-	// hold, when set, is waited for before each answer but the first two.
-	hold chan struct{}
+	// opening, when set, is waited for before the first two answers, the
+	// language and the title; hold before each answer after the third.
+	opening, hold chan struct{}
 	// entry is long enough to take three requests.
 	entry *store.Entry
 }
@@ -45,11 +46,16 @@ func interpret(t *testing.T, s *site) *interpreter {
 		system, user := request.Messages[0].Content, request.Messages[1].Content
 		in.mu.Lock()
 		in.asked, in.systems = append(in.asked, user), append(in.systems, system)
-		n, hold := len(in.asked), in.hold
+		n, wait := len(in.asked), in.hold
+		if n <= 2 {
+			wait = in.opening
+		} else if n == 3 {
+			wait = nil
+		}
 		in.mu.Unlock()
-		if hold != nil && n > 3 {
+		if wait != nil {
 			select {
-			case <-hold:
+			case <-wait:
 			case <-r.Context().Done():
 				return
 			}
@@ -113,12 +119,12 @@ func TestTranslateEntry(t *testing.T) {
 
 		// For the script: the next paragraphs, and how far it is.
 		a := s.part(http.MethodPost, path+"/translate", "entry", form("translate"))
-		if a.status != http.StatusOK || a.header.Get(progressHeader) != "2/5" || strings.Count(a.body, "<p>Привет") != 2 || strings.Count(a.body, "<p>Hello") != 3 ||
-			!strings.Contains(a.body, ">Привет, дорогой читатель</h2>") || !strings.Contains(a.body, `data-percent="40">Translate on (40%)</button>`) {
+		if a.status != http.StatusOK || a.header.Get(progressHeader) != "1/5" || strings.Count(a.body, "<p>Привет") != 1 || strings.Count(a.body, "<p>Hello") != 4 ||
+			!strings.Contains(a.body, ">Привет, дорогой читатель</h2>") || !strings.Contains(a.body, `data-percent="20">Translate on (20%)</button>`) {
 			t.Errorf("one step for the script: status %d, progress %q\n%.600s", a.status, a.header.Get(progressHeader), a.body)
 		}
-		if !strings.Contains(in.systems[0], "one word") || !strings.Contains(in.asked[0], "written in English") {
-			t.Errorf("the language was asked for as %q", in.asked[0])
+		if all := strings.Join(in.asked, "\n"); !strings.Contains(all, "written in English") {
+			t.Errorf("the language was not asked for: %.300q", all)
 		}
 		// The entry itself keeps its text: other clients read the original.
 		if e := s.entry("alice", in.entry.ID); e.Content != in.entry.Content || e.Title != "Hello, dear reader" {
@@ -156,9 +162,11 @@ func TestTranslateEntry(t *testing.T) {
 		}
 
 		// The language is the one the reader set, when there is one.
+		// The language is chosen from a list, the language of the interface first.
 		page := s.page("/settings/reading")
-		if !strings.Contains(page, `name="translate_to" value=""`) {
-			t.Errorf("the settings do not ask for the language to translate into")
+		if !strings.Contains(page, `<select id="translate_to" name="translate_to">`+"\n"+`<option value="" selected>The language of the interface</option>`) ||
+			!strings.Contains(page, `<option value="de">German</option>`) || !strings.Contains(page, `<option value="pt-BR">Brazilian Portuguese</option>`) {
+			t.Errorf("the settings do not list the languages to translate into:\n%.1500s", page[max(0, strings.Index(page, "translate_to")-200):])
 		}
 		settings := s.formAt("/settings/reading", "/settings/reading")
 		settings.Set("translate_to", "no such language")
@@ -168,8 +176,17 @@ func TestTranslateEntry(t *testing.T) {
 		settings.Set("translate_to", " de ")
 		s.follow("/settings/reading", settings)
 		if a := s.part(http.MethodPost, path+"/translate", "entry", form("translate")); !strings.Contains(in.asked[len(in.asked)-1], "[[1]]") ||
-			!strings.Contains(in.systems[len(in.systems)-1], "Translate into German") || a.header.Get(progressHeader) != "2/5" {
+			!strings.Contains(in.systems[len(in.systems)-1], "Translate into German") || a.header.Get(progressHeader) != "1/5" {
 			t.Errorf("after the language was set to German: instruction %q, progress %q", in.systems[len(in.systems)-1], a.header.Get(progressHeader))
+		}
+
+		if page := s.page("/settings/reading"); !strings.Contains(page, `<option value="de" selected>German</option>`) {
+			t.Error("the settings do not show the language that was chosen")
+		}
+		// A tag set otherwise and not in the list stays to be chosen.
+		s.setting("alice", "translate_to", "eo")
+		if page := s.page("/settings/reading"); !strings.Contains(page, `<option value="eo" selected>Esperanto</option>`) {
+			t.Error("the settings do not show a language that is set and not in the list")
 		}
 
 		// A service that does not answer leaves the entry and says so.

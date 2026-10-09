@@ -218,7 +218,7 @@ func (k keyboard) bindings() map[string]string {
 var scriptTexts = []string{
 	"js.close", "js.confirm", "js.cancel", "js.failed", "js.help", "js.help.key", "js.help.action", "js.help.fixed-enter",
 	"js.help.fixed-escape", "js.help.fixed-palette", "js.help.none", "js.mark-all", "js.palette",
-	"js.palette.empty", "js.palette.hint", "js.palette.action", "js.labels", "js.no-entry", "js.copied", "js.no-share", "js.translating",
+	"js.palette.empty", "js.palette.hint", "js.palette.action", "js.labels", "js.no-entry", "js.copied", "js.no-share", "js.translating", "js.translate-begun", "js.translate-stopping",
 }
 
 // scriptConfig is what a page hands to the script.
