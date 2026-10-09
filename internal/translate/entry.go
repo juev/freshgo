@@ -31,6 +31,9 @@ type record struct {
 	Done   int `json:"done"`
 	Total  int `json:"total"`
 	Failed int `json:"failed,omitempty"`
+	// At is how many runs of the text, with words or without, are behind:
+	// where the next step goes on.
+	At int `json:"at"`
 	// Of is the hash of the title and the text the translation was made
 	// from: when the entry has another text, it has no translation.
 	Of string `json:"of"`
@@ -114,6 +117,8 @@ func (t *Translator) Step(ctx context.Context, userID, entryID int64, tag langua
 		if err != nil {
 			return State{}, err
 		}
+		// As the parser writes it: the steps count the runs of this text.
+		rec.Content = render(root)
 		paragraphs := units(root)
 		rec.Total = len(paragraphs)
 		var sample strings.Builder
@@ -134,10 +139,12 @@ func (t *Translator) Step(ctx context.Context, userID, entryID int64, tag langua
 			return Of(e, key), ErrSameLanguage
 		}
 		if letters.MatchString(e.Title) {
-			if title, err := t.client.alone(ctx, e.Title, name, &st); err == nil && title != "" && !mark.MatchString(title) {
+			title, err := t.client.alone(ctx, e.Title, name, &st)
+			if err != nil {
+				return State{}, err
+			}
+			if title != "" && !mark.MatchString(title) {
 				rec.Title = title
-			} else if ctx.Err() != nil {
-				return State{}, ctx.Err()
 			}
 		}
 	}
@@ -145,18 +152,30 @@ func (t *Translator) Step(ctx context.Context, userID, entryID int64, tag langua
 	if err != nil {
 		return State{}, err
 	}
-	// What was translated keeps its paragraphs: those still to do follow
-	// the ones done.
-	rest := units(root)
-	rest = rest[min(rec.Done, len(rest)):]
+	// The runs of a text keep their numbers while it is translated, so
+	// the step goes on after the last run it has dealt with.
+	every := runs(root)
+	var rest []*unit
+	for _, run := range every[min(rec.At, len(every)):] {
+		if run.words {
+			rest = append(rest, run)
+		}
+	}
 	n := first(rest)
 	if err := t.client.translate(ctx, rest[:n], name, &st); err != nil {
 		return State{}, err
 	}
-	rec.Content, rec.Done, rec.Failed, rec.Hidden = render(root), rec.Done+n, rec.Failed+st.Failed, false
-	if n == len(rest) {
+	rec.Done, rec.Failed, rec.Hidden, rec.At = rec.Done+n, rec.Failed+st.Failed, false, len(every)
+	if n < len(rest) {
+		for i, run := range every {
+			if run == rest[n] {
+				rec.At = i
+			}
+		}
+	} else {
 		rec.Done = rec.Total
 	}
+	rec.Content = render(root)
 	return t.store(ctx, userID, entryID, key, func(fresh *store.Entry, _ record, _ bool) (record, bool) {
 		// The text was changed meanwhile: what was translated is of another text.
 		return rec, hashOf(fresh) == rec.Of

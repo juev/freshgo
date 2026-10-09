@@ -41,12 +41,30 @@ type unit struct {
 	marks []*html.Node
 	// plain is the text alone, to tell an answer that translated nothing.
 	plain string
+	// words is false for a run with nothing to translate: no two letters
+	// in a row, as in numbers, marks of footnotes and punctuation.
+	words bool
 }
 
 var letters = regexp.MustCompile(`\p{L}{2}`)
 
-// units cuts the content of a node into what is translated as one.
+// units cuts the content of a node into what is translated as one,
+// leaving out the runs without words.
 func units(root *html.Node) []*unit {
+	var out []*unit
+	for _, u := range runs(root) {
+		if u.words {
+			out = append(out, u)
+		}
+	}
+	return out
+}
+
+// runs cuts the content of a node into its runs of text and inline
+// elements, with words or without. How many there are and where does not
+// depend on what the text says, so a run keeps its number when the runs
+// before it are translated.
+func runs(root *html.Node) []*unit {
 	var out []*unit
 	var walk func(parent *html.Node)
 	walk = func(parent *html.Node) {
@@ -54,6 +72,9 @@ func units(root *html.Node) []*unit {
 		flush := func() {
 			nodes := run
 			run = nil
+			if len(nodes) == 0 {
+				return
+			}
 			u := &unit{parent: parent, nodes: nodes}
 			var marked, plain strings.Builder
 			var write func(n *html.Node)
@@ -79,12 +100,8 @@ func units(root *html.Node) []*unit {
 			for _, n := range nodes {
 				write(n)
 			}
-			// Without two letters in a row there is nothing to translate:
-			// numbers, marks of footnotes, punctuation.
-			if !letters.MatchString(plain.String()) {
-				return
-			}
 			u.marked, u.plain = strings.Join(strings.Fields(marked.String()), " "), strings.Join(strings.Fields(plain.String()), " ")
+			u.words = letters.MatchString(u.plain)
 			out = append(out, u)
 		}
 		var children []*html.Node

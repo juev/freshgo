@@ -141,10 +141,10 @@ func TestBlocks(t *testing.T) {
 		t.Errorf("Blocks of a text that stays = %q, %+v, %v", got, stats, err)
 	}
 
-	// A service that does not answer leaves the text and fails nothing else.
+	// A service that refuses is an error, not paragraphs given up.
 	s = newService(t, translator)
 	s.Key = "wrong"
-	if got, stats, err = s.Blocks(ctx, sentence, "Russian"); err != nil || got != sentence || stats.Failed != 1 || stats.Reasons["request failed"] != 1 {
+	if got, stats, err = s.Blocks(ctx, sentence, "Russian"); err == nil || stats.Failed != 0 {
 		t.Errorf("Blocks with a service that refuses = %q, %+v, %v", got, stats, err)
 	}
 
@@ -265,6 +265,48 @@ func TestSteps(t *testing.T) {
 			if state, err = tr.Step(ctx, u.ID, own, russian); !errors.Is(err, ErrSameLanguage) || state.Exists || s.requests() != before+1 {
 				t.Errorf("a text in Russian: %+v, %v, %d requests", state, err, s.requests()-before)
 			}
+			// A translation of one letter does not make the steps lose count:
+			// every paragraph after it is still asked for.
+			short := &store.Entry{FeedID: f.ID, GUID: "short", Title: "42", Content: "<p>Yes</p>" + strings.Repeat("<p>Hello "+strings.Repeat("y", 1400)+"</p>", 4)}
+			if err := db.InsertEntries(ctx, u.ID, []*store.Entry{short}); err != nil {
+				t.Fatal(err)
+			}
+			terse := newService(t, func(system, user string) string {
+				if strings.HasPrefix(system, "Answer with one word") {
+					return "no"
+				}
+				return strings.Replace(ru.Replace(user), "Yes", "是", 1)
+			})
+			if state, err = New(db, terse.Client).All(ctx, u.ID, short.ID, russian); err != nil || !state.Complete() || state.Failed != 0 ||
+				!strings.HasPrefix(state.Content, "<p>是</p>") || strings.Count(state.Content, "<p>Привет") != 4 {
+				t.Errorf("a text with a translation of one letter: %+v, %v", state, err)
+			}
+
+			// A service that stops answering fails the step and leaves the
+			// translation where it was, to go on when it answers again.
+			fresh := &store.Entry{FeedID: f.ID, GUID: "outage", Title: "Hello", Content: long}
+			if err := db.InsertEntries(ctx, u.ID, []*store.Entry{fresh}); err != nil {
+				t.Fatal(err)
+			}
+			if state, err = tr.Step(ctx, u.ID, fresh.ID, russian); err != nil || state.Done != 2 {
+				t.Fatalf("the first step: %+v, %v", state, err)
+			}
+			key := s.Key
+			s.Key = "refused"
+			for range 2 {
+				if _, err = tr.Step(ctx, u.ID, fresh.ID, russian); err == nil {
+					t.Error("a step with a service that refuses: no error")
+				}
+			}
+			e, _ = db.EntryByID(ctx, u.ID, fresh.ID)
+			if state = Of(e, "ru"); state.Done != 2 || state.Failed != 0 || state.Complete() {
+				t.Errorf("after the service refused: %+v", state)
+			}
+			s.Key = key
+			if state, err = tr.All(ctx, u.ID, fresh.ID, russian); err != nil || !state.Complete() || state.Failed != 0 || strings.Count(state.Content, "<p>Привет") != 5 {
+				t.Errorf("after the service came back: %+v, %v", state, err)
+			}
+
 			if _, err = tr.Step(ctx, u.ID, 12345, russian); !errors.Is(err, store.ErrNotFound) {
 				t.Errorf("an entry there is not: %v", err)
 			}
