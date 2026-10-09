@@ -159,9 +159,9 @@ func (h *Handler) libraryOf(ctx context.Context, user *store.User, counts bool) 
 	if lib.labels, err = h.db.Tags(ctx, userID); err != nil {
 		return nil, err
 	}
-	feedCounts, labelCounts := map[int64]store.Counts{}, map[int64]store.Counts{}
+	unread, labelCounts := map[int64]int{}, map[int64]store.Counts{}
 	if counts {
-		if feedCounts, err = h.db.FeedCounts(ctx, userID); err != nil {
+		if unread, err = h.db.UnreadByFeed(ctx, userID); err != nil {
 			return nil, err
 		}
 		if labelCounts, err = h.db.LabelCounts(ctx, userID); err != nil {
@@ -178,7 +178,7 @@ func (h *Handler) libraryOf(ctx context.Context, user *store.User, counts bool) 
 	slices.SortStableFunc(lib.categories, func(a, b *store.Category) int { return cmp.Compare(position(a), position(b)) })
 	for _, f := range lib.feeds {
 		lib.feed[f.ID] = f
-		lib.unread[f.ID] = feedCounts[f.ID].Unread
+		lib.unread[f.ID] = unread[f.ID]
 	}
 	for id, c := range labelCounts {
 		lib.labelled[id] = c.Unread

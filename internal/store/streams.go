@@ -320,6 +320,41 @@ func (s *Store) FeedCounts(ctx context.Context, userID int64) (map[int64]Counts,
 	return counts, nil
 }
 
+// A plain GROUP BY feed_id with "is_read = FALSE" will not do: SQLite then
+// still reads the whole index, in the order of the feeds.
+const unreadByFeed = `
+	SELECT f.id, (SELECT COUNT(*) FROM entries e
+		WHERE e.user_id = f.user_id AND e.feed_id = f.id AND e.is_read = FALSE)
+	FROM feeds f WHERE f.user_id = ?`
+
+// UnreadByFeed returns the number of unread entries of every feed that has
+// one. It counts feed by feed, so that only the unread entries are read:
+// FeedCounts reads every entry of the user for the newest of each feed.
+func (s *Store) UnreadByFeed(ctx context.Context, userID int64) (map[int64]int, error) {
+	rows, err := s.query(ctx, unreadByFeed, userID)
+	if err != nil {
+		return nil, fmt.Errorf("store: unread by feed: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	unread := map[int64]int{}
+	for rows.Next() {
+		var (
+			id int64
+			n  int
+		)
+		if err := rows.Scan(&id, &n); err != nil {
+			return nil, fmt.Errorf("store: unread by feed: %w", err)
+		}
+		if n > 0 {
+			unread[id] = n
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: unread by feed: %w", err)
+	}
+	return unread, nil
+}
+
 // LabelCounts returns the counts of the labels attached to entries, by label.
 func (s *Store) LabelCounts(ctx context.Context, userID int64) (map[int64]Counts, error) {
 	counts, err := s.counts(ctx, `
