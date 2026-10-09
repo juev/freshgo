@@ -79,7 +79,7 @@ Source: `docker images`, `du`, the `dbstat` table and `PRAGMA freelist_count` of
 
 The articles take the same room in both. The difference in the data directory is the cache FreshRSS keeps of every feed document it fetched; freshgo keeps only the `ETag` and `Last-Modified` of a feed. A database imported anew from this FreshRSS is 47.3 MiB.
 
-The bytes written are `container_fs_writes_bytes_total` of cAdvisor for the device of the array, over the 24 hours to the evening of 2026-10-09: 1203 MiB for FreshRSS and 553 MiB for freshgo. Over 48 hours they are 2473 MiB and 1038 MiB. The day of freshgo was not a usual one: seven containers ran in turn as new versions came, two of which rebuilt indexes of the table of articles and one of which wrote 1178 texts anew, so a day of normal work writes less than this.
+The bytes written are `container_fs_writes_bytes_total` of cAdvisor for the device of the array, over the 24 hours to the evening of 2026-10-09: 1203 MiB for FreshRSS and 553 MiB for freshgo. Over 48 hours they are 2473 MiB and 1038 MiB. The day of freshgo was not a usual one: seven containers ran in turn as new versions came, one of which built new indexes on the table of articles and another wrote 1178 texts anew, so a day of normal work writes less than this.
 
 ## Time of answers
 
