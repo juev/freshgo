@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"testing"
 )
@@ -94,5 +95,21 @@ func TestImportUsage(t *testing.T) {
 	}
 	if code, stdout, stderr := runCLI(t, "import", "-h"); code != 0 || stdout != "" || !strings.Contains(stderr, "-source-database-url") {
 		t.Errorf("import -h: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}
+
+// The collector runs as the server sets it, unless the environment says
+// how it is to run.
+func TestTuneGC(t *testing.T) {
+	before := debug.SetGCPercent(100)
+	t.Cleanup(func() { debug.SetGCPercent(before) })
+
+	tuneGC(func(string) string { return "50" })
+	if got := debug.SetGCPercent(100); got != 100 {
+		t.Errorf("with GOGC set: %d, want it left at 100", got)
+	}
+	tuneGC(func(string) string { return "" })
+	if got := debug.SetGCPercent(100); got != gcPercent {
+		t.Errorf("without GOGC: %d, want %d", got, gcPercent)
 	}
 }
