@@ -681,7 +681,7 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 			Authors: strings.Join(e.Authors, ", "), Date: date.Format("2006-01-02 15:04"), DateTime: date.Format(time.RFC3339),
 			// What is stored was cleaned when it was fetched, but not all of it by
 			// freshgo: an import brings what FreshRSS let through.
-			Content:     template.HTML(throughServer(withReferrers(sanitize.HTML(content, e.Link, nil), prefs.Referrers))), //nolint:gosec // cleaned on this line
+			Content:     template.HTML(throughServer(prepared(sanitize.HTML(content, e.Link, nil), prefs.Referrers))), //nolint:gosec // cleaned on this line
 			Attachments: attachments(e), Tags: e.Tags, Labels: labels[e.ID], Read: e.IsRead, Starred: e.IsFavorite,
 			Full:     refresh.HasPageText(e),
 			ShowFeed: prefs.ToplineWebsite != "none", ShowDate: prefs.ToplineDate == nil || *prefs.ToplineDate,
@@ -702,28 +702,27 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 	return out, nil
 }
 
-// withReferrers lets the frames of the given hosts know where the reader
-// comes from, which some players ask for before they play: everything else
-// an entry embeds is told nothing.
-func withReferrers(content string, hosts []string) string {
-	if len(hosts) == 0 || !strings.Contains(content, "<iframe") {
+// prepared makes the cleaned text of an entry ready for a page. Its images
+// and frames are fetched when they come near the screen, not when the page
+// opens: a stream holds the text of every entry it lists, folded or not.
+// The frames of the given hosts are told where the reader comes from, which
+// some players ask for before they play: everything else an entry embeds
+// is told nothing.
+func prepared(content string, hosts []string) string {
+	if !strings.Contains(content, "<img") && !strings.Contains(content, "<iframe") {
 		return content
 	}
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader("<html><body>" + content + "</body></html>"))
 	if err != nil {
 		return content
 	}
-	changed := false
+	doc.Find("img, iframe").SetAttr("loading", "lazy")
 	doc.Find("iframe[src]").Each(func(_ int, frame *goquery.Selection) {
 		address, err := url.Parse(frame.AttrOr("src", ""))
 		if err == nil && slices.Contains(hosts, strings.ToLower(address.Hostname())) {
 			frame.SetAttr("referrerpolicy", "strict-origin-when-cross-origin")
-			changed = true
 		}
 	})
-	if !changed {
-		return content
-	}
 	out, err := doc.Find("body").Html()
 	if err != nil {
 		return content

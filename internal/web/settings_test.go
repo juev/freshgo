@@ -157,9 +157,14 @@ func TestUserSettings(t *testing.T) {
 		if a := s.post("/settings/privacy", url.Values{"hosts": {"https://video.example/x"}}); a.status != http.StatusBadRequest {
 			t.Errorf("an address in place of a host: status %d", a.status)
 		}
-		frames := withReferrers(`<p>a</p><iframe src="https://video.example/1"></iframe><iframe src="https://other.example/2"></iframe>`, []string{"video.example"})
-		if frames != `<p>a</p><iframe src="https://video.example/1" referrerpolicy="strict-origin-when-cross-origin"></iframe><iframe src="https://other.example/2"></iframe>` {
-			t.Errorf("frames with the referrer policy = %s", frames)
+		// U99: images and frames wait until they are near the screen; the
+		// frames of the hosts named are told where the reader comes from.
+		ready := prepared(`<p>a</p><img src="https://example.org/i.png"/><iframe src="https://video.example/1"></iframe><iframe src="https://other.example/2"></iframe>`, []string{"video.example"})
+		if ready != `<p>a</p><img src="https://example.org/i.png" loading="lazy"/><iframe src="https://video.example/1" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe><iframe src="https://other.example/2" loading="lazy"></iframe>` {
+			t.Errorf("the text of an entry made ready for a page = %s", ready)
+		}
+		if plain := `<p>a <b>b</b></p>`; prepared(plain, []string{"video.example"}) != plain {
+			t.Errorf("a text without images and frames changed: %s", prepared(plain, nil))
 		}
 	})
 }

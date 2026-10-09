@@ -912,6 +912,40 @@ func TestE2ETranslate(t *testing.T) {
 	})
 }
 
+// U99: the image of a folded entry is fetched when the entry is opened,
+// not when the page opens.
+func TestE2EImagesWait(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		remote := newFeedSite(t)
+		remote.serve("/picture.svg", "image/svg+xml", `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40"/></svg>`)
+		hits := func() int {
+			remote.mu.Lock()
+			defer remote.mu.Unlock()
+			return remote.hits["/picture.svg"]
+		}
+		pictured := &store.Entry{FeedID: 1, GUID: "pictured", Title: "With a picture", Link: "https://example.org/pictured",
+			Content: `<p><img src="` + remote.URL + `/picture.svg" alt="A square"></p>`}
+		if err := s.db.InsertEntries(context.Background(), s.user("alice").ID, []*store.Entry{pictured}); err != nil {
+			t.Fatal(err)
+		}
+		b := browse(t, s)
+		b.login("alice")
+		id := strconv.FormatInt(pictured.ID, 10)
+		b.open("/feeds/1?state=all#e" + id)
+		b.until("the entry of the address current, folded", current(pictured.ID, false))
+		b.until("the image set to wait", `document.querySelector('#e`+id+` .entry-content img').loading === 'lazy'`)
+		// The page is loaded, and whatever it fetches by itself is fetched.
+		time.Sleep(500 * time.Millisecond)
+		if n := hits(); n != 0 {
+			t.Errorf("the image of a folded entry was requested %d times before the entry was opened", n)
+		}
+		b.press("o")
+		b.until("the entry open", current(pictured.ID, true))
+		b.eventually("the image requested once the entry is open", func() bool { return hits() > 0 })
+		b.until("the image shown", `document.querySelector('#e`+id+` .entry-content img').naturalWidth === 40`)
+	})
+}
+
 // U93, U94: on a phone a reader goes through the entries by their rows, one
 // open at a time, and the controls of a stream wait behind a button.
 func TestE2EPhoneRows(t *testing.T) {
