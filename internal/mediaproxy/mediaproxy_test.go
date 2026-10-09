@@ -60,10 +60,37 @@ func TestRewrite(t *testing.T) {
 			`<video poster="/p/https-i.example-p.png" src="https://v.example/v.mp4"></video>`},
 		{"the source of an audio stays", ModeAll, `<audio><source src="https://a.example/a.mp3"></audio> &amp; text`, `<audio><source src="https://a.example/a.mp3"></audio> &amp; text`},
 		{"a link stays", ModeAll, `<a href="http://i.example/a.png">a.png</a>`, `<a href="http://i.example/a.png">a.png</a>`},
+		{"an address written with a character reference", ModeHTTPOnly, `<img src="http&#58;//i.example/a.png">`, `<img src="/p/http-i.example-a.png"/>`},
+		{"an image after one that stays", ModeHTTPOnly, `<img src="https://i.example/a.png"><p>b</p><img alt="x" src=" http://i.example/b.png ">`,
+			`<img src="https://i.example/a.png"/><p>b</p><img alt="x" src="/p/http-i.example-b.png"/>`},
+		{"a tag in capitals", ModeHTTPOnly, `<img src="https://i.example/a.png"><IMG SRC="http://i.example/b.png">`, `<img src="https://i.example/a.png"/><img src="/p/http-i.example-b.png"/>`},
+		{"what looks like an image inside a text area", ModeAll, `<textarea><img src="https://i.example/a.png"></textarea>`, `<textarea><img src="https://i.example/a.png"></textarea>`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := Rewrite(tc.content, tc.mode, through); got != tc.want {
 				t.Errorf("Rewrite:\n got %s\nwant %s", got, tc.want)
+			}
+		})
+	}
+}
+
+// A text with images none of which the mode takes, the usual case with
+// http-only: about 6 KB and three images over https. And the same text with
+// the images over http, which has to be written anew.
+func BenchmarkRewrite(b *testing.B) {
+	text := func(scheme string) string {
+		paragraphs := strings.Repeat(`<p>Сегодня вышла новая версия, <a href="https://example.org/a?x=1&amp;y=2">подробности</a> — "в статье". The quick brown fox jumps over the lazy dog.</p>`+"\n", 10)
+		return strings.Repeat(paragraphs+`<p><img src="`+scheme+`://example.org/i.png" alt="x" width="600"/></p>`+"\n", 3)
+	}
+	through := func(target string) string { return "/p/" + target }
+	for _, tc := range []struct{ name, content string }{
+		{"nothing to replace", text("https")},
+		{"three images to replace", text("http")},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				Rewrite(tc.content, ModeHTTPOnly, through)
 			}
 		})
 	}
