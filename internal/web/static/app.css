@@ -945,6 +945,14 @@ button.star[aria-pressed="true"] {
 	margin-left: auto;
 }
 
+/* What an action had to say, on a line of its own under the actions. */
+.entry-notice {
+	flex: 1 1 100%;
+	margin: 0;
+	color: var(--text);
+	font-weight: 700;
+}
+
 @media (max-width: 48rem) {
 	.entry > details > summary {
 		flex-wrap: wrap;
