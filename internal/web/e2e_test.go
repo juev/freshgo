@@ -587,8 +587,18 @@ func TestE2EListGoesOn(t *testing.T) {
 		if got := b.text(`document.querySelectorAll('.entries article.entry').length`); got != strconv.Itoa(len(ids)) {
 			t.Errorf("the page lists %s entries, want %d", got, len(ids))
 		}
+		top := `Math.round(document.getElementById('content').getBoundingClientRect().top + window.scrollY)`
+		before := b.text(top)
 		b.press("j")
 		b.until("the end of the list said", `document.getElementById('messages').textContent.includes('No more entries.')`)
+		// U101: the message lies over the page, moves nothing and goes.
+		if got := b.text(`getComputedStyle(document.querySelector('#messages p')).position + ' ' + document.getElementById('messages').getBoundingClientRect().height`); got != "fixed 0" {
+			t.Errorf("the message of the script is %s, want it fixed and the region without height", got)
+		}
+		if got := b.text(top); got != before {
+			t.Errorf("the content begins at %s with a message of the script, at %s without", got, before)
+		}
+		b.until("the message gone", `!document.querySelector('#messages p')`)
 		if unread := s.stored("alice", store.Listing{Set: mainStream(), Read: ptr(false)}); len(unread) != 18 {
 			t.Errorf("%d unread entries with mark_when.article off, want 18", len(unread))
 		}
@@ -915,7 +925,7 @@ func TestE2ETranslate(t *testing.T) {
 		b.press("T")
 		b.until("the button and the page saying that it has begun, nothing translated yet",
 			button+` === 'Stop translating…' && document.querySelector('#e`+id+` form[action$="/translate"] button').getAttribute('aria-busy') === 'true' && `+
-				`document.getElementById('messages').textContent === 'Translating…' && `+translated+` === 0`)
+				`document.querySelector('#messages p.visually-hidden').textContent === 'Translating…' && `+translated+` === 0`)
 		// The first part comes and is shown while the second is waited for.
 		close(in.opening)
 		b.until("the first paragraph and the title translated, the button offering to stop",

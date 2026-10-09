@@ -26,11 +26,21 @@
 		return node;
 	};
 
-	// say puts a message where screen readers announce it.
-	const say = (text) => {
-		if (messages) {
-			messages.replaceChildren(el('p', null, text));
+	// say puts a message where screen readers announce it. It lies over the
+	// page, so that nothing moves, and goes after a while; one that the
+	// page shows otherwise is for screen readers alone.
+	let lastSaid = null;
+	const say = (text, shown = true) => {
+		if (!messages) {
+			return;
 		}
+		if (lastSaid) {
+			lastSaid.remove();
+		}
+		const line = el('p', { class: shown ? 'said' : 'visually-hidden' }, text);
+		lastSaid = line;
+		messages.append(line);
+		setTimeout(() => line.remove(), 5000);
 	};
 
 	const parse = (html) => new DOMParser().parseFromString(html, 'text/html');
@@ -290,7 +300,7 @@
 		const said = () => (asked() ? asked().querySelector('button').textContent : '');
 		let label = said();
 		waiting(`${t('js.translating')}…`);
-		say(t('js.translate-begun'));
+		say(t('js.translate-begun'), false);
 		while (article.dataset.translating && asked()) {
 			const progress = await inTurn(() => (asked() ? post(asked(), article) : false));
 			const [done, total] = typeof progress === 'string' ? progress.split('/').map(Number) : [0, 0];

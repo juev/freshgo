@@ -458,6 +458,18 @@ button.link {
 	background: var(--bg-raised);
 }
 
+/* What the script has to say lies over the page and moves nothing. */
+.messages p.said {
+	position: fixed;
+	top: var(--space);
+	left: 50%;
+	z-index: 20;
+	max-width: calc(100% - var(--space) * 4);
+	margin: 0;
+	transform: translateX(-50%);
+	pointer-events: none;
+}
+
 .reader {
 	display: grid;
 	grid-template-columns: minmax(11rem, 16rem) minmax(0, 1fr);
