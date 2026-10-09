@@ -21,6 +21,7 @@ import (
 
 	"golang.org/x/text/language"
 
+	pagebrowser "github.com/juev/freshgo/internal/browser"
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/sanitize"
@@ -1097,6 +1098,9 @@ func (h *Handler) fullTextEntry(w http.ResponseWriter, r *http.Request) {
 	case err != nil:
 		h.log.Warn("page of an entry gave no text", "user", user.Name, "entry", e.ID, "error", err)
 		notice = "notice.fulltext-failed"
+		if errors.Is(err, pagebrowser.ErrChallenge) {
+			notice = "notice.fulltext-check"
+		}
 	}
 	h.back(w, r, e.ID, notice)
 }

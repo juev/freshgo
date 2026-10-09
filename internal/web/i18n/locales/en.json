@@ -155,6 +155,8 @@
   "feed.fulltext": "Full text of entries",
   "feed.fulltext.auto": "Find the article on its page without a selector",
   "feed.fulltext.auto.hint": "The text of every new entry is taken from the page it links to, the way the reader view of a browser finds it. The selector of the article is then not used.",
+  "feed.fulltext.browser": "Read the pages with a browser",
+  "feed.fulltext.browser.hint": "For a site that lets only a browser through to its pages, as behind a check of Cloudflare. The browser of the server opens every page, which takes seconds; the proxy, the cookies and the user agent set for the feed do not apply to it.",
   "feed.general": "The feed",
   "feed.headers": "Extra headers, one a line",
   "feed.heading": "Settings of a feed",
@@ -397,6 +399,7 @@
     "one": "Saved. %d unread entry got another text.",
     "other": "Saved. %d unread entries got another text."
   },
+  "notice.fulltext-check": "The page stays behind a check of its site, which did not let the browser of the server through.",
   "notice.fulltext-failed": "The text could not be taken from the page of the entry. The log of the server says why.",
   "notice.imported": {
     "one": "Imported: %d feed or entry added or updated.",

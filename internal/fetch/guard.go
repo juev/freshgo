@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"net/url"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -114,4 +116,38 @@ func internal(ip netip.Addr) bool {
 		}
 	}
 	return false
+}
+
+// Allowed reports whether address is one a request may go to: an http or
+// https address whose host resolves to nothing internal that the allowlist
+// does not name. It is for a page that something other than this client
+// requests, a browser. Unlike a request of the client, it looks at what the
+// name resolves to now, not at what is then connected to.
+func (c *Client) Allowed(ctx context.Context, address string) error {
+	u, err := url.Parse(address)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" {
+		return fmt.Errorf("%w: %s", ErrForbiddenAddress, redacted(address))
+	}
+	port := u.Port()
+	if port == "" {
+		port = map[string]string{"http": "80", "https": "443"}[u.Scheme]
+	}
+	number, err := strconv.ParseUint(port, 10, 16)
+	if err != nil {
+		return fmt.Errorf("%w: %s", ErrForbiddenAddress, redacted(address))
+	}
+	g := c.guard
+	if g.all || g.literals[strings.ToLower(net.JoinHostPort(u.Hostname(), port))] {
+		return nil
+	}
+	ips, err := net.DefaultResolver.LookupNetIP(ctx, "ip", u.Hostname())
+	if err != nil {
+		return fmt.Errorf("%s: %w", redacted(address), err)
+	}
+	for _, ip := range ips {
+		if !g.allowed(netip.AddrPortFrom(ip, uint16(number))) {
+			return fmt.Errorf("%w: %s", ErrForbiddenAddress, redacted(address))
+		}
+	}
+	return nil
 }

@@ -45,6 +45,10 @@ type Refresher struct {
 	// WebSub, when set, subscribes to the hubs feeds announce. A feed whose
 	// hub delivers is then polled once a day only.
 	WebSub *websub.Service
+	// Browser, when set, reads the pages of the feeds that ask for it
+	// (page_by_browser) in place of a request: it returns the address a
+	// page ends at and its markup.
+	Browser func(ctx context.Context, address string) (final, markup string, err error)
 
 	// running keeps one run at a time: a second one would find the same
 	// feeds due and fetch them again.

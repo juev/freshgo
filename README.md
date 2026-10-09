@@ -202,7 +202,7 @@ A feed that carries summaries can have the text of its articles taken from their
 
 For one article, the action "Full text" (key `f`) takes its text from its page whatever the feed says, and "Text of the feed" puts the text of the feed back.
 
-Pages are requested with the request settings of the feed and under the address rules of every request. A page that needs JavaScript to show its text gives none.
+Pages are requested with the request settings of the feed and under the address rules of every request. A page that needs JavaScript to show its text gives none, unless a browser reads it: see "Pages only a browser gets".
 
 ### How users log in
 
@@ -263,6 +263,7 @@ Every setting is a flag and an environment variable; the flag wins. The help of 
 | `-translate-url` | `FRESHGO_TRANSLATE_URL` | | Address of the OpenAI-compatible API that translates articles, without `/chat/completions`; see "Translating articles". |
 | `-translate-key` | `FRESHGO_TRANSLATE_KEY` | | Key of that API. |
 | `-translate-model` | `FRESHGO_TRANSLATE_MODEL` | | Model that translates. |
+| `-browser-url` | `FRESHGO_BROWSER_URL` | | Websocket of the DevTools protocol of a browser that reads the pages of the feeds set to it: `ws://host:port`; see "Pages only a browser gets". |
 | `-smtp-url` | `FRESHGO_SMTP_URL` | | SMTP server for the letters that confirm e-mail addresses: `smtp[s]://user:password@host:port?from=address`. Without it, confirmation cannot be required. |
 
 ### Translating articles
@@ -300,6 +301,23 @@ The server can hand out the images of articles from its own address, so that the
 - "none": the addresses stay as the feeds have them.
 
 It holds for the web interface and for apps that read through the Google Reader API; for apps, start the server with `-base-url` so that the addresses lead to where the apps reach it. The addresses are signed: the server fetches only what it has put into an article itself. Images are passed through, not stored, and the browser is told to keep them for three days. Audio and video are not handed out.
+
+### Pages only a browser gets
+
+Some sites answer a request for a page with a check that only a browser passes, the "Just a moment…" of Cloudflare among them: the feed is read, and the full text of its articles cannot be taken. With a browser beside the server, a feed can have its pages read by it. Run one that speaks the DevTools protocol, tell the server where it is, and check "Read the pages with a browser" under "Full text of entries" in the settings of the feed:
+
+```sh
+docker network create freshgo
+docker run -d --name browser --restart unless-stopped --network freshgo lightpanda/browser:nightly
+docker run -d --name freshgo --restart unless-stopped --network freshgo \
+  -v freshgo:/data -p 127.0.0.1:8080:8080 -e FRESHGO_BROWSER_URL=ws://browser:9222 ghcr.io/juev/freshgo
+```
+
+[Lightpanda](https://lightpanda.io) is the lightest browser that was tried: about 30 MiB idle and a few hundred while it reads a page. The headless shell of Chrome works the same way, started with one flag: `chromedp/headless-shell --disable-blink-features=AutomationControlled`. Every page is opened in a tab that knows nothing of the pages before it. A page takes seconds instead of a fraction of one, and the browser reads one page at a time, so set it for the feeds that need it and not for all.
+
+The browser goes its own way to the network. The proxy of the installation, and the proxy, cookies and user agent of the feed, do not apply to it: a check is passed by the address and the signs of the browser itself, and in the trial it was not passed through a proxy. The address of an article is held to the address rules of every request before the browser gets it, but what a page then loads is the browser's own matter: keep the browser where it reaches nothing internal that a page of the web must not see. A container reaches what its host reaches unless a firewall says otherwise, so that is a matter of the rules of the host, not of the network above. The port of the browser needs no publishing and must not be reachable from outside: whoever reaches it drives the browser.
+
+A check that wants a click or a puzzle is not passed. The article then keeps the text of the feed, and "Full text" says that the page stays behind a check.
 
 ### Proxy
 

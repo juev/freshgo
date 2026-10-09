@@ -16,6 +16,7 @@ import (
 	"sync"
 	"testing"
 
+	pagebrowser "github.com/juev/freshgo/internal/browser"
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/store"
 )
@@ -1076,6 +1077,69 @@ func TestPaletteHasSettings(t *testing.T) {
 			if !found {
 				t.Errorf("the palette does not offer %+v", p)
 			}
+		}
+	})
+}
+
+// U102: with a browser to read pages with, the form of a feed asks whether
+// its pages are read by it; without one it has no word on it and leaves
+// what is stored. A page that stays behind a check says so.
+func TestFeedPagesByBrowser(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		ctx := context.Background()
+		s.asAlice()
+		id := s.stored("alice", store.Listing{Set: mainStream()})[0]
+		e := s.entry("alice", id)
+		target := fmt.Sprintf("/subscriptions/feeds/%d", e.FeedID)
+		byBrowser := func() any { return decoded(t, s.feed("alice", e.FeedID).Attributes)["page_by_browser"] }
+
+		f := s.feed("alice", e.FeedID)
+		attrs := readAttrs(f.Attributes)
+		attrs.set("page_by_browser", true)
+		f.Attributes = attrs.raw()
+		if err := s.db.UpdateFeed(ctx, f); err != nil {
+			t.Fatal(err)
+		}
+		if page := s.page(target); strings.Contains(page, "page_by_browser") {
+			t.Errorf("the form asks about a browser the server does not have:\n%s", page)
+		}
+		if _, body := s.follow(target, s.feedForm(e.FeedID)); notice(body) != "Saved." || byBrowser() != true {
+			t.Errorf("saved without a browser: notice %q, page_by_browser %v", notice(body), byBrowser())
+		}
+
+		var failure error
+		s.h.refresher.Browser = func(_ context.Context, address string) (string, string, error) {
+			return address, "", failure
+		}
+		if page := s.page(target); !strings.Contains(page, `name="page_by_browser" value="1" checked`) || !strings.Contains(page, "Read the pages with a browser") {
+			t.Errorf("the form does not show the pages as read by the browser:\n%s", page)
+		}
+		form := s.feedForm(e.FeedID)
+		if form.Get("page_by_browser") != "1" {
+			t.Errorf("the form as shown: page_by_browser %q", form.Get("page_by_browser"))
+		}
+		form.Del("page_by_browser")
+		if _, body := s.follow(target, form); notice(body) == "" || byBrowser() != nil {
+			t.Errorf("the box cleared: notice %q, page_by_browser %v", notice(body), byBrowser())
+		}
+		if page := s.page(target); !strings.Contains(page, `name="page_by_browser" value="1" aria-describedby`) {
+			t.Errorf("the form shows the box checked after it was cleared:\n%s", page)
+		}
+		form.Set("page_by_browser", "1")
+		if _, body := s.follow(target, form); notice(body) == "" || byBrowser() != true {
+			t.Errorf("the box checked: notice %q, page_by_browser %v", notice(body), byBrowser())
+		}
+
+		// U97: a page that stays behind a check says that, not that the log knows.
+		failure = fmt.Errorf("reading: %w", pagebrowser.ErrChallenge)
+		a := s.part(http.MethodPost, fmt.Sprintf("/entries/%d/fulltext", id), "entry", url.Values{"full": {"1"}, "next": {"/"}})
+		if said, _ := url.PathUnescape(a.header.Get(noticeHeader)); a.status != http.StatusOK || !strings.Contains(said, "stays behind a check of its site") ||
+			s.entry("alice", id).Content != e.Content {
+			t.Errorf("a page behind a check: status %d, notice %q", a.status, said)
+		}
+		form.Set("path_entries_auto", "1")
+		if a := s.post(target+"/preview", form); a.status != http.StatusOK || !strings.Contains(a.body, "stays behind a check of its site") {
+			t.Errorf("the preview of a page behind a check: status %d\n%s", a.status, a.body)
 		}
 	})
 }

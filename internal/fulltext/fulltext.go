@@ -12,6 +12,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/url"
 	"regexp"
 	"strings"
@@ -63,6 +64,11 @@ type Request struct {
 	// ForceHTTPS, when not nil, gets every URL of the result and returns the
 	// one to keep.
 	ForceHTTPS func(string) string
+	// Read, when not nil, gets the page in place of a request of the client:
+	// a browser, for a page that only a browser is let through to. It
+	// returns the address the page ends at and its markup. Params are then
+	// not used.
+	Read func(ctx context.Context, address string) (final, markup string, err error)
 }
 
 // selectorPadding is what FreshRSS trims off a list of selectors.
@@ -99,17 +105,28 @@ func Article(ctx context.Context, client *fetch.Client, req Request) (string, er
 	pageURL := req.URL
 	var doc *goquery.Document
 	for refreshes := 0; ; refreshes++ {
-		resp, err := client.Fetch(ctx, fetch.Request{URL: pageURL, Accept: fetch.AcceptHTML, Params: req.Params})
-		if err != nil {
-			return "", err
-		}
-		if len(bytes.TrimSpace(resp.Body)) == 0 {
-			return "", ErrEmptyPage
-		}
-		pageURL = resp.URL
-		r, err := charset.NewReader(bytes.NewReader(resp.Body), resp.Header.Get("Content-Type"))
-		if err != nil {
-			return "", fmt.Errorf("fulltext: %w", err)
+		var r io.Reader
+		if req.Read != nil {
+			final, markup, err := req.Read(ctx, pageURL)
+			if err != nil {
+				return "", err
+			}
+			if strings.TrimSpace(markup) == "" {
+				return "", ErrEmptyPage
+			}
+			pageURL, r = final, strings.NewReader(markup)
+		} else {
+			resp, err := client.Fetch(ctx, fetch.Request{URL: pageURL, Accept: fetch.AcceptHTML, Params: req.Params})
+			if err != nil {
+				return "", err
+			}
+			if len(bytes.TrimSpace(resp.Body)) == 0 {
+				return "", ErrEmptyPage
+			}
+			pageURL = resp.URL
+			if r, err = charset.NewReader(bytes.NewReader(resp.Body), resp.Header.Get("Content-Type")); err != nil {
+				return "", fmt.Errorf("fulltext: %w", err)
+			}
 		}
 		// Without scripting, as libxml reads it: what noscript holds is markup.
 		root, err := html.ParseWithOptions(r, html.ParseOptionEnableScripting(false))
@@ -118,7 +135,8 @@ func Article(ctx context.Context, client *fetch.Client, req Request) (string, er
 		}
 		doc = goquery.NewDocumentFromNode(root)
 		next := ""
-		if refreshes < maxRefreshes {
+		// A browser has followed where the page sent it on already.
+		if req.Read == nil && refreshes < maxRefreshes {
 			next = refreshedTo(doc, pageURL)
 		}
 		if next == "" {
