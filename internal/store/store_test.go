@@ -109,8 +109,8 @@ func TestMigrationWebSubHub(t *testing.T) {
 			if err := s.PutWebSub(ctx, &WebSub{Topic: "https://example.org/feed", Hub: "https://hub.example.org/", Key: "k", Secret: "s"}); err != nil {
 				t.Fatal(err)
 			}
-			// Back to the schema before the migration.
-			for _, q := range []string{"ALTER TABLE feeds DROP COLUMN websub_hub", "DELETE FROM schema_migrations WHERE version = 8"} {
+			// Back to the schema before the migration; those after it run again.
+			for _, q := range []string{"ALTER TABLE feeds DROP COLUMN websub_hub", "DELETE FROM schema_migrations WHERE version >= 8"} {
 				if _, err := s.exec(ctx, q); err != nil {
 					t.Fatalf("%s: %v", q, err)
 				}
