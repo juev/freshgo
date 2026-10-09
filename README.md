@@ -304,7 +304,28 @@ It holds for the web interface and for apps that read through the Google Reader 
 
 ### Pages only a browser gets
 
-Some sites answer a request for a page with a check that only a browser passes, the "Just a moment…" of Cloudflare among them: the feed is read, and the full text of its articles cannot be taken. With a browser beside the server, a feed can have its pages read by it. Run one that speaks the DevTools protocol, tell the server where it is, and check "Read the pages with a browser" under "Full text of entries" in the settings of the feed:
+Some sites answer a request for a page with a check that only a browser passes, the "Just a moment…" of Cloudflare among them: the feed is read, and the full text of its articles cannot be taken. With a browser beside the server, a feed can have its pages read by it.
+
+Two things are set, once for the installation: a browser that speaks the DevTools protocol runs beside the server, and the server is told where it is. In the `compose.yaml` of "Behind a reverse proxy" that is one more service, and one more setting of the server:
+
+```yaml
+services:
+  freshgo:
+    environment:
+      FRESHGO_BROWSER_URL: ws://browser:9222
+    depends_on:
+      - browser
+
+  browser:
+    image: lightpanda/browser:nightly
+    restart: unless-stopped
+```
+
+`docker compose up -d` then starts the browser with the server, and it comes back with it when the host starts again: nothing is started by hand. The browser publishes no port.
+
+The address is a setting of the server, not of a feed. With it, the settings of every feed have the box "Read the pages with a browser" under "Full text of entries"; without it the box is not there. Check it for the feeds whose pages need a browser.
+
+Without Compose, the two containers are given a network of their own:
 
 ```sh
 docker network create freshgo
