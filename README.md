@@ -254,6 +254,7 @@ Every setting is a flag and an environment variable; the flag wins. The help of 
 |---|---|---|---|
 | `-database-url` | `FRESHGO_DATABASE_URL` | `sqlite://freshgo.sqlite` | `sqlite://<path>` or `postgres://<dsn>`. |
 | `-listen` | `FRESHGO_LISTEN` | `127.0.0.1:8080` | Address the HTTP server binds to. |
+| `-debug-listen` | `FRESHGO_DEBUG_LISTEN` | | Address the profiles of the Go runtime are handed out at, under `/debug/pprof/`, apart from the server: `127.0.0.1:6060`. They show what the server does and can keep it busy, so the address is not one for the public. |
 | `-base-url` | `FRESHGO_BASE_URL` | | Public address of the server. Set it behind a reverse proxy: links to feed icons are built from it, and WebSub needs it. |
 | `-refresh-interval` | `FRESHGO_REFRESH_INTERVAL` | `10m` | How often `serve` looks for feeds that are due. |
 | `-fetch-allowlist` | `FRESHGO_FETCH_ALLOWLIST` | | Internal destinations feeds may be fetched from: `host:port`, a CIDR range, or `*`, separated by commas. Without it, requests to private and loopback addresses are refused. |
