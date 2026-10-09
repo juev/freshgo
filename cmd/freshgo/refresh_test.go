@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -223,6 +224,34 @@ func TestServe(t *testing.T) {
 		}
 		if resp.StatusCode != want.status || !strings.HasPrefix(string(body), want.body) {
 			t.Errorf("GET %s: status %d, body %q; want %d and a body starting with %q", path, resp.StatusCode, body, want.status, want.body)
+		}
+	}
+}
+
+// With -debug-listen the profiles of the runtime are handed out at that
+// address, and never at the address of the server.
+func TestServeProfiles(t *testing.T) {
+	free, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	debug := free.Addr().String()
+	_ = free.Close()
+	database := "sqlite://" + filepath.Join(t.TempDir(), "freshgo.sqlite")
+	address := serving(t, "handing out profiles", "-database-url", database, "-debug-listen", debug)
+
+	for url, want := range map[string]int{
+		"http://" + debug + "/debug/pprof/heap":    http.StatusOK,
+		"http://" + debug + "/debug/pprof/cmdline": http.StatusOK,
+		"http://" + address + "/debug/pprof/":      http.StatusNotFound,
+	} {
+		resp, err := http.Get(url)
+		if err != nil {
+			t.Fatalf("GET %s: %v", url, err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != want {
+			t.Errorf("GET %s: status %d, want %d", url, resp.StatusCode, want)
 		}
 	}
 }

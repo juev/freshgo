@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"strings"
 	"sync"
 	"time"
@@ -76,6 +77,18 @@ func routes(api, icons, misc, hubs, pages http.Handler) http.Handler {
 	})
 }
 
+// profileHandler hands out the profiles of the Go runtime. They are on a
+// handler of their own, so that the address of the server never shows them.
+func profileHandler() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	return mux
+}
+
 // runServe answers API clients and refreshes the feeds until the process is
 // told to stop.
 func runServe(ctx context.Context, e env, args []string) (err error) {
@@ -123,6 +136,21 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	var profiles *http.Server
+	if conf.DebugListen != "" {
+		debugListener, err := net.Listen("tcp", conf.DebugListen)
+		if err != nil {
+			_ = listener.Close()
+			return err
+		}
+		profiles = &http.Server{Handler: profileHandler(), ReadHeaderTimeout: 10 * time.Second}
+		s.log.Info("handing out profiles", "address", debugListener.Addr().String())
+		go func() {
+			if err := profiles.Serve(debugListener); !errors.Is(err, http.ErrServerClosed) {
+				s.log.Error("the server of the profiles stopped", "error", err)
+			}
+		}()
+	}
 	server := &http.Server{
 		Handler:           routes(api, s.icons, extensions(s.registry), hubs, pages),
 		ReadHeaderTimeout: 10 * time.Second,
@@ -144,6 +172,9 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 		if err := server.Shutdown(stop); err != nil {
 			s.log.Error("server did not stop cleanly", "error", err)
 			_ = server.Close()
+		}
+		if profiles != nil {
+			_ = profiles.Close()
 		}
 	})
 	err = server.Serve(listener)
