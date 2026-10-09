@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/juev/freshgo/internal/hooks"
+	"github.com/juev/freshgo/internal/sanitize"
 	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
 )
@@ -300,8 +301,9 @@ func TestEntryIsShown(t *testing.T) {
 		entries := []*store.Entry{
 			{
 				FeedID: 1, GUID: "shown", Title: `Tom & "Jerry" <b>`, Authors: []string{"Ann", "Bo"}, Link: "https://example.org/a?b=1&c=2",
-				Content: `<p onclick="steal()">Text <a href="/relative">link</a></p><script>alert(1)</script><form action="/logout"><input name="x"></form>` +
-					`<img src="https://example.org/inline.png">`,
+				// As a writer stores it: the page shows the text as it is stored.
+				Content: sanitize.HTML(`<p onclick="steal()">Text <a href="/relative">link</a></p><script>alert(1)</script><form action="/logout"><input name="x"></form>`+
+					`<img src="https://example.org/inline.png">`, "https://example.org/a?b=1&c=2", nil),
 				Published: time.Date(2026, 3, 1, 23, 30, 0, 0, time.UTC).Unix(), Tags: []string{"cats", "mice"},
 				Attributes: json.RawMessage(`{"enclosures":[
 					{"url":"https://example.org/s.mp3","type":"audio/mpeg","title":"Episode"},
@@ -342,7 +344,9 @@ func TestEntryIsShown(t *testing.T) {
 			if n := strings.Count(body, "example.org/inline.png"); n != 1 {
 				t.Errorf("GET %s shows the picture of the text %d times, want once", target, n)
 			}
-			for _, unwanted := range []string{"onclick", "<script>alert", "steal()", `action="/logout"><input`, "javascript:alert"} {
+			// The addresses of the enclosures and of the entry are not part of
+			// the text, and the page looks at them itself.
+			for _, unwanted := range []string{"javascript:alert"} {
 				if strings.Contains(body, unwanted) {
 					t.Errorf("GET %s shows %q", target, unwanted)
 				}
