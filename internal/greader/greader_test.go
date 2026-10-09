@@ -23,6 +23,7 @@ import (
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/mediaproxy"
 	"github.com/juev/freshgo/internal/refresh"
+	"github.com/juev/freshgo/internal/sanitize"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/storetest"
 )
@@ -319,16 +320,24 @@ func TestEnclosures(t *testing.T) {
 			{"url":"/relative.png"},
 			{"url":"https://example.org/bare.png","length":0}]}`
 		const text = `<p><img src="https://example.org/inline.png"></p>`
+		const legacyText = `<p>text</p><div class="enclosure"><p class="enclosure-content">` +
+			`<audio src="https://example.org/a.mp3" data-type="audio/mpeg" data-length="5"></audio></p></div>` +
+			`<div class="enclosure"><p class="enclosure-content"><img src="https://example.org/b.png"></p></div>`
 		w.entries(w.alice,
 			&store.Entry{ID: 1 * second, FeedID: f.ID, Title: "with", Content: text, Attributes: []byte(attributes)},
 			&store.Entry{ID: 2 * second, FeedID: plain.ID, Title: "without", Content: text, Attributes: []byte(attributes)},
 			// As FreshRSS before 1.20.1 stored attachments: in the text only.
-			&store.Entry{ID: 3 * second, FeedID: f.ID, Title: "legacy", Content: `<p>text</p><div class="enclosure"><p class="enclosure-content">` +
-				`<audio src="https://example.org/a.mp3" data-type="audio/mpeg" data-length="5"></audio></p></div>` +
-				`<div class="enclosure"><p class="enclosure-content"><img src="https://example.org/b.png"></p></div>`})
+			&store.Entry{ID: 3 * second, FeedID: f.ID, Title: "legacy", Content: legacyText})
+		// The same after it was cleaned, as an import and the migration of
+		// the texts leave it.
+		cleaned := sanitize.HTML(legacyText, "", nil)
+		if !strings.Contains(cleaned, `data-sanitized-class="enclosure-content"`) {
+			t.Fatalf("cleaning left the text as %s", cleaned)
+		}
+		w.entries(w.alice, &store.Entry{ID: 4 * second, FeedID: f.ID, Title: "legacy, cleaned", Content: cleaned})
 
-		items := w.items(1*second, 2*second, 3*second)
-		legacy, without, with := items[0], items[1], items[2]
+		items := w.items(1*second, 2*second, 3*second, 4*second)
+		legacyCleaned, legacy, without, with := items[0], items[1], items[2], items[3]
 
 		wantContent := text +
 			"<figure class=\"enclosure\">\n\t<p class=\"enclosure-content\">\n\t\t<img class=\"enclosure-thumbnail\" src=\"https://example.org/thumb.jpg\" alt=\"\" />\n\t</p>\n</figure>" +
@@ -363,6 +372,9 @@ func TestEnclosures(t *testing.T) {
 		}
 		if !reflect.DeepEqual(legacy.Enclosure, wantLegacy) {
 			t.Errorf("attachments written in the text = %v, want %v", legacy.Enclosure, wantLegacy)
+		}
+		if !reflect.DeepEqual(legacyCleaned.Enclosure, wantLegacy) {
+			t.Errorf("attachments written in a text that was cleaned = %v, want %v", legacyCleaned.Enclosure, wantLegacy)
 		}
 	})
 }
