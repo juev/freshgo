@@ -162,7 +162,7 @@ freshgo serve
 
 ## Web interface
 
-Open the address of the server in a browser and sign in. Pages are rendered by the server: every action is a link or a form and works without JavaScript; the script adds keys and actions that do not reload the page. On a phone the menu and the controls of a stream (search, state, order) fold behind buttons, a tap on a row opens its entry and closes the one that was open, and a bar at the foot of the screen opens the next and the previous entry, marks read and stars. The browser of a phone or a desktop can install freshgo as an application ("Add to Home Screen", "Install"); that takes HTTPS, and nothing is read offline.
+Open the address of the server in a browser and sign in. Pages are rendered by the server: every action is a link or a form and works without JavaScript; the script adds keys and actions that do not reload the page. The actions of an open entry (read or unread, the original, full text, translation, sharing, folding) stand between its title and its text and stay at the top of the screen while the text is read. On a phone the menu and the controls of a stream (search, state, order) fold behind buttons, a tap on a row opens its entry and closes the one that was open, and a bar at the foot of the screen opens the next and the previous entry, marks read and stars. The browser of a phone or a desktop can install freshgo as an application ("Add to Home Screen", "Install"); that takes HTTPS, and nothing is read offline.
 
 The reading screen has the tree of categories, feeds, saved queries and labels on the left and the entries on the right, laid out after Google Reader: an entry is one row with its star, feed, title and the beginning of its text, and opens in place as a card. "List" and "Expanded" above the entries switch between rows and open entries. The pages come in two looks, "Reader classic" and "Reader 2011", each with light and dark colours; the choice is on the page "Display" of the settings. The search field takes the search language of FreshRSS. The other sections are subscriptions (feeds with all their settings, categories, labels, import and export), statistics, settings, and administration for administrators (users, the installation, how users log in, the log).
 
@@ -195,6 +195,14 @@ The reading screen has the tree of categories, feeds, saved queries and labels o
 | `Esc` | close a dialog |
 
 Keys are changed on the page "Keys" of the settings, where one checkbox switches off all keys pressed alone. A user imported from FreshRSS keeps the keys they changed there; the keys FreshRSS gave by default make way for those above. Keys do nothing while the focus is in a field.
+
+### Full text of articles
+
+A feed that carries summaries can have the text of its articles taken from their pages. The settings of a feed have two ways under "Full text of entries": "Find the article on its page without a selector", which finds the article the way the reader view of a browser does, and a CSS selector of the article for the sites where that takes too much or too little. A second selector names what to leave out, searches limit the reading of pages to the articles that match, and "Try it on the newest entry" shows the result before anything is stored. When the form is saved with a change of these settings, the unread articles of the feed get their text the new way at once; articles already read keep theirs.
+
+For one article, the action "Full text" (key `f`) takes its text from its page whatever the feed says, and "Text of the feed" puts the text of the feed back.
+
+Pages are requested with the request settings of the feed and under the address rules of every request. A page that needs JavaScript to show its text gives none.
 
 ### How users log in
 
@@ -313,6 +321,8 @@ make test-integration   # the same tests on SQLite and on a PostgreSQL started i
 make lint
 make test-e2e           # needs Chrome: the interface in a headless browser, keyboard only, with accessibility checks
 ```
+
+`make lint` runs the `golangci-lint` that is installed; CI runs v2.14.0 (`.github/workflows/ci.yml`), and a local one of another version may find more or less.
 
 GitHub Actions runs the lint, the integration tests, the browser tests and a trial build of the release on every push to `main` and on every pull request (`.github/workflows/ci.yml`). A release is a tag:
 
