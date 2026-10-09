@@ -328,6 +328,17 @@ code {
 	html {
 		scroll-behavior: smooth;
 	}
+
+	/* What was asked of the server and takes its time. */
+	button[aria-busy="true"] {
+		animation: waiting 0.9s ease-in-out infinite alternate;
+	}
+}
+
+@keyframes waiting {
+	to {
+		opacity: 0.4;
+	}
 }
 
 .account {

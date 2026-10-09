@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 
 	"golang.org/x/text/language"
 	"golang.org/x/text/language/display"
@@ -111,7 +112,9 @@ func (t *Translator) Step(ctx context.Context, userID, entryID int64, tag langua
 	_, all := records(e)
 	rec, ok := all[key]
 	var st Stats
+	size := batchBytes
 	if !ok || rec.Of != hashOf(e) {
+		size = openingBytes
 		rec = record{Of: hashOf(e), Title: e.Title, Content: e.Content}
 		root, err := parse(e.Content)
 		if err != nil {
@@ -131,21 +134,29 @@ func (t *Translator) Step(ctx context.Context, userID, entryID int64, tag langua
 		if sample.Len() == 0 {
 			sample.WriteString(e.Title)
 		}
+		// The two questions are asked at once: the reader is waiting.
+		var (
+			asked    sync.WaitGroup
+			titled   Stats
+			title    string
+			titleErr error
+		)
+		if letters.MatchString(e.Title) {
+			asked.Go(func() { title, titleErr = t.client.alone(ctx, e.Title, name, &titled) })
+		}
 		same, err := t.client.written(ctx, sample.String(), name, &st)
+		asked.Wait()
 		if err != nil {
 			return State{}, err
 		}
 		if same {
 			return Of(e, key), ErrSameLanguage
 		}
-		if letters.MatchString(e.Title) {
-			title, err := t.client.alone(ctx, e.Title, name, &st)
-			if err != nil {
-				return State{}, err
-			}
-			if title != "" && !mark.MatchString(title) {
-				rec.Title = title
-			}
+		if titleErr != nil {
+			return State{}, titleErr
+		}
+		if title != "" && !mark.MatchString(title) {
+			rec.Title = title
 		}
 	}
 	root, err := parse(rec.Content)
@@ -161,7 +172,7 @@ func (t *Translator) Step(ctx context.Context, userID, entryID int64, tag langua
 			rest = append(rest, run)
 		}
 	}
-	n := first(rest)
+	n := first(rest, size)
 	if err := t.client.translate(ctx, rest[:n], name, &st); err != nil {
 		return State{}, err
 	}

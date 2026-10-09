@@ -872,7 +872,7 @@ func TestE2EFullTextOfAnEntry(t *testing.T) {
 func TestE2ETranslate(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
 		in := interpret(t, s)
-		in.hold = make(chan struct{})
+		in.opening, in.hold = make(chan struct{}), make(chan struct{})
 		b := browse(t, s)
 		b.login("alice")
 		id := strconv.FormatInt(in.entry.ID, 10)
@@ -883,19 +883,27 @@ func TestE2ETranslate(t *testing.T) {
 		translated := `[...document.querySelectorAll('#e` + id + ` .entry-content p')].filter(p => p.textContent.startsWith('Привет')).length`
 		button := `document.querySelector('#e` + id + ` form[action$="/translate"] button').textContent`
 
-		// The first part comes and is shown while the second is waited for.
+		// Before the service has said a word, the button and the page say
+		// that the translation was asked for.
 		b.press("T")
-		b.until("the first paragraphs and the title translated, the button offering to stop",
-			translated+` === 2 && document.querySelector('#e`+id+` .entry-title').textContent === 'Привет, дорогой читатель' && `+button+` === 'Stop translating (40%)'`)
-		b.accessible("an entry half translated")
+		b.until("the button and the page saying that it has begun, nothing translated yet",
+			button+` === 'Stop translating…' && document.querySelector('#e`+id+` form[action$="/translate"] button').getAttribute('aria-busy') === 'true' && `+
+				`document.getElementById('messages').textContent === 'Translating…' && `+translated+` === 0`)
+		// The first part comes and is shown while the second is waited for.
+		close(in.opening)
+		b.until("the first paragraph and the title translated, the button offering to stop",
+			translated+` === 1 && document.querySelector('#e`+id+` .entry-title').textContent === 'Привет, дорогой читатель' && `+button+` === 'Stop translating (20%)'`)
+		b.accessible("an entry partly translated")
 
-		// Stopped, it stays where it is and offers to go on.
+		// Stopped, it says so at once, stays where the part under way
+		// leaves it and offers to go on.
 		b.tabTo("#e" + id + ` form[action$="/translate"] button`)
 		b.press(kb.Enter)
+		b.until("the button saying that it stops", button+` === 'Stopping…'`)
 		close(in.hold)
-		b.until("the translation stopped after the part under way", translated+` === 4 && `+button+` === 'Translate on (80%)'`)
-		b.eventually("four paragraphs of five stored", func() bool {
-			return strings.Count(translate.Of(s.entry("alice", in.entry.ID), "en").Content, "<p>Привет") == 4
+		b.until("the translation stopped after the part under way", translated+` === 3 && `+button+` === 'Translate on (60%)'`)
+		b.eventually("three paragraphs of five stored", func() bool {
+			return strings.Count(translate.Of(s.entry("alice", in.entry.ID), "en").Content, "<p>Привет") == 3
 		})
 
 		// Asked again, it goes on to the end and offers the original.

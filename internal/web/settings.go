@@ -15,6 +15,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"golang.org/x/text/language"
+	"golang.org/x/text/language/display"
 
 	"github.com/juev/freshgo/internal/store"
 )
@@ -223,7 +224,8 @@ func (h *Handler) showReading(w http.ResponseWriter, r *http.Request, status int
 		page.On["same_title_in_feed"], page.Text["same_title_in_feed"] = true, "1"
 	}
 	page.Text["filters_read"], page.Text["filters_star"] = s.filtersFor("read"), s.filtersFor("star")
-	page.Text["translate_to"], page.On["translating"] = prefs.TranslateTo, h.translator != nil
+	page.On["translating"] = h.translator != nil
+	page.Options["translate_to"] = translateOptions(v, prefs.TranslateTo)
 	if problem != "" {
 		page.Problem = v.T(problem)
 	}
@@ -288,6 +290,30 @@ func (h *Handler) saveReading(w http.ResponseWriter, r *http.Request) {
 		}
 		return problem
 	}, func(status int, s attrs, problem string) { h.showReading(w, r, status, s, problem) })
+}
+
+// translateTags are the languages a reader can have entries translated
+// into.
+var translateTags = []string{
+	"ar", "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "he", "hi", "hu", "id", "it", "ja", "ko", "lt", "lv", "nb", "nl",
+	"pl", "pt", "pt-BR", "ro", "ru", "sk", "sl", "sr", "sv", "th", "tr", "uk", "vi", "zh",
+}
+
+// translateOptions lists the languages to translate into by their names in
+// the language of the page, after the language of the interface itself. A
+// tag that is set and not among them is listed too.
+func translateOptions(v *view, chosen string) []option {
+	names := display.Tags(language.Make(v.Lang()))
+	tags := translateTags
+	if _, err := language.Parse(chosen); err == nil && chosen != "" && !slices.Contains(tags, chosen) {
+		tags = append(slices.Clone(tags), chosen)
+	}
+	options := make([]option, 0, len(tags)+1)
+	for _, tag := range tags {
+		options = append(options, option{tag, names.Name(language.Make(tag)), tag == chosen})
+	}
+	slices.SortFunc(options, func(a, b option) int { return strings.Compare(a.Name, b.Name) })
+	return append([]option{{"", v.T("settings.translate-to.interface"), chosen == ""}}, options...)
 }
 
 // ---- Archiving ----

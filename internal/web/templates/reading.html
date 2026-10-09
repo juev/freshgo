@@ -62,8 +62,8 @@
 <legend>{{.T "settings.translating"}}</legend>
 <p>
 <label for="translate_to">{{.T "settings.translate-to"}}</label>
-<input type="text" id="translate_to" name="translate_to" value="{{index .Data.Text "translate_to"}}" autocapitalize="off" spellcheck="false" aria-describedby="translate-to-hint">
-<span class="hint" id="translate-to-hint">{{.T "settings.translate-to.hint"}}</span>
+<select id="translate_to" name="translate_to">
+{{template "options" (index .Data.Options "translate_to")}}</select>
 </p>
 </fieldset>
 {{end}}

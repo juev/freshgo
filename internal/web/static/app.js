@@ -242,15 +242,27 @@
 	// part shown as it comes, until none is left or the reader presses the
 	// button again, which then says so.
 	const translate = async (article) => {
-		if (article.dataset.translating) {
-			delete article.dataset.translating;
-			return;
-		}
-		article.dataset.translating = '1';
 		const asked = () => {
 			const form = article.querySelector('form.entry-action[action$="/translate"]');
 			return form && form.elements.do.value === 'translate' ? form : null;
 		};
+		// The button says at once what was asked of it: the answer of a
+		// model takes seconds.
+		const waiting = (text) => {
+			const button = asked() && asked().querySelector('button');
+			if (button) {
+				button.textContent = text;
+				button.setAttribute('aria-busy', 'true');
+			}
+		};
+		if (article.dataset.translating) {
+			delete article.dataset.translating;
+			waiting(t('js.translate-stopping'));
+			return;
+		}
+		article.dataset.translating = '1';
+		waiting(`${t('js.translating')}…`);
+		say(t('js.translate-begun'));
 		while (article.dataset.translating && asked()) {
 			const progress = await inTurn(() => (asked() ? post(asked(), article) : false));
 			const [done, total] = typeof progress === 'string' ? progress.split('/').map(Number) : [0, 0];
@@ -259,7 +271,7 @@
 				break;
 			}
 			if (article.dataset.translating) {
-				form.querySelector('button').textContent = `${t('js.translating')} (${Math.floor(done * 100 / total)}%)`;
+				waiting(`${t('js.translating')} (${Math.floor(done * 100 / total)}%)`);
 			}
 		}
 		delete article.dataset.translating;
