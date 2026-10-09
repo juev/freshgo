@@ -159,6 +159,27 @@
 		wasOpened(article);
 	};
 
+	// asked is the form of an entry that asks for its translation.
+	const asked = (article) => {
+		const form = article.querySelector('form.entry-action[action$="/translate"]');
+		return form && form.elements.do.value === 'translate' ? form : null;
+	};
+
+	// waiting has the button of a translation under way say that it waits,
+	// and keeps beside it what the button offers. Every answer about the
+	// entry brings new buttons, also the answer to another action.
+	const waiting = (article) => {
+		const button = asked(article) && asked(article).querySelector('button');
+		if (!button || !article.dataset.waiting) {
+			return;
+		}
+		if (!('offers' in button.dataset)) {
+			button.dataset.offers = button.textContent;
+		}
+		button.textContent = article.dataset.waiting;
+		button.setAttribute('aria-busy', 'true');
+	};
+
 	// sync brings an entry of the page up to date with what the server
 	// says it is now, without touching the text being read, unless it is
 	// the text that was asked for.
@@ -188,6 +209,7 @@
 				(article.querySelector('.entry-body') || article).append(now);
 			}
 		}
+		waiting(article);
 		revealShares(article);
 		const fresher = article.querySelector('details.share');
 		if (shared && fresher) {
@@ -276,49 +298,37 @@
 	// part shown as it comes, until none is left or the reader presses the
 	// button again, which then says so.
 	const translate = async (article) => {
-		const asked = () => {
-			const form = article.querySelector('form.entry-action[action$="/translate"]');
-			return form && form.elements.do.value === 'translate' ? form : null;
-		};
 		// The button says at once what was asked of it: the answer of a
 		// model takes seconds.
-		const waiting = (text) => {
-			const button = asked() && asked().querySelector('button');
-			if (button) {
-				button.textContent = text;
-				button.setAttribute('aria-busy', 'true');
-			}
+		const wait = (text) => {
+			article.dataset.waiting = text;
+			waiting(article);
 		};
 		if (article.dataset.translating) {
 			delete article.dataset.translating;
-			waiting(t('js.translate-stopping'));
+			wait(t('js.translate-stopping'));
 			return;
 		}
 		article.dataset.translating = '1';
-		// What the button said before it was made to say that it waits:
-		// that is what it says again when an answer does not come.
-		const said = () => (asked() ? asked().querySelector('button').textContent : '');
-		let label = said();
-		waiting(`${t('js.translating')}…`);
+		wait(`${t('js.translating')}…`);
 		say(t('js.translate-begun'), false);
-		while (article.dataset.translating && asked()) {
-			const progress = await inTurn(() => (asked() ? post(asked(), article) : false));
+		while (article.dataset.translating && asked(article)) {
+			const progress = await inTurn(() => (asked(article) ? post(asked(article), article) : false));
 			const [done, total] = typeof progress === 'string' ? progress.split('/').map(Number) : [0, 0];
-			const form = asked();
-			if (progress) {
-				label = said();
-			}
-			if (!(done < total) || !form) {
+			if (!(done < total) || !asked(article)) {
 				break;
 			}
 			if (article.dataset.translating) {
-				waiting(`${t('js.translating')} (${Math.floor(done * 100 / total)}%)`);
+				wait(`${t('js.translating')} (${Math.floor(done * 100 / total)}%)`);
 			}
 		}
 		delete article.dataset.translating;
-		const button = asked() && asked().querySelector('button');
-		if (button && button.hasAttribute('aria-busy')) {
-			button.textContent = label;
+		delete article.dataset.waiting;
+		// A button still waiting says again what it offers.
+		const button = asked(article) && asked(article).querySelector('button');
+		if (button && 'offers' in button.dataset) {
+			button.textContent = button.dataset.offers;
+			delete button.dataset.offers;
 			button.removeAttribute('aria-busy');
 		}
 	};

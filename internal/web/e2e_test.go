@@ -915,6 +915,10 @@ func TestE2ETranslate(t *testing.T) {
 		id := strconv.FormatInt(in.entry.ID, 10)
 		b.open("/feeds/1?state=all#e" + id)
 		b.until("the entry of the address current", current(in.entry.ID, false))
+		// Opening the entry marks it read. That answer, which brings the
+		// entry new buttons, is kept back until the translation is asked for.
+		b.text(`(() => { const ask = window.fetch; window.kept = new Promise((go) => { window.letGo = go; }); ` +
+			`window.fetch = (url, options) => (String(url).endsWith('/read') ? window.kept.then(() => ask(url, options)) : ask(url, options)); return ''; })()`)
 		b.press("o")
 		b.until("the entry open", current(in.entry.ID, true))
 		translated := `[...document.querySelectorAll('#e` + id + ` .entry-content p')].filter(p => p.textContent.startsWith('Привет')).length`
@@ -923,6 +927,9 @@ func TestE2ETranslate(t *testing.T) {
 		// Before the service has said a word, the button and the page say
 		// that the translation was asked for.
 		b.press("T")
+		b.until("the button saying that it has begun", button+` === 'Stop translating…'`)
+		b.text(`(window.letGo(), '')`)
+		b.until("the entry marked read", `document.getElementById('e`+id+`').classList.contains('read')`)
 		b.until("the button and the page saying that it has begun, nothing translated yet",
 			button+` === 'Stop translating…' && document.querySelector('#e`+id+` form[action$="/translate"] button').getAttribute('aria-busy') === 'true' && `+
 				`document.querySelector('#messages p.visually-hidden').textContent === 'Translating…' && `+translated+` === 0`)
@@ -960,6 +967,13 @@ func TestE2ETranslate(t *testing.T) {
 		waits := `document.querySelector('` + e(other) + ` form[action$="/translate"] button')`
 		b.until("the failure said, the button back to what it offered",
 			`document.getElementById('messages').textContent.includes('could not be translated') && `+waits+`.textContent === 'Translate' && !`+waits+`.hasAttribute('aria-busy')`)
+
+		// So does a request that gets no answer at all.
+		b.text(`(() => { const ask = window.fetch; ` +
+			`window.fetch = (url, options) => (String(url).endsWith('/translate') ? Promise.reject(new TypeError('no answer')) : ask(url, options)); return ''; })()`)
+		b.press("T")
+		b.until("no answer said, the button back to what it offered",
+			`document.querySelector('`+e(other)+` .entry-notice').textContent.includes('The action failed') && `+waits+`.textContent === 'Translate' && !`+waits+`.hasAttribute('aria-busy')`)
 
 		// The help names the action and its key.
 		b.press("?")
