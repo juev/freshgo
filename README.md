@@ -91,6 +91,8 @@ Set `FRESHGO_DATABASE_URL` to `postgres://user:password@host:5432/freshgo`. The 
 
 To update, pull the new image and start the container again: `docker compose pull && docker compose up -d`. The server brings the database to its version when it starts.
 
+The first start of a version after 0.2.5 also cleans the texts of the articles that are stored: until then the pages cleaned a text each time they showed it, and now they show what is stored. It takes a few seconds for some thousands of articles, and the log says how many texts changed. What the cleaning takes out of a text is gone from the database, so back it up before this update.
+
 To back up a SQLite installation, stop the container and copy the volume: next to `freshgo.sqlite` lie the files `-wal` and `-shm`, and a copy taken from a running server may miss what they hold.
 
 ### Without Docker
@@ -142,6 +144,7 @@ What it does not: the theme and the other settings of the FreshRSS pages that th
 - **XPath runs over an HTML5 tree**, not the one libxml builds. An expression such as `//table/tr` stops matching, because HTML5 puts rows inside `tbody`; write `//table//tr`.
 - **Filter actions ignore case for all letters**, as FreshRSS does on PostgreSQL. On a FreshRSS that ran on SQLite, only ASCII letters were compared without case, so rules with other letters now match more.
 - **Regular expressions in filters are RE2.** Rules with backreferences or lookaround are skipped with a warning in the log; the import lists them.
+- **The texts of articles are cleaned again by the import**, by the rules of freshgo. A text with markup may be written differently than FreshRSS has it, with the same meaning; a text without markup is taken as it is.
 - **Old articles are cleaned up at every refresh of a feed**, not at a random one in thirty. The rules are the same.
 - **Full text and content filters apply to new, changed and unread articles.** Changing how a feed gets its text brings its unread articles in line when the form is saved; articles already read keep the text they had.
 

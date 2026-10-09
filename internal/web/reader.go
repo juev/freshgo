@@ -680,9 +680,9 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 		a := article{
 			ID: e.ID, Title: title, Translation: offered, URL: h.url("/entries/" + strconv.FormatInt(e.ID, 10)),
 			Authors: strings.Join(e.Authors, ", "), Date: date.Format("2006-01-02 15:04"), DateTime: date.Format(time.RFC3339),
-			// What is stored was cleaned when it was fetched, but not all of it by
-			// freshgo: an import brings what FreshRSS let through.
-			Content:     template.HTML(throughServer(prepared(sanitize.HTML(content, e.Link, nil), prefs.Referrers))), //nolint:gosec // cleaned on this line
+			// What is stored is clean: every writer cleans what it stores, and
+			// serve cleaned once what was stored before they did.
+			Content:     template.HTML(throughServer(prepared(content, prefs.Referrers))), //nolint:gosec // cleaned when it was stored
 			Attachments: attachments(e), Tags: e.Tags, Labels: labels[e.ID], Read: e.IsRead, Starred: e.IsFavorite,
 			Full:     refresh.HasPageText(e),
 			ShowFeed: prefs.ToplineWebsite != "none", ShowDate: prefs.ToplineDate == nil || *prefs.ToplineDate,
