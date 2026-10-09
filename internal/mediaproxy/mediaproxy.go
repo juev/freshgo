@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/net/html"
 )
 
 // Path is where the addresses that lead through the server start, after
@@ -93,6 +94,9 @@ func Rewrite(content, mode string, through func(target string) string) string {
 	if !strings.Contains(content, "<img") && !strings.Contains(content, "<source") && !strings.Contains(content, "<video") {
 		return content
 	}
+	if !taken(content, mode) {
+		return content
+	}
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader("<html><body>" + content + "</body></html>"))
 	if err != nil {
 		return content
@@ -123,6 +127,50 @@ func Rewrite(content, mode string, through func(target string) string) string {
 		return content
 	}
 	return out
+}
+
+// taken reports whether the text may have an address the mode takes. It
+// reads the tags that can carry one without building a document, which
+// costs many times less: most texts have no such address, and they need no
+// document. It may say yes where the document then has nothing to replace,
+// never the reverse.
+func taken(content, mode string) bool {
+	found := false
+	one := func(address string) string {
+		found = found || remote(address, mode)
+		return address
+	}
+	for rest := content; ; {
+		at := strings.IndexByte(rest, '<')
+		if at < 0 || len(rest)-at < 4 {
+			return false
+		}
+		rest = rest[at:]
+		// The parser reads <image> as <img>.
+		if head := rest[1:4]; !strings.EqualFold(head, "img") && !strings.EqualFold(head, "ima") &&
+			!strings.EqualFold(head, "sou") && !strings.EqualFold(head, "vid") {
+			rest = rest[1:]
+			continue
+		}
+		z := html.NewTokenizer(strings.NewReader(rest))
+		if kind := z.Next(); kind == html.StartTagToken || kind == html.SelfClosingTagToken {
+			_, more := z.TagName()
+			for more {
+				var key, value []byte
+				key, value, more = z.TagAttr()
+				switch string(key) {
+				case "src", "poster":
+					one(string(value))
+				case "srcset":
+					srcset(string(value), one)
+				}
+			}
+			if found {
+				return true
+			}
+		}
+		rest = rest[1:]
+	}
 }
 
 // srcset rewrites the addresses of a list of image candidates. A candidate
