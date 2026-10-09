@@ -24,6 +24,7 @@ import (
 
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/fetch"
+	"github.com/juev/freshgo/internal/sanitize"
 	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
 )
@@ -642,6 +643,11 @@ func (u *userImport) entries() error {
 		e.IsRead, e.IsFavorite = isRead.Int64 != 0, isFavorite.Int64 != 0
 		e.Tags = splitTags(tags.String)
 		e.Attributes = u.attributes(attributes.String, "entry %d", e.ID)
+		// FreshRSS cleaned the text by its own rules. A page shows what is
+		// stored, so the text is cleaned by the rules of this server too.
+		var attrs []byte
+		e.Content, attrs, _ = sanitize.Stored(e.Content, e.Attributes, e.Link)
+		e.Attributes = attrs
 		batch = append(batch, e)
 		if len(batch) == entryBatch {
 			if err := flush(); err != nil {
