@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/juev/freshgo/internal/config"
 )
 
 // library is two users with feeds of every priority, entries in every state
@@ -581,4 +583,51 @@ func TestValidUserName(t *testing.T) {
 			t.Errorf("ValidUserName(%q) = %v, want %v", name, got, want)
 		}
 	}
+}
+
+// The listings by state are answered from the indexes on the state: SQLite
+// walked the primary key and opened every row of the user for the flag,
+// which is stored behind the text of the entry.
+func TestStateListingsUseTheirIndex(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		if s.driver != config.DriverSQLite {
+			t.Skip("the plan is read as SQLite words it")
+		}
+		lib := newLibrary(t, s)
+		unread, shown := false, 0
+		for _, tc := range []struct {
+			name  string
+			query EntryQuery
+			index string
+		}{
+			{"unread", EntryQuery{Set: EntrySet{MinPriority: &shown}, Read: &unread, Limit: 1000}, "entries_read_index"},
+			{"unread since", EntryQuery{Read: &unread, Since: 1, Limit: 1000}, "entries_read_index"},
+			{"starred", EntryQuery{Set: EntrySet{MinPriority: &shown, OnlyFavorite: true}, Limit: 1000}, "entries_favorite_index"},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				query, args := tc.query.sql(lib.alice.ID, `id`)
+				rows, err := s.query(context.Background(), `EXPLAIN QUERY PLAN `+query, args...)
+				if err != nil {
+					t.Fatal(err)
+				}
+				steps, err := collect(rows, func(sc scanner) (string, error) {
+					var (
+						id, parent, unused int
+						detail             string
+					)
+					return detail, sc.Scan(&id, &parent, &unused, &detail)
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				plan := strings.Join(steps, "\n")
+				if !strings.Contains(plan, "SEARCH entries USING INDEX "+tc.index) && !strings.Contains(plan, "SEARCH entries USING COVERING INDEX "+tc.index) {
+					t.Errorf("the plan does not search %s:\n%s", tc.index, plan)
+				}
+				if strings.Contains(plan, "TEMP B-TREE") {
+					t.Errorf("the plan sorts:\n%s", plan)
+				}
+			})
+		}
+	})
 }

@@ -64,7 +64,8 @@ func (set EntrySet) where(userID int64) (string, []any) {
 		args = append(args, set.LabelID)
 	}
 	if set.OnlyFavorite {
-		b.WriteString(` AND is_favorite`)
+		// Compared, not bare: SQLite takes an index for a comparison only.
+		b.WriteString(` AND is_favorite = TRUE`)
 	}
 	if set.Labeled {
 		b.WriteString(` AND ` + anyLabel)
