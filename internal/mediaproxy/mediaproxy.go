@@ -8,10 +8,10 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
+	"io"
 	"net/url"
 	"strings"
 
-	"github.com/PuerkitoBio/goquery"
 	"golang.org/x/net/html"
 )
 
@@ -85,8 +85,9 @@ func remote(address, mode string) bool {
 
 // Rewrite returns the text of an entry with the addresses of its images
 // replaced by what through gives for them: src and srcset of img, srcset of
-// the sources of a picture, the poster of a video. A text none of whose
-// addresses the mode takes comes back as it is, byte for byte.
+// the sources of a picture, the poster of a video. A tag with a replaced
+// address is written anew; the rest of the text, and a text none of whose
+// addresses the mode takes, comes back as it is, byte for byte.
 func Rewrite(content, mode string, through func(target string) string) string {
 	if mode != ModeHTTPOnly && mode != ModeAll {
 		return content
@@ -97,10 +98,6 @@ func Rewrite(content, mode string, through func(target string) string) string {
 	if !taken(content, mode) {
 		return content
 	}
-	doc, err := goquery.NewDocumentFromReader(strings.NewReader("<html><body>" + content + "</body></html>"))
-	if err != nil {
-		return content
-	}
 	changed := false
 	one := func(address string) string {
 		if !remote(address, mode) {
@@ -109,24 +106,85 @@ func Rewrite(content, mode string, through func(target string) string) string {
 		changed = true
 		return through(strings.TrimSpace(address))
 	}
-	doc.Find("img[src], video[poster]").Each(func(_ int, node *goquery.Selection) {
-		name := "src"
-		if goquery.NodeName(node) == "video" {
-			name = "poster"
+	var out strings.Builder
+	out.Grow(len(content) + len(content)/8)
+	// The tokenizer reads what is inside a comment, a text area or a script
+	// as text, so nothing there is taken for a tag.
+	z := html.NewTokenizer(strings.NewReader(content))
+	pictures := 0
+	for {
+		kind := z.Next()
+		if kind == html.ErrorToken {
+			break
 		}
-		node.SetAttr(name, one(node.AttrOr(name, "")))
-	})
-	doc.Find("img[srcset], picture source[srcset]").Each(func(_ int, node *goquery.Selection) {
-		node.SetAttr("srcset", srcset(node.AttrOr("srcset", ""), one))
-	})
-	if !changed {
+		raw := z.Raw()
+		name := tagName(raw)
+		switch {
+		case kind == html.EndTagToken && name == "picture" && pictures > 0:
+			pictures--
+		case kind == html.StartTagToken && name == "picture":
+			pictures++
+		case (kind == html.StartTagToken || kind == html.SelfClosingTagToken) &&
+			(name == "img" || name == "video" || name == "source" && pictures > 0):
+			// Reading the attributes changes what Raw returned.
+			asWritten := string(raw)
+			tag := html.Token{Type: kind, Data: name}
+			before := changed
+			changed = false
+			for _, more := z.TagName(); more; {
+				var key, value []byte
+				key, value, more = z.TagAttr()
+				attr := html.Attribute{Key: string(key), Val: string(value)}
+				switch {
+				case attr.Key == "src" && name == "img", attr.Key == "poster" && name == "video":
+					attr.Val = one(attr.Val)
+				case attr.Key == "srcset" && name != "video":
+					attr.Val = srcset(attr.Val, one)
+				}
+				tag.Attr = append(tag.Attr, attr)
+			}
+			if changed {
+				out.WriteString(tag.String())
+			} else {
+				out.WriteString(asWritten)
+			}
+			changed = changed || before
+			continue
+		}
+		out.Write(raw)
+	}
+	if !changed || z.Err() != io.EOF {
 		return content
 	}
-	out, err := doc.Find("body").Html()
-	if err != nil {
-		return content
+	return out.String()
+}
+
+// tagName returns the name of the tag a token of the tokenizer starts
+// with, in lower case; the parser reads <image> as <img>. It is "" for what
+// is no tag. Asking the tokenizer for the name would change the token.
+func tagName(raw []byte) string {
+	if len(raw) < 2 || raw[0] != '<' {
+		return ""
 	}
-	return out
+	start := 1
+	if raw[1] == '/' {
+		start = 2
+	}
+	end := start
+	for end < len(raw) && (raw[end]|0x20 >= 'a' && raw[end]|0x20 <= 'z') {
+		end++
+	}
+	// The names that matter are short: no other is worth a string.
+	if end-start < 3 || end-start > 7 {
+		return ""
+	}
+	switch name := strings.ToLower(string(raw[start:end])); name {
+	case "image":
+		return "img"
+	case "img", "video", "source", "picture":
+		return name
+	}
+	return ""
 }
 
 // taken reports whether the text may have an address the mode takes. It
