@@ -3,9 +3,9 @@
 <p class="page-links"><a href="{{.URL .Data.ReadURL}}">{{.T "sub.read"}}</a> <a href="{{.URL "/subscriptions"}}">{{.T "sub.back"}}</a></p>
 {{if .Data.Failing}}<p class="alert">{{.T "feed.failing" .Data.Failing}}</p>{{end}}
 {{if .Data.Problem}}<p class="alert" role="alert" id="form-problem">{{.Data.Problem}}</p>{{end}}
-{{if .Data.PreviewNote}}<p class="alert" role="alert">{{.Data.PreviewNote}}</p>{{end}}
+{{if .Data.PreviewNote}}<p class="alert" role="alert" tabindex="-1" autofocus>{{.Data.PreviewNote}}</p>{{end}}
 {{if .Data.Preview}}
-<section class="preview" aria-labelledby="preview-heading">
+<section class="preview" aria-labelledby="preview-heading" tabindex="-1" autofocus>
 <h2 id="preview-heading">{{.T "feed.preview.heading"}}</h2>
 <div class="entry-content">{{.Data.Preview}}</div>
 </section>

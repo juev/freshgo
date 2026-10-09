@@ -744,6 +744,12 @@ func (h *Handler) saveFeed(w http.ResponseWriter, r *http.Request) {
 			}
 			notice = "notice.feed-texts"
 		}
+		// A browser for pages that nothing has read: said, since the box
+		// looks like a switch of its own.
+		if a := readAttrs(edited.Attributes); h.refresher.Browser != nil && a["page_by_browser"] != nil &&
+			strings.TrimSpace(edited.PathEntries) == "" && a["path_entries_auto"] == nil {
+			notice, n = "notice.feed-browser-alone", 0
+		}
 		h.notify(w, r, notice, n)
 		http.Redirect(w, r, h.url("/subscriptions/feeds/"+strconv.FormatInt(old.ID, 10)), http.StatusSeeOther)
 	}
@@ -765,9 +771,12 @@ func (h *Handler) previewFeed(w http.ResponseWriter, r *http.Request) {
 	v := h.view(r, "", "feed.heading")
 	page := feedPage{}
 	selector, automatic := strings.TrimSpace(r.PostForm.Get("path_entries")), r.PostForm.Get("path_entries_auto") != ""
-	if selector == "" && !automatic {
+	switch {
+	case selector == "" && !automatic && h.refresher.Browser != nil && r.PostForm.Get("page_by_browser") != "":
+		page.PreviewNote = v.T("feed.preview.browser-alone")
+	case selector == "" && !automatic:
 		page.PreviewNote = v.T("feed.preview.no-selector")
-	} else {
+	default:
 		article, err := h.refresher.PreviewArticle(ctx, user, old.ID, selector, automatic, r.PostForm.Get("path_entries_filter"),
 			r.PostForm.Get("page_by_browser") != "")
 		switch {
