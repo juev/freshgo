@@ -9,6 +9,7 @@ A feed aggregator server in one binary that takes over an existing [FreshRSS](ht
 - refreshes every feed kind of FreshRSS: RSS, Atom, JSON Feed, HTML and XML with XPath, JSON with dot notation, JSON embedded in HTML;
 - applies the retention settings, the auto-read rules and the filter actions of FreshRSS, with its search language;
 - fetches the full text of articles, by CSS selector or found on the page automatically, for a whole feed or for one article on request;
+- translates an article on request with a language model of your choice, part by part as you read;
 - serves the Google Reader API, OPML import and export, and feed icons;
 - has a web interface of its own, in English and Russian, in which everything can be done from the keyboard and without JavaScript;
 - subscribes to WebSub hubs;
@@ -176,6 +177,7 @@ The reading screen has the tree of categories, feeds, saved queries and labels o
 | `Space` | page through the entry, then go to the next one |
 | `v` | open the original in a new tab |
 | `f` | take the text of the entry from its page, or put the text of the feed back |
+| `T` | translate the entry, or show its original |
 | `m` | mark read or unread |
 | `s` | star |
 | `l` | labels |
@@ -238,7 +240,7 @@ freshrss-password "…"
 
 ## Settings
 
-Every setting is a flag and an environment variable; the flag wins. The help of a command shows a value of the environment as the default of its flag, except for the three that carry passwords: `-database-url`, `-smtp-url` and `-oidc-client-secret`.
+Every setting is a flag and an environment variable; the flag wins. The help of a command shows a value of the environment as the default of its flag, except for the four that carry passwords: `-database-url`, `-smtp-url`, `-oidc-client-secret` and `-translate-key`.
 
 | Flag | Variable | Default | Meaning |
 |---|---|---|---|
@@ -250,7 +252,26 @@ Every setting is a flag and an environment variable; the flag wins. The help of 
 | `-websub` | `FRESHGO_WEBSUB` | off | Subscribe to the WebSub hubs feeds announce. |
 | `-trusted-proxies` | `FRESHGO_TRUSTED_PROXIES` | `127.0.0.0/8,::1/128` | Reverse proxies whose word is taken for who the user is and for the address of the browser: addresses or CIDR ranges, separated by commas. |
 | `-oidc-client-secret` | `FRESHGO_OIDC_CLIENT_SECRET` | | Secret of the client the installation is at its OpenID Connect provider; see "Signing in through a provider". |
+| `-translate-url` | `FRESHGO_TRANSLATE_URL` | | Address of the OpenAI-compatible API that translates articles, without `/chat/completions`; see "Translating articles". |
+| `-translate-key` | `FRESHGO_TRANSLATE_KEY` | | Key of that API. |
+| `-translate-model` | `FRESHGO_TRANSLATE_MODEL` | | Model that translates. |
 | `-smtp-url` | `FRESHGO_SMTP_URL` | | SMTP server for the letters that confirm e-mail addresses: `smtp[s]://user:password@host:port?from=address`. Without it, confirmation cannot be required. |
+
+### Translating articles
+
+With a service to translate with, an open article has the action "Translate" (key `T`). The text comes a few paragraphs at a time and is shown as it comes; the action then stops the translation, and afterwards switches between the translation and the original. A translation is kept with the article until its text changes. The language is that of the interface, or the one set on the page "Reading" of the settings. Clients of the Google Reader API get the original.
+
+The service is any API that speaks the chat completions of OpenAI. Nothing is built in: the three settings name the address of the API (without `/chat/completions`), a key and a model, and without all three nothing offers to translate.
+
+```
+FRESHGO_TRANSLATE_URL=https://routerai.ru/api/v1
+FRESHGO_TRANSLATE_KEY=...
+FRESHGO_TRANSLATE_MODEL=openai/gpt-6-luna
+```
+
+`openai/gpt-6-luna` is the model recommended: of the two measured on twelve articles of 1425 paragraphs in all (prose, code, tables, lists, German, Chinese and Japanese sources) it needed a second request for the fewest paragraphs and the fewest tokens. `deepseek-v4-flash` at `https://api.deepseek.com` translated all of them too, but it reasons before every answer, and freshgo sends nothing that switches the reasoning of a model off: expect several times the waiting and the tokens. The numbers are in issue #31.
+
+The model is sent the text of the article, paragraph by paragraph, and never its markup: links, images and code stand as numbered marks and are put back as they were. What an article says therefore leaves your server for the service you named, each time you ask for a translation.
 
 ### Signing in through a provider
 

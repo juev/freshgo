@@ -22,6 +22,7 @@ import (
 	"github.com/chromedp/chromedp/kb"
 
 	"github.com/juev/freshgo/internal/store"
+	"github.com/juev/freshgo/internal/translate"
 )
 
 // The scenarios below drive a headless Chrome over the interface the way a
@@ -863,6 +864,51 @@ func TestE2EFullTextOfAnEntry(t *testing.T) {
 		// The help names the action and its key.
 		b.press("?")
 		b.until("the help with the action", `[...document.querySelectorAll('dialog[open] tr')].some(row => row.textContent.includes('Take the text from the page') && row.textContent.includes('f'))`)
+	})
+}
+
+// U98: an entry is translated by a key, part by part before the eyes of
+// the reader, who can stop it, go on, and see the original again.
+func TestE2ETranslate(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		in := interpret(t, s)
+		in.hold = make(chan struct{})
+		b := browse(t, s)
+		b.login("alice")
+		id := strconv.FormatInt(in.entry.ID, 10)
+		b.open("/feeds/1?state=all#e" + id)
+		b.until("the entry of the address current", current(in.entry.ID, false))
+		b.press("o")
+		b.until("the entry open", current(in.entry.ID, true))
+		translated := `[...document.querySelectorAll('#e` + id + ` .entry-content p')].filter(p => p.textContent.startsWith('Привет')).length`
+		button := `document.querySelector('#e` + id + ` form[action$="/translate"] button').textContent`
+
+		// The first part comes and is shown while the second is waited for.
+		b.press("T")
+		b.until("the first paragraphs and the title translated, the button offering to stop",
+			translated+` === 2 && document.querySelector('#e`+id+` .entry-title').textContent === 'Привет, дорогой читатель' && `+button+` === 'Stop translating (40%)'`)
+		b.accessible("an entry half translated")
+
+		// Stopped, it stays where it is and offers to go on.
+		b.tabTo("#e" + id + ` form[action$="/translate"] button`)
+		b.press(kb.Enter)
+		close(in.hold)
+		b.until("the translation stopped after the part under way", translated+` === 4 && `+button+` === 'Translate on (80%)'`)
+		b.eventually("four paragraphs of five stored", func() bool {
+			return strings.Count(translate.Of(s.entry("alice", in.entry.ID), "en").Content, "<p>Привет") == 4
+		})
+
+		// Asked again, it goes on to the end and offers the original.
+		b.press("T")
+		b.until("everything translated", translated+` === 5 && `+button+` === 'Show the original'`)
+		b.until("the focus still in the entry", `document.querySelector('#e`+id+`').contains(document.activeElement)`)
+		b.tabTo("#e" + id + ` form[action$="/translate"] button`)
+		b.press(kb.Enter)
+		b.until("the original shown", translated+` === 0 && document.querySelector('#e`+id+` .entry-title').textContent === 'Hello, dear reader' && `+button+` === 'Show the translation'`)
+
+		// The help names the action and its key.
+		b.press("?")
+		b.until("the help with the action", `[...document.querySelectorAll('dialog[open] tr')].some(row => row.textContent.includes('Translate the entry') && row.textContent.includes('T'))`)
 	})
 }
 

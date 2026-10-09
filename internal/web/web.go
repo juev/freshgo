@@ -23,6 +23,7 @@ import (
 	"github.com/juev/freshgo/internal/mediaproxy"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/store"
+	"github.com/juev/freshgo/internal/translate"
 	"github.com/juev/freshgo/internal/web/i18n"
 )
 
@@ -62,6 +63,9 @@ type Options struct {
 	// OpenID Connect provider; empty when the server was given none, and
 	// then nobody signs in through a provider.
 	OIDCClientSecret string
+	// Translator translates entries; nil when the server was given no
+	// service for it, and then no entry offers to be translated.
+	Translator *translate.Translator
 }
 
 // Handler serves the interface.
@@ -69,8 +73,10 @@ type Handler struct {
 	db        *store.Store
 	log       *slog.Logger
 	refresher *refresh.Refresher
-	hooks     *hooks.Registry
-	baseURL   string
+	// translator is nil when entries are not translated.
+	translator *translate.Translator
+	hooks      *hooks.Registry
+	baseURL    string
 	// prefix is the path of the public address, without a trailing slash.
 	prefix  string
 	version string
@@ -101,7 +107,7 @@ type Handler struct {
 // does not hold together.
 func New(o Options) (*Handler, error) {
 	h := &Handler{
-		db: o.DB, log: o.Log, refresher: o.Refresher, baseURL: o.BaseURL, version: o.Version, assets: map[string]string{},
+		db: o.DB, log: o.Log, refresher: o.Refresher, translator: o.Translator, baseURL: o.BaseURL, version: o.Version, assets: map[string]string{},
 		proxies: o.TrustedProxies, allowlist: o.FetchAllowlist, mailer: o.Mailer, crossOrigin: http.NewCrossOriginProtection(), now: time.Now, hooks: o.Hooks,
 	}
 	if h.hooks == nil {
@@ -182,6 +188,7 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /entries/{id}/read", h.protect(members, h.markEntry))
 	h.mux.HandleFunc("POST /entries/{id}/star", h.protect(members, h.starEntry))
 	h.mux.HandleFunc("POST /entries/{id}/fulltext", h.protect(members, h.fullTextEntry))
+	h.mux.HandleFunc("POST /entries/{id}/translate", h.protect(members, h.translateEntry))
 	h.mux.HandleFunc("POST /entries/{id}/labels", h.protect(members, h.labelEntry))
 	h.mux.HandleFunc("POST /read-all", h.protect(members, h.markAll))
 	h.mux.HandleFunc("POST /settings/view", h.protect(members, h.saveView))
