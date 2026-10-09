@@ -3,6 +3,7 @@ package greader
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -731,4 +732,70 @@ func TestSwitchAndLimits(t *testing.T) {
 			t.Errorf("%d categories; the first feed is in %d, the second in %d", len(categories), moved.CategoryID, kept.CategoryID)
 		}
 	})
+}
+
+// The two listings a client synchronises with, on the library the comparison
+// with FreshRSS was measured on: 84 feeds and 6023 entries of about 6 KB,
+// one in 107 unread. Run by `make bench`.
+func BenchmarkListings(b *testing.B) {
+	ctx := context.Background()
+	e := storetest.Engines()[0]
+	driver, dsn := e.New(b)
+	db, err := store.Open(ctx, driver, dsn)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Cleanup(func() { _ = db.Close() })
+	u := &store.User{Name: "alice"}
+	if err := db.CreateUser(ctx, u); err != nil {
+		b.Fatal(err)
+	}
+	feeds := make([]*store.Feed, 84)
+	for i := range feeds {
+		feeds[i] = &store.Feed{UserID: u.ID, URL: fmt.Sprintf("https://example.org/%d", i), Name: fmt.Sprintf("Feed %d", i), Priority: priorityMain}
+		if err := db.CreateFeed(ctx, feeds[i]); err != nil {
+			b.Fatal(err)
+		}
+	}
+	text := strings.Repeat(`<p>Сегодня вышла новая версия, <a href="https://example.org/a?x=1&amp;y=2">подробности</a> — "в статье".</p>`+
+		`<p>The quick brown fox jumps over the lazy dog; <img src="https://example.org/i.png" alt=""/> and more text here.</p>`+"\n", 22)
+	entries := make([]*store.Entry, 6023)
+	for i := range entries {
+		address := fmt.Sprintf("https://example.org/e/%d", i)
+		entries[i] = &store.Entry{
+			FeedID: feeds[i%len(feeds)].ID, GUID: address, Title: fmt.Sprintf("Entry %d", i), Authors: []string{"Somebody"},
+			Content: text, Link: address, Published: 1_760_000_000 + int64(i), IsRead: i%107 != 0, Tags: []string{"news", "go"},
+		}
+	}
+	if err := db.InsertEntries(ctx, u.ID, entries); err != nil {
+		b.Fatal(err)
+	}
+	client, err := fetch.New(fetch.Options{Allowlist: []string{"*"}})
+	if err != nil {
+		b.Fatal(err)
+	}
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+	registry := &hooks.Registry{}
+	h := New(Options{DB: db, Refresher: refresh.New(db, client, registry, log), Hooks: registry, Log: log})
+	secret, err := h.authToken(ctx, u)
+	if err != nil {
+		b.Fatal(err)
+	}
+	for _, tc := range []struct{ name, path string }{
+		{"contents of 50 entries", "/reader/api/0/stream/contents/user/-/state/com.google/reading-list?output=json&n=50"},
+		{"unread identifiers", "/reader/api/0/stream/items/ids?output=json&s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+				req.Header.Set("Authorization", "GoogleLogin auth=alice/"+secret)
+				rec := httptest.NewRecorder()
+				h.ServeHTTP(rec, req)
+				if rec.Code != http.StatusOK {
+					b.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+				}
+			}
+		})
+	}
 }

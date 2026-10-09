@@ -139,12 +139,16 @@ func feedName(f *store.Feed) string {
 // replace quotes and the caret there as well, but its list of them is merged
 // in a way that drops the first three, and clients see the result.
 func alternative(s string, extended bool) string {
-	pairs := []string{"&", "＆", "<", "＜", ">", "＞"}
 	if extended {
-		pairs = append(pairs, "?", "？", `\`, "＼", "/", "／", ",", "，", ";", "；")
+		return phpTrim(alternativesExtended.Replace(s))
 	}
-	return phpTrim(strings.NewReplacer(pairs...).Replace(s))
+	return phpTrim(alternatives.Replace(s))
 }
+
+var (
+	alternatives         = strings.NewReplacer("&", "＆", "<", "＜", ">", "＞")
+	alternativesExtended = strings.NewReplacer("&", "＆", "<", "＜", ">", "＞", "?", "？", `\`, "＼", "/", "／", ",", "，", ";", "；")
+)
 
 // phpTrim strips what PHP trim() strips.
 func phpTrim(s string) string {
