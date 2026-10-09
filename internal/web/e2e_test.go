@@ -1313,6 +1313,9 @@ func TestE2ESubscriptions(t *testing.T) {
 		b.tabTo(`button[formaction$="/preview"]`)
 		b.press(kb.Enter)
 		b.until("the preview of the selector", `document.querySelector('.preview .entry-content').textContent.includes('Text of one')`)
+		// U103: the page stands at what the button brought, with the focus on it.
+		b.until("the preview focused and in view", `document.activeElement.matches('section.preview') && `+
+			`document.activeElement.getBoundingClientRect().top >= 0 && document.activeElement.getBoundingClientRect().top < window.innerHeight`)
 		b.accessible("the settings of a feed with a preview")
 		b.tabTo(`form.settings button[type="submit"]:not([formaction])`)
 		b.press(kb.Enter)

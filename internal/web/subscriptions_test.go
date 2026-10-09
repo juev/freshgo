@@ -1130,6 +1130,21 @@ func TestFeedPagesByBrowser(t *testing.T) {
 			t.Errorf("the box checked: notice %q, page_by_browser %v", notice(body), byBrowser())
 		}
 
+		// The box alone reads no page, and the form says so: when it is
+		// stored, and when it is tried.
+		if _, body := s.follow(target, form); !strings.Contains(notice(body), "Saved, but no page is read yet") || byBrowser() != true {
+			t.Errorf("the box alone, saved: notice %q, page_by_browser %v", notice(body), byBrowser())
+		}
+		if a := s.post(target+"/preview", form); a.status != http.StatusOK || !strings.Contains(a.body, "nothing says how the article is found on them") ||
+			strings.Contains(a.body, "There is no selector to try") || !strings.Contains(a.body, `role="alert" tabindex="-1" autofocus>`) {
+			t.Errorf("the box alone, tried: status %d\n%s", a.status, a.body)
+		}
+		form.Set("path_entries", "article")
+		if _, body := s.follow(target, form); strings.Contains(notice(body), "no page is read yet") {
+			t.Errorf("the box with a selector, saved: notice %q", notice(body))
+		}
+		form.Set("path_entries", "")
+
 		// U97: a page that stays behind a check says that, not that the log knows.
 		failure = fmt.Errorf("reading: %w", pagebrowser.ErrChallenge)
 		a := s.part(http.MethodPost, fmt.Sprintf("/entries/%d/fulltext", id), "entry", url.Values{"full": {"1"}, "next": {"/"}})
