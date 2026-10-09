@@ -116,6 +116,9 @@ func TestAutomatic(t *testing.T) {
 	page("/news/moved", `<html><head><meta http-equiv="refresh" content="0; url=boats"></head><body><p>Moved.</p></body></html>`)
 	page("/news/based", strings.Replace(readablePage(""), "<head>", `<head><base href="/elsewhere/">`, 1))
 	page("/news/bare", `<html><head><title>Bare</title></head><body></body></html>`)
+	// A page that is an application: what its loading screen says.
+	page("/news/game", `<html><head><title>Harbour, the game</title></head><body><div id="overlay"><h1>HARBOUR</h1><p>fetching engine…</p>`+
+		`<p>click (or press Enter) to start · then press any key for the menu</p></div><canvas></canvas><script src="game.js"></script></body></html>`)
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 	client := newClient(t, server)
@@ -149,6 +152,9 @@ func TestAutomatic(t *testing.T) {
 	}
 	if got, err = article("/news/bare", ""); !errors.Is(err, ErrNoArticle) {
 		t.Errorf("a page without an article: %q, error = %v, want ErrNoArticle", got, err)
+	}
+	if got, err = article("/news/game", ""); !errors.Is(err, ErrNoArticle) {
+		t.Errorf("a page with a few words and no article: %q, error = %v, want ErrNoArticle", got, err)
 	}
 	if _, err = article("/news/boats", "p["); !errors.Is(err, ErrSelector) {
 		t.Errorf("a filter that is not CSS: error = %v, want ErrSelector", err)

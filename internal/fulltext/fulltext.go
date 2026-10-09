@@ -27,6 +27,11 @@ import (
 	"github.com/juev/freshgo/internal/sanitize"
 )
 
+// minArticle is how many characters of text an article found without a
+// selector has at the least. Of twelve pages looked at, those without an
+// article gave 42 to 156 characters, the shortest article 1284.
+const minArticle = 250
+
 // maxRefreshes is how many times a page may send on to another one with
 // <meta http-equiv="refresh">.
 const maxRefreshes = 4
@@ -170,7 +175,9 @@ func Article(ctx context.Context, client *fetch.Client, req Request) (string, er
 		content, _ = strip(content, drop)
 	}
 	content = strings.TrimSpace(content)
-	if req.Automatic && content == "" {
+	// A page that is an application has a few words on it, the name of
+	// the thing and what its loading screen says; they are no article.
+	if req.Automatic && len([]rune(sanitize.Text(content, minArticle+1))) < minArticle {
 		return "", ErrNoArticle
 	}
 	return content, nil
