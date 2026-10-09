@@ -365,9 +365,10 @@ func stringList(v any) []string {
 
 // enclosures lists the attachments of an entry: those stored with it, or,
 // for an entry stored by a FreshRSS older than 1.20.1, those written into
-// its text.
+// its text. Cleaning such a text has moved its classes to another
+// attribute, as it does with every class.
 func enclosures(text string, attrs entryAttributes) []map[string]any {
-	if attrs.Enclosures != nil || !strings.Contains(text, `<p class="enclosure-content`) {
+	if attrs.Enclosures != nil || !strings.Contains(text, `class="enclosure-content`) {
 		return attrs.Enclosures
 	}
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(text))
@@ -375,7 +376,8 @@ func enclosures(text string, attrs entryAttributes) []map[string]any {
 		return nil
 	}
 	var found []map[string]any
-	doc.Find(`div[class="enclosure"] > p[class="enclosure-content"] > [src]`).Each(func(_ int, node *goquery.Selection) {
+	doc.Find(`div[class="enclosure"] > p[class="enclosure-content"] > [src], ` +
+		`div[data-sanitized-class="enclosure"] > p[data-sanitized-class="enclosure-content"] > [src]`).Each(func(_ int, node *goquery.Selection) {
 		enc := map[string]any{
 			"url":    escapeAttribute(node.AttrOr("src", "")),
 			"type":   escapeAttribute(node.AttrOr("data-type", "")),

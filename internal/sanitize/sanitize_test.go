@@ -231,3 +231,63 @@ func TestText(t *testing.T) {
 		}
 	}
 }
+
+// A text stored with comments that mean something keeps them, and is clean
+// around them.
+func TestKeeping(t *testing.T) {
+	const start, end = "<!-- FULLCONTENT start //-->", "<!-- FULLCONTENT end //-->"
+	for _, tc := range []struct{ name, in, want string }{
+		{"no comment to keep", `<p onclick="x()">a</p><!-- other -->`, `<p>a</p>`},
+		{"a text between the two", start + `<p>page<script>x()</script></p>` + end + `<p>feed <a href="/b">b</a></p>`,
+			start + `<p>page</p>` + end + `<p>feed <a href="https://e.example/b">b</a></p>`},
+		{"other comments go", `<!-- a -->` + start + `<!-- b --><p>c</p>` + end, start + `<p>c</p>` + end},
+		{"a comment twice", start + `a` + start + `b`, start + `a` + start + `b`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := Keeping(tc.in, "https://e.example/a", start, end)
+			if got != tc.want {
+				t.Errorf("Keeping:\n got %s\nwant %s", got, tc.want)
+			}
+			if again := Keeping(got, "https://e.example/a", start, end); again != got {
+				t.Errorf("a second cleaning changed the text:\n got %s\nwant %s", again, got)
+			}
+		})
+	}
+}
+
+// The texts of an entry that came from elsewhere are cleaned, the marks of
+// a full text stay, and what is clean is left as it is, byte for byte.
+func TestStored(t *testing.T) {
+	const base = "https://e.example/a"
+	content := FullContentStart + `<p onclick="x()">page</p>` + FullContentEnd + `<p>feed<script>x()</script></p>`
+	attributes := []byte(`{"original_content":"<p>feed<script>x()</script></p>","enclosures":[{"url":"https://e.example/a.mp3"}]}`)
+	content, attributes, changed := Stored(content, attributes, base)
+	if !changed {
+		t.Fatal("Stored reports no change of an unclean entry")
+	}
+	if want := FullContentStart + `<p>page</p>` + FullContentEnd + `<p>feed</p>`; content != want {
+		t.Errorf("content:\n got %s\nwant %s", content, want)
+	}
+	var attrs map[string]json.RawMessage
+	if err := json.Unmarshal(attributes, &attrs); err != nil {
+		t.Fatal(err)
+	}
+	if string(attrs["original_content"]) != `"\u003cp\u003efeed\u003c/p\u003e"` || string(attrs["enclosures"]) != `[{"url":"https://e.example/a.mp3"}]` {
+		t.Errorf("attributes: %s", attributes)
+	}
+	if again, same, changed := Stored(content, attributes, base); changed || again != content || string(same) != string(attributes) {
+		t.Errorf("a clean entry was changed: %s %s", again, same)
+	}
+
+	// Nothing to clean: not a byte changes, whatever the attributes are.
+	for _, tc := range []struct{ content, attributes string }{
+		{`Text with &lt;brackets&gt; &amp; &quot;quotes&quot;.`, `{"enclosures":[]}`},
+		{`plain`, ``},
+		{`plain`, `[1,2]`},
+		{`<p>clean</p>`, `{"original_content":7}`},
+	} {
+		if got, attrs, changed := Stored(tc.content, []byte(tc.attributes), base); changed || got != tc.content || string(attrs) != tc.attributes {
+			t.Errorf("Stored(%q, %q) = %q, %q, %v; want them as they are", tc.content, tc.attributes, got, attrs, changed)
+		}
+	}
+}

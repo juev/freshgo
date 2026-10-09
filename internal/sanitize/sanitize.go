@@ -6,6 +6,7 @@
 package sanitize
 
 import (
+	"encoding/json"
 	"regexp"
 	"strings"
 	"unicode"
@@ -128,6 +129,68 @@ func HTML(fragment, base string, forceHTTPS func(string) string) string {
 		return ""
 	}
 	return strings.TrimSpace(inner(root))
+}
+
+// Keeping is HTML for a text with comments in it that have to stay: each of
+// the comments, written exactly so, is left where it stands, and what is
+// before, between and after them is cleaned apart.
+func Keeping(fragment, base string, comments ...string) string {
+	var b strings.Builder
+	for {
+		at, found := -1, ""
+		for _, c := range comments {
+			if i := strings.Index(fragment, c); i >= 0 && (at < 0 || i < at) {
+				at, found = i, c
+			}
+		}
+		if at < 0 {
+			b.WriteString(HTML(fragment, base, nil))
+			return b.String()
+		}
+		b.WriteString(HTML(fragment[:at], base, nil))
+		b.WriteString(found)
+		fragment = fragment[at+len(found):]
+	}
+}
+
+// Marks FreshRSS puts around the text taken from the page of an article.
+// "Remove the full text" looks for them, so they stay in a cleaned text.
+const (
+	FullContentStart = "<!-- FULLCONTENT start //-->"
+	FullContentEnd   = "<!-- FULLCONTENT end //-->"
+)
+
+// Stored cleans the texts of an entry that were stored without being
+// cleaned here: its text, and in its attributes the text the feed gave,
+// which is kept there while a full text stands in its place. Relative
+// addresses are resolved against base. It returns the two as they are to
+// be stored and whether either changed.
+//
+// A text without markup is left as it is written: it holds nothing to
+// clean, and parsing it would only write its character references anew.
+func Stored(content string, attributes []byte, base string) (string, []byte, bool) {
+	one := func(text string) string {
+		if !strings.Contains(text, "<") {
+			return text
+		}
+		return Keeping(text, base, FullContentStart, FullContentEnd)
+	}
+	changed := false
+	if cleaned := one(content); cleaned != content {
+		content, changed = cleaned, true
+	}
+	const key = "original_content"
+	var attrs map[string]json.RawMessage
+	var original string
+	if json.Unmarshal(attributes, &attrs) == nil && json.Unmarshal(attrs[key], &original) == nil {
+		if cleaned := one(original); cleaned != original {
+			// A string and a map of raw values cannot fail to be written.
+			attrs[key], _ = json.Marshal(cleaned)
+			attributes, _ = json.Marshal(attrs)
+			changed = true
+		}
+	}
+	return content, attributes, changed
 }
 
 // XHTML is HTML for an Atom construct of type xhtml: its content is one div

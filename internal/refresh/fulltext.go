@@ -7,14 +7,15 @@ import (
 
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/fulltext"
+	"github.com/juev/freshgo/internal/sanitize"
 	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
 )
 
 // Markers FreshRSS puts around the text taken from the page of an article.
 const (
-	fullContentStart = "<!-- FULLCONTENT start //-->"
-	fullContentEnd   = "<!-- FULLCONTENT end //-->"
+	fullContentStart = sanitize.FullContentStart
+	fullContentEnd   = sanitize.FullContentEnd
 )
 
 // completion is how a feed completes the text of its entries.
