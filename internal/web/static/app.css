@@ -329,15 +329,28 @@ code {
 		scroll-behavior: smooth;
 	}
 
-	/* What was asked of the server and takes its time. */
-	button[aria-busy="true"] {
-		animation: waiting 0.9s ease-in-out infinite alternate;
+	button[aria-busy="true"]::after {
+		animation: turning 0.8s linear infinite;
 	}
 }
 
-@keyframes waiting {
+/* What was asked of the server and takes its time has a ring after its
+   text; the text itself stays as easy to read as it was. */
+button[aria-busy="true"]::after {
+	content: "";
+	display: inline-block;
+	width: 0.7em;
+	height: 0.7em;
+	margin-left: 0.5em;
+	border: 2px solid currentColor;
+	border-right-color: transparent;
+	border-radius: 50%;
+	vertical-align: -0.05em;
+}
+
+@keyframes turning {
 	to {
-		opacity: 0.4;
+		transform: rotate(360deg);
 	}
 }
 
