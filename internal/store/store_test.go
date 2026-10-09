@@ -110,7 +110,7 @@ func TestMigrationWebSubHub(t *testing.T) {
 				t.Fatal(err)
 			}
 			// Back to the schema before the migration; those after it run again.
-			for _, q := range []string{"ALTER TABLE feeds DROP COLUMN websub_hub", "DELETE FROM schema_migrations WHERE version >= 8"} {
+			for _, q := range []string{"ALTER TABLE feeds DROP COLUMN websub_hub", "DROP INDEX entries_state_index", "DELETE FROM schema_migrations WHERE version >= 8"} {
 				if _, err := s.exec(ctx, q); err != nil {
 					t.Fatalf("%s: %v", q, err)
 				}

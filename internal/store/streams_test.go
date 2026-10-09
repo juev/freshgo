@@ -601,8 +601,10 @@ func TestStateListingsUseTheirIndex(t *testing.T) {
 			index string
 		}{
 			{"unread", EntryQuery{Set: EntrySet{MinPriority: &shown}, Read: &unread, Limit: 1000}, "entries_read_index"},
-			{"unread since", EntryQuery{Read: &unread, Since: 1, Limit: 1000}, "entries_read_index"},
+			{"unread since", EntryQuery{Read: &unread, Since: 1, Limit: 1000}, "entries_state_index"},
 			{"starred", EntryQuery{Set: EntrySet{MinPriority: &shown, OnlyFavorite: true}, Limit: 1000}, "entries_favorite_index"},
+			{"since", EntryQuery{Set: EntrySet{MinPriority: &shown}, Since: 1, Limit: 1000}, "entries_state_index"},
+			{"until", EntryQuery{Set: EntrySet{MinPriority: &shown}, Until: 1, Limit: 1000}, "entries_state_index"},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				query, args := tc.query.sql(lib.alice.ID, `id`)
