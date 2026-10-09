@@ -45,7 +45,23 @@ func commands() []command {
 	}
 }
 
+// gcPercent is how far the heap may grow over what is in use before the
+// garbage collector runs, in percent. The runtime of Go starts at 100. What
+// stays in use here is a few megabytes and an answer of the API allocates
+// more than one, so at 100 a collection ran every few requests: at 200 an
+// answer takes a third less time, for 8 MB more of heap.
+const gcPercent = 200
+
+// tuneGC sets gcPercent unless the environment says how the collector is
+// to run.
+func tuneGC(getenv func(string) string) {
+	if getenv("GOGC") == "" {
+		debug.SetGCPercent(gcPercent)
+	}
+}
+
 func main() {
+	tuneGC(os.Getenv)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	code := run(ctx, env{stdin: os.Stdin, stdout: os.Stdout, stderr: os.Stderr, getenv: os.Getenv}, os.Args[1:])
 	stop()

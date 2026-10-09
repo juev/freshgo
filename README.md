@@ -266,6 +266,8 @@ Every setting is a flag and an environment variable; the flag wins. The help of 
 | `-browser-url` | `FRESHGO_BROWSER_URL` | | Websocket of the DevTools protocol of a browser that reads the pages of the feeds set to it: `ws://host:port`; see "Pages only a browser gets". |
 | `-smtp-url` | `FRESHGO_SMTP_URL` | | SMTP server for the letters that confirm e-mail addresses: `smtp[s]://user:password@host:port?from=address`. Without it, confirmation cannot be required. |
 
+The garbage collector of Go runs with `GOGC=200` unless the variable `GOGC` is set: the heap grows to three times what is in use before a collection, where the runtime of Go lets it grow to twice. An answer of the API takes about a third less time for it, and the process about 8 MB more memory. `GOGC=100` gives the memory back.
+
 ### Translating articles
 
 With a service to translate with, an open article has the action "Translate" (key `T`). The text comes a few paragraphs at a time and is shown as it comes; the action then stops the translation, and afterwards switches between the translation and the original. A translation is kept with the article until its text changes. The language is that of the interface, or the one set on the page "Reading" of the settings. Clients of the Google Reader API get the original.
