@@ -898,6 +898,44 @@ func TestImportUntitledEntry(t *testing.T) {
 	})
 }
 
+// A page shows the text of an entry as it is stored, so the import cleans
+// what FreshRSS let through, the text a full text stands in for included.
+// The marks of a full text stay, and a text without markup is not touched.
+func TestImportCleansTexts(t *testing.T) {
+	ctx := context.Background()
+	dir := brokenCopy(t)
+	sourceExec(t, dir, "alice", `UPDATE entry SET
+		content = '<!-- FULLCONTENT start //--><p onclick="x()">page</p><script>x()</script><!-- FULLCONTENT end //--><p>feed</p>',
+		attributes = '{"original_content":"<p>feed<script>x()</script></p>"}'
+		WHERE id = (SELECT MIN(id) FROM entry)`)
+	sourceExec(t, dir, "alice", `UPDATE entry SET content = 'a &quot;b&quot; &amp; c' WHERE id = (SELECT MAX(id) FROM entry)`)
+
+	eachDestination(t, func(t *testing.T, dst *store.Store) {
+		if _, err := Run(ctx, dst, Options{DataDir: dir}); err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+		alice, err := dst.UserByName(ctx, "alice")
+		if err != nil {
+			t.Fatal(err)
+		}
+		entries, err := dst.ListEntries(ctx, alice.ID, store.EntryQuery{Ascending: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		first, last := entries[0], entries[len(entries)-1]
+		if want := `<!-- FULLCONTENT start //--><p>page</p><!-- FULLCONTENT end //--><p>feed</p>`; first.Content != want {
+			t.Errorf("content:\n got %s\nwant %s", first.Content, want)
+		}
+		var attrs map[string]string
+		if err := json.Unmarshal(first.Attributes, &attrs); err != nil || attrs["original_content"] != `<p>feed</p>` {
+			t.Errorf("attributes: %s (%v)", first.Attributes, err)
+		}
+		if last.Content != `a &quot;b&quot; &amp; c` {
+			t.Errorf("a text without markup: %q, want it as FreshRSS has it", last.Content)
+		}
+	})
+}
+
 // FreshRSS shows the default category, and names it to API clients, in the
 // language of the user whatever name is stored; the import stores that name.
 func TestImportNamesDefaultCategoryInTheLanguageOfTheUser(t *testing.T) {
