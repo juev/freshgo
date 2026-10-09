@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/url"
 
+	"github.com/juev/freshgo/internal/browser"
 	"github.com/juev/freshgo/internal/config"
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/fetch"
@@ -85,6 +86,13 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 			return nil, err
 		}
 		s.translator = translate.New(db, &translate.Client{URL: conf.TranslateURL, Key: conf.TranslateKey, Model: conf.TranslateModel, HTTP: asking})
+	}
+	if conf.BrowserURL != "" {
+		pages, err := browser.New(conf.BrowserURL)
+		if err != nil {
+			return nil, err
+		}
+		s.refresher.Browser = pages.Page
 	}
 	if conf.WebSub {
 		s.webSub, err = websub.New(db, client, s.log, conf.BaseURL)

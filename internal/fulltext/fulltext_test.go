@@ -160,3 +160,46 @@ func TestAutomatic(t *testing.T) {
 		t.Errorf("a filter that is not CSS: error = %v, want ErrSelector", err)
 	}
 }
+
+// A page that something else reads, a browser, is taken as it is handed
+// over: no request is made, and where the page sends on is not followed.
+func TestReadInPlaceOfARequest(t *testing.T) {
+	asked := ""
+	read := func(markup string, err error) func(context.Context, string) (string, string, error) {
+		return func(_ context.Context, address string) (string, string, error) {
+			asked = address
+			return "https://site.example/news/boats/", markup, err
+		}
+	}
+	// No client: a request would be a nil dereference.
+	article := func(req Request) (string, error) {
+		req.URL = "https://site.example/go/boats"
+		return Article(context.Background(), nil, req)
+	}
+
+	got, err := article(Request{Automatic: true, Read: read(readablePage(`<meta http-equiv="refresh" content="0; url=/elsewhere">`), nil)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if asked != "https://site.example/go/boats" {
+		t.Errorf("asked for %q", asked)
+	}
+	// Relative addresses are resolved against where the page ended.
+	for _, want := range []string{"First. The harbour", `<a href="https://site.example/news/boats/more.html">link</a>`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("the article lacks %q:\n%s", want, got)
+		}
+	}
+
+	got, err = article(Request{Selector: "h1", Read: read(`<html><body><h1>Boats</h1><p>Text.</p></body></html>`, nil)})
+	if err != nil || got != "<h1>Boats</h1>" {
+		t.Errorf("with a selector: %q, %v", got, err)
+	}
+	if _, err := article(Request{Selector: "h1", Read: read(" \n", nil)}); !errors.Is(err, ErrEmptyPage) {
+		t.Errorf("a page without markup: %v, want ErrEmptyPage", err)
+	}
+	failure := errors.New("behind a check")
+	if _, err := article(Request{Selector: "h1", Read: read("", failure)}); !errors.Is(err, failure) {
+		t.Errorf("a page that was not read: %v, want the error of the reader", err)
+	}
+}

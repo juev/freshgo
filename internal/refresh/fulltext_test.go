@@ -1,7 +1,10 @@
 package refresh
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -258,6 +261,87 @@ func TestContentFilterWithoutFullText(t *testing.T) {
 		w.later()
 		if st := w.runOne(); st.UpdatedEntries != 0 {
 			t.Errorf("second refresh: stats %+v", st)
+		}
+	})
+}
+
+// A feed set to it has the pages of its entries read by the browser of the
+// installation, when there is one, in place of a request.
+func TestPagesByBrowser(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		u := w.user("alice", `{}`)
+		// What a request gets from a site that lets only a browser through.
+		check := `<html><head><title>Just a moment...</title></head><body><p>Checking.</p></body></html>`
+		for _, page := range []string{"one", "two", "three"} {
+			w.serveBody("/articles/"+page, "text/html; charset=utf-8", check)
+		}
+		link := func(page string) string { return w.server.URL + "/articles/" + page }
+		byBrowser := func(f *store.Feed) {
+			f.Attributes = json.RawMessage(`{"path_entries_auto":true,"page_by_browser":true}`)
+		}
+
+		// Without a browser the setting does nothing: the page is requested.
+		w.serveBody("/feed-before", rssType, rss("Before", item{guid: "a", title: "First", link: link("one"), body: "Summary"}))
+		before := w.feed(u, "/feed-before", byBrowser)
+		w.runOne()
+		if e := w.entry(before, "a"); e.Content != "Summary" || w.hitCount("/articles/one") != 1 {
+			t.Errorf("without a browser: content %q, %d requests for the page", e.Content, w.hitCount("/articles/one"))
+		}
+
+		var opened []string
+		var failure error
+		w.r.Browser = func(_ context.Context, address string) (string, string, error) {
+			opened = append(opened, address)
+			return address, readablePage, failure
+		}
+		// An address a request may not go to is not handed to the browser.
+		internal := "http://127.0.0.1:1/secret"
+		w.serveBody("/feed", rssType, rss("Blog",
+			item{guid: "internal", title: "Internal", link: internal, body: "Summary"},
+			item{guid: "b", title: "Second", link: link("two"), body: "Summary"}))
+		f := w.feed(u, "/feed", byBrowser)
+		w.runOne()
+		e := w.entry(f, "b")
+		if !HasPageText(e) || !strings.Contains(e.Content, "First. The harbour") || w.hitCount("/articles/two") != 0 {
+			t.Errorf("with a browser: %d requests for the page, content %q", w.hitCount("/articles/two"), e.Content)
+		}
+		if got := fmt.Sprint(opened); got != fmt.Sprint([]string{link("two")}) {
+			t.Errorf("the browser opened %s, want the page of the entry alone", got)
+		}
+		if e := w.entry(f, "internal"); e.Content != "Summary" {
+			t.Errorf("an entry at an internal address: content %q", e.Content)
+		}
+		// A feed that does not ask for the browser is read by requests.
+		w.serveBody("/feed-plain", rssType, rss("Plain", item{guid: "c", title: "Third", link: link("three"), body: "Summary"}))
+		w.feed(u, "/feed-plain", func(f *store.Feed) { f.Attributes = json.RawMessage(`{"path_entries_auto":true}`) })
+		w.runOne()
+		if len(opened) != 1 || w.hitCount("/articles/three") != 1 {
+			t.Errorf("a feed without the setting: the browser opened %v, %d requests for the page", opened, w.hitCount("/articles/three"))
+		}
+
+		// One entry on request, and the preview of the form, go the same way.
+		opened = nil
+		w.later()
+		if err := w.r.CompleteEntry(ctx, u, w.entry(before, "a").ID, true); err != nil {
+			t.Fatalf("CompleteEntry: %v", err)
+		}
+		if e := w.entry(before, "a"); !HasPageText(e) || len(opened) != 1 || w.hitCount("/articles/one") != 1 {
+			t.Errorf("an entry on request: the browser opened %v, %d requests for the page, content %q", opened, w.hitCount("/articles/one"), e.Content)
+		}
+		if got, err := w.r.PreviewArticle(ctx, u, before.ID, "", true, "", true); err != nil || !strings.Contains(got, "First. The harbour") || len(opened) != 2 {
+			t.Errorf("a preview with the browser: %v, the browser opened %v, %q", err, opened, got)
+		}
+		if _, err := w.r.PreviewArticle(ctx, u, before.ID, "", true, "", false); err == nil || len(opened) != 2 || w.hitCount("/articles/one") != 2 {
+			t.Errorf("a preview without the browser: %v, the browser opened %v, %d requests for the page", err, opened, w.hitCount("/articles/one"))
+		}
+		// What the browser could not do is the error of the caller.
+		failure = errors.New("behind a check")
+		if err := w.r.CompleteEntry(ctx, u, w.entry(f, "b").ID, true); !errors.Is(err, failure) {
+			t.Errorf("a page the browser was not let through to: %v", err)
+		}
+		if e := w.entry(f, "b"); !strings.Contains(e.Content, "First. The harbour") {
+			t.Errorf("the entry lost its text to a page that was not read: %q", e.Content)
 		}
 	})
 }

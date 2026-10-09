@@ -85,7 +85,12 @@
 <label for="path_entries_auto">{{.T "feed.fulltext.auto"}}</label>
 <span class="hint" id="auto-hint">{{.T "feed.fulltext.auto.hint"}}</span>
 </p>
-<p>
+{{if .Data.CanBrowse}}<p class="check">
+<input type="checkbox" id="page_by_browser" name="page_by_browser" value="1"{{if .Data.Browser}} checked{{end}} aria-describedby="browser-hint">
+<label for="page_by_browser">{{.T "feed.fulltext.browser"}}</label>
+<span class="hint" id="browser-hint">{{.T "feed.fulltext.browser.hint"}}</span>
+</p>
+{{end}}<p>
 <label for="path_entries">{{.T "feed.selector"}}</label>
 <input type="text" id="path_entries" name="path_entries" value="{{.Data.Feed.PathEntries}}" autocapitalize="off" spellcheck="false" aria-describedby="selector-hint">
 <span class="hint" id="selector-hint">{{.T "feed.selector.hint"}}</span>

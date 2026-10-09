@@ -886,3 +886,51 @@ func TestErrorsDoNotRevealPasswords(t *testing.T) {
 		t.Errorf("error: %v", err)
 	}
 }
+
+// An address that something other than the client is to request, a
+// browser, is held to the address rules of a request.
+func TestAllowed(t *testing.T) {
+	c, err := New(Options{Allowlist: []string{"127.0.0.1:8081", "10.1.0.0/16", "intranet.example:443"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	for _, address := range []string{
+		"https://93.184.216.34/article",  // a public address
+		"http://127.0.0.1:8081/page",     // an internal one the allowlist names with its port
+		"https://10.1.2.3/",              // one inside a range of the allowlist
+		"https://intranet.example/a?b=c", // a name the allowlist takes whatever it resolves to
+		"https://INTRANET.example:443/a",
+	} {
+		if err := c.Allowed(ctx, address); err != nil {
+			t.Errorf("%s: %v, want it allowed", address, err)
+		}
+	}
+	for _, address := range []string{
+		"http://127.0.0.1/",       // internal
+		"http://127.0.0.1:8082/",  // another port than the allowlist names
+		"http://localhost/",       // a name that resolves to an internal address
+		"http://[::1]:8081/",      // internal, by IPv6
+		"https://10.2.0.1/",       // outside the range
+		"http://169.254.169.254/", // link-local
+		"file:///etc/passwd",      // not a page of the web
+		"javascript:alert(1)",
+		"http:///nowhere",
+		"https://host.example:99999/", // no such port
+		"::",
+	} {
+		if err := c.Allowed(ctx, address); !errors.Is(err, ErrForbiddenAddress) {
+			t.Errorf("%s: %v, want ErrForbiddenAddress", address, err)
+		}
+	}
+	open, err := New(Options{Allowlist: []string{"*"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := open.Allowed(ctx, "http://127.0.0.1/"); err != nil {
+		t.Errorf("with everything allowed: %v", err)
+	}
+	if err := open.Allowed(ctx, "ftp://127.0.0.1/"); !errors.Is(err, ErrForbiddenAddress) {
+		t.Errorf("another scheme with everything allowed: %v, want ErrForbiddenAddress", err)
+	}
+}

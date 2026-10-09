@@ -29,7 +29,9 @@ type completion struct {
 	conditions []*search.Query
 	// action says where the text of the page goes: "replace", "prepend" or "append".
 	action string
-	params fetch.Params
+	// browser has the pages read by the browser of the installation.
+	browser bool
+	params  fetch.Params
 }
 
 // pages reports that the pages of entries are read.
@@ -48,6 +50,7 @@ func (r *Refresher) completion(j *job, f *store.Feed, attrs attributes, params f
 	c.filter = strings.TrimSpace(c.filter)
 	c.action, _ = get[string](attrs, "content_action")
 	c.automatic, _ = get[bool](attrs, "path_entries_auto")
+	c.browser, _ = get[bool](attrs, "page_by_browser")
 	if !c.pages() {
 		return c
 	}
@@ -102,6 +105,7 @@ func (r *Refresher) complete(ctx context.Context, j *job, f *store.Feed, c *comp
 	}
 	article, err := fulltext.Article(ctx, r.client, fulltext.Request{
 		URL: e.Link, Params: c.params, Selector: c.selector, Automatic: c.automatic, Filter: c.filter, ForceHTTPS: j.https.URL,
+		Read: r.reader(c.browser),
 	})
 	if err != nil {
 		if ctx.Err() == nil && !errors.Is(err, context.Canceled) {
@@ -122,6 +126,22 @@ func (r *Refresher) complete(ctx context.Context, j *job, f *store.Feed, c *comp
 	default:
 		setOriginalContent(e, e.Content)
 		e.Content = article
+	}
+}
+
+// reader returns what reads a page in place of a request, nil for a
+// request: the browser of the installation, when there is one and the feed
+// asks for it. The address of the page is held to the address rules of a
+// request first; where the browser goes from there is its own matter.
+func (r *Refresher) reader(browser bool) func(ctx context.Context, address string) (string, string, error) {
+	if !browser || r.Browser == nil {
+		return nil
+	}
+	return func(ctx context.Context, address string) (string, string, error) {
+		if err := r.client.Allowed(ctx, address); err != nil {
+			return "", "", err
+		}
+		return r.Browser(ctx, address)
 	}
 }
 
@@ -169,9 +189,11 @@ func (r *Refresher) CompleteEntry(ctx context.Context, u *store.User, entryID in
 		if err != nil {
 			return err
 		}
-		filter, _ := get[string](readAttributes(f.Attributes), "path_entries_filter")
+		attrs := readAttributes(f.Attributes)
+		filter, _ := get[string](attrs, "path_entries_filter")
+		browser, _ := get[bool](attrs, "page_by_browser")
 		article, err := fulltext.Article(ctx, r.client, fulltext.Request{
-			URL: e.Link, Params: params, Automatic: true, Filter: filter, ForceHTTPS: https.URL,
+			URL: e.Link, Params: params, Automatic: true, Filter: filter, ForceHTTPS: https.URL, Read: r.reader(browser),
 		})
 		if err != nil {
 			return err

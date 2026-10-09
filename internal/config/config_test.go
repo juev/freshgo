@@ -197,6 +197,24 @@ func TestTranslateSettings(t *testing.T) {
 	}
 }
 
+// The browser is named by the websocket of its DevTools protocol.
+func TestBrowserURL(t *testing.T) {
+	for _, address := range []string{"ws://browser:9222", "wss://browsers.example/session?token=t", "ws://127.0.0.1:9222/devtools/browser/1"} {
+		c := parse(t, map[string]string{EnvBrowserURL: address})
+		if err := c.Validate(); err != nil || c.BrowserURL != address {
+			t.Errorf("%s: %q, %v", address, c.BrowserURL, err)
+		}
+	}
+	if c := parse(t, nil); c.BrowserURL != "" || c.Validate() != nil {
+		t.Errorf("without the setting: %q, %v", c.BrowserURL, c.Validate())
+	}
+	for _, address := range []string{"http://browser:9222", "browser:9222", "ws://", "ws:///devtools"} {
+		if err := parse(t, map[string]string{EnvBrowserURL: address}).Validate(); err == nil || !strings.Contains(err.Error(), "browser URL") {
+			t.Errorf("%s: error = %v", address, err)
+		}
+	}
+}
+
 func TestTrustedProxies(t *testing.T) {
 	prefixes := func(c *Config) []string {
 		t.Helper()

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	pagebrowser "github.com/juev/freshgo/internal/browser"
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/scrape"
@@ -104,9 +105,13 @@ type feedPage struct {
 	Failing    string
 	HTTPUser   string
 	// Full text.
-	Conditions    string
-	Filter        string
-	Automatic     bool
+	Conditions string
+	Filter     string
+	Automatic  bool
+	// Browser is whether the pages are read by the browser of the
+	// installation; CanBrowse whether there is one.
+	Browser       bool
+	CanBrowse     bool
 	ContentAction []option
 	Preview       template.HTML
 	PreviewNote   string
@@ -247,6 +252,8 @@ func (h *Handler) showFeed(w http.ResponseWriter, r *http.Request, status int, f
 	_ = json.Unmarshal(a["path_entries_conditions"], &conditions)
 	page.Conditions, page.Filter = strings.Join(conditions, "\n"), a.text("path_entries_filter")
 	_ = json.Unmarshal(a["path_entries_auto"], &page.Automatic)
+	_ = json.Unmarshal(a["page_by_browser"], &page.Browser)
+	page.CanBrowse = h.refresher.Browser != nil
 	action := a.text("content_action")
 	if action != "prepend" && action != "append" {
 		action = "replace"
@@ -346,7 +353,8 @@ type icon struct {
 
 // applyFeed writes what the form of the settings of a feed says into f. It
 // returns the key of the text that says what is wrong, empty when nothing is.
-func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, ttlDefault int) string {
+// canBrowse is whether the form asks about reading pages with a browser.
+func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, ttlDefault int, canBrowse bool) string {
 	form := r.PostForm
 	get := func(name string) string { return strings.TrimSpace(form.Get(name)) }
 	number := func(name string) (int, bool) {
@@ -422,6 +430,14 @@ func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, ttl
 		a.set("path_entries_auto", true)
 	} else {
 		delete(a, "path_entries_auto")
+	}
+	// Without a browser the form has no word on it, and what is stored stays.
+	if canBrowse {
+		if get("page_by_browser") != "" {
+			a.set("page_by_browser", true)
+		} else {
+			delete(a, "page_by_browser")
+		}
 	}
 	if conditions := lines(form.Get("path_entries_conditions")); len(conditions) > 0 {
 		a.set("path_entries_conditions", conditions)
@@ -600,7 +616,7 @@ var errFormProblem = errors.New("web: the form cannot be stored as it is")
 var parsingKeys = []string{
 	"xpath", "json_dotnotation", "xPathToJson", "curl_params", "ssl_verify", "timeout", "unicityCriteria",
 	"unicityCriteriaForced", "hasBadGuids", "path_entries_auto", "path_entries_conditions", "path_entries_filter",
-	"content_action",
+	"content_action", "page_by_browser",
 }
 
 // sameParsing reports whether two feeds are fetched and read alike.
@@ -613,7 +629,7 @@ func sameParsing(a, b *store.Feed) bool {
 
 // fullTextKeys are the attributes of a feed that decide what text its
 // entries get, beside the selector.
-var fullTextKeys = []string{"path_entries_auto", "path_entries_conditions", "path_entries_filter", "content_action"}
+var fullTextKeys = []string{"path_entries_auto", "path_entries_conditions", "path_entries_filter", "content_action", "page_by_browser"}
 
 // sameFullText reports whether the entries of two feeds get their text
 // the same way.
@@ -649,7 +665,7 @@ func (h *Handler) editFeed(ctx context.Context, r *http.Request, db *store.Store
 		ttlDefault = n
 	}
 	before := *f
-	problem = applyFeed(r, f, categories, ttlDefault)
+	problem = applyFeed(r, f, categories, ttlDefault, h.refresher.Browser != nil)
 	// The copy the validators stand for was fetched and read otherwise.
 	if !sameParsing(&before, f) {
 		f.HTTPETag, f.HTTPLastModified = "", ""
@@ -752,12 +768,16 @@ func (h *Handler) previewFeed(w http.ResponseWriter, r *http.Request) {
 	if selector == "" && !automatic {
 		page.PreviewNote = v.T("feed.preview.no-selector")
 	} else {
-		article, err := h.refresher.PreviewArticle(ctx, user, old.ID, selector, automatic, r.PostForm.Get("path_entries_filter"))
+		article, err := h.refresher.PreviewArticle(ctx, user, old.ID, selector, automatic, r.PostForm.Get("path_entries_filter"),
+			r.PostForm.Get("page_by_browser") != "")
 		switch {
 		case ctx.Err() != nil:
 			return
 		case errors.Is(err, refresh.ErrNoEntries):
 			page.PreviewNote = v.T("feed.preview.no-entries")
+		case errors.Is(err, pagebrowser.ErrChallenge):
+			h.log.Warn("full text preview failed", "user", user.Name, "feed", old.ID, "error", err)
+			page.PreviewNote = v.T("notice.fulltext-check")
 		case err != nil:
 			h.log.Warn("full text preview failed", "user", user.Name, "feed", old.ID, "error", err)
 			page.PreviewNote = v.T("feed.preview.failed")

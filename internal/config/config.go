@@ -35,6 +35,9 @@ const (
 	EnvTranslateURL   = "FRESHGO_TRANSLATE_URL"
 	EnvTranslateKey   = "FRESHGO_TRANSLATE_KEY"
 	EnvTranslateModel = "FRESHGO_TRANSLATE_MODEL"
+	// EnvBrowserURL names the browser that reads the pages a request does
+	// not get: the websocket of its DevTools protocol.
+	EnvBrowserURL = "FRESHGO_BROWSER_URL"
 	// EnvTrustedProxies is read by the web interface.
 	EnvTrustedProxies = "FRESHGO_TRUSTED_PROXIES"
 )
@@ -93,6 +96,10 @@ type Config struct {
 	// "/chat/completions", its key and a model. All empty, and nothing is
 	// translated.
 	TranslateURL, TranslateKey, TranslateModel string
+	// BrowserURL is the websocket of the DevTools protocol of a browser
+	// that runs already, for the feeds whose pages only a browser gets.
+	// Empty: no page is read by a browser.
+	BrowserURL string
 
 	// invalid is what was wrong with the environment, reported by Validate.
 	invalid error
@@ -139,6 +146,8 @@ func Bind(fs *flag.FlagSet, getenv func(string) string) *Config {
 		"secret of the OpenID Connect client set up on the page of authentication ($"+EnvOIDCClientSecret+")")
 	fs.StringVar(&c.TranslateURL, "translate-url", getenv(EnvTranslateURL),
 		"address of the OpenAI-compatible API that translates entries, without /chat/completions ($"+EnvTranslateURL+")")
+	fs.StringVar(&c.BrowserURL, "browser-url", getenv(EnvBrowserURL),
+		"websocket of the DevTools protocol of a browser that reads the pages of feeds set to it, ws://host:port ($"+EnvBrowserURL+")")
 	fs.StringVar(&c.TranslateKey, "translate-key", getenv(EnvTranslateKey),
 		"key of the API that translates entries ($"+EnvTranslateKey+")")
 	fs.StringVar(&c.TranslateModel, "translate-model", getenv(EnvTranslateModel),
@@ -198,6 +207,11 @@ func (c *Config) Validate() error {
 	if c.TranslateURL != "" {
 		if u, err := url.Parse(c.TranslateURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
 			return fmt.Errorf("translate URL %q: want an http or https address", c.TranslateURL)
+		}
+	}
+	if c.BrowserURL != "" {
+		if u, err := url.Parse(c.BrowserURL); err != nil || (u.Scheme != "ws" && u.Scheme != "wss") || u.Host == "" {
+			return fmt.Errorf("browser URL %q: want a ws or wss address", c.BrowserURL)
 		}
 	}
 	if c.RefreshInterval <= 0 {
