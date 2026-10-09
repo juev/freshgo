@@ -418,3 +418,64 @@ func (s *Store) EntryFacts(ctx context.Context, userID int64, each func(EntryFac
 	}
 	return nil
 }
+
+// textBatch is how many entries RewriteEntryTexts reads and stores at once.
+const textBatch = 500
+
+// RewriteEntryTexts goes through the entries of every user and stores, for
+// those rewrite changes, the text and the attributes it returns. Nothing
+// else of an entry changes: not the time it was last modified, which would
+// make every client fetch it again, and not its hash. It returns how many
+// entries were changed.
+func (s *Store) RewriteEntryTexts(ctx context.Context,
+	rewrite func(content string, attributes []byte, link string) (string, []byte, bool),
+) (int, error) {
+	type text struct {
+		userID, id                int64
+		content, link, attributes string
+	}
+	var (
+		changed      int
+		afterUser    int64
+		afterID      int64
+		wrap         = func(err error) error { return fmt.Errorf("store: rewrite the texts of entries: %w", err) }
+		scanEntryRow = func(sc scanner) (text, error) {
+			var t text
+			return t, sc.Scan(&t.userID, &t.id, &t.content, &t.link, &t.attributes)
+		}
+	)
+	for {
+		rows, err := s.query(ctx, `
+			SELECT user_id, id, content, link, attributes FROM entries
+			WHERE (user_id, id) > (?, ?) ORDER BY user_id, id LIMIT ?`, afterUser, afterID, textBatch)
+		if err != nil {
+			return changed, wrap(err)
+		}
+		batch, err := collect(rows, scanEntryRow)
+		if err != nil {
+			return changed, wrap(err)
+		}
+		if len(batch) == 0 {
+			return changed, nil
+		}
+		err = s.InTx(ctx, func(tx *Store) error {
+			for _, t := range batch {
+				content, attributes, differs := rewrite(t.content, []byte(t.attributes), t.link)
+				if !differs {
+					continue
+				}
+				if _, err := tx.exec(ctx, `UPDATE entries SET content = ?, attributes = ? WHERE user_id = ? AND id = ?`,
+					content, jsonObject(attributes), t.userID, t.id); err != nil {
+					return err
+				}
+				changed++
+			}
+			return nil
+		})
+		if err != nil {
+			return changed, wrap(err)
+		}
+		last := batch[len(batch)-1]
+		afterUser, afterID = last.userID, last.id
+	}
+}

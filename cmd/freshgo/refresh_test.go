@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -254,6 +255,66 @@ func TestServeProfiles(t *testing.T) {
 			t.Errorf("GET %s: status %d, want %d", url, resp.StatusCode, want)
 		}
 	}
+}
+
+// serve cleans the texts that were stored before the writers cleaned their
+// own, once: what is stored unclean afterwards is not its business.
+func TestServeCleansStoredTexts(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "freshgo.sqlite")
+	db, err := store.Open(ctx, config.DriverSQLite, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u := &store.User{Name: "alice"}
+	if err := db.CreateUser(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+	f := &store.Feed{UserID: u.ID, URL: "https://feeds.example.org/a"}
+	if err := db.CreateFeed(ctx, f); err != nil {
+		t.Fatal(err)
+	}
+	unclean := &store.Entry{FeedID: f.ID, GUID: "1", Link: "https://e.example/a", Content: `<p onclick="x()">a</p><script>x()</script>`, LastModified: 7}
+	if err := db.InsertEntries(ctx, u.ID, []*store.Entry{unclean}); err != nil {
+		t.Fatal(err)
+	}
+	content := func() string {
+		t.Helper()
+		e, err := db.EntryByID(ctx, u.ID, unclean.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if e.LastModified != 7 {
+			t.Errorf("the entry was modified at %d, want it left at 7", e.LastModified)
+		}
+		return e.Content
+	}
+	log := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	if err := cleanStoredTexts(ctx, db, log); err != nil {
+		t.Fatal(err)
+	}
+	if got := content(); got != `<p>a</p>` {
+		t.Errorf("after the first start: %s", got)
+	}
+	// What a writer stores from now on is its own to clean.
+	unclean.Content = `<p onclick="x()">b</p>`
+	if err := db.UpdateEntry(ctx, unclean); err != nil {
+		t.Fatal(err)
+	}
+	if err := cleanStoredTexts(ctx, db, log); err != nil {
+		t.Fatal(err)
+	}
+	if got := content(); got != `<p onclick="x()">b</p>` {
+		t.Errorf("after the second start: %s; the texts were gone through again", got)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// And serve does it before it listens.
+	fresh := filepath.Join(t.TempDir(), "freshgo.sqlite")
+	serving(t, `msg="cleaned the texts stored before" changed=0`, "-database-url", "sqlite://"+fresh)
 }
 
 func TestPurge(t *testing.T) {

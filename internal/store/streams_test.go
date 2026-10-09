@@ -1,9 +1,12 @@
 package store
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -630,6 +633,67 @@ func TestStateListingsUseTheirIndex(t *testing.T) {
 					t.Errorf("the plan sorts:\n%s", plan)
 				}
 			})
+		}
+	})
+}
+
+// The texts of entries are rewritten for every user, batch after batch,
+// and nothing else of an entry changes.
+func TestRewriteEntryTexts(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		lib := newLibrary(t, s)
+		// More than one batch for alice, so that the pages have to follow on.
+		many := make([]*Entry, 2*textBatch+7)
+		for i := range many {
+			many[i] = &Entry{FeedID: 1, GUID: "many" + strconv.Itoa(i), Content: "old", LastModified: 77, Hash: []byte{1, 2}, IsRead: i%2 == 0}
+		}
+		if err := s.InsertEntries(ctx, lib.alice.ID, many); err != nil {
+			t.Fatal(err)
+		}
+		before, err := s.EntryByID(ctx, lib.bob.ID, e3)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		seen := 0
+		rewrite := func(content string, attributes []byte, link string) (string, []byte, bool) {
+			seen++
+			if content != "old" {
+				return content, attributes, false
+			}
+			return "new", []byte(`{"was":"old"}`), true
+		}
+		changed, err := s.RewriteEntryTexts(ctx, rewrite)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if changed != len(many) || seen != len(many)+14 {
+			t.Errorf("changed %d of %d entries seen; want %d of %d", changed, seen, len(many), len(many)+14)
+		}
+		for _, id := range []int64{many[0].ID, many[textBatch].ID, many[len(many)-1].ID} {
+			e, err := s.EntryByID(ctx, lib.alice.ID, id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var attrs map[string]string
+			_ = json.Unmarshal(e.Attributes, &attrs)
+			if e.Content != "new" || attrs["was"] != "old" {
+				t.Errorf("entry %d: content %q, attributes %s", id, e.Content, e.Attributes)
+			}
+			if e.LastModified != 77 || !bytes.Equal(e.Hash, []byte{1, 2}) || e.GUID == "" {
+				t.Errorf("entry %d lost what was not to change: %+v", id, e)
+			}
+		}
+		after, err := s.EntryByID(ctx, lib.bob.ID, e3)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(before, after) {
+			t.Errorf("an entry that was not to change did:\n got %+v\nwant %+v", after, before)
+		}
+		if again, err := s.RewriteEntryTexts(ctx, rewrite); err != nil || again != 0 {
+			t.Errorf("a second pass changed %d entries (%v)", again, err)
 		}
 	})
 }

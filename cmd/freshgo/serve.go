@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -14,6 +15,8 @@ import (
 	"github.com/juev/freshgo/internal/greader"
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/mail"
+	"github.com/juev/freshgo/internal/sanitize"
+	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/web"
 	"github.com/juev/freshgo/internal/websub"
 )
@@ -77,6 +80,23 @@ func routes(api, icons, misc, hubs, pages http.Handler) http.Handler {
 	})
 }
 
+// cleanStoredTexts cleans, once for a database, the texts that were stored
+// before every writer cleaned its own: an import used to store what
+// FreshRSS let through, and the pages cleaned every text they showed. They
+// show what is stored now, so nothing is shown before this is done.
+func cleanStoredTexts(ctx context.Context, db *store.Store, log *slog.Logger) error {
+	_, err := db.Setting(ctx, store.SettingTextsCleaned)
+	if !errors.Is(err, store.ErrNotFound) {
+		return err
+	}
+	changed, err := db.RewriteEntryTexts(ctx, sanitize.Stored)
+	if err != nil {
+		return err
+	}
+	log.Info("cleaned the texts stored before", "changed", changed)
+	return db.SetSetting(ctx, store.SettingTextsCleaned, "1")
+}
+
 // profileHandler hands out the profiles of the Go runtime. They are on a
 // handler of their own, so that the address of the server never shows them.
 func profileHandler() http.Handler {
@@ -103,6 +123,9 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 		return err
 	}
 	defer s.close()
+	if err := cleanStoredTexts(ctx, db, s.log); err != nil {
+		return err
+	}
 	api := greader.New(greader.Options{
 		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL, MediaProxy: true,
 	})
