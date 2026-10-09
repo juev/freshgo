@@ -39,10 +39,11 @@ const (
 	stateHidden      = "user/-/state/org.freshrss/hidden"
 )
 
-// library is the subscriptions of a user in the order the API lists them.
+// library is the subscriptions of a user; the categories are in the order
+// the API lists them.
 type library struct {
 	categories []*store.Category
-	feeds      map[int64][]*store.Feed // by category
+	feeds      []*store.Feed
 	byID       map[int64]*store.Feed
 	category   map[int64]*store.Category
 }
@@ -58,23 +59,33 @@ func (h *Handler) library(ctx context.Context, u *store.User) (*library, error) 
 	}
 	lib := &library{
 		categories: categories,
-		feeds:      map[int64][]*store.Feed{},
+		feeds:      feeds,
 		byID:       map[int64]*store.Feed{},
 		category:   map[int64]*store.Category{},
 	}
 	// FreshRSS leaves the order of categories to the database, and the
-	// reference one compares bytes; feeds it sorts itself, like labels.
+	// reference one compares bytes.
 	slices.SortStableFunc(lib.categories, func(a, b *store.Category) int { return cmp.Compare(a.Name, b.Name) })
-	order := collator(u)
-	slices.SortStableFunc(feeds, func(a, b *store.Feed) int { return order.CompareString(feedName(a), feedName(b)) })
 	for _, c := range categories {
 		lib.category[c.ID] = c
 	}
 	for _, f := range feeds {
-		lib.feeds[f.CategoryID] = append(lib.feeds[f.CategoryID], f)
 		lib.byID[f.ID] = f
 	}
 	return lib, nil
+}
+
+// listed returns the feeds by category in the order the API lists them:
+// FreshRSS sorts feeds itself, like labels. Sorting by the language of the
+// user takes time, so only the listings of feeds ask for it.
+func (lib *library) listed(u *store.User) map[int64][]*store.Feed {
+	order := collator(u)
+	slices.SortStableFunc(lib.feeds, func(a, b *store.Feed) int { return order.CompareString(feedName(a), feedName(b)) })
+	byCategory := map[int64][]*store.Feed{}
+	for _, f := range lib.feeds {
+		byCategory[f.CategoryID] = append(byCategory[f.CategoryID], f)
+	}
+	return byCategory
 }
 
 func (lib *library) categoryNamed(name string) *store.Category {
@@ -223,8 +234,9 @@ func (h *Handler) subscriptionList(ctx context.Context, q *request) error {
 	}
 	icons := h.base(q.r) + favicon.Path
 	subscriptions := []subscription{}
+	feeds := lib.listed(q.user)
 	for _, c := range lib.categories {
-		for _, f := range lib.feeds[c.ID] {
+		for _, f := range feeds[c.ID] {
 			if f.Priority <= priorityHidden {
 				continue
 			}
@@ -274,12 +286,13 @@ func (h *Handler) unreadCount(ctx context.Context, q *request) error {
 		total       int
 		totalNewest int64
 	)
+	feeds := lib.listed(q.user)
 	for _, c := range lib.categories {
 		var (
 			unread int
 			newest int64
 		)
-		for _, f := range lib.feeds[c.ID] {
+		for _, f := range feeds[c.ID] {
 			if f.Priority <= priorityHidden {
 				continue
 			}
