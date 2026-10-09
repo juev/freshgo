@@ -339,8 +339,10 @@ var lineBreaks = regexp.MustCompile(`\r\n|\n\r|\n|\r`)
 
 // escapeAttribute is PHP htmlspecialchars() with ENT_COMPAT.
 func escapeAttribute(s string) string {
-	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;").Replace(s)
+	return attributeChars.Replace(s)
 }
+
+var attributeChars = strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;", `"`, "&quot;")
 
 // stringList reads an attribute that is a string or a list of strings.
 func stringList(v any) []string {

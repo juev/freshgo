@@ -3,6 +3,7 @@ package greader
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -329,13 +330,23 @@ func (h *Handler) throughServer(q *request) (func(content string) string, error)
 // writeItems answers with a list of items in the layout of FreshRSS: one
 // item per line. Every list calls itself the reading list.
 func (h *Handler) writeItems(q *request, items []item, continuation string) error {
+	// Room for the whole answer at once: a buffer that doubles copies the
+	// answer several times over. What JSON adds to an item besides its text
+	// is a guess.
+	size := 256
+	for i := range items {
+		size += len(items[i].Summary.Content)*9/8 + 1024
+	}
 	var b bytes.Buffer
+	b.Grow(size)
 	fmt.Fprintf(&b, "{\n\t\"id\": %q,\n\t\"updated\": %d,\n\t\"items\": [\n", stateReadingList, h.now().Unix())
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
 	for i, it := range items {
 		if i > 0 {
 			b.WriteString(",\n")
 		}
-		if err := encode(&b, it); err != nil {
+		if err := enc.Encode(it); err != nil {
 			return err
 		}
 		b.Truncate(b.Len() - 1) // the line break of the encoder
