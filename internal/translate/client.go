@@ -129,8 +129,9 @@ func first(all []*unit) int {
 // translate puts the translations of the paragraphs in their place. They
 // are asked for together, each under its number, and the answer is taken
 // paragraph by paragraph; a paragraph whose answer cannot be used is asked
-// for again alone, and stands as it was when that fails too. The only
-// error is that of the context.
+// for again alone, and stands as it was when that answer is no better. A
+// request that fails is an error: the paragraphs are then to be asked for
+// another time, not given up.
 func (c *Client) translate(ctx context.Context, batch []*unit, language string, st *Stats) error {
 	together := "You are a translator. The user sends paragraphs of one article, each on a line that begins with its number in double square brackets, like [[7]]. " +
 		rules(language) + " Answer in the same form: each translated paragraph on a line that begins with its number in double square brackets. Translate every paragraph."
@@ -143,21 +144,19 @@ func (c *Client) translate(ctx context.Context, batch []*unit, language string, 
 		fmt.Fprintf(&request, "[[%d]] %s\n\n", i+1, one.marked)
 	}
 	answer, err := c.ask(ctx, together, request.String(), st)
-	if ctx.Err() != nil {
-		return ctx.Err()
+	if err != nil {
+		return err
 	}
 	answers := map[int]string{}
-	if err == nil {
-		found := numbered.FindAllStringSubmatchIndex(answer, -1)
-		for i, loc := range found {
-			end := len(answer)
-			if i+1 < len(found) {
-				end = found[i+1][0]
-			}
-			number, _ := strconv.Atoi(answer[loc[2]:loc[3]])
-			if _, twice := answers[number]; !twice {
-				answers[number] = answer[loc[1]:end]
-			}
+	found := numbered.FindAllStringSubmatchIndex(answer, -1)
+	for i, loc := range found {
+		end := len(answer)
+		if i+1 < len(found) {
+			end = found[i+1][0]
+		}
+		number, _ := strconv.Atoi(answer[loc[2]:loc[3]])
+		if _, twice := answers[number]; !twice {
+			answers[number] = answer[loc[1]:end]
 		}
 	}
 	for i, one := range batch {
@@ -166,8 +165,6 @@ func (c *Client) translate(ctx context.Context, batch []*unit, language string, 
 			if reason = "left untranslated"; !one.same(got) {
 				reason = one.put(got)
 			}
-		} else if err != nil {
-			reason = "request failed"
 		}
 		if reason == "" {
 			continue
@@ -175,12 +172,12 @@ func (c *Client) translate(ctx context.Context, batch []*unit, language string, 
 		st.Again++
 		st.why(reason)
 		got, err := c.alone(ctx, one.marked, language, st)
-		if ctx.Err() != nil {
-			return ctx.Err()
+		if err != nil {
+			return err
 		}
 		// A paragraph the model leaves as it is when asked for it alone
 		// needs no translating.
-		if err != nil || (!one.same(got) && one.put(got) != "") {
+		if !one.same(got) && one.put(got) != "" {
 			st.Failed++
 		}
 	}
