@@ -46,15 +46,25 @@ func browse(t *testing.T, s *site) *browser {
 	options := append(chromedp.DefaultExecAllocatorOptions[:], chromedp.WindowSize(1280, 900))
 	allocator, cancelAllocator := chromedp.NewExecAllocator(context.Background(), options...)
 	t.Cleanup(cancelAllocator)
-	ctx, cancel := chromedp.NewContext(allocator)
+	chrome, cancel := chromedp.NewContext(allocator)
 	t.Cleanup(cancel)
-	ctx, cancelTimeout := context.WithTimeout(ctx, 2*time.Minute)
-	t.Cleanup(cancelTimeout)
-	b := &browser{t: t, s: s, ctx: ctx, base: server.URL}
-	if err := chromedp.Do(ctx); err != nil {
+	// Chrome is asked to close before its context is cancelled. A Chrome that
+	// is only killed leaves the clone of its application on the disk, 1.4 GB
+	// of it at every start on macOS.
+	t.Cleanup(func() {
+		if err := chromedp.Cancel(chrome); err != nil {
+			t.Logf("Chrome does not close: %v", err)
+		}
+	})
+	// Chrome is started in its own context, not in the one with the limit of
+	// time: the process lives as long as the context it was started in, and
+	// the limit is taken away before Chrome is asked to close.
+	if err := chromedp.Do(chrome); err != nil {
 		t.Fatalf("Chrome does not start: %v", err)
 	}
-	return b
+	ctx, cancelTimeout := context.WithTimeout(chrome, 2*time.Minute)
+	t.Cleanup(cancelTimeout)
+	return &browser{t: t, s: s, ctx: ctx, base: server.URL}
 }
 
 func (b *browser) run(actions ...chromedp.Action[chromedp.Void]) {

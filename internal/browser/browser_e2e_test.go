@@ -34,6 +34,14 @@ func chrome(t *testing.T) string {
 	t.Cleanup(cancel)
 	ctx, cancel := chromedp.NewContext(allocator)
 	t.Cleanup(cancel)
+	// Chrome is asked to close before its context is cancelled. A Chrome that
+	// is only killed leaves the clone of its application on the disk, 1.4 GB
+	// of it at every start on macOS.
+	t.Cleanup(func() {
+		if err := chromedp.Cancel(ctx); err != nil {
+			t.Logf("Chrome does not close: %v", err)
+		}
+	})
 	if err := chromedp.Do(ctx); err != nil {
 		t.Fatalf("Chrome does not start: %v", err)
 	}
