@@ -261,12 +261,19 @@
 			return;
 		}
 		article.dataset.translating = '1';
+		// What the button said before it was made to say that it waits:
+		// that is what it says again when an answer does not come.
+		const said = () => (asked() ? asked().querySelector('button').textContent : '');
+		let label = said();
 		waiting(`${t('js.translating')}…`);
 		say(t('js.translate-begun'));
 		while (article.dataset.translating && asked()) {
 			const progress = await inTurn(() => (asked() ? post(asked(), article) : false));
 			const [done, total] = typeof progress === 'string' ? progress.split('/').map(Number) : [0, 0];
 			const form = asked();
+			if (progress) {
+				label = said();
+			}
 			if (!(done < total) || !form) {
 				break;
 			}
@@ -275,6 +282,11 @@
 			}
 		}
 		delete article.dataset.translating;
+		const button = asked() && asked().querySelector('button');
+		if (button && button.hasAttribute('aria-busy')) {
+			button.textContent = label;
+			button.removeAttribute('aria-busy');
+		}
 	};
 
 	// submit sends a form about an entry: the one that translates goes on

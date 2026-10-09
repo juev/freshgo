@@ -914,6 +914,16 @@ func TestE2ETranslate(t *testing.T) {
 		b.press(kb.Enter)
 		b.until("the original shown", translated+` === 0 && document.querySelector('#e`+id+` .entry-title').textContent === 'Hello, dear reader' && `+button+` === 'Show the translation'`)
 
+		// A service that fails leaves the button as it was, not waiting for ever.
+		s.h.translator = translate.New(s.db, &translate.Client{URL: "http://127.0.0.1:1", Key: "k", Model: "m", HTTP: mustFetch(t)})
+		other := s.stored("alice", store.Listing{Set: mainStream(), Read: ptr(false)})[0]
+		b.open("/?state=all#e" + strconv.FormatInt(other, 10))
+		b.until("another entry current", current(other, false))
+		b.press("o", "T")
+		waits := `document.querySelector('` + e(other) + ` form[action$="/translate"] button')`
+		b.until("the failure said, the button back to what it offered",
+			`document.getElementById('messages').textContent.includes('could not be translated') && `+waits+`.textContent === 'Translate' && !`+waits+`.hasAttribute('aria-busy')`)
+
 		// The help names the action and its key.
 		b.press("?")
 		b.until("the help with the action", `[...document.querySelectorAll('dialog[open] tr')].some(row => row.textContent.includes('Translate the entry') && row.textContent.includes('T'))`)
