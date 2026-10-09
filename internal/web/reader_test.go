@@ -518,7 +518,7 @@ func TestEntryActions(t *testing.T) {
 		if a := s.post(path+"/read", url.Values{"next": {"https://evil.example/"}}); a.header.Get("Location") != "/#e"+strconv.FormatInt(id, 10) {
 			t.Errorf("next on another site: Location %q", a.header.Get("Location"))
 		}
-		for _, target := range []string{"/entries/5/read", "/entries/x/star", "/entries/5/labels", "/entries/5/fulltext"} {
+		for _, target := range []string{"/entries/5/read", "/entries/x/star", "/entries/5/labels", "/entries/5/fulltext", "/entries/5/translate"} {
 			if a := s.post(target, form()); a.status != http.StatusNotFound {
 				t.Errorf("POST %s: status %d, want 404", target, a.status)
 			}
@@ -767,7 +767,7 @@ func TestVisitorOnlyReads(t *testing.T) {
 		if page := s.page("/entries/" + id); strings.Contains(page, "<form") && strings.Contains(page, "/labels") {
 			t.Error("the entry page of a visitor has the form of labels")
 		}
-		for _, target := range []string{"/entries/" + id + "/read", "/entries/" + id + "/star", "/entries/" + id + "/labels", "/entries/" + id + "/fulltext", "/read-all"} {
+		for _, target := range []string{"/entries/" + id + "/read", "/entries/" + id + "/star", "/entries/" + id + "/labels", "/entries/" + id + "/fulltext", "/entries/" + id + "/translate", "/read-all"} {
 			if a := s.post(target, url.Values{"stream": {"/"}}); a.status != http.StatusForbidden {
 				t.Errorf("POST %s by a visitor: status %d, want 403", target, a.status)
 			}

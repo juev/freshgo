@@ -57,6 +57,16 @@
 <span class="hint" id="filters-hint">{{.T "form.filters-hint"}}</span>
 </p>
 </fieldset>
+{{if index .Data.On "translating"}}
+<fieldset>
+<legend>{{.T "settings.translating"}}</legend>
+<p>
+<label for="translate_to">{{.T "settings.translate-to"}}</label>
+<input type="text" id="translate_to" name="translate_to" value="{{index .Data.Text "translate_to"}}" autocapitalize="off" spellcheck="false" aria-describedby="translate-to-hint">
+<span class="hint" id="translate-to-hint">{{.T "settings.translate-to.hint"}}</span>
+</p>
+</fieldset>
+{{end}}
 <p><button type="submit">{{.T "keys.save"}}</button></p>
 </form>
 {{end}}

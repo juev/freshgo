@@ -35,6 +35,11 @@
 <input type="hidden" name="full" value="{{if .Entry.Full}}0{{else}}1{{end}}">
 <button type="submit" class="link">{{if .Entry.Full}}{{.Page.T "entry.feed-text"}}{{else}}{{.Page.T "entry.full-text"}}{{end}}</button>
 </form>{{end}}
+{{with .Entry.Translation}}<form method="post" action="{{$.Entry.URL}}/translate" class="entry-action">
+<input type="hidden" name="next" value="{{$.Here}}">
+<input type="hidden" name="do" value="{{.Do}}">
+<button type="submit" class="link"{{if .Percent}} data-percent="{{.Percent}}"{{end}}>{{.Label}}</button>
+</form>{{end}}
 {{end}}
 
 {{define "entry-star"}}

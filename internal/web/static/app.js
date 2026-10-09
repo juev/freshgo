@@ -164,7 +164,7 @@
 		const ways = 'a, button:not([hidden])';
 		const way = menu && menu.contains(focused) ? Array.from(menu.querySelectorAll(ways)).indexOf(focused) : -1;
 		const parts = ['.entry-state', '.entry-star', '.entry-labels', '.entry-actions'];
-		for (const part of text ? [...parts, '.entry-excerpt', '.entry-content'] : parts) {
+		for (const part of text ? [...parts, '.entry-title', '.entry-excerpt', '.entry-content'] : parts) {
 			const old = article.querySelector(part);
 			const now = fresh.querySelector(part);
 			if (old && now) {
@@ -221,13 +221,13 @@
 			say(t('js.failed'));
 			return false;
 		}
-		sync(article, fresh, form.getAttribute('action').endsWith('/fulltext'));
+		sync(article, fresh, /\/(fulltext|translate)$/.test(form.getAttribute('action')));
 		const notice = response.headers.get('X-Notice');
 		if (notice) {
 			say(decodeURIComponent(notice));
 		}
 		refreshTree();
-		return true;
+		return response.headers.get('X-Progress') || true;
 	};
 
 	// send submits a form about an entry when its turn comes. A form of the
@@ -237,6 +237,42 @@
 		const live = form.isConnected ? form : article.querySelector(`form.entry-action[action="${action}"]`);
 		return live ? post(live, article) : false;
 	});
+
+	// translate has an entry translated a few paragraphs at a time, each
+	// part shown as it comes, until none is left or the reader presses the
+	// button again, which then says so.
+	const translate = async (article) => {
+		if (article.dataset.translating) {
+			delete article.dataset.translating;
+			return;
+		}
+		article.dataset.translating = '1';
+		const asked = () => {
+			const form = article.querySelector('form.entry-action[action$="/translate"]');
+			return form && form.elements.do.value === 'translate' ? form : null;
+		};
+		while (article.dataset.translating && asked()) {
+			const progress = await inTurn(() => (asked() ? post(asked(), article) : false));
+			const [done, total] = typeof progress === 'string' ? progress.split('/').map(Number) : [0, 0];
+			const form = asked();
+			if (!(done < total) || !form) {
+				break;
+			}
+			if (article.dataset.translating) {
+				form.querySelector('button').textContent = `${t('js.translating')} (${Math.floor(done * 100 / total)}%)`;
+			}
+		}
+		delete article.dataset.translating;
+	};
+
+	// submit sends a form about an entry: the one that translates goes on
+	// by itself, any other is sent once.
+	const submit = (form, article) => {
+		if (form.getAttribute('action').endsWith('/translate') && form.elements.do.value === 'translate') {
+			return translate(article);
+		}
+		return send(form, article);
+	};
 
 	// act presses the button of an entry that marks it read or stars it.
 	// With unreadOnly it leaves an entry alone that is read by the time its
@@ -254,7 +290,7 @@
 			const article = event.target.closest('article.entry');
 			if (article && event.target.matches('form.entry-action')) {
 				event.preventDefault();
-				send(event.target, article);
+				submit(event.target, article);
 			}
 		});
 		entries.addEventListener('focusin', (event) => {
@@ -806,6 +842,10 @@
 			return link && window.open(link.href, '_blank', 'noopener');
 		}
 		case 'fulltext': return current && act(current, 'fulltext');
+		case 'translate': {
+			const form = current && current.querySelector('form.entry-action[action$="/translate"]');
+			return form && submit(form, current);
+		}
 		case 'read': return current && act(current, 'read');
 		case 'star': return current && act(current, 'star');
 		case 'labels': return current && current.querySelector('form.entry-action') && showLabels(current);

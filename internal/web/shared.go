@@ -354,7 +354,7 @@ func (h *Handler) serveShared(w http.ResponseWriter, r *http.Request, sh *shared
 		return
 	}
 	v := h.view(r, "", "shared.heading")
-	shown, err := h.articles(ctx, v, sh.lib, sh.owner.ID, prefs, entries)
+	shown, err := h.articles(ctx, v, sh.lib, sh.owner.ID, prefs, entries, false)
 	if err != nil {
 		h.broken(w, r, err)
 		return

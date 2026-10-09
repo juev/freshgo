@@ -19,11 +19,14 @@ import (
 
 	"github.com/PuerkitoBio/goquery"
 
+	"golang.org/x/text/language"
+
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/sanitize"
 	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
+	"github.com/juev/freshgo/internal/translate"
 )
 
 // Priorities of feeds as FreshRSS names them: a feed is shown in the main
@@ -92,6 +95,9 @@ type reading struct {
 	Referrers      []string `json:"send_referrer_allowlist"`
 	// Sharing are the services entries can be sent to.
 	Sharing json.RawMessage `json:"sharing"`
+	// TranslateTo is the language entries are translated into, as a tag;
+	// empty for the language of the interface.
+	TranslateTo string `json:"translate_to"`
 }
 
 func readReading(u *store.User) reading {
@@ -589,15 +595,57 @@ type article struct {
 	Starred     bool
 	// Full says that the text is that of the page of the entry.
 	Full bool
+	// Translation is what the entry offers about its translation; nil
+	// when entries are not translated.
+	Translation *translation
 	// ShowFeed and ShowDate say what the row of the entry in a list names.
 	ShowFeed, ShowDate bool
 	// Share are the ways the entry can be sent on.
 	Share []shareLink
 }
 
+// translation is the action an entry offers about its translation.
+type translation struct {
+	// Do is what the form asks for: "translate" has the next paragraphs
+	// translated, "original" and "translation" switch what is shown.
+	Do string
+	// Label names the action; Percent is how far a translation that was
+	// begun has come, 0 when none was.
+	Label   string
+	Percent int
+}
+
+// translateTo is the language the entries of a reader are translated into.
+func translateTo(v *view, prefs reading) language.Tag {
+	if tag, err := language.Parse(prefs.TranslateTo); err == nil && prefs.TranslateTo != "" {
+		return tag
+	}
+	return language.Make(v.Lang())
+}
+
+// offer says what an entry in a state of translation offers.
+func offer(v *view, state translate.State) *translation {
+	t := &translation{Do: "translate"}
+	if state.Total > 0 {
+		t.Percent = min(100, state.Done*100/state.Total)
+	}
+	switch {
+	case !state.Exists:
+		t.Label, t.Percent = v.T("entry.translate"), 0
+	case !state.Shown:
+		t.Do, t.Label = "translation", v.T("entry.translation")
+	case !state.Complete():
+		t.Label = v.T("entry.translate-on", t.Percent)
+	default:
+		t.Do, t.Label = "original", v.T("entry.untranslated")
+	}
+	return t
+}
+
 // articles prepares entries for a page. Handlers of EntryBeforeDisplay see
-// each and may leave it out.
-func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID int64, prefs reading, entries []*store.Entry) ([]article, error) {
+// each and may leave it out. With translated set, an entry that has a
+// translation into the language of the reader is shown in it.
+func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID int64, prefs reading, entries []*store.Entry, translated bool) ([]article, error) {
 	loc := prefs.location()
 	ids := make([]int64, len(entries))
 	for i, e := range entries {
@@ -622,12 +670,18 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 		if e.Published != 0 {
 			date = time.Unix(e.Published, 0).In(loc)
 		}
+		title, content := e.Title, e.Content
+		var offered *translation
+		if translated && h.translator != nil {
+			state := translate.Of(e, translateTo(v, prefs).String())
+			title, content, offered = state.Title, state.Content, offer(v, state)
+		}
 		a := article{
-			ID: e.ID, Title: e.Title, URL: h.url("/entries/" + strconv.FormatInt(e.ID, 10)),
+			ID: e.ID, Title: title, Translation: offered, URL: h.url("/entries/" + strconv.FormatInt(e.ID, 10)),
 			Authors: strings.Join(e.Authors, ", "), Date: date.Format("2006-01-02 15:04"), DateTime: date.Format(time.RFC3339),
 			// What is stored was cleaned when it was fetched, but not all of it by
 			// freshgo: an import brings what FreshRSS let through.
-			Content:     template.HTML(throughServer(withReferrers(sanitize.HTML(e.Content, e.Link, nil), prefs.Referrers))), //nolint:gosec // cleaned on this line
+			Content:     template.HTML(throughServer(withReferrers(sanitize.HTML(content, e.Link, nil), prefs.Referrers))), //nolint:gosec // cleaned on this line
 			Attachments: attachments(e), Tags: e.Tags, Labels: labels[e.ID], Read: e.IsRead, Starred: e.IsFavorite,
 			Full:     refresh.HasPageText(e),
 			ShowFeed: prefs.ToplineWebsite != "none", ShowDate: prefs.ToplineDate == nil || *prefs.ToplineDate,
@@ -822,7 +876,7 @@ func (h *Handler) reader(kind string) http.HandlerFunc {
 				return
 			}
 			if err == nil {
-				page.Entries, err = h.articles(ctx, v, lib, who.user.ID, prefs, entries)
+				page.Entries, err = h.articles(ctx, v, lib, who.user.ID, prefs, entries, true)
 			}
 			if err != nil {
 				h.broken(w, r, err)
@@ -884,7 +938,7 @@ func (h *Handler) entry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := h.view(r, "reader", "entry.untitled")
-	shown, err := h.articles(ctx, v, lib, who.user.ID, readReading(who.user), []*store.Entry{e})
+	shown, err := h.articles(ctx, v, lib, who.user.ID, readReading(who.user), []*store.Entry{e}, true)
 	if err != nil {
 		h.broken(w, r, err)
 		return
@@ -974,7 +1028,7 @@ func (h *Handler) entryFragment(w http.ResponseWriter, r *http.Request, entryID 
 	}
 	v := h.view(r, "reader", "entry.untitled")
 	prefs := readReading(who.user)
-	shown, err := h.articles(ctx, v, lib, who.user.ID, prefs, []*store.Entry{e})
+	shown, err := h.articles(ctx, v, lib, who.user.ID, prefs, []*store.Entry{e}, true)
 	if err != nil {
 		h.broken(w, r, err)
 		return
@@ -1045,6 +1099,56 @@ func (h *Handler) fullTextEntry(w http.ResponseWriter, r *http.Request) {
 		h.log.Warn("page of an entry gave no text", "user", user.Name, "entry", e.ID, "error", err)
 		notice = "notice.fulltext-failed"
 	}
+	h.back(w, r, e.ID, notice)
+}
+
+// progressHeader tells the script how far the translation of an entry is:
+// paragraphs done, a slash, paragraphs in all.
+const progressHeader = "X-Progress"
+
+// translateEntry has the text of an entry translated into the language of
+// the reader, or switches between the translation and the original. The
+// script gets the entry after the next paragraphs and asks again while
+// some are left; a plain form waits for all of them.
+func (h *Handler) translateEntry(w http.ResponseWriter, r *http.Request) {
+	ctx, user := r.Context(), state(r).who.user
+	if h.translator == nil {
+		h.fail(w, r, http.StatusNotFound)
+		return
+	}
+	e, ok := h.ownEntry(w, r)
+	if !ok || !h.form(w, r) {
+		return
+	}
+	tag := translateTo(h.view(r, "reader", "entry.untitled"), readReading(user))
+	var (
+		progress translate.State
+		err      error
+	)
+	switch do := r.PostForm.Get("do"); {
+	case do == "original" || do == "translation":
+		progress, err = h.translator.Show(ctx, user.ID, e.ID, tag, do == "translation")
+	case r.Header.Get(fragmentHeader) == "entry":
+		progress, err = h.translator.Step(ctx, user.ID, e.ID, tag)
+	default:
+		progress, err = h.translator.All(ctx, user.ID, e.ID, tag)
+	}
+	notice := ""
+	switch {
+	case ctx.Err() != nil:
+		return
+	case errors.Is(err, store.ErrNotFound):
+		h.fail(w, r, http.StatusNotFound)
+		return
+	case errors.Is(err, translate.ErrSameLanguage):
+		notice = "notice.translate-same"
+	case err != nil:
+		h.log.Warn("entry was not translated", "user", user.Name, "entry", e.ID, "error", err)
+		notice = "notice.translate-failed"
+	case progress.Complete() && progress.Failed > 0 && r.PostForm.Get("do") == "translate":
+		notice = "notice.translate-partly"
+	}
+	w.Header().Set(progressHeader, strconv.Itoa(progress.Done)+"/"+strconv.Itoa(progress.Total))
 	h.back(w, r, e.ID, notice)
 }
 
