@@ -145,6 +145,7 @@ func TestHelpKeepsSecrets(t *testing.T) {
 		EnvDatabaseURL:      "postgres://freshgo:database-password@db/freshgo",
 		EnvSMTPURL:          "smtp://freshgo:smtp-password@mail:587?from=a@example.org",
 		EnvOIDCClientSecret: "oidc-password",
+		EnvTranslateKey:     "translate-password",
 		EnvListen:           "0.0.0.0:9000",
 	}
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
@@ -154,7 +155,7 @@ func TestHelpKeepsSecrets(t *testing.T) {
 	if err := fs.Parse([]string{"-h"}); !errors.Is(err, flag.ErrHelp) {
 		t.Fatalf("parse -h: %v", err)
 	}
-	for _, secret := range []string{"database-password", "smtp-password", "oidc-password"} {
+	for _, secret := range []string{"database-password", "smtp-password", "oidc-password", "translate-password"} {
 		if strings.Contains(help.String(), secret) {
 			t.Errorf("the help shows %q:\n%s", secret, help.String())
 		}
@@ -166,6 +167,33 @@ func TestHelpKeepsSecrets(t *testing.T) {
 	}
 	if c.DatabaseURL != env[EnvDatabaseURL] || c.SMTPURL != env[EnvSMTPURL] || c.OIDCClientSecret != env[EnvOIDCClientSecret] {
 		t.Errorf("the values of the environment are not taken: %+v", c)
+	}
+}
+
+// The service that translates is named whole or not at all.
+func TestTranslateSettings(t *testing.T) {
+	whole := map[string]string{EnvTranslateURL: "https://api.example/v1", EnvTranslateKey: "key", EnvTranslateModel: "model"}
+	c := parse(t, whole)
+	if err := c.Validate(); err != nil || c.TranslateURL != "https://api.example/v1" || c.TranslateKey != "key" || c.TranslateModel != "model" {
+		t.Errorf("the three settings: %+v, %v", c, err)
+	}
+	if err := parse(t, nil).Validate(); err != nil {
+		t.Errorf("none of the settings: %v", err)
+	}
+	for _, missing := range []string{EnvTranslateURL, EnvTranslateKey, EnvTranslateModel} {
+		part := map[string]string{}
+		for name, value := range whole {
+			if name != missing {
+				part[name] = value
+			}
+		}
+		if err := parse(t, part).Validate(); err == nil || !strings.Contains(err.Error(), "together") {
+			t.Errorf("without %s: error = %v", missing, err)
+		}
+	}
+	whole[EnvTranslateURL] = "api.example/v1"
+	if err := parse(t, whole).Validate(); err == nil {
+		t.Error("an address without a scheme is taken")
 	}
 }
 
