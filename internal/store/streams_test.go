@@ -286,6 +286,47 @@ func TestCounts(t *testing.T) {
 		if err != nil || !reflect.DeepEqual(labels, wantLabels) {
 			t.Errorf("LabelCounts = %v, %v; want %v", labels, err, wantLabels)
 		}
+		// The numbers of unread entries alone: the same, and a feed without an
+		// unread entry is not named.
+		want := map[int64]int{1: 1, 2: 1, 3: 1, 4: 1}
+		if unread, err := s.UnreadByFeed(ctx, lib.alice.ID); err != nil || !reflect.DeepEqual(unread, want) {
+			t.Errorf("UnreadByFeed = %v, %v; want %v", unread, err, want)
+		}
+		if _, err := s.SetEntriesRead(ctx, lib.alice.ID, []int64{e2, e5}, true, 5000); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.SetEntriesRead(ctx, lib.alice.ID, []int64{e1}, false, 5000); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.SetEntriesRead(ctx, lib.alice.ID, []int64{e3}, false, 5000); err != nil {
+			t.Fatal(err)
+		}
+		want = map[int64]int{1: 1, 2: 2, 4: 1}
+		if unread, err := s.UnreadByFeed(ctx, lib.alice.ID); err != nil || !reflect.DeepEqual(unread, want) {
+			t.Errorf("UnreadByFeed after reading = %v, %v; want %v", unread, err, want)
+		}
+		if unread, err := s.UnreadByFeed(ctx, lib.bob.ID); err != nil || !reflect.DeepEqual(unread, map[int64]int{1: 1, 2: 1, 3: 1, 4: 1}) {
+			t.Errorf("UnreadByFeed of another user = %v, %v; want it as it was", unread, err)
+		}
+		if s.driver == config.DriverSQLite {
+			rows, err := s.query(ctx, `EXPLAIN QUERY PLAN `+unreadByFeed, lib.alice.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			steps, err := collect(rows, func(sc scanner) (string, error) {
+				var (
+					id, parent, unused int
+					detail             string
+				)
+				return detail, sc.Scan(&id, &parent, &unused, &detail)
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if plan := strings.Join(steps, "\n"); !strings.Contains(plan, "entries_feed_read_index (user_id=? AND feed_id=? AND is_read=?)") {
+				t.Errorf("the unread entries are not looked up feed by feed:\n%s", plan)
+			}
+		}
 	})
 }
 

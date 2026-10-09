@@ -20,10 +20,11 @@ test-e2e:
 
 # Fails when a search of 100 000 entries takes longer than it may. Runs on
 # SQLite, and on PostgreSQL too when FRESHGO_TEST_POSTGRES_URL names a server.
-# The listings of the API are timed on SQLite and have no limit to fail at.
+# The listings of the API and the pages are timed on SQLite and have no limit
+# to fail at.
 bench:
 	go test -run '^$$' -bench . -benchtime 3x -timeout 30m ./internal/store
-	go test -run '^$$' -bench . -benchmem ./internal/greader
+	go test -run '^$$' -bench . -benchmem ./internal/greader ./internal/web
 
 lint:
 	go vet ./...
