@@ -14,6 +14,7 @@ import (
 	"github.com/juev/freshgo/internal/journal"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/store"
+	"github.com/juev/freshgo/internal/translate"
 	"github.com/juev/freshgo/internal/websub"
 )
 
@@ -36,6 +37,8 @@ type services struct {
 	// images fetches the images of entries the server hands out.
 	images *fetch.Client
 	icons  *favicon.Service
+	// translator is nil when the server was given no service to translate with.
+	translator *translate.Translator
 	// webSub is nil when WebSub is off.
 	webSub *websub.Service
 	// close lets go of what the services hold; it comes before the
@@ -74,6 +77,15 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 	s.icons = favicon.New(db, client, s.log)
 	s.refresher = refresh.New(db, client, s.registry, s.log)
 	s.refresher.Icons = s.icons
+	if conf.TranslateURL != "" {
+		// A client of its own, for the reason images have one: a model
+		// takes its time, and the feeds of the same host must not wait.
+		asking, err := fetch.New(fetching)
+		if err != nil {
+			return nil, err
+		}
+		s.translator = translate.New(db, &translate.Client{URL: conf.TranslateURL, Key: conf.TranslateKey, Model: conf.TranslateModel, HTTP: asking})
+	}
 	if conf.WebSub {
 		s.webSub, err = websub.New(db, client, s.log, conf.BaseURL)
 		switch {

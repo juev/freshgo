@@ -143,7 +143,7 @@ func TestBlocks(t *testing.T) {
 
 	// A service that does not answer leaves the text and fails nothing else.
 	s = newService(t, translator)
-	s.Client.Key = "wrong"
+	s.Key = "wrong"
 	if got, stats, err = s.Blocks(ctx, sentence, "Russian"); err != nil || got != sentence || stats.Failed != 1 || stats.Reasons["request failed"] != 1 {
 		t.Errorf("Blocks with a service that refuses = %q, %+v, %v", got, stats, err)
 	}

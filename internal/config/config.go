@@ -29,6 +29,12 @@ const (
 	// EnvOIDCClientSecret is the secret of the client the installation is
 	// at its OpenID Connect provider.
 	EnvOIDCClientSecret = "FRESHGO_OIDC_CLIENT_SECRET"
+	// EnvTranslateURL, EnvTranslateKey and EnvTranslateModel name the
+	// service that translates entries: the address of an OpenAI-compatible
+	// API, its key and a model.
+	EnvTranslateURL   = "FRESHGO_TRANSLATE_URL"
+	EnvTranslateKey   = "FRESHGO_TRANSLATE_KEY"
+	EnvTranslateModel = "FRESHGO_TRANSLATE_MODEL"
 	// EnvTrustedProxies is read by the web interface.
 	EnvTrustedProxies = "FRESHGO_TRUSTED_PROXIES"
 )
@@ -82,6 +88,11 @@ type Config struct {
 	// client named in the settings of the installation; without it nobody
 	// signs in through a provider.
 	OIDCClientSecret string
+	// TranslateURL, TranslateKey and TranslateModel name the service that
+	// translates entries: the address of an OpenAI-compatible API without
+	// "/chat/completions", its key and a model. All empty, and nothing is
+	// translated.
+	TranslateURL, TranslateKey, TranslateModel string
 
 	// invalid is what was wrong with the environment, reported by Validate.
 	invalid error
@@ -126,11 +137,18 @@ func Bind(fs *flag.FlagSet, getenv func(string) string) *Config {
 		"SMTP server for the letters that confirm e-mail addresses: smtp[s]://user:password@host:port?from=address ($"+EnvSMTPURL+")")
 	fs.StringVar(&c.OIDCClientSecret, "oidc-client-secret", getenv(EnvOIDCClientSecret),
 		"secret of the OpenID Connect client set up on the page of authentication ($"+EnvOIDCClientSecret+")")
+	fs.StringVar(&c.TranslateURL, "translate-url", getenv(EnvTranslateURL),
+		"address of the OpenAI-compatible API that translates entries, without /chat/completions ($"+EnvTranslateURL+")")
+	fs.StringVar(&c.TranslateKey, "translate-key", getenv(EnvTranslateKey),
+		"key of the API that translates entries ($"+EnvTranslateKey+")")
+	fs.StringVar(&c.TranslateModel, "translate-model", getenv(EnvTranslateModel),
+		"model that translates entries ($"+EnvTranslateModel+")")
 	// The help of a command prints the default of every flag, and these
 	// variables carry passwords: it shows what is built in instead.
 	fs.Lookup("database-url").DefValue = defaultDatabaseURL
 	fs.Lookup("smtp-url").DefValue = ""
 	fs.Lookup("oidc-client-secret").DefValue = ""
+	fs.Lookup("translate-key").DefValue = ""
 	return c
 }
 
@@ -173,6 +191,14 @@ func (c *Config) Validate() error {
 	}
 	if _, _, err := c.Database(); err != nil {
 		return err
+	}
+	if set := c.TranslateURL != ""; set != (c.TranslateKey != "") || set != (c.TranslateModel != "") {
+		return errors.New("translating entries needs -translate-url, -translate-key and -translate-model together")
+	}
+	if c.TranslateURL != "" {
+		if u, err := url.Parse(c.TranslateURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return fmt.Errorf("translate URL %q: want an http or https address", c.TranslateURL)
+		}
 	}
 	if c.RefreshInterval <= 0 {
 		return fmt.Errorf("refresh interval %s: want a positive duration", c.RefreshInterval)
