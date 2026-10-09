@@ -15,8 +15,10 @@ test-integration:
 # Needs Chrome: goes through the interface in a headless browser with the
 # keyboard alone and checks its pages with axe-core, and has pages read by
 # the browser of the server.
+# The packages run one after the other: side by side, the browsers of one keep
+# that of the other from starting in time on a small machine.
 test-e2e:
-	go test -tags e2e -count=1 -run '^TestE2E' ./internal/web ./internal/browser
+	go test -tags e2e -count=1 -p 1 -run '^TestE2E' ./internal/web ./internal/browser
 
 # Fails when a search of 100 000 entries takes longer than it may. Runs on
 # SQLite, and on PostgreSQL too when FRESHGO_TEST_POSTGRES_URL names a server.
