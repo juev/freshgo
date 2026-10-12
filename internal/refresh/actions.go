@@ -337,10 +337,7 @@ func (r *Refresher) mirrorOPML(ctx context.Context, u *store.User, conf userSett
 			}
 			switch {
 			case !stays && fresh.TTL >= 0:
-				if fresh.TTL == 0 {
-					fresh.TTL = conf.ttlDefault
-				}
-				fresh.TTL = -fresh.TTL
+				fresh.TTL = muted(fresh.TTL)
 			case stays && fresh.TTL < 0:
 				fresh.TTL = -fresh.TTL
 			default:

@@ -127,15 +127,18 @@ func TestUserSettings(t *testing.T) {
 
 		// Archiving.
 		form = s.formAt("/settings/archiving", "/settings/archiving")
-		for key, value := range map[string]string{"ttl_default": "7200", "keep_max": "10", "keep_max_on": "1", "keep_min": "2", "keep_period_count": "5", "keep_period_unit": "P1D", "keep_period_on": "1"} {
+		if form.Has("ttl_default") {
+			t.Error("the form of archiving asks for a default period, which a feed no longer has")
+		}
+		for key, value := range map[string]string{"keep_max": "10", "keep_max_on": "1", "keep_min": "2", "keep_period_count": "5", "keep_period_unit": "P1D", "keep_period_on": "1"} {
 			form.Set(key, value)
 		}
 		form.Del("keep_favourites")
 		s.follow("/settings/archiving", form)
 		got = s.settings("alice")
-		if archiving := got["archiving"].(map[string]any); got["ttl_default"] != 7200.0 || archiving["keep_period"] != "P5D" || archiving["keep_max"] != 10.0 ||
+		if archiving := got["archiving"].(map[string]any); archiving["keep_period"] != "P5D" || archiving["keep_max"] != 10.0 ||
 			archiving["keep_min"] != 2.0 || archiving["keep_favourites"] != false {
-			t.Errorf("settings after the form of archiving: ttl %v, archiving %v", got["ttl_default"], got["archiving"])
+			t.Errorf("settings after the form of archiving: %v", got["archiving"])
 		}
 		// Purging applies the rules now: no feed keeps more than ten entries
 		// it could give up.

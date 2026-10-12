@@ -142,12 +142,16 @@ func (h *hubWorld) titles(f *store.Feed) []string {
 // R14: a feed that names a hub is subscribed to at the hub after its
 // refresh, with a callback under the public address and a secret; the hub's
 // question is answered with its challenge and the lease is recorded.
+// hourly gives a feed a period of its own, so that a test can count its polls
+// in hours whatever it publishes.
+func hourly(f *store.Feed) { f.TTL = 3600 }
+
 func TestWebSubSubscribes(t *testing.T) {
 	eachEngine(t, func(t *testing.T, w *world) {
 		h := newHubWorld(t, w)
 		u := w.user("alice", "")
-		f := w.feed(u, "/feed.xml", nil)
-		plain := w.feed(u, "/plain.xml", nil)
+		f := w.feed(u, "/feed.xml", hourly)
+		plain := w.feed(u, "/plain.xml", hourly)
 		w.serveBody("/plain.xml", "application/rss+xml", blogFeed)
 
 		w.runOne()
@@ -177,7 +181,7 @@ func TestWebSubSubscribes(t *testing.T) {
 			t.Errorf("subscription after the confirmation = %+v; want the lease recorded and no trust before the first push", sub)
 		}
 		// The hub is not asked again while the lease is far from its end.
-		w.later()
+		w.clock = w.clock.Add(2 * time.Hour)
 		w.runOne()
 		if n := len(h.requests()); n != 1 {
 			t.Errorf("the hub was asked %d times after the next refresh, want still once", n)
@@ -330,7 +334,7 @@ func TestWebSubRenews(t *testing.T) {
 	eachEngine(t, func(t *testing.T, w *world) {
 		h := newHubWorld(t, w)
 		u := w.user("alice", "")
-		w.feed(u, "/feed.xml", nil)
+		w.feed(u, "/feed.xml", hourly)
 		w.runOne()
 		h.confirm(2 * 24 * 3600)
 		key := h.subscription().Key
@@ -359,7 +363,7 @@ func TestWebSubRenews(t *testing.T) {
 		h.mu.Unlock()
 		w.clock = w.clock.Add(22 * time.Hour) // the lease has run out
 		for range 3 {
-			w.later()
+			w.clock = w.clock.Add(2 * time.Hour)
 			w.runOne()
 		}
 		if n := len(h.requests()); n != 3 {
@@ -382,12 +386,12 @@ func TestWebSubPollsLessOften(t *testing.T) {
 	eachEngine(t, func(t *testing.T, w *world) {
 		h := newHubWorld(t, w)
 		u := w.user("alice", "")
-		f := w.feed(u, "/feed.xml", nil)
+		f := w.feed(u, "/feed.xml", hourly)
 		w.runOne()
 		h.confirm(30 * 24 * 3600)
 
 		// Confirmed but silent: no trust yet, polled by its own period.
-		w.later()
+		w.clock = w.clock.Add(2 * time.Hour)
 		w.runOne()
 		if hits := w.hitCount("/feed.xml"); hits != 2 {
 			t.Fatalf("%d requests before the first push, want 2: an untried hub does not spare polls", hits)
@@ -397,7 +401,7 @@ func TestWebSubPollsLessOften(t *testing.T) {
 		}
 		h.publish("a", "b", "c")
 		for range 5 {
-			w.later()
+			w.clock = w.clock.Add(2 * time.Hour)
 			w.runOne()
 		}
 		if hits := w.hitCount("/feed.xml"); hits != 2 {
@@ -420,7 +424,7 @@ func TestWebSubPollsLessOften(t *testing.T) {
 			t.Error("the hub is still trusted after a poll found an entry it did not push")
 		}
 		before := w.hitCount("/feed.xml")
-		w.later()
+		w.clock = w.clock.Add(2 * time.Hour)
 		w.runOne()
 		if w.hitCount("/feed.xml") != before+1 {
 			t.Error("a feed whose hub let it down is not polled by its own period again")
@@ -470,9 +474,9 @@ func TestWebSubSwitchedOn(t *testing.T) {
 		h := newHubWorld(t, w)
 		w.r.WebSub = nil
 		u := w.user("alice", "")
-		w.feed(u, "/feed.xml", nil)
+		w.feed(u, "/feed.xml", hourly)
 		w.serveBody("/muted.xml", "application/atom+xml", h.document("http://blog.example/muted.xml", "m"))
-		muted := w.feed(u, "/muted.xml", nil)
+		muted := w.feed(u, "/muted.xml", hourly)
 		w.runOne()
 		muted = w.storedFeed(muted)
 		muted.TTL = -3600
@@ -482,13 +486,13 @@ func TestWebSubSwitchedOn(t *testing.T) {
 
 		w.r.WebSub = h.service
 		h.unchanged()
-		w.later()
+		w.clock = w.clock.Add(2 * time.Hour)
 		w.runOne()
 		asked := h.requests()
 		if len(asked) != 1 || asked[0].Get("hub.topic") != h.topic || asked[0].Get("hub.mode") != "subscribe" {
 			t.Fatalf("the hub was asked %v; want one subscription, to %s", asked, h.topic)
 		}
-		w.later()
+		w.clock = w.clock.Add(2 * time.Hour)
 		w.runOne()
 		if n := len(h.requests()); n != 1 {
 			t.Errorf("the hub was asked %d times in two refreshes, want once", n)

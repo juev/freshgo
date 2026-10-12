@@ -165,6 +165,32 @@ func (s *Store) DeleteFeedEntries(ctx context.Context, userID, feedID int64) (in
 	return n, nil
 }
 
+// EntryCountsSince returns, by feed, the number of entries dated after since,
+// for the feeds that have such entries.
+func (s *Store) EntryCountsSince(ctx context.Context, userID, since int64) (map[int64]int, error) {
+	rows, err := s.query(ctx, `
+		SELECT feed_id, COUNT(*) FROM entries WHERE user_id = ? AND published > ? GROUP BY feed_id`, userID, since)
+	if err != nil {
+		return nil, fmt.Errorf("store: entry counts: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	counts := map[int64]int{}
+	for rows.Next() {
+		var (
+			feedID int64
+			n      int
+		)
+		if err := rows.Scan(&feedID, &n); err != nil {
+			return nil, fmt.Errorf("store: entry counts: %w", err)
+		}
+		counts[feedID] = n
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("store: entry counts: %w", err)
+	}
+	return counts, nil
+}
+
 // NewestEntryDates returns, by feed, the date of the newest entry of the
 // feeds that have entries.
 func (s *Store) NewestEntryDates(ctx context.Context, userID int64) (map[int64]int64, error) {

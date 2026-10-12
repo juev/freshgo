@@ -611,24 +611,19 @@ func attachLabels(ctx context.Context, tx *store.Store, u *store.User, labelled 
 type settings struct {
 	// readOnArrival makes read the entries whose state a document does not say.
 	readOnArrival bool
-	ttlDefault    int
 	location      *time.Location
 }
 
 func readSettings(u *store.User) settings {
 	var stored struct {
-		TTLDefault int    `json:"ttl_default"`
-		Timezone   string `json:"timezone"`
-		MarkWhen   struct {
+		Timezone string `json:"timezone"`
+		MarkWhen struct {
 			Reception bool `json:"reception"`
 		} `json:"mark_when"`
 	}
 	// Settings of another shape are settings nobody made.
 	_ = json.Unmarshal(u.Settings, &stored)
-	s := settings{readOnArrival: stored.MarkWhen.Reception, ttlDefault: 3600, location: time.Local}
-	if stored.TTLDefault > 0 {
-		s.ttlDefault = stored.TTLDefault
-	}
+	s := settings{readOnArrival: stored.MarkWhen.Reception, location: time.Local}
 	if loc, err := time.LoadLocation(stored.Timezone); err == nil && stored.Timezone != "" {
 		s.location = loc
 	}
@@ -748,7 +743,7 @@ func addFeed(ctx context.Context, tx *store.Store, registry *hooks.Registry, u *
 		f.Website = src.address
 	}
 	if src.muted {
-		f.TTL = -s.ttlDefault
+		f.TTL = store.MutedTTL
 	}
 	if src.category != "" {
 		categories, err := tx.Categories(ctx, u.ID)
