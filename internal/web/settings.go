@@ -328,16 +328,6 @@ func (h *Handler) showArchiving(w http.ResponseWriter, r *http.Request, status i
 	for _, unit := range []string{"PT1H", "P1D", "P1W", "P1M", "P1Y"} {
 		page.Units = append(page.Units, option{unit, v.T("retention.unit." + unit), unit == page.Retention.PeriodUnit})
 	}
-	ttl, ok := s.number("ttl_default")
-	if !ok || ttl <= 0 {
-		ttl = 3600
-	}
-	if !slices.Contains(periods, ttl) {
-		page.Options["ttl_default"] = append(page.Options["ttl_default"], option{strconv.Itoa(ttl), duration(v, ttl), true})
-	}
-	for _, seconds := range periods[1:] {
-		page.Options["ttl_default"] = append(page.Options["ttl_default"], option{strconv.Itoa(seconds), duration(v, seconds), seconds == ttl})
-	}
 	v.Data = page
 	h.render(w, r, status, "archiving", v)
 }
@@ -348,9 +338,6 @@ func (h *Handler) archivingPage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) saveArchiving(w http.ResponseWriter, r *http.Request) {
 	h.saveSettings(w, r, "/settings/archiving", func(form url.Values, s attrs) string {
-		if ttl, err := strconv.Atoi(form.Get("ttl_default")); err == nil && ttl > 0 {
-			s.set("ttl_default", ttl)
-		}
 		s.setRetention(form, false)
 		return ""
 	}, func(status int, s attrs, _ string) { h.showArchiving(w, r, status, s) })

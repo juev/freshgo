@@ -217,12 +217,17 @@ func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options, hubs map
 		slots = make(chan struct{}, feedConcurrency)
 		now   = r.now().Unix()
 	)
+	// How much each feed has published lately says how often to ask it.
+	published, err := r.db.EntryCountsSince(ctx, j.user.ID, now-frequencyWindow)
+	if err != nil {
+		return st, err
+	}
 	for _, f := range feeds {
 		if f.TTL >= 0 && f.WebSubTopic != "" && f.WebSubHub != "" {
 			hubs[f.WebSubTopic] = f.WebSubHub
 		}
 		f, ok := r.hooks.FeedBeforeActualize.Call(ctx, f)
-		if !ok || !due(f, j.conf, now, o.Force, j.pushing[f.WebSubTopic]) {
+		if !ok || !due(f, published[f.ID], now, o.Force, j.pushing[f.WebSubTopic]) {
 			continue
 		}
 		select {
@@ -262,19 +267,33 @@ func lastAttempt(f *store.Feed) int64 {
 // pushedPeriod is how often a feed is polled while its hub delivers.
 const pushedPeriod = 24 * 3600
 
-// due reports whether the feed is to be refreshed at the time now. pushed
-// says a WebSub hub delivers its entries.
-func due(f *store.Feed, conf userSettings, now int64, force, pushed bool) bool {
+// A feed without a period of its own is asked as often as it has published
+// entries within frequencyWindow, and once in maxPeriod at least.
+const (
+	frequencyWindow = 7 * 24 * 3600
+	maxPeriod       = 24 * 3600
+)
+
+// period is the refresh period, in seconds, of a feed that is not muted and
+// has published that many entries within frequencyWindow.
+func period(f *store.Feed, published int) int {
+	if f.TTL > 0 {
+		return f.TTL
+	}
+	return min(maxPeriod, frequencyWindow/max(published, 1))
+}
+
+// due reports whether the feed is to be refreshed at the time now. published
+// is the number of its entries within frequencyWindow; pushed says a WebSub
+// hub delivers its entries.
+func due(f *store.Feed, published int, now int64, force, pushed bool) bool {
 	if f.TTL < 0 {
 		return false
 	}
 	if force {
 		return true
 	}
-	ttl := f.TTL
-	if ttl == 0 {
-		ttl = conf.ttlDefault
-	}
+	ttl := period(f, published)
 	if pushed {
 		ttl = max(ttl, pushedPeriod)
 	}

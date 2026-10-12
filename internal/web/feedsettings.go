@@ -37,7 +37,8 @@ var kinds = []struct {
 	{scrape.KindHTMLXPathJSON, "html-json"},
 }
 
-// Refresh periods a form offers, in seconds; zero is the period of the user.
+// Refresh periods a form offers, in seconds; zero leaves the period to how
+// often the feed publishes.
 var periods = []int{
 	0, 900, 1200, 1500, 1800, 2700, 3600, 5400, 7200, 10800, 14400, 18000, 21600, 25200, 28800, 36000, 43200,
 	64800, 86400, 129600, 172800, 259200, 345600, 432000, 518400, 604800,
@@ -237,7 +238,7 @@ func (h *Handler) showFeed(w http.ResponseWriter, r *http.Request, status int, f
 		page.Periods = append(page.Periods, option{strconv.Itoa(ttl), duration(v, ttl), true})
 	}
 	for _, seconds := range periods {
-		name := v.T("form.inherit")
+		name := v.T("feed.ttl.automatic")
 		if seconds > 0 {
 			name = duration(v, seconds)
 		}
@@ -354,7 +355,7 @@ type icon struct {
 // applyFeed writes what the form of the settings of a feed says into f. It
 // returns the key of the text that says what is wrong, empty when nothing is.
 // canBrowse is whether the form asks about reading pages with a browser.
-func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, ttlDefault int, canBrowse bool) string {
+func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, canBrowse bool) string {
 	form := r.PostForm
 	get := func(name string) string { return strings.TrimSpace(form.Get(name)) }
 	number := func(name string) (int, bool) {
@@ -399,7 +400,7 @@ func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, ttl
 	if get("mute") != "" {
 		// A muted feed keeps its period, as FreshRSS stores it: below zero.
 		if f.TTL == 0 {
-			f.TTL = ttlDefault
+			f.TTL = -store.MutedTTL
 		}
 		f.TTL = -f.TTL
 	}
@@ -660,12 +661,8 @@ func (h *Handler) editFeed(ctx context.Context, r *http.Request, db *store.Store
 	if err != nil {
 		return "", err
 	}
-	ttlDefault := 3600
-	if n, ok := readAttrs(user.Settings).number("ttl_default"); ok && n > 0 {
-		ttlDefault = n
-	}
 	before := *f
-	problem = applyFeed(r, f, categories, ttlDefault, h.refresher.Browser != nil)
+	problem = applyFeed(r, f, categories, h.refresher.Browser != nil)
 	// The copy the validators stand for was fetched and read otherwise.
 	if !sameParsing(&before, f) {
 		f.HTTPETag, f.HTTPLastModified = "", ""

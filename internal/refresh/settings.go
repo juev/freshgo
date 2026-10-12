@@ -7,10 +7,6 @@ import (
 	"github.com/juev/freshgo/internal/search"
 )
 
-// defaultTTL is the refresh period of a user who has not set one: the
-// ttl_default of FreshRSS.
-const defaultTTL = 3600
-
 // attributes is a JSON object read key by key, so that one value of an
 // unexpected type does not hide the others.
 type attributes map[string]json.RawMessage
@@ -58,8 +54,6 @@ func (a attributes) raw() json.RawMessage {
 // the names FreshRSS gives them in the user's config.php.
 type userSettings struct {
 	enabled bool
-	// ttlDefault is the refresh period, in seconds, of feeds that set none.
-	ttlDefault int
 	// markUpdatedUnread makes an entry the feed has changed unread again.
 	markUpdatedUnread bool
 	// location is the time zone of feed dates written without one.
@@ -85,12 +79,9 @@ type userSettings struct {
 
 func readUserSettings(raw json.RawMessage) userSettings {
 	a := readAttributes(raw)
-	s := userSettings{enabled: true, ttlDefault: defaultTTL, location: time.Local, archiving: defaultArchiving, maxUnread: -1}
+	s := userSettings{enabled: true, location: time.Local, archiving: defaultArchiving, maxUnread: -1}
 	if v, ok := get[bool](a, "enabled"); ok {
 		s.enabled = v
-	}
-	if v, ok := get[int](a, "ttl_default"); ok && v > 0 {
-		s.ttlDefault = v
 	}
 	s.markUpdatedUnread, _ = get[bool](a, "mark_updated_article_unread")
 	if name, _ := get[string](a, "timezone"); name != "" {

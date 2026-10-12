@@ -178,7 +178,7 @@ func TestRefreshOfImportedInstallation(t *testing.T) {
 		}
 
 		// Once more, now with hashes to compare: still nothing changes.
-		w.clock = w.clock.Add(24 * time.Hour)
+		w.later()
 		for _, st := range w.run(Options{}) {
 			if want := (Stats{User: st.User, Refreshed: feedCount[st.User]}); st != want {
 				t.Errorf("second refresh: stats %+v, want %+v", st, want)
@@ -200,7 +200,7 @@ func TestRefreshOfImportedInstallation(t *testing.T) {
 		if err := os.WriteFile(file, []byte(strings.Replace(string(doc), "</channel>", added, 1)), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		w.clock = w.clock.Add(24 * time.Hour)
+		w.later()
 		for _, st := range w.run(Options{}) {
 			if want := (Stats{User: st.User, Refreshed: feedCount[st.User], NewEntries: 1}); st != want {
 				t.Errorf("refresh after one new item: stats %+v, want %+v", st, want)
@@ -242,13 +242,13 @@ func TestSettingsOfImportedUser(t *testing.T) {
 		if err := json.Unmarshal(alice.Settings, &raw); err != nil {
 			t.Fatal(err)
 		}
-		for _, key := range []string{"enabled", "ttl_default", "mark_updated_article_unread", "timezone", "archiving", "mark_when"} {
+		for _, key := range []string{"enabled", "mark_updated_article_unread", "timezone", "archiving", "mark_when"} {
 			if _, ok := raw[key]; !ok {
 				t.Errorf("imported settings have no %q", key)
 			}
 		}
 		conf := readUserSettings(alice.Settings)
-		if !conf.enabled || conf.ttlDefault != 3600 || conf.markUpdatedUnread || conf.location != time.Local {
+		if !conf.enabled || conf.markUpdatedUnread || conf.location != time.Local {
 			t.Errorf("settings of alice: %+v", conf)
 		}
 		// What FreshRSS wrote down for a new user is what freshgo assumes for one.

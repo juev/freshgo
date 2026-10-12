@@ -174,9 +174,10 @@ func (w *world) runOne() Stats {
 	return stats[0]
 }
 
-// later moves the clock past the default refresh period.
+// later moves the clock past the longest period of a feed that has none of
+// its own.
 func (w *world) later() {
-	w.clock = w.clock.Add(2 * time.Hour)
+	w.clock = w.clock.Add(25 * time.Hour)
 }
 
 func (w *world) storedFeed(f *store.Feed) *store.Feed {
@@ -545,13 +546,27 @@ func TestWhichFeedsAreRefreshed(t *testing.T) {
 		w.registry.UserMaintenance.Add(0, func(_ context.Context, u *store.User) { maintained = append(maintained, u.Name) })
 
 		now := start.Unix()
-		u := w.user("alice", `{"ttl_default":1800}`)
-		for _, path := range []string{"/never", "/fresh", "/stale", "/own-ttl-fresh", "/own-ttl-stale", "/muted", "/failed", "/off"} {
+		u := w.user("alice", `{}`)
+		for _, path := range []string{"/never", "/quiet-fresh", "/quiet-stale", "/fresh", "/stale", "/own-ttl-fresh", "/own-ttl-stale", "/muted", "/failed", "/off"} {
 			w.serveBody(path, rssType, rss("Blog", item{guid: "a", title: "A", body: "x"}))
 		}
+		// hourly gives the feed an entry an hour for the last week.
+		hourly := func(f *store.Feed) {
+			var entries []*store.Entry
+			for i := range 168 {
+				entries = append(entries, &store.Entry{UserID: u.ID, FeedID: f.ID, GUID: fmt.Sprintf("h%d", i), Published: now - int64(i)*3600})
+			}
+			w.insert(u, entries...)
+		}
 		w.feed(u, "/never", func(f *store.Feed) { f.Name = "never" })
-		w.feed(u, "/fresh", func(f *store.Feed) { f.Name, f.LastUpdate = "fresh", now-1800 })
-		w.feed(u, "/stale", func(f *store.Feed) { f.Name, f.LastUpdate = "stale", now-1801 })
+		// A feed that has published nothing lately is asked once a day.
+		w.feed(u, "/quiet-fresh", func(f *store.Feed) { f.Name, f.LastUpdate = "quiet-fresh", now-86400 })
+		quiet := w.feed(u, "/quiet-stale", func(f *store.Feed) { f.Name, f.LastUpdate = "quiet-stale", now-86401 })
+		// What it published before the last week does not count.
+		w.insert(u, &store.Entry{UserID: u.ID, FeedID: quiet.ID, GUID: "old", Published: now - 8*86400})
+		// A feed with an entry an hour is asked once an hour.
+		hourly(w.feed(u, "/fresh", func(f *store.Feed) { f.Name, f.LastUpdate = "fresh", now-3600 }))
+		hourly(w.feed(u, "/stale", func(f *store.Feed) { f.Name, f.LastUpdate = "stale", now-3601 }))
 		w.feed(u, "/own-ttl-fresh", func(f *store.Feed) { f.Name, f.LastUpdate, f.TTL = "own-ttl-fresh", now-5000, 7200 })
 		w.feed(u, "/own-ttl-stale", func(f *store.Feed) { f.Name, f.LastUpdate, f.TTL = "own-ttl-stale", now-7201, 7200 })
 		w.feed(u, "/muted", func(f *store.Feed) { f.Name, f.TTL = "muted", -3600 })
@@ -561,17 +576,17 @@ func TestWhichFeedsAreRefreshed(t *testing.T) {
 		w.feed(disabled, "/off", nil)
 
 		stats := w.run(Options{})
-		if len(stats) != 1 || stats[0].User != "alice" || stats[0].Refreshed != 4 {
-			t.Errorf("stats = %+v, want 4 feeds of alice", stats)
+		if len(stats) != 1 || stats[0].User != "alice" || stats[0].Refreshed != 5 {
+			t.Errorf("stats = %+v, want 5 feeds of alice", stats)
 		}
-		for path, want := range map[string]int{"/never": 1, "/fresh": 0, "/stale": 1, "/own-ttl-fresh": 0,
+		for path, want := range map[string]int{"/never": 1, "/quiet-fresh": 0, "/quiet-stale": 1, "/fresh": 0, "/stale": 1, "/own-ttl-fresh": 0,
 			"/own-ttl-stale": 1, "/muted": 0, "/failed": 1, "/off": 0} {
 			if got := w.hitCount(path); got != want {
 				t.Errorf("%s was requested %d times, want %d", path, got, want)
 			}
 		}
 		// Longest without an attempt first.
-		if want := []string{"never", "muted", "own-ttl-stale", "own-ttl-fresh", "stale", "fresh", "failed"}; !reflect.DeepEqual(order, want) {
+		if want := []string{"never", "muted", "quiet-stale", "quiet-fresh", "own-ttl-stale", "own-ttl-fresh", "stale", "fresh", "failed"}; !reflect.DeepEqual(order, want) {
 			t.Errorf("feeds were offered as %q, want %q", order, want)
 		}
 		if !reflect.DeepEqual(maintained, []string{"alice"}) {
@@ -579,13 +594,27 @@ func TestWhichFeedsAreRefreshed(t *testing.T) {
 		}
 
 		// Forced: every feed that is not muted.
-		if stats := w.run(Options{Force: true}); stats[0].Refreshed != 6 {
-			t.Errorf("forced run: stats %+v, want 6 feeds", stats)
+		if stats := w.run(Options{Force: true}); stats[0].Refreshed != 8 {
+			t.Errorf("forced run: stats %+v, want 8 feeds", stats)
 		}
 		if w.hitCount("/fresh") != 1 || w.hitCount("/muted") != 0 || w.hitCount("/off") != 0 {
 			t.Errorf("forced run requested: fresh %d, muted %d, disabled user's %d", w.hitCount("/fresh"), w.hitCount("/muted"), w.hitCount("/off"))
 		}
 	})
+}
+
+func TestPeriodOfAFeed(t *testing.T) {
+	for _, c := range []struct {
+		ttl, published, want int
+	}{
+		{0, 0, 86400}, {0, 1, 86400}, {0, 7, 86400}, {0, 8, 75600}, {0, 168, 3600}, {0, 2000, 302},
+		// A period of its own stands whatever the feed publishes.
+		{7200, 0, 7200}, {7200, 2000, 7200}, {172800, 168, 172800},
+	} {
+		if got := period(&store.Feed{TTL: c.ttl}, c.published); got != c.want {
+			t.Errorf("period with ttl %d and %d entries in a week = %d, want %d", c.ttl, c.published, got, c.want)
+		}
+	}
 }
 
 func TestUnchangedFeed(t *testing.T) {
@@ -685,7 +714,7 @@ func TestFeedAddressFollowsPermanentRedirect(t *testing.T) {
 
 func TestFailedFeed(t *testing.T) {
 	eachEngine(t, func(t *testing.T, w *world) {
-		u := w.user("alice", `{"ttl_default":1800}`)
+		u := w.user("alice", `{}`)
 		good := rss("Blog", item{guid: "a", title: "A", body: "x"})
 		w.serve("/broken", func(rw http.ResponseWriter, _ *http.Request) { http.Error(rw, "boom", http.StatusInternalServerError) })
 		w.serveBody("/not-a-feed", "text/html", "<html><body>Hello</body></html>")
@@ -729,8 +758,8 @@ func TestFailedFeed(t *testing.T) {
 				t.Errorf("%s: error %d, last update %d, ttl %d", name, got.Error, got.LastUpdate, got.TTL)
 			}
 		}
-		if got := w.storedFeed(gone); got.Error != start.Unix() || got.TTL != -1800 {
-			t.Errorf("410: error %d, ttl %d; want the feed muted with the user's period", got.Error, got.TTL)
+		if got := w.storedFeed(gone); got.Error != start.Unix() || got.TTL != store.MutedTTL {
+			t.Errorf("410: error %d, ttl %d; want the feed muted", got.Error, got.TTL)
 		}
 		if got := w.storedFeed(goneOwnTTL); got.TTL != -7200 {
 			t.Errorf("410 with a period of its own: ttl %d, want -7200", got.TTL)

@@ -39,6 +39,10 @@ type Category struct {
 	Attributes json.RawMessage
 }
 
+// MutedTTL is the TTL a feed without a period of its own gets when it is
+// muted: FreshRSS keeps the muted state in the sign, and zero has none.
+const MutedTTL = -3600
+
 // Feed is a subscription.
 type Feed struct {
 	UserID      int64
@@ -58,9 +62,10 @@ type Feed struct {
 	HTTPAuth string
 	// Error is the time of the last failed refresh, zero if the last one succeeded.
 	Error int64
-	// TTL is the refresh period in seconds; zero stands for the user's
-	// default. A negative value is a muted feed: it is not refreshed, and
-	// the period it had is the absolute value.
+	// TTL is the refresh period in seconds; zero leaves the period to how
+	// often the feed publishes. A negative value is a muted feed: it is not
+	// refreshed, and the period it had is the absolute value, MutedTTL for a
+	// feed that had none.
 	TTL        int
 	Attributes json.RawMessage
 	// HTTPETag and HTTPLastModified are the validators of the copy fetched

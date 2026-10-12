@@ -386,6 +386,9 @@ func TestFeedSettings(t *testing.T) {
 
 		// The form as it is shown stores the feed as it is.
 		form := s.feedForm(4)
+		if page := s.get("/subscriptions/feeds/4").body; !strings.Contains(page, `<option value="0" selected>Automatic, by how often the feed publishes</option>`) {
+			t.Error("the form of a feed without a period of its own does not show the period as automatic")
+		}
 		if form.Get("xpath-item") != "//record" || form.Get("xpath-itemTimeFormat") != "Y-m-d H:i:s" || form.Get("kind") != "15" ||
 			form.Get("url") != "http://feeds.freshgo.test/data.xml" || form.Get("category") != "3" || form.Get("priority") != "10" {
 			t.Errorf("form of feed 4 = %v", form)
@@ -1019,7 +1022,7 @@ func TestRefreshNow(t *testing.T) {
 			t.Errorf("refreshing before anything is due: notice %q", notice(body))
 		}
 		f := s.feed("alice", 9)
-		f.LastUpdate -= 7200
+		f.LastUpdate -= 90000
 		if err := s.db.UpdateFeed(context.Background(), f); err != nil {
 			t.Fatal(err)
 		}

@@ -426,10 +426,7 @@ func (r *Refresher) fail(ctx context.Context, j *job, f *store.Feed, now int64, 
 		}
 		fresh.Error = now
 		if gone && fresh.TTL >= 0 {
-			if fresh.TTL == 0 {
-				fresh.TTL = j.conf.ttlDefault
-			}
-			fresh.TTL = -fresh.TTL
+			fresh.TTL = muted(fresh.TTL)
 		}
 		return tx.UpdateFeed(ctx, fresh)
 	})
@@ -437,6 +434,14 @@ func (r *Refresher) fail(ctx context.Context, j *job, f *store.Feed, now int64, 
 		cause = fmt.Errorf("%w; the feed is muted", cause)
 	}
 	return errors.Join(cause, err)
+}
+
+// muted is the TTL of a muted feed whose TTL was ttl, which is not negative.
+func muted(ttl int) int {
+	if ttl == 0 {
+		return store.MutedTTL
+	}
+	return -ttl
 }
 
 // accept is the Accept header for the kind of document behind a feed.

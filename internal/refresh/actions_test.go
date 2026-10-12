@@ -348,7 +348,7 @@ func TestDynamicOPML(t *testing.T) {
 
 		// Not read again before it is due.
 		document = opmlOf(w.server.URL, "/a.xml", "/c.xml")
-		w.later()
+		w.clock = w.clock.Add(2 * time.Hour)
 		w.runOne()
 		if hits := w.hitCount("/list.opml"); hits != 1 {
 			t.Errorf("the document was requested %d times within its period, want once", hits)
@@ -359,7 +359,7 @@ func TestDynamicOPML(t *testing.T) {
 			t.Fatalf("RefreshOPML: %v", err)
 		}
 		feeds = byURL()
-		if feeds["/b.xml"].TTL != -defaultTTL || feeds["/a.xml"].TTL != 0 || len(feeds) != 3 || feeds["/c.xml"].CategoryID != elsewhere.CategoryID {
+		if feeds["/b.xml"].TTL != store.MutedTTL || feeds["/a.xml"].TTL != 0 || len(feeds) != 3 || feeds["/c.xml"].CategoryID != elsewhere.CategoryID {
 			t.Errorf("after the document dropped a feed: b ttl %d, a ttl %d, %d feeds, c in category %d",
 				feeds["/b.xml"].TTL, feeds["/a.xml"].TTL, len(feeds), feeds["/c.xml"].CategoryID)
 		}
@@ -369,8 +369,8 @@ func TestDynamicOPML(t *testing.T) {
 		if err := w.r.RefreshOPML(ctx, u, c.ID); err != nil {
 			t.Fatalf("RefreshOPML: %v", err)
 		}
-		if ttl := byURL()["/b.xml"].TTL; ttl != defaultTTL {
-			t.Errorf("ttl of the feed that is back = %d, want %d", ttl, defaultTTL)
+		if ttl := byURL()["/b.xml"].TTL; ttl != -store.MutedTTL {
+			t.Errorf("ttl of the feed that is back = %d, want %d", ttl, -store.MutedTTL)
 		}
 
 		// A document that cannot be read leaves the feeds alone and is recorded.
