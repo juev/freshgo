@@ -667,7 +667,7 @@ func (h *Handler) editFeed(ctx context.Context, r *http.Request, db *store.Store
 	// what the feed failed with may be what has just been set right.
 	if !sameParsing(&before, f) {
 		f.HTTPETag, f.HTTPLastModified = "", ""
-		f.Failures = 0
+		f.Failures, f.NotBefore = 0, 0
 	}
 	return problem, nil
 }

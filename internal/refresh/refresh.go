@@ -311,7 +311,7 @@ func due(f *store.Feed, published int, now int64, force, pushed bool) bool {
 	if force {
 		return true
 	}
-	if now < f.Error+retryWait(f.Failures) {
+	if now < f.NotBefore || now < f.Error+retryWait(f.Failures) {
 		return false
 	}
 	ttl := period(f, published)

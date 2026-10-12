@@ -64,6 +64,9 @@ type Feed struct {
 	Error int64
 	// Failures is the number of refreshes that have failed in a row.
 	Failures int
+	// NotBefore is the time before which the server of the feed asked not
+	// to be requested again, zero when it asked nothing.
+	NotBefore int64
 	// TTL is the refresh period in seconds; zero leaves the period to how
 	// often the feed publishes. A negative value is a muted feed: it is not
 	// refreshed, and the period it had is the absolute value, MutedTTL for a

@@ -110,7 +110,7 @@ func TestMigrationWebSubHub(t *testing.T) {
 				t.Fatal(err)
 			}
 			// Back to the schema before the migration; those after it run again.
-			for _, q := range []string{"ALTER TABLE feeds DROP COLUMN websub_hub", "ALTER TABLE feeds DROP COLUMN failures", "DROP INDEX entries_state_index", "DELETE FROM schema_migrations WHERE version >= 8"} {
+			for _, q := range []string{"ALTER TABLE feeds DROP COLUMN websub_hub", "ALTER TABLE feeds DROP COLUMN failures", "ALTER TABLE feeds DROP COLUMN not_before", "DROP INDEX entries_state_index", "DELETE FROM schema_migrations WHERE version >= 8"} {
 				if _, err := s.exec(ctx, q); err != nil {
 					t.Fatalf("%s: %v", q, err)
 				}
@@ -289,7 +289,7 @@ func TestFeedRoundTrip(t *testing.T) {
 			UserID: u.ID, URL: "https://example.org/feed?a=1&b=2", Kind: 10, CategoryID: category.ID,
 			Name: "Tom & Jerry <news>", Website: "https://example.org/", Description: "Новости — каждый день",
 			LastUpdate: 1700000100, Priority: -5, PathEntries: "article .body", HTTPAuth: "user:p@ss",
-			Error: 1700000200, Failures: 3, TTL: -3600,
+			Error: 1700000200, Failures: 3, NotBefore: 1700007400, TTL: -3600,
 			Attributes: json.RawMessage(`{"xpath":{"item":"//article"},"curl_params":{"10004":"proxy:8080"}}`),
 			HTTPETag:   `W/"abc"`, HTTPLastModified: "Tue, 06 Oct 2026 10:00:00 GMT",
 		}
