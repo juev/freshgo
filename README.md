@@ -145,7 +145,7 @@ What it does not: the theme and the other settings of the FreshRSS pages that th
 - **Filter actions ignore case for all letters**, as FreshRSS does on PostgreSQL. On a FreshRSS that ran on SQLite, only ASCII letters were compared without case, so rules with other letters now match more.
 - **Regular expressions in filters are RE2.** Rules with backreferences or lookaround are skipped with a warning in the log; the import lists them.
 - **The texts of articles are cleaned again by the import**, by the rules of freshgo. A text with markup may be written differently than FreshRSS has it, with the same meaning; a text without markup is taken as it is.
-- **A feed without a refresh period of its own is asked as often as it publishes**: a week divided by the number of its articles of the last week, once a day at least and no more often than `-refresh-interval`. The default period of the user (`ttl_default`) is not used. A feed keeps the period set in its own settings.
+- **A feed without a refresh period of its own is asked as often as it publishes**: the time since the oldest of its articles of the last week divided by their number, once a day at least and no more often than `-refresh-interval`. The default period of the user (`ttl_default`) is not used. A feed keeps the period set in its own settings.
 - **Old articles are cleaned up at every refresh of a feed**, not at a random one in thirty. The rules are the same.
 - **Full text and content filters apply to new, changed and unread articles.** Changing how a feed gets its text brings its unread articles in line when the form is saved; articles already read keep the text they had.
 
