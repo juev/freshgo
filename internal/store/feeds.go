@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 )
 
@@ -9,11 +10,14 @@ const feedColumns = `id, url, kind, category_id, name, website, description, las
 	priority, path_entries, http_auth, error, ttl, attributes, http_etag, http_last_modified, websub_topic, websub_hub, failures, not_before`
 
 // CreateFeed adds a feed. A zero f.ID is replaced with a new identifier, a
-// zero f.CategoryID with the default category.
+// zero f.CategoryID with the default category, and attributes that are not
+// there with the empty object that is stored for them: the feed is then what
+// reading it back gives.
 func (s *Store) CreateFeed(ctx context.Context, f *Feed) error {
 	if f.CategoryID == 0 {
 		f.CategoryID = DefaultCategoryID
 	}
+	f.Attributes = json.RawMessage(jsonObject(f.Attributes))
 	return s.InTx(ctx, func(tx *Store) error {
 		if err := tx.assignID(ctx, f.UserID, seqFeed, &f.ID); err != nil {
 			return err

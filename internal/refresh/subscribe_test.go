@@ -28,11 +28,21 @@ func TestAddFeed(t *testing.T) {
 	eachEngine(t, func(t *testing.T, w *world) {
 		ctx := context.Background()
 		u := w.user("alice", "")
-		w.serveBody("/feed.xml", "application/rss+xml", blogFeed)
+		w.serve("/feed.xml", func(rw http.ResponseWriter, _ *http.Request) {
+			rw.Header().Set("Content-Type", "application/rss+xml")
+			rw.Header().Set("ETag", `"v1"`)
+			rw.Header().Set("Last-Modified", "Tue, 06 Oct 2026 09:00:00 GMT")
+			rw.Header().Set("Cache-Control", "max-age=7200")
+			_, _ = rw.Write([]byte(blogFeed))
+		})
 
 		f := &store.Feed{URL: "  " + w.server.URL + "/feed.xml ", Priority: 10}
 		if err := w.r.AddFeed(ctx, u, f); err != nil {
 			t.Fatalf("AddFeed: %v", err)
+		}
+		// What the answer said of itself is kept for the next refresh.
+		if f.HTTPETag != `"v1"` || f.HTTPLastModified != "Tue, 06 Oct 2026 09:00:00 GMT" || f.NotBefore != start.Unix()+7200 {
+			t.Errorf("added feed: validators %q and %q, not before %d", f.HTTPETag, f.HTTPLastModified, f.NotBefore)
 		}
 		if f.ID != 1 || f.URL != w.server.URL+"/feed.xml" || f.Name != "The Blog" || f.Website != "http://blog.example/" ||
 			f.Description != "About things" || f.CategoryID != store.DefaultCategoryID || f.LastUpdate != start.Unix() {
