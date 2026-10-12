@@ -219,7 +219,7 @@ func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options, hubs map
 	)
 	// How much each feed has published lately says how often to ask it.
 	// Entries dated ahead, as a list of events has them, say nothing of it.
-	published, err := r.db.EntryCountsBetween(ctx, j.user.ID, now-frequencyWindow, now)
+	published, err := r.db.PublishedBetween(ctx, j.user.ID, now-frequencyWindow, now)
 	if err != nil {
 		return st, err
 	}
@@ -275,13 +275,22 @@ const (
 	maxPeriod       = 24 * 3600
 )
 
-// period is the refresh period, in seconds, of a feed that is not muted and
-// has published that many entries within frequencyWindow.
-func period(f *store.Feed, published int) int {
+// period is the refresh period at the time now, in seconds, of a feed that
+// is not muted; published is what it has published within frequencyWindow.
+//
+// The entries are taken to speak for the time since the oldest of them, not
+// for the whole window: a feed subscribed an hour ago has no more than its
+// document listed, and a feed that was silent and comes to life is not as
+// slow as its silence. The time runs on while nothing comes, so the period
+// of a feed that falls silent grows by itself.
+func period(f *store.Feed, published store.Published, now int64) int {
 	if f.TTL > 0 {
 		return f.TTL
 	}
-	return min(maxPeriod, frequencyWindow/max(published, 1))
+	if published.Entries == 0 {
+		return maxPeriod
+	}
+	return int(min(maxPeriod, max(0, now-published.Oldest)/int64(published.Entries)))
 }
 
 // A feed that has failed twice in a row waits retryStep before it is tried
@@ -302,9 +311,9 @@ func retryWait(failures int) int64 {
 }
 
 // due reports whether the feed is to be refreshed at the time now. published
-// is the number of its entries within frequencyWindow; pushed says a WebSub
-// hub delivers its entries.
-func due(f *store.Feed, published int, now int64, force, pushed bool) bool {
+// is what it has published within frequencyWindow; pushed says a WebSub hub
+// delivers its entries.
+func due(f *store.Feed, published store.Published, now int64, force, pushed bool) bool {
 	if f.TTL < 0 {
 		return false
 	}
@@ -314,7 +323,7 @@ func due(f *store.Feed, published int, now int64, force, pushed bool) bool {
 	if now < f.NotBefore || now < f.Error+retryWait(f.Failures) {
 		return false
 	}
-	ttl := period(f, published)
+	ttl := period(f, published, now)
 	if pushed {
 		ttl = max(ttl, pushedPeriod)
 	}

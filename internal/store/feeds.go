@@ -170,31 +170,39 @@ func (s *Store) DeleteFeedEntries(ctx context.Context, userID, feedID int64) (in
 	return n, nil
 }
 
-// EntryCountsBetween returns, by feed, the number of entries dated after since
-// and not after until, for the feeds that have such entries.
-func (s *Store) EntryCountsBetween(ctx context.Context, userID, since, until int64) (map[int64]int, error) {
+// Published says how much a feed has published within a stretch of time.
+type Published struct {
+	// Entries is the number of entries dated within the stretch.
+	Entries int
+	// Oldest is the date of the oldest of them.
+	Oldest int64
+}
+
+// PublishedBetween returns, by feed, how much the feeds have published after
+// since and not after until, for the feeds that have such entries.
+func (s *Store) PublishedBetween(ctx context.Context, userID, since, until int64) (map[int64]Published, error) {
 	rows, err := s.query(ctx, `
-		SELECT feed_id, COUNT(*) FROM entries WHERE user_id = ? AND published > ? AND published <= ?
+		SELECT feed_id, COUNT(*), MIN(published) FROM entries WHERE user_id = ? AND published > ? AND published <= ?
 		GROUP BY feed_id`, userID, since, until)
 	if err != nil {
-		return nil, fmt.Errorf("store: entry counts: %w", err)
+		return nil, fmt.Errorf("store: published entries: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
-	counts := map[int64]int{}
+	published := map[int64]Published{}
 	for rows.Next() {
 		var (
 			feedID int64
-			n      int
+			p      Published
 		)
-		if err := rows.Scan(&feedID, &n); err != nil {
-			return nil, fmt.Errorf("store: entry counts: %w", err)
+		if err := rows.Scan(&feedID, &p.Entries, &p.Oldest); err != nil {
+			return nil, fmt.Errorf("store: published entries: %w", err)
 		}
-		counts[feedID] = n
+		published[feedID] = p
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("store: entry counts: %w", err)
+		return nil, fmt.Errorf("store: published entries: %w", err)
 	}
-	return counts, nil
+	return published, nil
 }
 
 // NewestEntryDates returns, by feed, the date of the newest entry of the
