@@ -451,6 +451,17 @@
 		}
 	});
 
+	// save has the server keep an entry in the first service of its menu
+	// that the server saves to itself.
+	const save = (article) => {
+		const form = article.querySelector('details.share form.entry-action[action$="/save"]');
+		if (!form) {
+			say(t('js.no-linkding'));
+			return;
+		}
+		send(form, article);
+	};
+
 	// share opens the ways an entry can be sent on, or goes the only way
 	// there is.
 	const share = (article) => {
@@ -918,6 +929,7 @@
 		case 'star': return current && act(current, 'star');
 		case 'labels': return current && current.querySelector('form.entry-action') && showLabels(current);
 		case 'share': return current && share(current);
+		case 'linkding': return current && save(current);
 		case 'mark-all': return confirmMarkAll();
 		case 'more': return loadMore();
 		case 'refresh': {

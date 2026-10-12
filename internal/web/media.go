@@ -25,8 +25,9 @@ const (
 	mediaSecurityPolicy = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
 )
 
-// ImageFetcher fetches the images the server hands out from its own address.
-type ImageFetcher interface {
+// Fetcher makes the requests the server makes for a reader: for the images it
+// hands out from its own address, and to the services entries are saved to.
+type Fetcher interface {
 	Fetch(ctx context.Context, req fetch.Request) (*fetch.Response, error)
 }
 

@@ -5,7 +5,7 @@
 <div class="entry-actions">
 {{template "entry-actions" (dict "Entry" .Data.Entry "Here" .Data.Here "Page" .)}}
 </div>
-{{template "share" (dict "Entry" .Data.Entry "Page" .)}}
+{{template "share" (dict "Entry" .Data.Entry "Here" .Data.Here "CanChange" true "Page" .)}}
 {{end}}
 {{template "entry-body" .Data.Entry}}
 {{if .Data.Entry.Tags}}<p class="entry-tags">{{.T "entry.tags"}} {{range $i, $tag := .Data.Entry.Tags}}{{if $i}}, {{end}}{{$tag}}{{end}}</p>{{end}}

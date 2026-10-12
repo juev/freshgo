@@ -56,7 +56,11 @@
 <details class="menu share">
 <summary>{{.Page.T "entry.share"}}</summary>
 <ul>
-{{range .Entry.Share}}<li>{{if .Button}}<button type="button" class="link" data-share="{{.Button}}" data-link="{{$.Entry.Link}}" data-title="{{$.Entry.Title}}" hidden>{{.Name}}</button>{{else}}<a href="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.Name}}</a>{{end}}</li>
+{{range .Entry.Share}}<li>{{if and .Save $.CanChange}}<form method="post" action="{{$.Entry.URL}}/save" class="entry-action">
+<input type="hidden" name="next" value="{{$.Here}}">
+<input type="hidden" name="service" value="{{.Save}}">
+<button type="submit" class="link">{{.Name}}</button>
+</form>{{else if .Button}}<button type="button" class="link" data-share="{{.Button}}" data-link="{{$.Entry.Link}}" data-title="{{$.Entry.Title}}" hidden>{{.Name}}</button>{{else}}<a href="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.Name}}</a>{{end}}</li>
 {{end}}</ul>
 </details>
 {{end}}{{end}}
@@ -115,7 +119,7 @@
 {{if .CanChange}}{{template "entry-actions" (dict "Entry" .Entry "Here" .Here "Page" .Page "Row" true)}}{{end}}
 {{if .Entry.Link}}<a class="original" href="{{.Entry.Link}}" rel="noopener noreferrer">{{.Page.T "entry.original"}}</a>{{end}}
 <a class="entry-page" href="{{.Entry.URL}}">{{.Page.T "entry.page"}}</a>
-{{template "share" (dict "Entry" .Entry "Page" .Page)}}
+{{template "share" (dict "Entry" .Entry "Here" .Here "CanChange" .CanChange "Page" .Page)}}
 <button type="button" class="link" data-fold hidden>{{.Page.T "entry.fold"}}</button>
 </div>
 {{template "entry-body" .Entry}}

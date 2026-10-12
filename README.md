@@ -186,6 +186,7 @@ The reading screen has the tree of categories, feeds, saved queries and labels o
 | `s` | star |
 | `l` | labels |
 | `S` | share |
+| `b` | save the entry to Linkding |
 | `A` | mark everything shown as read |
 | `r` | refresh the feeds |
 | `/` | search |
@@ -197,6 +198,8 @@ The reading screen has the tree of categories, feeds, saved queries and labels o
 | `:` or `Ctrl+K` | palette of commands: finds any stream, feed, category, label, saved query, page and action by a few letters |
 | `?` | help with the keys in force |
 | `Esc` | close a dialog |
+
+Entries are shared with the services set on the page "Integrations" of the settings: each opens the service in a new tab with the address of the entry. A Linkding that is given the API token from its own settings there is saved to at once instead, by the server and without the form of Linkding, from the menu "Share" or with `b`; the server has to reach Linkding at the address given.
 
 Keys are changed on the page "Keys" of the settings, where one checkbox switches off all keys pressed alone. A user imported from FreshRSS keeps the keys they changed there; the keys FreshRSS gave by default make way for those above. Keys do nothing while the focus is in a field.
 
