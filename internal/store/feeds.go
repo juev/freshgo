@@ -165,11 +165,12 @@ func (s *Store) DeleteFeedEntries(ctx context.Context, userID, feedID int64) (in
 	return n, nil
 }
 
-// EntryCountsSince returns, by feed, the number of entries dated after since,
-// for the feeds that have such entries.
-func (s *Store) EntryCountsSince(ctx context.Context, userID, since int64) (map[int64]int, error) {
+// EntryCountsBetween returns, by feed, the number of entries dated after since
+// and not after until, for the feeds that have such entries.
+func (s *Store) EntryCountsBetween(ctx context.Context, userID, since, until int64) (map[int64]int, error) {
 	rows, err := s.query(ctx, `
-		SELECT feed_id, COUNT(*) FROM entries WHERE user_id = ? AND published > ? GROUP BY feed_id`, userID, since)
+		SELECT feed_id, COUNT(*) FROM entries WHERE user_id = ? AND published > ? AND published <= ?
+		GROUP BY feed_id`, userID, since, until)
 	if err != nil {
 		return nil, fmt.Errorf("store: entry counts: %w", err)
 	}
