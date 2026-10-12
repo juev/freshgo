@@ -62,6 +62,8 @@ type Feed struct {
 	HTTPAuth string
 	// Error is the time of the last failed refresh, zero if the last one succeeded.
 	Error int64
+	// Failures is the number of refreshes that have failed in a row.
+	Failures int
 	// TTL is the refresh period in seconds; zero leaves the period to how
 	// often the feed publishes. A negative value is a muted feed: it is not
 	// refreshed, and the period it had is the absolute value, MutedTTL for a

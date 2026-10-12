@@ -663,9 +663,11 @@ func (h *Handler) editFeed(ctx context.Context, r *http.Request, db *store.Store
 	}
 	before := *f
 	problem = applyFeed(r, f, categories, h.refresher.Browser != nil)
-	// The copy the validators stand for was fetched and read otherwise.
+	// The copy the validators stand for was fetched and read otherwise, and
+	// what the feed failed with may be what has just been set right.
 	if !sameParsing(&before, f) {
 		f.HTTPETag, f.HTTPLastModified = "", ""
+		f.Failures = 0
 	}
 	return problem, nil
 }

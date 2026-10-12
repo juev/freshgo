@@ -284,6 +284,23 @@ func period(f *store.Feed, published int) int {
 	return min(maxPeriod, frequencyWindow/max(published, 1))
 }
 
+// A feed that has failed twice in a row waits retryStep before it is tried
+// again, and twice as long after every further failure, maxRetryWait at most.
+const (
+	retryStep    = 600
+	maxRetryWait = 24 * 3600
+)
+
+// retryWait is how long, in seconds, a feed is left alone after its last
+// failed refresh, which was the failures-th in a row.
+func retryWait(failures int) int64 {
+	if failures < 2 {
+		return 0
+	}
+	// Beyond eight doublings the wait is past maxRetryWait.
+	return min(int64(maxRetryWait), int64(retryStep)<<min(failures-2, 8))
+}
+
 // due reports whether the feed is to be refreshed at the time now. published
 // is the number of its entries within frequencyWindow; pushed says a WebSub
 // hub delivers its entries.
@@ -293,6 +310,9 @@ func due(f *store.Feed, published int, now int64, force, pushed bool) bool {
 	}
 	if force {
 		return true
+	}
+	if now < f.Error+retryWait(f.Failures) {
+		return false
 	}
 	ttl := period(f, published)
 	if pushed {
