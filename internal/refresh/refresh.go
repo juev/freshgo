@@ -218,7 +218,8 @@ func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options, hubs map
 		now   = r.now().Unix()
 	)
 	// How much each feed has published lately says how often to ask it.
-	published, err := r.db.EntryCountsSince(ctx, j.user.ID, now-frequencyWindow)
+	// Entries dated ahead, as a list of events has them, say nothing of it.
+	published, err := r.db.EntryCountsBetween(ctx, j.user.ID, now-frequencyWindow, now)
 	if err != nil {
 		return st, err
 	}

@@ -227,7 +227,7 @@ func (r *Refresher) RefreshOPML(ctx context.Context, u *store.User, categoryID i
 	}
 	for _, c := range categories {
 		if c.ID == categoryID {
-			return r.refreshOPML(ctx, u, readUserSettings(u.Settings), c)
+			return r.refreshOPML(ctx, u, c)
 		}
 	}
 	return fmt.Errorf("refresh: category %d: %w", categoryID, store.ErrNotFound)
@@ -250,18 +250,18 @@ func (r *Refresher) refreshOPMLs(ctx context.Context, j *job) {
 		if c.Kind != KindDynamicOPML || now <= max(c.LastUpdate, c.Error)+period {
 			continue
 		}
-		if err := r.refreshOPML(ctx, j.user, j.conf, c); err != nil && ctx.Err() == nil {
+		if err := r.refreshOPML(ctx, j.user, c); err != nil && ctx.Err() == nil {
 			r.log.Warn("OPML of a category was not read", "user", j.user.Name, "category", c.ID, "error", err)
 		}
 	}
 }
 
-func (r *Refresher) refreshOPML(ctx context.Context, u *store.User, conf userSettings, c *store.Category) error {
+func (r *Refresher) refreshOPML(ctx context.Context, u *store.User, c *store.Category) error {
 	address, _ := get[string](readAttributes(c.Attributes), "opml_url")
 	if c.Kind != KindDynamicOPML || address == "" {
 		return ErrNoOPML
 	}
-	err := r.mirrorOPML(ctx, u, conf, c, address)
+	err := r.mirrorOPML(ctx, u, c, address)
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -288,7 +288,7 @@ func (r *Refresher) refreshOPML(ctx context.Context, u *store.User, conf userSet
 	return errors.Join(err, recorded)
 }
 
-func (r *Refresher) mirrorOPML(ctx context.Context, u *store.User, conf userSettings, c *store.Category, address string) error {
+func (r *Refresher) mirrorOPML(ctx context.Context, u *store.User, c *store.Category, address string) error {
 	resp, err := r.client.Fetch(ctx, fetch.Request{URL: address, Accept: fetch.AcceptXML})
 	if err != nil {
 		return err

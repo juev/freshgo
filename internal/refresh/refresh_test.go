@@ -562,8 +562,12 @@ func TestWhichFeedsAreRefreshed(t *testing.T) {
 		// A feed that has published nothing lately is asked once a day.
 		w.feed(u, "/quiet-fresh", func(f *store.Feed) { f.Name, f.LastUpdate = "quiet-fresh", now-86400 })
 		quiet := w.feed(u, "/quiet-stale", func(f *store.Feed) { f.Name, f.LastUpdate = "quiet-stale", now-86401 })
-		// What it published before the last week does not count.
+		// What it published before the last week does not count, nor do
+		// entries dated ahead.
 		w.insert(u, &store.Entry{UserID: u.ID, FeedID: quiet.ID, GUID: "old", Published: now - 8*86400})
+		for i := range 50 {
+			w.insert(u, &store.Entry{UserID: u.ID, FeedID: quiet.ID, GUID: fmt.Sprintf("ahead%d", i), Published: now + int64(i+1)*3600})
+		}
 		// A feed with an entry an hour is asked once an hour.
 		hourly(w.feed(u, "/fresh", func(f *store.Feed) { f.Name, f.LastUpdate = "fresh", now-3600 }))
 		hourly(w.feed(u, "/stale", func(f *store.Feed) { f.Name, f.LastUpdate = "stale", now-3601 }))
