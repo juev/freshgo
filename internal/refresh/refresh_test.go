@@ -783,13 +783,69 @@ func TestFailedFeed(t *testing.T) {
 		if st.Refreshed != 1 || st.Failed != 3 {
 			t.Errorf("next run: stats %+v, want 1 recovered and 3 failed", st)
 		}
-		if got := w.storedFeed(broken); got.Error != 0 || got.LastUpdate != w.clock.Unix() || len(w.entries(broken)) != 1 {
+		if got := w.storedFeed(broken); got.Error != 0 || got.Failures != 0 || got.LastUpdate != w.clock.Unix() || len(w.entries(broken)) != 1 {
 			t.Errorf("recovered feed: %+v", got)
 		}
 		if w.hitCount("/gone") != 1 || w.hitCount("/gone-own-ttl") != 1 {
 			t.Errorf("muted feeds were requested again: %d, %d", w.hitCount("/gone"), w.hitCount("/gone-own-ttl"))
 		}
 	})
+}
+
+func TestFailingFeedWaits(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		u := w.user("alice", `{}`)
+		broken := func(rw http.ResponseWriter, _ *http.Request) { http.Error(rw, "boom", http.StatusInternalServerError) }
+		w.serve("/feed", broken)
+		f := w.feed(u, "/feed", func(f *store.Feed) { f.TTL = 900 })
+		// after runs once the clock has moved, and says how often the feed
+		// has been requested and how many failures in a row it has by then.
+		after := func(step time.Duration, o Options) (hits, failures int) {
+			t.Helper()
+			w.clock = w.clock.Add(step)
+			w.run(o)
+			return w.hitCount("/feed"), w.storedFeed(f).Failures
+		}
+		for _, c := range []struct {
+			what           string
+			step           time.Duration
+			o              Options
+			hits, failures int
+		}{
+			{"the first attempt", 0, Options{}, 1, 1},
+			{"the run after the first failure", time.Minute, Options{}, 2, 2},
+			{"nine minutes after the second failure", 9 * time.Minute, Options{}, 2, 2},
+			{"ten minutes after the second failure", time.Minute, Options{}, 3, 3},
+			{"nineteen minutes after the third failure", 19 * time.Minute, Options{}, 3, 3},
+			{"twenty minutes after the third failure", time.Minute, Options{}, 4, 4},
+			{"a forced run within the wait", time.Minute, Options{Force: true}, 5, 5},
+		} {
+			if hits, failures := after(c.step, c.o); hits != c.hits || failures != c.failures {
+				t.Errorf("%s: %d requests and %d failures in a row, want %d and %d", c.what, hits, failures, c.hits, c.failures)
+			}
+		}
+
+		// A success ends the row: the next failure is the first again.
+		w.serveBody("/feed", rssType, rss("Blog", item{guid: "a", title: "A", body: "x"}))
+		if hits, failures := after(80*time.Minute, Options{}); hits != 6 || failures != 0 || w.storedFeed(f).Error != 0 {
+			t.Errorf("after the feed recovered: %d requests, %d failures in a row, feed %+v", hits, failures, w.storedFeed(f))
+		}
+		w.serve("/feed", broken)
+		if hits, failures := after(time.Hour, Options{}); hits != 7 || failures != 1 {
+			t.Errorf("the first failure of a new row: %d requests, %d failures in a row", hits, failures)
+		}
+		if hits, failures := after(time.Minute, Options{}); hits != 8 || failures != 2 {
+			t.Errorf("the run after it: %d requests, %d failures in a row", hits, failures)
+		}
+	})
+}
+
+func TestRetryWait(t *testing.T) {
+	for failures, want := range map[int]int64{0: 0, 1: 0, 2: 600, 3: 1200, 4: 2400, 9: 76800, 10: 86400, 11: 86400, 1000: 86400} {
+		if got := retryWait(failures); got != want {
+			t.Errorf("wait after %d failures in a row = %d s, want %d", failures, got, want)
+		}
+	}
 }
 
 // R8 in the pipeline.

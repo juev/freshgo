@@ -294,7 +294,7 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 		}
 
 		if pushed {
-			fresh.Error = 0
+			fresh.Error, fresh.Failures = 0, 0
 		} else {
 			succeeded(fresh, f, resp, now)
 			fresh.WebSubTopic, fresh.WebSubHub = topic, hub
@@ -385,7 +385,7 @@ func (r *Refresher) storeUnchanged(ctx context.Context, j *job, f *store.Feed, r
 // fetched is the feed as it was when it was fetched.
 func succeeded(fresh, fetched *store.Feed, resp *fetch.Response, now int64) {
 	fresh.LastUpdate = now
-	fresh.Error = 0
+	fresh.Error, fresh.Failures = 0, 0
 	// A 304 need not repeat the validators.
 	if !resp.NotModified || resp.Header.Get("ETag") != "" {
 		fresh.HTTPETag = resp.Header.Get("ETag")
@@ -425,6 +425,7 @@ func (r *Refresher) fail(ctx context.Context, j *job, f *store.Feed, now int64, 
 			return err
 		}
 		fresh.Error = now
+		fresh.Failures++
 		if gone && fresh.TTL >= 0 {
 			fresh.TTL = muted(fresh.TTL)
 		}

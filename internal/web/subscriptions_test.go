@@ -427,10 +427,15 @@ func TestFeedSettings(t *testing.T) {
 			t.Error("the reading screen does not sort the feed the way its settings say")
 		}
 
+		failing := s.feed("alice", 4)
+		failing.Failures = 5
+		if err := s.db.UpdateFeed(context.Background(), failing); err != nil {
+			t.Fatal(err)
+		}
 		form.Set("xpath-item", "//entry")
 		s.follow("/subscriptions/feeds/4", form)
-		if got := s.feed("alice", 4); got.HTTPETag != "" || got.HTTPLastModified != "" {
-			t.Errorf("validators after a change of the XPath = %q, %q; want none", got.HTTPETag, got.HTTPLastModified)
+		if got := s.feed("alice", 4); got.HTTPETag != "" || got.HTTPLastModified != "" || got.Failures != 0 {
+			t.Errorf("after a change of the XPath: validators %q, %q, %d failures in a row; want none", got.HTTPETag, got.HTTPLastModified, got.Failures)
 		}
 
 		// Every other setting.
