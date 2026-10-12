@@ -58,7 +58,10 @@ type Options struct {
 	TrustedProxies []netip.Prefix
 	// Images fetches the images of entries the server hands out from its
 	// own address; nil, and it hands out none.
-	Images ImageFetcher
+	Images Fetcher
+	// Services sends entries to the services that take them from the server
+	// (share.go); nil, and entries are sent by the browser alone.
+	Services Fetcher
 	// OIDCClientSecret is the secret of the client the settings name at an
 	// OpenID Connect provider; empty when the server was given none, and
 	// then nobody signs in through a provider.
@@ -97,7 +100,9 @@ type Handler struct {
 	letters guard
 	decoys  decoys
 	now     func() time.Time
-	images  ImageFetcher
+	images  Fetcher
+	// services is Options.Services.
+	services Fetcher
 	// oidcSecret and oidc are what signing in through a provider takes.
 	oidcSecret string
 	oidc       oidcProviders
@@ -114,6 +119,7 @@ func New(o Options) (*Handler, error) {
 		h.hooks = &hooks.Registry{}
 	}
 	h.images = o.Images
+	h.services = o.Services
 	h.oidcSecret, h.oidc.client = o.OIDCClientSecret, &http.Client{Timeout: oidcTimeout}
 	if o.BaseURL != "" {
 		public, err := url.Parse(o.BaseURL)
@@ -190,6 +196,7 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /entries/{id}/fulltext", h.protect(members, h.fullTextEntry))
 	h.mux.HandleFunc("POST /entries/{id}/translate", h.protect(members, h.translateEntry))
 	h.mux.HandleFunc("POST /entries/{id}/labels", h.protect(members, h.labelEntry))
+	h.mux.HandleFunc("POST /entries/{id}/save", h.protect(members, h.saveEntry))
 	h.mux.HandleFunc("POST /read-all", h.protect(members, h.markAll))
 	h.mux.HandleFunc("POST /settings/view", h.protect(members, h.saveView))
 	h.mux.HandleFunc("POST /refresh", h.protect(readers, h.refreshNow))

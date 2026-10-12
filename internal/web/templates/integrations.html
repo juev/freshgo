@@ -17,6 +17,17 @@
 {{if .Help}}<span class="hint"><a href="{{.Help}}" rel="noopener noreferrer">{{$.T "integrations.help" .Service}}</a></span>{{end}}
 </p>
 {{end}}
+{{if .Token}}
+<p>
+<label for="token-{{.N}}">{{$.T "integrations.token"}}</label>
+<input type="password" id="token-{{.N}}" name="token-{{.N}}" autocomplete="off" aria-describedby="token-hint-{{.N}}">
+<span class="hint" id="token-hint-{{.N}}">{{if .HasToken}}{{$.T "integrations.token.stored"}}{{else}}{{$.T "integrations.token.hint"}}{{end}}</span>
+</p>
+{{if .HasToken}}<p class="check">
+<input type="checkbox" id="forget-{{.N}}" name="forget-{{.N}}" value="1">
+<label for="forget-{{.N}}">{{$.T "integrations.token.forget"}}</label>
+</p>{{end}}
+{{end}}
 <p class="check">
 <input type="checkbox" id="remove-{{.N}}" name="remove-{{.N}}" value="1">
 <label for="remove-{{.N}}">{{$.T "integrations.remove"}}</label>
@@ -39,6 +50,11 @@
 <label for="add_url">{{.T "integrations.address"}}</label>
 <input type="text" id="add_url" name="add_url" inputmode="url" autocapitalize="off" spellcheck="false" aria-describedby="add-url-hint">
 <span class="hint" id="add-url-hint">{{.T "integrations.address.hint"}}</span>
+</p>
+<p>
+<label for="add_token">{{.T "integrations.token"}}</label>
+<input type="password" id="add_token" name="add_token" autocomplete="off" aria-describedby="add-token-hint">
+<span class="hint" id="add-token-hint">{{.T "integrations.token.hint"}}</span>
 </p>
 </fieldset>
 <p><button type="submit">{{.T "keys.save"}}</button></p>

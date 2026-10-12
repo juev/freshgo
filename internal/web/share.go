@@ -1,12 +1,17 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/juev/freshgo/internal/fetch"
 )
 
 // Ways a sharing service wants the link and the title written into its
@@ -108,6 +113,9 @@ type sharing struct {
 	Type string `json:"type"`
 	Name string `json:"name"`
 	URL  string `json:"url"`
+	// Token is the key of the API of the service, for the one service the
+	// server sends entries to itself: Linkding. FreshRSS has no such field.
+	Token string `json:"token"`
 }
 
 func readSharing(s attrs) []sharing {
@@ -145,15 +153,21 @@ type shareLink struct {
 	// place of a link: "clipboard", "print" or "web-sharing-api".
 	URL    string
 	Button string
+	// Save, when not empty, is the place of the service among those of the
+	// user: the server saves the entry there itself, and for whoever may
+	// change the entry the way is a form in place of the link.
+	Save string
 }
 
 // shareLinks are the ways the user has switched on, for one entry.
-func shareLinks(list []sharing, id int64, title, link string) []shareLink {
+//
+// saves says the server can send entries to the services that take them.
+func shareLinks(list []sharing, id int64, title, link string, saves bool) []shareLink {
 	if link == "" {
 		return nil
 	}
 	var out []shareLink
-	for _, one := range list {
+	for n, one := range list {
 		service := serviceByID(one.Type)
 		if service == nil || service.advanced && one.URL == "" {
 			continue
@@ -172,9 +186,95 @@ func shareLinks(list []sharing, id int64, title, link string) []shareLink {
 		if parsed, err := url.Parse(address); err != nil || parsed.Scheme != "http" && parsed.Scheme != "https" && parsed.Scheme != "mailto" {
 			continue
 		}
-		out = append(out, shareLink{Name: name, URL: address})
+		way := shareLink{Name: name, URL: address}
+		if saves && one.saves() {
+			way.Save = strconv.Itoa(n)
+		}
+		out = append(out, way)
 	}
 	return out
+}
+
+// linkding is the one service the server sends entries to itself, through
+// the API of the service, when the user gave a token for it.
+const linkding = "linkding"
+
+// saves reports whether entries are saved to the service by the server.
+func (s sharing) saves() bool {
+	return s.Type == linkding && s.Token != "" && s.URL != ""
+}
+
+// Outcomes of saving an entry to a service that are told apart for the reader.
+var (
+	errServiceRefused = errors.New("the service refused the token")
+	errServiceAnswer  = errors.New("the service did not take the entry")
+)
+
+// saveBookmark has the Linkding at base keep link as a bookmark. Linkding
+// reads the title and the rest from the page, and updates the bookmark it
+// already has for the address.
+func (h *Handler) saveBookmark(ctx context.Context, base, token, link string) error {
+	body, err := json.Marshal(map[string]string{"url": link})
+	if err != nil {
+		return err
+	}
+	_, err = h.services.Fetch(ctx, fetch.Request{
+		URL:    strings.TrimSuffix(base, "/") + "/api/bookmarks/",
+		Accept: fetch.AcceptJSON,
+		Params: fetch.Params{
+			Post: true, PostBody: string(body),
+			Header: http.Header{"Content-Type": {"application/json"}, "Authorization": {"Token " + token}},
+		},
+	})
+	var status *fetch.StatusError
+	switch {
+	case err == nil:
+		return nil
+	case !errors.As(err, &status):
+		return err
+	// A bookmark that was made is answered with 201, which the client
+	// takes for an error as it does every status but 200.
+	case status.Code/100 == 2:
+		return nil
+	case status.Code == http.StatusUnauthorized || status.Code == http.StatusForbidden:
+		return fmt.Errorf("%w: %w", errServiceRefused, err)
+	default:
+		return fmt.Errorf("%w: %w", errServiceAnswer, err)
+	}
+}
+
+// webLink reports whether a link of an entry is an http or https address.
+func webLink(link string) bool {
+	address, err := url.Parse(link)
+	return err == nil && (address.Scheme == "http" || address.Scheme == "https")
+}
+
+// saveEntry sends an entry to the service of the user the form names by its
+// place, which is one the server saves to itself.
+func (h *Handler) saveEntry(w http.ResponseWriter, r *http.Request) {
+	ctx, user := r.Context(), state(r).who.user
+	e, ok := h.ownEntry(w, r)
+	if !ok || !h.form(w, r) {
+		return
+	}
+	list := readSharing(userSettings(r))
+	n, err := strconv.Atoi(r.PostForm.Get("service"))
+	if h.services == nil || err != nil || n < 0 || n >= len(list) || !list[n].saves() || !webLink(e.Link) {
+		h.fail(w, r, http.StatusNotFound)
+		return
+	}
+	notice := "notice.linkding-saved"
+	switch err := h.saveBookmark(ctx, list[n].URL, list[n].Token, e.Link); {
+	case ctx.Err() != nil:
+		return
+	case errors.Is(err, errServiceRefused):
+		notice = "notice.linkding-refused"
+	case err != nil:
+		// The error of a request names its address, never its headers.
+		h.log.Warn("entry was not saved to the service", "user", user.Name, "entry", e.ID, "service", list[n].Type, "error", err)
+		notice = "notice.linkding-failed"
+	}
+	h.back(w, r, e.ID, notice)
 }
 
 // integrationRow is a service the user has switched on, in the form.
@@ -186,6 +286,10 @@ type integrationRow struct {
 	URL      string
 	Advanced bool
 	Help     string
+	// Token says the service takes a token of its API; HasToken that one
+	// is stored. The token itself is not shown again.
+	Token    bool
+	HasToken bool
 }
 
 // integrationsPage is what the page of integrations shows.
@@ -205,6 +309,7 @@ func (h *Handler) showIntegrations(w http.ResponseWriter, r *http.Request, statu
 		}
 		page.Rows = append(page.Rows, integrationRow{
 			N: n, Type: one.Type, Service: service.name, Name: one.Name, URL: one.URL, Advanced: service.advanced, Help: service.help,
+			Token: one.Type == linkding, HasToken: one.Token != "",
 		})
 	}
 	page.Services = []option{{"", v.T("integrations.choose"), true}}
@@ -243,7 +348,7 @@ func (h *Handler) saveIntegrations(w http.ResponseWriter, r *http.Request) {
 		stored := phpList[attrs](s["sharing"])
 		problem := ""
 		kept := []attrs{}
-		add := func(one attrs, kind, name, address string) {
+		add := func(one attrs, kind, name, address, token string, forget bool) {
 			service := serviceByID(kind)
 			if service == nil {
 				return
@@ -261,6 +366,13 @@ func (h *Handler) saveIntegrations(w http.ResponseWriter, r *http.Request) {
 				}
 				one.set("url", address)
 			}
+			// An empty field keeps the token there is: it is not shown.
+			switch token = strings.TrimSpace(token); {
+			case kind != linkding || forget:
+				delete(one, "token")
+			case token != "":
+				one.set("token", token)
+			}
 			kept = append(kept, one)
 		}
 		for n, one := range stored {
@@ -268,10 +380,10 @@ func (h *Handler) saveIntegrations(w http.ResponseWriter, r *http.Request) {
 			if form.Get("remove-"+i) != "" {
 				continue
 			}
-			add(one, one.text("type"), form.Get("name-"+i), form.Get("url-"+i))
+			add(one, one.text("type"), form.Get("name-"+i), form.Get("url-"+i), form.Get("token-"+i), form.Get("forget-"+i) != "")
 		}
 		if kind := form.Get("add_type"); kind != "" {
-			add(attrs{}, kind, form.Get("add_name"), form.Get("add_url"))
+			add(attrs{}, kind, form.Get("add_name"), form.Get("add_url"), form.Get("add_token"), false)
 		}
 		s.set("sharing", kept)
 		shown = readSharing(s)

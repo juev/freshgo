@@ -688,10 +688,10 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 			ShowFeed: prefs.ToplineWebsite != "none", ShowDate: prefs.ToplineDate == nil || *prefs.ToplineDate,
 		}
 		a.Excerpt = sanitize.Text(string(a.Content), excerptLength)
-		if address, err := url.Parse(e.Link); err == nil && (address.Scheme == "http" || address.Scheme == "https") {
+		if webLink(e.Link) {
 			a.Link = e.Link
 		}
-		a.Share = shareLinks(phpList[sharing](prefs.Sharing), e.ID, e.Title, a.Link)
+		a.Share = shareLinks(phpList[sharing](prefs.Sharing), e.ID, e.Title, a.Link, h.services != nil)
 		if a.Title == "" {
 			a.Title = v.T("entry.untitled")
 		}
