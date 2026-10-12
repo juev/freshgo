@@ -7,11 +7,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/juev/freshgo/internal/feed"
 	"github.com/juev/freshgo/internal/fetch"
@@ -386,6 +389,7 @@ func (r *Refresher) storeUnchanged(ctx context.Context, j *job, f *store.Feed, r
 func succeeded(fresh, fetched *store.Feed, resp *fetch.Response, now int64) {
 	fresh.LastUpdate = now
 	fresh.Error, fresh.Failures = 0, 0
+	fresh.NotBefore = freshUntil(resp.Header, now)
 	// A 304 need not repeat the validators.
 	if !resp.NotModified || resp.Header.Get("ETag") != "" {
 		fresh.HTTPETag = resp.Header.Get("ETag")
@@ -399,12 +403,65 @@ func succeeded(fresh, fetched *store.Feed, resp *fetch.Response, now int64) {
 	if fresh.Kind != fetched.Kind || fresh.HTTPAuth != fetched.HTTPAuth || fresh.PathEntries != fetched.PathEntries ||
 		fresh.URL != fetched.URL || !bytes.Equal(fresh.Attributes, fetched.Attributes) {
 		fresh.HTTPETag, fresh.HTTPLastModified = "", ""
+		fresh.NotBefore = 0
 	}
 	// The address follows a permanent redirect, unless the user has changed
 	// it meanwhile.
 	if resp.PermanentURL != "" && fresh.URL == fetched.URL {
 		fresh.URL = withoutCredentials(resp.PermanentURL)
 	}
+}
+
+// freshUntil is the time up to which an answer received at now calls itself
+// fresh, by max-age of Cache-Control or else by Expires, maxPeriod from now at
+// most. It is zero for an answer that says nothing of it, or says that it is
+// not to be kept.
+func freshUntil(h http.Header, now int64) int64 {
+	age := int64(-1)
+	for _, value := range h.Values("Cache-Control") {
+		for directive := range strings.SplitSeq(value, ",") {
+			name, argument, _ := strings.Cut(strings.TrimSpace(directive), "=")
+			switch strings.ToLower(name) {
+			case "no-cache", "no-store":
+				return 0
+			case "max-age":
+				if n, err := strconv.ParseInt(strings.Trim(argument, `"`), 10, 64); err == nil && n >= 0 {
+					age = n
+				}
+			}
+		}
+	}
+	until := int64(0)
+	if age >= 0 {
+		until = now + min(age, maxPeriod)
+	} else if expires, err := http.ParseTime(h.Get("Expires")); err == nil {
+		until = min(expires.Unix(), now+maxPeriod)
+	}
+	if until <= now {
+		return 0
+	}
+	return until
+}
+
+// retryAt is the time before which the server asked not to be requested
+// again when a fetch at now failed with cause, maxPeriod from now at most;
+// zero when it asked nothing.
+func retryAt(cause error, now int64) int64 {
+	var (
+		status *fetch.StatusError
+		paused *fetch.RetryAfterError
+		wait   time.Duration
+	)
+	switch {
+	case errors.As(cause, &status):
+		wait = status.RetryAfter
+	case errors.As(cause, &paused):
+		wait = paused.Left
+	}
+	if wait <= 0 {
+		return 0
+	}
+	return now + min(int64(wait/time.Second), maxPeriod)
 }
 
 // fail marks the feed as failing and returns the cause. A feed that is gone
@@ -426,6 +483,7 @@ func (r *Refresher) fail(ctx context.Context, j *job, f *store.Feed, now int64, 
 		}
 		fresh.Error = now
 		fresh.Failures++
+		fresh.NotBefore = retryAt(cause, now)
 		if gone && fresh.TTL >= 0 {
 			fresh.TTL = muted(fresh.TTL)
 		}

@@ -428,14 +428,15 @@ func TestFeedSettings(t *testing.T) {
 		}
 
 		failing := s.feed("alice", 4)
-		failing.Failures = 5
+		failing.Failures, failing.NotBefore = 5, 1<<40
 		if err := s.db.UpdateFeed(context.Background(), failing); err != nil {
 			t.Fatal(err)
 		}
 		form.Set("xpath-item", "//entry")
 		s.follow("/subscriptions/feeds/4", form)
-		if got := s.feed("alice", 4); got.HTTPETag != "" || got.HTTPLastModified != "" || got.Failures != 0 {
-			t.Errorf("after a change of the XPath: validators %q, %q, %d failures in a row; want none", got.HTTPETag, got.HTTPLastModified, got.Failures)
+		if got := s.feed("alice", 4); got.HTTPETag != "" || got.HTTPLastModified != "" || got.Failures != 0 || got.NotBefore != 0 {
+			t.Errorf("after a change of the XPath: validators %q, %q, %d failures in a row, not before %d; want none",
+				got.HTTPETag, got.HTTPLastModified, got.Failures, got.NotBefore)
 		}
 
 		// Every other setting.

@@ -416,8 +416,8 @@ func TestRetryAfterPausesHost(t *testing.T) {
 
 			_, err := c.Fetch(context.Background(), Request{URL: s.URL + "/a"})
 			var se *StatusError
-			if !errors.As(err, &se) || se.Code != status {
-				t.Fatalf("first Fetch: %v", err)
+			if !errors.As(err, &se) || se.Code != status || se.RetryAfter != 120*time.Second {
+				t.Fatalf("first Fetch: %v, pause %v", err, se)
 			}
 
 			// Another document of the same host is not requested either.
@@ -427,7 +427,7 @@ func TestRetryAfterPausesHost(t *testing.T) {
 			if !errors.As(err, &ra) {
 				t.Fatalf("Fetch during the pause: %v", err)
 			}
-			if want := time.Date(2026, 10, 6, 12, 2, 0, 0, time.UTC); !ra.Until.Equal(want) || ra.Host != hostOf(s) {
+			if want := time.Date(2026, 10, 6, 12, 2, 0, 0, time.UTC); !ra.Until.Equal(want) || ra.Host != hostOf(s) || ra.Left != time.Second {
 				t.Errorf("pause of %q until %v, want %q until %v", ra.Host, ra.Until, hostOf(s), want)
 			}
 			if hits.Load() != 1 {

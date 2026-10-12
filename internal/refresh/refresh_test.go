@@ -840,6 +840,114 @@ func TestFailingFeedWaits(t *testing.T) {
 	})
 }
 
+func TestServerSaysWhenToComeBack(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		u := w.user("alice", `{}`)
+		body := rss("Blog", item{guid: "a", title: "A", body: "x"})
+		cached := func(control string) http.HandlerFunc {
+			return func(rw http.ResponseWriter, _ *http.Request) {
+				rw.Header().Set("Cache-Control", control)
+				rw.Header().Set("Content-Type", rssType)
+				_, _ = rw.Write([]byte(body))
+			}
+		}
+		w.serve("/six-hours", cached("public, max-age=21600"))
+		w.serve("/minute", cached("max-age=60"))
+		w.serve("/week", cached("max-age=604800"))
+		var asked atomic.Int32
+		w.serve("/busy", func(rw http.ResponseWriter, req *http.Request) {
+			if asked.Add(1) > 1 {
+				cached("")(rw, req)
+				return
+			}
+			rw.Header().Set("Retry-After", "7200")
+			rw.WriteHeader(http.StatusTooManyRequests)
+		})
+		hourly := func(f *store.Feed) { f.TTL = 3600 }
+		sixHours, minute, week := w.feed(u, "/six-hours", hourly), w.feed(u, "/minute", hourly), w.feed(u, "/week", hourly)
+		w.runOne()
+		// The feed that is told to wait is asked by a process of its own: the
+		// pause holds the whole host back in the memory of that one.
+		busy := w.feed(u, "/busy", hourly)
+		w.r = w.refresher()
+		w.runOne()
+		t0 := start.Unix()
+		for name, c := range map[string]struct {
+			feed *store.Feed
+			want int64
+		}{"max-age of six hours": {sixHours, t0 + 21600}, "max-age of a minute": {minute, t0 + 60}, "max-age of a week": {week, t0 + 86400},
+			"Retry-After of two hours": {busy, t0 + 7200}} {
+			if got := w.storedFeed(c.feed).NotBefore; got != c.want {
+				t.Errorf("%s: not before %d, want %d", name, got, c.want)
+			}
+		}
+
+		// A new process knows the pauses from the feeds alone.
+		w.r = w.refresher()
+		hits := func() [4]int {
+			return [4]int{w.hitCount("/six-hours"), w.hitCount("/minute"), w.hitCount("/week"), w.hitCount("/busy")}
+		}
+		for _, c := range []struct {
+			step time.Duration
+			want [4]int
+		}{
+			{time.Hour + time.Minute, [4]int{1, 2, 1, 1}},
+			{time.Hour, [4]int{1, 2, 1, 2}},      // 2:01, the pause of two hours is over
+			{4 * time.Hour, [4]int{2, 3, 1, 3}},  // 6:01
+			{18 * time.Hour, [4]int{3, 4, 2, 4}}, // 24:01
+		} {
+			w.clock = w.clock.Add(c.step)
+			w.runOne()
+			if got := hits(); got != c.want {
+				t.Errorf("%s after the first run: requests %v, want %v", w.clock.Sub(start), got, c.want)
+			}
+		}
+
+		// A forced run asks whatever the server said.
+		w.run(Options{Force: true})
+		if got, want := hits(), [4]int{4, 5, 3, 5}; got != want {
+			t.Errorf("after a forced run: requests %v, want %v", got, want)
+		}
+	})
+}
+
+func TestFreshUntil(t *testing.T) {
+	now := start.Unix()
+	date := func(seconds int64) string { return time.Unix(now+seconds, 0).UTC().Format(http.TimeFormat) }
+	for name, c := range map[string]struct {
+		control []string
+		expires string
+		want    int64
+	}{
+		"nothing":                       {nil, "", 0},
+		"max-age":                       {[]string{"max-age=600"}, "", now + 600},
+		"max-age among others":          {[]string{"public, Max-Age=600, must-revalidate"}, "", now + 600},
+		"max-age in a second header":    {[]string{"public", `max-age="900"`}, "", now + 900},
+		"max-age wins over Expires":     {[]string{"max-age=600"}, date(7200), now + 600},
+		"max-age of zero":               {[]string{"max-age=0"}, date(7200), 0},
+		"too long":                      {[]string{"max-age=31536000"}, "", now + 86400},
+		"no-cache":                      {[]string{"no-cache, max-age=600"}, date(7200), 0},
+		"no-store":                      {[]string{"max-age=600", "no-store"}, "", 0},
+		"s-maxage is for shared caches": {[]string{"s-maxage=600"}, "", 0},
+		"not a number":                  {[]string{"max-age=soon"}, date(7200), now + 7200},
+		"Expires":                       {nil, date(7200), now + 7200},
+		"Expires too far":               {nil, date(864000), now + 86400},
+		"Expires in the past":           {nil, date(-60), 0},
+		"Expires that is not a date":    {nil, "0", 0},
+	} {
+		h := http.Header{}
+		for _, v := range c.control {
+			h.Add("Cache-Control", v)
+		}
+		if c.expires != "" {
+			h.Set("Expires", c.expires)
+		}
+		if got := freshUntil(h, now); got != c.want {
+			t.Errorf("%s: fresh until %d, want %d", name, got, c.want)
+		}
+	}
+}
+
 func TestRetryWait(t *testing.T) {
 	for failures, want := range map[int]int64{0: 0, 1: 0, 2: 600, 3: 1200, 4: 2400, 9: 76800, 10: 86400, 11: 86400, 1000: 86400} {
 		if got := retryWait(failures); got != want {

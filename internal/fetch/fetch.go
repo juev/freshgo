@@ -64,6 +64,9 @@ var (
 // StatusError is a response with a status other than 200 and 304.
 type StatusError struct {
 	Code int
+	// RetryAfter is how long the host is not requested after a 429 or 503;
+	// zero for every other status.
+	RetryAfter time.Duration
 }
 
 func (e *StatusError) Error() string {
@@ -75,6 +78,8 @@ func (e *StatusError) Error() string {
 type RetryAfterError struct {
 	Host  string
 	Until time.Time
+	// Left is how much of the pause is left.
+	Left time.Duration
 }
 
 func (e *RetryAfterError) Error() string {
@@ -237,7 +242,7 @@ func (c *Client) Fetch(ctx context.Context, req Request) (*Response, error) {
 	res := &Response{}
 	permanent := true
 	for redirects := 0; ; redirects++ {
-		status, header, body, err := c.do(ctx, u, &h)
+		status, header, body, retryAfter, err := c.do(ctx, u, &h)
 		if err != nil {
 			return nil, err
 		}
@@ -275,7 +280,7 @@ func (c *Client) Fetch(ctx context.Context, req Request) (*Response, error) {
 			res.URL, res.Header, res.NotModified = u.String(), header, true
 			return res, nil
 		default:
-			return nil, fmt.Errorf("%s: %w", redacted(u.String()), &StatusError{Code: status})
+			return nil, fmt.Errorf("%s: %w", redacted(u.String()), &StatusError{Code: status, RetryAfter: retryAfter})
 		}
 	}
 }
@@ -293,29 +298,30 @@ type hop struct {
 	timeout time.Duration
 }
 
-// do sends one request and reads the body of a 200 response.
-func (c *Client) do(ctx context.Context, u *url.URL, h *hop) (int, http.Header, []byte, error) {
+// do sends one request and reads the body of a 200 response. retryAfter is
+// the pause a 429 or 503 response has put the host into.
+func (c *Client) do(ctx context.Context, u *url.URL, h *hop) (status int, header http.Header, body []byte, retryAfter time.Duration, err error) {
 	host := strings.ToLower(u.Host)
 	pauseKey := host + " " + h.proxy
 	if until := c.pausedUntil(pauseKey); !until.IsZero() {
-		return 0, nil, nil, &RetryAfterError{Host: host, Until: until}
+		return 0, nil, nil, 0, &RetryAfterError{Host: host, Until: until, Left: until.Sub(c.now())}
 	}
 	release, err := c.acquire(ctx, host)
 	if err != nil {
-		return 0, nil, nil, err
+		return 0, nil, nil, 0, err
 	}
 	defer release()
 
 	ctx, cancel := context.WithTimeout(ctx, h.timeout)
 	defer cancel()
 
-	method, body := http.MethodGet, io.Reader(nil)
+	method, sent := http.MethodGet, io.Reader(nil)
 	if h.post {
-		method, body = http.MethodPost, strings.NewReader(h.req.Params.PostBody)
+		method, sent = http.MethodPost, strings.NewReader(h.req.Params.PostBody)
 	}
-	r, err := http.NewRequestWithContext(ctx, method, u.String(), body)
+	r, err := http.NewRequestWithContext(ctx, method, u.String(), sent)
 	if err != nil {
-		return 0, nil, nil, fmt.Errorf("%w: %s", ErrBadURL, redacted(u.String()))
+		return 0, nil, nil, 0, fmt.Errorf("%w: %s", ErrBadURL, redacted(u.String()))
 	}
 	accept := h.req.Accept
 	if accept == "" {
@@ -355,7 +361,7 @@ func (c *Client) do(ctx context.Context, u *url.URL, h *hop) (int, http.Header, 
 
 	resp, err := h.client.Do(r)
 	if err != nil {
-		return 0, nil, nil, err
+		return 0, nil, nil, 0, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if h.jar != nil {
@@ -366,16 +372,16 @@ func (c *Client) do(ctx context.Context, u *url.URL, h *hop) (int, http.Header, 
 	case http.StatusOK:
 		data, err := io.ReadAll(io.LimitReader(resp.Body, c.maxBody+1))
 		if err != nil {
-			return 0, nil, nil, fmt.Errorf("%s: %w", redacted(u.String()), err)
+			return 0, nil, nil, 0, fmt.Errorf("%s: %w", redacted(u.String()), err)
 		}
 		if int64(len(data)) > c.maxBody {
-			return 0, nil, nil, fmt.Errorf("%w: %s is over %d bytes", ErrBodyTooLarge, redacted(u.String()), c.maxBody)
+			return 0, nil, nil, 0, fmt.Errorf("%w: %s is over %d bytes", ErrBodyTooLarge, redacted(u.String()), c.maxBody)
 		}
-		return resp.StatusCode, resp.Header, data, nil
+		return resp.StatusCode, resp.Header, data, 0, nil
 	case http.StatusTooManyRequests, http.StatusServiceUnavailable:
-		c.pause(pauseKey, resp.Header.Get("Retry-After"))
+		retryAfter = c.pause(pauseKey, resp.Header.Get("Retry-After"))
 	}
-	return resp.StatusCode, resp.Header, nil, nil
+	return resp.StatusCode, resp.Header, nil, retryAfter, nil
 }
 
 // transport returns the connection pool for the proxy and TLS settings.
@@ -446,9 +452,9 @@ func (c *Client) pausedUntil(key string) time.Time {
 	return until
 }
 
-// pause records the Retry-After of a 429 or 503 response: a number of
-// seconds or an HTTP date.
-func (c *Client) pause(key, retryAfter string) {
+// pause records the Retry-After of a 429 or 503 response, a number of
+// seconds or an HTTP date, and returns how long the pause is.
+func (c *Client) pause(key, retryAfter string) time.Duration {
 	now := c.now()
 	until := now.Add(retryAfterDefault)
 	if seconds, err := strconv.ParseUint(strings.TrimSpace(retryAfter), 10, 63); err == nil {
@@ -463,6 +469,7 @@ func (c *Client) pause(key, retryAfter string) {
 	c.mu.Lock()
 	c.retryAfter[key] = until
 	c.mu.Unlock()
+	return max(0, until.Sub(now))
 }
 
 func parseURL(raw string) (*url.URL, error) {
