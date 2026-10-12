@@ -796,6 +796,9 @@ func BenchmarkListings(b *testing.B) {
 	for _, tc := range []struct{ name, path string }{
 		{"contents of 50 entries", "/reader/api/0/stream/contents/user/-/state/com.google/reading-list?output=json&n=50"},
 		{"unread identifiers", "/reader/api/0/stream/items/ids?output=json&s=user/-/state/com.google/reading-list&xt=user/-/state/com.google/read&n=1000"},
+		// What a client asks to learn what is new since it last asked: nothing here.
+		{"contents since a moment ago", "/reader/api/0/stream/contents/user/-/state/com.google/reading-list?output=json&n=50&ot=" + strconv.FormatInt(time.Now().Add(time.Hour).Unix(), 10)},
+		{"contents since long ago", "/reader/api/0/stream/contents/user/-/state/com.google/reading-list?output=json&n=50&ot=1"},
 	} {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()

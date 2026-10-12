@@ -144,9 +144,26 @@ func (q EntryQuery) sql(userID int64, columns string) (string, []any) {
 	return query, args
 }
 
+// entries is the statement for the whole entries the query selects.
+func (q EntryQuery) entries(userID int64) (string, []any) {
+	if q.Since == 0 && q.Until == 0 {
+		return q.sql(userID, entryColumns)
+	}
+	// A bound of time is not what the entries are ordered by, so every
+	// entry is looked at. Their identifiers are found in an index first,
+	// and only the rows of those are opened: a row is long.
+	ids, args := q.sql(userID, `id`)
+	order := `DESC`
+	if q.Ascending {
+		order = `ASC`
+	}
+	return `SELECT ` + entryColumns + ` FROM entries WHERE user_id = ? AND id IN (` + ids + `) ORDER BY id ` + order,
+		append([]any{userID}, args...)
+}
+
 // ListEntries returns the entries a query selects.
 func (s *Store) ListEntries(ctx context.Context, userID int64, q EntryQuery) ([]*Entry, error) {
-	query, args := q.sql(userID, entryColumns)
+	query, args := q.entries(userID)
 	rows, err := s.query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("store: list entries: %w", err)

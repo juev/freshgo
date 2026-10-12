@@ -109,7 +109,11 @@ func TestListEntries(t *testing.T) {
 			"since":           {EntryQuery{Since: 1004}, []int64{e7, e6, e5, e3}},
 			"until":           {EntryQuery{Until: 1002}, []int64{e2, e1}},
 			"since and until": {EntryQuery{Since: 1006, Until: 1001}, []int64{e7, e3, e2, e1}},
-			"an unknown feed": {EntryQuery{Set: EntrySet{FeedID: 99}}, nil},
+			"a page since":    {EntryQuery{Since: 1004, Limit: 2}, []int64{e7, e6}},
+			"the next page since, oldest first": {
+				EntryQuery{Since: 1004, Ascending: true, From: e5, Limit: 2}, []int64{e5, e6}},
+			"unread of a label until": {EntryQuery{Set: EntrySet{LabelID: 1}, Read: boolPtr(false), Until: 1002}, []int64{e2}},
+			"an unknown feed":         {EntryQuery{Set: EntrySet{FeedID: 99}}, nil},
 		} {
 			entries, err := s.ListEntries(ctx, lib.alice.ID, tc.q)
 			if err != nil {
@@ -643,15 +647,24 @@ func TestStateListingsUseTheirIndex(t *testing.T) {
 			name  string
 			query EntryQuery
 			index string
+			// whole asks for the entries instead of their identifiers.
+			whole bool
 		}{
-			{"unread", EntryQuery{Set: EntrySet{MinPriority: &shown}, Read: &unread, Limit: 1000}, "entries_read_index"},
-			{"unread since", EntryQuery{Read: &unread, Since: 1, Limit: 1000}, "entries_state_index"},
-			{"starred", EntryQuery{Set: EntrySet{MinPriority: &shown, OnlyFavorite: true}, Limit: 1000}, "entries_favorite_index"},
-			{"since", EntryQuery{Set: EntrySet{MinPriority: &shown}, Since: 1, Limit: 1000}, "entries_state_index"},
-			{"until", EntryQuery{Set: EntrySet{MinPriority: &shown}, Until: 1, Limit: 1000}, "entries_state_index"},
+			{"unread", EntryQuery{Set: EntrySet{MinPriority: &shown}, Read: &unread, Limit: 1000}, "entries_read_index", false},
+			{"unread since", EntryQuery{Read: &unread, Since: 1, Limit: 1000}, "entries_state_index", false},
+			{"starred", EntryQuery{Set: EntrySet{MinPriority: &shown, OnlyFavorite: true}, Limit: 1000}, "entries_favorite_index", false},
+			{"since", EntryQuery{Set: EntrySet{MinPriority: &shown}, Since: 1, Limit: 1000}, "entries_state_index", false},
+			{"until", EntryQuery{Set: EntrySet{MinPriority: &shown}, Until: 1, Limit: 1000}, "entries_state_index", false},
+			// Whole entries within bounds of time: found in the index, and
+			// no row is opened that is not listed.
+			{"entries since", EntryQuery{Set: EntrySet{MinPriority: &shown}, Since: 1, Limit: 50}, "entries_state_index", true},
+			{"entries until", EntryQuery{Until: 1, Limit: 50}, "entries_state_index", true},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
 				query, args := tc.query.sql(lib.alice.ID, `id`)
+				if tc.whole {
+					query, args = tc.query.entries(lib.alice.ID)
+				}
 				rows, err := s.query(context.Background(), `EXPLAIN QUERY PLAN `+query, args...)
 				if err != nil {
 					t.Fatal(err)
@@ -669,6 +682,11 @@ func TestStateListingsUseTheirIndex(t *testing.T) {
 				plan := strings.Join(steps, "\n")
 				if !strings.Contains(plan, "SEARCH entries USING INDEX "+tc.index) && !strings.Contains(plan, "SEARCH entries USING COVERING INDEX "+tc.index) {
 					t.Errorf("the plan does not search %s:\n%s", tc.index, plan)
+				}
+				// The bounds are read from the index alone: a search that goes
+				// on to the rows reads the text of every entry of the user.
+				if tc.whole && !strings.Contains(plan, "SEARCH entries USING COVERING INDEX "+tc.index) {
+					t.Errorf("the plan opens the rows to look at the bounds:\n%s", plan)
 				}
 				if strings.Contains(plan, "TEMP B-TREE") {
 					t.Errorf("the plan sorts:\n%s", plan)
