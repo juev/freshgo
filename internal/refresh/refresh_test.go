@@ -548,7 +548,7 @@ func TestWhichFeedsAreRefreshed(t *testing.T) {
 
 		now := start.Unix()
 		u := w.user("alice", `{}`)
-		for _, path := range []string{"/never", "/quiet-fresh", "/quiet-stale", "/fresh", "/stale", "/lately", "/own-ttl-fresh", "/own-ttl-stale", "/muted", "/failed", "/off"} {
+		for _, path := range []string{"/never", "/quiet-fresh", "/quiet-stale", "/fresh", "/stale", "/lately", "/lately-fresh", "/own-ttl-fresh", "/own-ttl-stale", "/muted", "/failed", "/off"} {
 			w.serveBody(path, rssType, rss("Blog", item{guid: "a", title: "A", body: "x"}))
 		}
 		// hourly gives the feed an entry an hour for the last week.
@@ -575,10 +575,15 @@ func TestWhichFeedsAreRefreshed(t *testing.T) {
 		hourly(w.feed(u, "/fresh", func(f *store.Feed) { f.Name, f.LastUpdate = "fresh", now-3578 }))
 		hourly(w.feed(u, "/stale", func(f *store.Feed) { f.Name, f.LastUpdate = "stale", now-3579 }))
 		// A feed subscribed just now has the entries of its document alone,
-		// and those say how often it publishes: twenty in a quarter of an hour.
-		lately := w.feed(u, "/lately", func(f *store.Feed) { f.Name, f.LastUpdate = "lately", now-60 })
-		for i := range 20 {
-			w.insert(u, &store.Entry{UserID: u.ID, FeedID: lately.ID, GUID: fmt.Sprintf("l%d", i), Published: now - int64(i)*45})
+		// and those say how often it publishes: twenty in a quarter of an
+		// hour, which is as often as any feed is asked, once in five minutes.
+		for _, f := range []*store.Feed{
+			w.feed(u, "/lately-fresh", func(f *store.Feed) { f.Name, f.LastUpdate = "lately-fresh", now-300 }),
+			w.feed(u, "/lately", func(f *store.Feed) { f.Name, f.LastUpdate = "lately", now-301 }),
+		} {
+			for i := range 20 {
+				w.insert(u, &store.Entry{UserID: u.ID, FeedID: f.ID, GUID: fmt.Sprintf("l%d", i), Published: now - int64(i)*45})
+			}
 		}
 		w.feed(u, "/own-ttl-fresh", func(f *store.Feed) { f.Name, f.LastUpdate, f.TTL = "own-ttl-fresh", now-5000, 7200 })
 		w.feed(u, "/own-ttl-stale", func(f *store.Feed) { f.Name, f.LastUpdate, f.TTL = "own-ttl-stale", now-7201, 7200 })
@@ -592,14 +597,14 @@ func TestWhichFeedsAreRefreshed(t *testing.T) {
 		if len(stats) != 1 || stats[0].User != "alice" || stats[0].Refreshed != 6 {
 			t.Errorf("stats = %+v, want 6 feeds of alice", stats)
 		}
-		for path, want := range map[string]int{"/never": 1, "/quiet-fresh": 0, "/quiet-stale": 1, "/fresh": 0, "/stale": 1, "/lately": 1, "/own-ttl-fresh": 0,
+		for path, want := range map[string]int{"/never": 1, "/quiet-fresh": 0, "/quiet-stale": 1, "/fresh": 0, "/stale": 1, "/lately": 1, "/lately-fresh": 0, "/own-ttl-fresh": 0,
 			"/own-ttl-stale": 1, "/muted": 0, "/failed": 1, "/off": 0} {
 			if got := w.hitCount(path); got != want {
 				t.Errorf("%s was requested %d times, want %d", path, got, want)
 			}
 		}
 		// Longest without an attempt first.
-		if want := []string{"never", "muted", "own-ttl-stale", "own-ttl-fresh", "quiet-stale", "quiet-fresh", "stale", "fresh", "lately", "failed"}; !reflect.DeepEqual(order, want) {
+		if want := []string{"never", "muted", "own-ttl-stale", "own-ttl-fresh", "quiet-stale", "quiet-fresh", "stale", "fresh", "lately", "lately-fresh", "failed"}; !reflect.DeepEqual(order, want) {
 			t.Errorf("feeds were offered as %q, want %q", order, want)
 		}
 		if !reflect.DeepEqual(maintained, []string{"alice"}) {
@@ -607,8 +612,8 @@ func TestWhichFeedsAreRefreshed(t *testing.T) {
 		}
 
 		// Forced: every feed that is not muted.
-		if stats := w.run(Options{Force: true}); stats[0].Refreshed != 9 {
-			t.Errorf("forced run: stats %+v, want 9 feeds", stats)
+		if stats := w.run(Options{Force: true}); stats[0].Refreshed != 10 {
+			t.Errorf("forced run: stats %+v, want 10 feeds", stats)
 		}
 		if w.hitCount("/fresh") != 1 || w.hitCount("/muted") != 0 || w.hitCount("/off") != 0 {
 			t.Errorf("forced run requested: fresh %d, muted %d, disabled user's %d", w.hitCount("/fresh"), w.hitCount("/muted"), w.hitCount("/off"))
@@ -628,12 +633,14 @@ func TestPeriodOfAFeed(t *testing.T) {
 		"nothing in the window, a limit of a day":   {0, 0, 0, 24 * hour, 24 * hour},
 		"an entry every two hours for a week":       {0, 84, 168 * hour, hour, hour},
 		"the same, a limit of four hours":           {0, 84, 168 * hour, 4 * hour, 2 * hour},
-		"subscribed just now, a busy feed":          {0, 20, 18 * minute, hour, 54},
+		"subscribed just now, a busy feed":          {0, 20, 18 * minute, hour, 5 * minute},
+		"a busy feed of a user in a hurry":          {0, 20, 18 * minute, 2 * minute, 2 * minute},
+		"an entry every six minutes":                {0, 10, hour, hour, 6 * minute},
 		"subscribed just now, two entries an hour":  {0, 25, 14 * hour, hour, 2016},
 		"three entries a day ago, silence since":    {0, 3, 24 * hour, 12 * hour, 8 * hour},
-		"one entry a minute ago":                    {0, 1, minute, hour, minute},
+		"one entry a minute ago":                    {0, 1, minute, hour, 5 * minute},
 		"one entry six days ago":                    {0, 1, 6 * 24 * hour, 24 * hour, 24 * hour},
-		"entries of this very second":               {0, 20, 0, hour, 0},
+		"entries of this very second":               {0, 20, 0, hour, 5 * minute},
 		"a period of its own, nothing published":    {7200, 0, 0, hour, 7200},
 		"a period of its own, a busy feed":          {7200, 2000, hour, hour, 7200},
 		"a period of its own longer than the limit": {172800, 168, 168 * hour, hour, 172800},

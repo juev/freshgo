@@ -1059,15 +1059,9 @@ func TestRefreshNow(t *testing.T) {
 		if a := s.post("/refresh", url.Values{"stream": {"/feeds/99"}}); a.status != http.StatusNotFound {
 			t.Errorf("refreshing a feed there is not: status %d", a.status)
 		}
-		// Any other stream refreshes the feeds that are due. The feed gets a
-		// period of its own: its entries have no dates, so they are of the
-		// second it was refreshed in, and by them alone it would be due as
-		// soon as the clock shows another second.
-		own := s.feed("alice", 9)
-		own.TTL = 3600
-		if err := s.db.UpdateFeed(context.Background(), own); err != nil {
-			t.Fatal(err)
-		}
+		// Any other stream refreshes the feeds that are due. This one is
+		// not, though its entries have no dates and are of the second it
+		// was refreshed in: a feed is not asked twice within five minutes.
 		remote.serve("/feed.xml", "application/rss+xml", rssOf(remote.URL, "The Blog", "one", "two", "three", "four"))
 		if _, body := s.follow("/refresh", url.Values{"stream": {"/"}, "next": {"/?state=all"}}); notice(body) != "Feeds refreshed: 0 new entries." {
 			t.Errorf("refreshing before anything is due: notice %q", notice(body))
