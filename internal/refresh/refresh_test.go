@@ -259,6 +259,7 @@ func TestNewFeedIsFilledIn(t *testing.T) {
 		f := w.feed(u, "/feed", func(f *store.Feed) { f.Name = "" })
 
 		st := w.runOne()
+		// A feed read whole is not an unchanged one.
 		if want := (Stats{User: "alice", Refreshed: 1, NewEntries: 3}); st != want {
 			t.Errorf("stats = %+v, want %+v", st, want)
 		}
@@ -702,7 +703,8 @@ func TestUnchangedFeed(t *testing.T) {
 		before := w.entries(f)
 
 		w.later()
-		if st := w.runOne(); st.Refreshed != 1 || st.Failed != 0 || st.NewEntries != 0 || st.UpdatedEntries != 0 {
+		// The feed is counted as refreshed and, of those, as unchanged.
+		if st := w.runOne(); st != (Stats{User: "alice", Refreshed: 1, Unchanged: 1}) {
 			t.Errorf("stats %+v", st)
 		}
 		if conditional.Load() != 1 {

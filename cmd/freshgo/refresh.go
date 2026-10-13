@@ -130,8 +130,8 @@ func runRefresh(ctx context.Context, e env, args []string) (err error) {
 	// run tries it again.
 	stats, err := s.refresher.Run(ctx, opts)
 	for _, st := range stats {
-		if _, werr := fmt.Fprintf(e.stdout, "%s: %d feeds refreshed, %d failed, %d new and %d updated entries\n",
-			st.User, st.Refreshed, st.Failed, st.NewEntries, st.UpdatedEntries); werr != nil {
+		if _, werr := fmt.Fprintf(e.stdout, "%s: %d feeds refreshed, %d of them unchanged, %d failed, %d new and %d updated entries\n",
+			st.User, st.Refreshed, st.Unchanged, st.Failed, st.NewEntries, st.UpdatedEntries); werr != nil {
 			return errors.Join(err, werr)
 		}
 	}

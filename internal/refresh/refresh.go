@@ -72,8 +72,10 @@ type Options struct {
 type Stats struct {
 	User string
 	// Refreshed counts the feeds fetched without an error, unchanged ones
-	// included; Failed the feeds that are now marked as failing.
+	// included; Unchanged those of them whose server answered 304 Not
+	// Modified; Failed the feeds that are now marked as failing.
 	Refreshed int
+	Unchanged int
 	Failed    int
 	// NewEntries and UpdatedEntries count stored entries.
 	NewEntries     int
@@ -115,7 +117,7 @@ func (r *Refresher) Run(ctx context.Context, o Options) ([]Stats, error) {
 		if err != nil {
 			return all, fmt.Errorf("refresh: user %s: %w", u.Name, err)
 		}
-		r.log.Info("feeds refreshed", "user", u.Name, "feeds", st.Refreshed, "failed", st.Failed,
+		r.log.Info("feeds refreshed", "user", u.Name, "feeds", st.Refreshed, "unchanged", st.Unchanged, "failed", st.Failed,
 			"new", st.NewEntries, "updated", st.UpdatedEntries)
 	}
 	r.subscribe(ctx, hubs)
@@ -257,6 +259,9 @@ func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options, hubs map
 				return
 			}
 			st.Refreshed++
+			if res.unchanged {
+				st.Unchanged++
+			}
 			st.NewEntries += res.added
 			st.UpdatedEntries += res.updated
 		}()

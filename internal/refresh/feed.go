@@ -31,6 +31,8 @@ const forceFeedSuffix = "#force_feed"
 // result is what the refresh of one feed stored.
 type result struct {
 	added, updated int
+	// unchanged says the server answered that the feed is as it was.
+	unchanged bool
 }
 
 // update is a stored entry the feed has changed, together with the state it
@@ -65,7 +67,7 @@ func (r *Refresher) refreshFeed(ctx context.Context, j *job, f *store.Feed) (res
 	if resp.NotModified {
 		err := r.storeUnchanged(ctx, j, f, resp, now)
 		r.refreshIcon(ctx, f, err)
-		return result{}, err
+		return result{unchanged: err == nil}, err
 	}
 	res, err := r.storeFetched(ctx, j, f, params, resp, now, false)
 	r.refreshIcon(ctx, f, err)
