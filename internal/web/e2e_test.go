@@ -465,12 +465,14 @@ func TestE2ETabOnly(t *testing.T) {
 		b.press(kb.Enter)
 		b.until("the focus on the content", `document.activeElement.id === 'content'`)
 
-		// Tab goes through the page in the order it reads.
+		// Tab goes through the page in the order it reads. After the last
+		// stop a browser takes the focus out of the document or straight
+		// back to the first stop of the page: the walk ends either way.
 		var order []string
 		for range 400 {
 			b.press(kb.Tab)
-			at := b.text(`(e => e === document.body ? 'body' : String(Array.prototype.indexOf.call(document.querySelectorAll('*'), e)))(document.activeElement)`)
-			if at == "body" {
+			at := b.text(`(e => e === document.body || e.matches('a.skip') ? 'end' : String(Array.prototype.indexOf.call(document.querySelectorAll('*'), e)))(document.activeElement)`)
+			if at == "end" {
 				break
 			}
 			order = append(order, at)
