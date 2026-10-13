@@ -17,6 +17,7 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/language/display"
 
+	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -325,6 +326,20 @@ func (h *Handler) showArchiving(w http.ResponseWriter, r *http.Request, status i
 		// What FreshRSS gives a user who has set nothing.
 		page.Retention = retention{Own: true, PeriodOn: true, PeriodCount: 3, PeriodUnit: "P1M", MaxOn: true, Max: defaultKeepMax, Min: 50, Favorites: true, Labels: true}
 	}
+	// Read as a refresh reads it: anything but a positive number is no
+	// period at all.
+	var limit int
+	if json.Unmarshal(s["ttl_default"], &limit) != nil || limit <= 0 {
+		limit = refresh.DefaultMaxPeriod
+	}
+	if !slices.Contains(periods, limit) {
+		page.Options["ttl_default"] = append(page.Options["ttl_default"], option{strconv.Itoa(limit), duration(v, limit), true})
+	}
+	// Without the first of the periods of a feed, "automatic": this is what
+	// automatic is bounded by.
+	for _, seconds := range periods[1:] {
+		page.Options["ttl_default"] = append(page.Options["ttl_default"], option{strconv.Itoa(seconds), duration(v, seconds), seconds == limit})
+	}
 	for _, unit := range []string{"PT1H", "P1D", "P1W", "P1M", "P1Y"} {
 		page.Units = append(page.Units, option{unit, v.T("retention.unit." + unit), unit == page.Retention.PeriodUnit})
 	}
@@ -338,6 +353,9 @@ func (h *Handler) archivingPage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) saveArchiving(w http.ResponseWriter, r *http.Request) {
 	h.saveSettings(w, r, "/settings/archiving", func(form url.Values, s attrs) string {
+		if n, err := strconv.Atoi(strings.TrimSpace(form.Get("ttl_default"))); err == nil && n > 0 {
+			s.set("ttl_default", n)
+		}
 		s.setRetention(form, false)
 		return ""
 	}, func(status int, s attrs, _ string) { h.showArchiving(w, r, status, s) })

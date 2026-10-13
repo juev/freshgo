@@ -625,6 +625,8 @@
   "settings.translate-to": "Language to translate into",
   "settings.translate-to.interface": "The language of the interface",
   "settings.translating": "Translating entries",
+  "settings.ttl-default": "Refresh a feed without a period of its own at least every",
+  "settings.ttl-default.hint": "A feed that publishes more often than that is refreshed more often.",
   "settings.view": "A stream lists",
   "settings.view.adaptive": "Unread entries while there are any, else all",
   "settings.view.all": "All entries",

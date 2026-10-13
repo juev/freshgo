@@ -655,6 +655,8 @@
   "settings.translate-to": "Язык перевода",
   "settings.translate-to.interface": "Язык интерфейса",
   "settings.translating": "Перевод статей",
+  "settings.ttl-default": "Обновлять фид без своего периода не реже чем раз в",
+  "settings.ttl-default.hint": "Фид, который публикует чаще, обновляется чаще.",
   "settings.view": "Поток показывает",
   "settings.view.adaptive": "Непрочитанные, пока они есть, иначе все",
   "settings.view.all": "Все статьи",
