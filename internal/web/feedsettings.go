@@ -16,6 +16,7 @@ import (
 
 	pagebrowser "github.com/juev/freshgo/internal/browser"
 	"github.com/juev/freshgo/internal/favicon"
+	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/scrape"
 	"github.com/juev/freshgo/internal/store"
@@ -102,6 +103,13 @@ type scrapeField struct {
 	Value string
 }
 
+// feedCheck is one way a feed was requested by, and what came of it.
+type feedCheck struct {
+	Way    string
+	Result string
+	OK     bool
+}
+
 // feedPage is what the page of the settings of a feed shows.
 type feedPage struct {
 	Feed       *store.Feed
@@ -124,6 +132,10 @@ type feedPage struct {
 	ContentAction []option
 	Preview       template.HTML
 	PreviewNote   string
+	// Checks are what requesting the feed by each way came to; CheckHint
+	// what to do about it, if anything.
+	Checks    []feedCheck
+	CheckHint string
 	// Rules.
 	FiltersRead  string
 	Retention    retention
@@ -810,6 +822,67 @@ func (h *Handler) previewFeed(w http.ResponseWriter, r *http.Request) {
 		default:
 			page.Preview = template.HTML(article) //nolint:gosec // cleaned by fulltext.Article
 		}
+	}
+	h.showFeed(w, r, http.StatusOK, edited, page)
+}
+
+// checkFeed requests the feed as the form has it, without a proxy and
+// through every proxy there is, and shows what each came to. Nothing is
+// stored.
+func (h *Handler) checkFeed(w http.ResponseWriter, r *http.Request) {
+	ctx, s := r.Context(), state(r)
+	old, ok := h.ownFeed(w, r)
+	if !ok || !h.settingsForm(w, r) {
+		return
+	}
+	edited := old
+	if _, err := h.editFeed(ctx, r, h.db, edited); err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	v := h.view(r, "", "feed.heading")
+	checks, err := h.refresher.CheckFeed(ctx, edited)
+	if ctx.Err() != nil {
+		return
+	}
+	if err != nil {
+		// Settings no request can be made by: a kind of proxy there is not.
+		h.showFeed(w, r, http.StatusOK, edited, feedPage{PreviewNote: v.T("feed.check.settings")})
+		return
+	}
+	page := feedPage{}
+	answered := map[string]bool{}
+	for _, c := range checks {
+		row := feedCheck{Way: v.T("feed.check.way." + c.Way), OK: c.Err == nil, Result: v.T("feed.check.ok")}
+		var status *fetch.StatusError
+		switch {
+		case c.Err == nil:
+		case errors.As(c.Err, &status):
+			row.Result = status.Error()
+		case c.Way == refresh.WayInstallation:
+			// What went wrong may name the proxy, which is the
+			// administrator's to know.
+			h.log.Warn("feed check through the proxy of the installation failed", "user", s.who.user.Name, "feed", old.ID, "error", c.Err)
+			row.Result = v.T("feed.check.failed")
+		default:
+			row.Result = c.Err.Error()
+		}
+		answered[c.Way] = c.Err == nil
+		page.Checks = append(page.Checks, row)
+	}
+	_, hasInstallation := answered[refresh.WayInstallation]
+	params, _ := fetch.FeedParams(edited.HTTPAuth, edited.Attributes)
+	// Whether the feed, as the form has it, goes through that proxy already.
+	through := params.Installation || (!s.system.ProxyChosenOnly && !params.Direct && params.Proxy == nil)
+	switch {
+	case answered[refresh.WayDirect] || answered[refresh.WayOwn]:
+	case answered[refresh.WayInstallation] && !through:
+		page.CheckHint = v.T("feed.check.hint.installation")
+	case hasInstallation:
+	case s.who.admin:
+		page.CheckHint = v.T("feed.check.hint.admin")
+	default:
+		page.CheckHint = v.T("feed.check.hint.user")
 	}
 	h.showFeed(w, r, http.StatusOK, edited, page)
 }

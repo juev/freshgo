@@ -5,12 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/fulltext"
 	"github.com/juev/freshgo/internal/store"
 )
@@ -543,6 +549,97 @@ func TestValidatorsOfAnOvertakenFetch(t *testing.T) {
 		w.runOne()
 		if got := w.storedFeed(f); len(sent) != 2 || sent[1] != "" || got.HTTPETag != `"v1"` {
 			t.Errorf("If-None-Match of the requests = %q, validator now %q; want none sent and the new one kept", sent, got.HTTPETag)
+		}
+	})
+}
+
+// A feed is requested by every way there is, and what each comes to tells a
+// site that refuses the address of the server from a feed that is gone.
+func TestCheckFeed(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		var asked atomic.Int32
+		// The site refuses whoever comes directly.
+		w.serve("/feed", func(rw http.ResponseWriter, _ *http.Request) {
+			asked.Add(1)
+			http.Error(rw, "not from there", http.StatusForbidden)
+		})
+		proxy := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+			rw.Header().Set("Content-Type", rssType)
+			_, _ = io.WriteString(rw, rss("Blog", item{guid: "a", title: "A", body: "x"}))
+		}))
+		t.Cleanup(proxy.Close)
+		proxyURL, _ := url.Parse(proxy.URL)
+
+		var installation *url.URL
+		client, err := fetch.New(fetch.Options{
+			UserAgent: "freshgo/test",
+			Allowlist: []string{strings.TrimPrefix(w.server.URL, "http://"), proxyURL.Host},
+			Proxy: func(context.Context) (fetch.InstallationProxy, error) {
+				return fetch.InstallationProxy{URL: installation, ChosenOnly: true}, nil
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		r := New(w.db, client, w.registry, slog.New(slog.NewTextHandler(io.Discard, nil)))
+		// The feed is not stored: the form checks what it holds before saving.
+		feed := func(attributes string) *store.Feed {
+			return &store.Feed{URL: w.server.URL + "/feed#force_feed", Attributes: json.RawMessage(attributes)}
+		}
+		ways := func(checks []FeedCheck) string {
+			var b strings.Builder
+			for _, c := range checks {
+				var status *fetch.StatusError
+				switch {
+				case c.Err == nil:
+					fmt.Fprintf(&b, "%s ok; ", c.Way)
+				case errors.As(c.Err, &status):
+					fmt.Fprintf(&b, "%s %d; ", c.Way, status.Code)
+				default:
+					fmt.Fprintf(&b, "%s %v; ", c.Way, c.Err)
+				}
+			}
+			return b.String()
+		}
+
+		// No proxy anywhere: one way, and it is refused.
+		checks, err := r.CheckFeed(ctx, feed(`{}`))
+		if got := ways(checks); err != nil || got != "direct 403; " {
+			t.Errorf("without a proxy: %q, %v", got, err)
+		}
+		// The proxy of the installation, whether or not the feed chose it
+		// or is set to go through none.
+		installation = proxyURL
+		for _, attributes := range []string{`{}`, `{"installation_proxy":true}`, `{"curl_params":{"101":-1}}`} {
+			checks, err = r.CheckFeed(ctx, feed(attributes))
+			if got := ways(checks); err != nil || got != "direct 403; installation ok; " {
+				t.Errorf("with the proxy of the installation, attributes %s: %q, %v", attributes, got, err)
+			}
+		}
+		// A proxy of the feed's own is a third way, and the only other one
+		// in an installation without a proxy.
+		own := `{"curl_params":{"101":0,"10004":"` + proxyURL.Host + `"}}`
+		checks, err = r.CheckFeed(ctx, feed(own))
+		if got := ways(checks); err != nil || got != "direct 403; installation ok; own ok; " {
+			t.Errorf("with a proxy of its own: %q, %v", got, err)
+		}
+		installation = nil
+		checks, err = r.CheckFeed(ctx, feed(own))
+		if got := ways(checks); err != nil || got != "direct 403; own ok; " {
+			t.Errorf("with a proxy of its own and none of the installation: %q, %v", got, err)
+		}
+		// Settings no request can be made by.
+		if checks, err := r.CheckFeed(ctx, feed(`{"curl_params":{"101":42,"10004":"127.0.0.1:1080"}}`)); !errors.Is(err, fetch.ErrUnsupportedProxy) || checks != nil {
+			t.Errorf("a kind of proxy there is not: %v, %v", checks, err)
+		}
+		// The site was asked once for every check, directly; nothing came
+		// of it in the database.
+		if asked.Load() != 6 {
+			t.Errorf("the site was asked directly %d times, want 6", asked.Load())
+		}
+		if feeds, err := w.db.Feeds(ctx, w.user("alice", `{}`).ID); err != nil || len(feeds) != 0 {
+			t.Errorf("feeds after the checks: %v, %v", feeds, err)
 		}
 	})
 }
