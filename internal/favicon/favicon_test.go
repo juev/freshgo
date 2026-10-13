@@ -352,6 +352,13 @@ func TestIconFollowsProxyOfFeed(t *testing.T) {
 			}
 		}
 
+		// What the proxy of one feed answered with is not the icon of a feed
+		// that looks at the same place by another way.
+		same := w.feed(&store.Feed{URL: "http://own.freshgo.test/other.xml"})
+		if got := body(t, w.get(same)); !bytes.Equal(got, defaultIcon) {
+			t.Errorf("a feed of the same site without the proxy: icon %q, want the built-in one", got)
+		}
+
 		f = w.feed(&store.Feed{URL: "http://chosen.freshgo.test/feed.xml", Attributes: []byte(`{"installation_proxy":true}`)})
 		if got := icon(f); !bytes.Equal(got, png) {
 			t.Errorf("a feed that chose the proxy of the installation: icon %q, want the one that proxy answers with", got)
