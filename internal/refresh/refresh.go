@@ -225,10 +225,7 @@ func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options, hubs map
 	if err != nil {
 		return st, err
 	}
-	limit := DefaultMaxPeriod
-	if v, ok := get[int](readAttributes(j.user.Settings), "ttl_default"); ok && v > 0 {
-		limit = v
-	}
+	limit := maxPeriod(j.user)
 	for _, f := range feeds {
 		if f.TTL >= 0 && f.WebSubTopic != "" && f.WebSubHub != "" {
 			hubs[f.WebSubTopic] = f.WebSubHub
@@ -288,6 +285,25 @@ const (
 	// DefaultMaxPeriod is that period, in seconds, of a user who has set none.
 	DefaultMaxPeriod = 3600
 )
+
+// maxPeriod is the longest a feed of the user without a period of its own
+// is left alone, in seconds.
+func maxPeriod(u *store.User) int {
+	if v, ok := get[int](readAttributes(u.Settings), "ttl_default"); ok && v > 0 {
+		return v
+	}
+	return DefaultMaxPeriod
+}
+
+// longestPeriod is the longest the feed is left alone by its settings and
+// those of its user, in seconds: its own period, else that of the user. Its
+// server puts the next request off no further than that.
+func longestPeriod(u *store.User, f *store.Feed) int64 {
+	if f.TTL > 0 {
+		return int64(f.TTL)
+	}
+	return int64(maxPeriod(u))
+}
 
 // period is the refresh period at the time now, in seconds, of a feed that
 // is not muted; published is what it has published within frequencyWindow

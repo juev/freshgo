@@ -301,7 +301,7 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 		if pushed {
 			fresh.Error, fresh.Failures = 0, 0
 		} else {
-			succeeded(fresh, f, resp, now)
+			succeeded(fresh, f, resp, now, longestPeriod(j.user, fresh))
 			fresh.WebSubTopic, fresh.WebSubHub = topic, hub
 		}
 		if used != criteria {
@@ -381,17 +381,18 @@ func (r *Refresher) storeUnchanged(ctx context.Context, j *job, f *store.Feed, r
 		if err := r.tidy(ctx, tx, j, fresh, now, false, false); err != nil {
 			return err
 		}
-		succeeded(fresh, f, resp, now)
+		succeeded(fresh, f, resp, now, longestPeriod(j.user, fresh))
 		return tx.UpdateFeed(ctx, fresh)
 	})
 }
 
 // succeeded writes into the feed what every successful fetch changes.
-// fetched is the feed as it was when it was fetched.
-func succeeded(fresh, fetched *store.Feed, resp *fetch.Response, now int64) {
+// fetched is the feed as it was when it was fetched, longest the longest its
+// server may put the next request off, in seconds.
+func succeeded(fresh, fetched *store.Feed, resp *fetch.Response, now, longest int64) {
 	fresh.LastUpdate = now
 	fresh.Error, fresh.Failures = 0, 0
-	fresh.NotBefore = freshUntil(resp.Header, now)
+	fresh.NotBefore = freshUntil(resp.Header, now, longest)
 	// A 304 need not repeat the validators.
 	if !resp.NotModified || resp.Header.Get("ETag") != "" {
 		fresh.HTTPETag = resp.Header.Get("ETag")
@@ -414,16 +415,16 @@ func succeeded(fresh, fetched *store.Feed, resp *fetch.Response, now int64) {
 	}
 }
 
-// maxServerWait is the longest a server is believed when it says how long
-// to stay away, in seconds.
+// maxServerWait is the longest a server is believed when it asks for a
+// pause, in seconds.
 const maxServerWait = 24 * 3600
 
 // freshUntil is the time up to which an answer received at now calls itself
-// fresh, by max-age of Cache-Control or else by Expires, maxServerWait from now at
-// most. Of max-age the time a cache on the way has held the answer already
+// fresh, by max-age of Cache-Control or else by Expires, longest seconds
+// from now at most. Of max-age the time a cache on the way has held the answer already
 // (Age) is spent. It is zero for an answer that says nothing of it, or says
 // that it is not to be kept.
-func freshUntil(h http.Header, now int64) int64 {
+func freshUntil(h http.Header, now, longest int64) int64 {
 	age := int64(-1)
 	for _, value := range h.Values("Cache-Control") {
 		for directive := range strings.SplitSeq(value, ",") {
@@ -443,9 +444,9 @@ func freshUntil(h http.Header, now int64) int64 {
 		if held, err := strconv.ParseInt(strings.TrimSpace(h.Get("Age")), 10, 64); err == nil && held > 0 {
 			age = max(0, age-held)
 		}
-		until = now + min(age, maxServerWait)
+		until = now + min(age, longest)
 	} else if expires, err := http.ParseTime(h.Get("Expires")); err == nil {
-		until = min(expires.Unix(), now+maxServerWait)
+		until = min(expires.Unix(), now+longest)
 	}
 	if until <= now {
 		return 0
