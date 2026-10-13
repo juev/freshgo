@@ -57,7 +57,10 @@ func subscribed(t *testing.T) (database, host string, hits *atomic.Int32) {
 	if err := db.CreateUser(ctx, u); err != nil {
 		t.Fatal(err)
 	}
-	if err := db.CreateFeed(ctx, &store.Feed{UserID: u.ID, URL: server.URL + "/feed", Name: "Blog"}); err != nil {
+	// A period of its own: the items have no dates, so the entries are of
+	// the second of the refresh, and by them alone the feed would be due as
+	// soon as the clock shows another second.
+	if err := db.CreateFeed(ctx, &store.Feed{UserID: u.ID, URL: server.URL + "/feed", Name: "Blog", TTL: 3600}); err != nil {
 		t.Fatal(err)
 	}
 	return "sqlite://" + path, strings.TrimPrefix(server.URL, "http://"), hits
