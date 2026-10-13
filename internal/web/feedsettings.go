@@ -84,6 +84,14 @@ var proxyTypes = []struct{ value, name string }{
 // FreshRSS stores -1 for it.
 const proxyDirect = "-1"
 
+// proxyInstallation is the choice of the proxy of the installation, which a
+// feed needs when that proxy is for chosen feeds only. It is kept in an
+// attribute of freshgo's own: curl_params has no value for it.
+const (
+	proxyInstallation     = "installation"
+	attrInstallationProxy = "installation_proxy"
+)
+
 // maxIcon is the largest picture taken for the icon of a feed, in bytes.
 const maxIcon = 1 << 20
 
@@ -293,9 +301,14 @@ func (h *Handler) showFeed(w http.ResponseWriter, r *http.Request, status int, f
 	curl := readAttrs(a["curl_params"])
 	proxyType, hasProxy := curl.number(curlProxyType)
 	direct := hasProxy && (proxyType < 0 || proxyType == 3)
+	// As fetch.FeedParams reads it: the choice of the proxy of the
+	// installation leaves no other to read.
+	installation := a.flag(attrInstallationProxy, false)
+	hasProxy = hasProxy && !installation
 	page.ProxyTypes = []option{
-		{"", v.T("feed.proxy.none"), !hasProxy},
-		{proxyDirect, v.T("feed.proxy.direct"), direct},
+		{"", v.T("feed.proxy.none"), !hasProxy && !installation},
+		{proxyInstallation, v.T("feed.proxy.installation"), installation},
+		{proxyDirect, v.T("feed.proxy.direct"), direct && !installation},
 	}
 	for _, p := range proxyTypes {
 		page.ProxyTypes = append(page.ProxyTypes, option{p.value, p.name, hasProxy && strconv.Itoa(proxyType) == p.value})
@@ -514,7 +527,10 @@ func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, can
 	} {
 		delete(curl, key)
 	}
-	if get("proxy_type") == proxyDirect {
+	delete(a, attrInstallationProxy)
+	if get("proxy_type") == proxyInstallation {
+		a.set(attrInstallationProxy, true)
+	} else if get("proxy_type") == proxyDirect {
 		curl.set(curlProxyType, -1)
 	} else if proxy := get("proxy"); proxy != "" {
 		for _, p := range proxyTypes {

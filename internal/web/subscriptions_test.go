@@ -525,6 +525,29 @@ func TestFeedSettings(t *testing.T) {
 			t.Errorf("feed 1 with every setting left to the levels above: ttl %d, kind %d, attributes %s", got.TTL, got.Kind, got.Attributes)
 		}
 
+		// The proxy of the installation is chosen without an address, in an
+		// attribute of its own, and leaves no other proxy behind.
+		shown.Set("proxy_type", "installation")
+		shown.Set("proxy", "proxy.example:1080")
+		s.follow("/subscriptions/feeds/1", shown)
+		if attributes := decoded(t, s.feed("alice", 1).Attributes); attributes["installation_proxy"] != true || attributes["curl_params"] != nil {
+			t.Errorf("feed 1 with the proxy of the installation chosen: %v", attributes)
+		}
+		if again := s.feedForm(1); again.Get("proxy_type") != "installation" || again.Get("proxy") != "" {
+			t.Errorf("form of feed 1 with the proxy of the installation chosen: proxy_type %q, proxy %q", again.Get("proxy_type"), again.Get("proxy"))
+		}
+		shown.Set("proxy_type", "-1")
+		shown.Set("proxy", "")
+		s.follow("/subscriptions/feeds/1", shown)
+		if attributes := decoded(t, s.feed("alice", 1).Attributes); attributes["installation_proxy"] != nil || attributes["curl_params"] == nil {
+			t.Errorf("feed 1 set to go direct after the proxy of the installation: %v", attributes)
+		}
+		if again := s.feedForm(1); again.Get("proxy_type") != "-1" {
+			t.Errorf("form of feed 1 set to go direct: proxy_type %q", again.Get("proxy_type"))
+		}
+		shown.Set("proxy_type", "")
+		s.follow("/subscriptions/feeds/1", shown)
+
 		// An address that is none stores nothing and keeps what was typed.
 		form = s.feedForm(2)
 		form.Set("url", " ")

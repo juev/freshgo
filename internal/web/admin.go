@@ -448,6 +448,7 @@ func (h *Handler) saveSystem(w http.ResponseWriter, r *http.Request) {
 		} else {
 			system.Proxy = proxy.String()
 		}
+		system.ProxyChosenOnly = form.Get("proxy_chosen_only") != ""
 		system.ClosedRegistrationMessage = strings.TrimSpace(form.Get("closed_registration_message"))
 		system.TOS = strings.TrimSpace(form.Get("tos"))
 		return problem

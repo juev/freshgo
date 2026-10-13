@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/url"
 
 	"github.com/juev/freshgo/internal/browser"
 	"github.com/juev/freshgo/internal/config"
@@ -52,12 +51,13 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 		UserAgent: userAgent(), Allowlist: conf.Allowlist(),
 		// Read for every request: an administrator changes it while the
 		// server runs, and a refresh may run in a process of its own.
-		Proxy: func(ctx context.Context) (*url.URL, error) {
+		Proxy: func(ctx context.Context) (fetch.InstallationProxy, error) {
 			system, err := db.System(ctx)
 			if err != nil {
-				return nil, err
+				return fetch.InstallationProxy{}, err
 			}
-			return fetch.ParseProxy(system.Proxy)
+			proxy, err := fetch.ParseProxy(system.Proxy)
+			return fetch.InstallationProxy{URL: proxy, ChosenOnly: system.ProxyChosenOnly}, err
 		},
 	}
 	client, err := fetch.New(fetching)

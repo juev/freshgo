@@ -23,6 +23,10 @@ type Params struct {
 	// Direct keeps the request away from the proxy of the installation: the
 	// feed is set to go through none.
 	Direct bool
+	// Installation sends the request through the proxy of the installation
+	// also when that one is for chosen feeds only: the feed has chosen it.
+	// Without such a proxy the request fails.
+	Installation bool
 	// Insecure skips the verification of the TLS certificate.
 	Insecure bool
 	// Timeout replaces the client's timeout when positive.
@@ -90,14 +94,18 @@ func FeedParams(httpAuth string, attributes json.RawMessage) (Params, error) {
 	}
 	var a struct {
 		CurlParams json.RawMessage `json:"curl_params"`
-		SSLVerify  json.RawMessage `json:"ssl_verify"`
-		Timeout    json.RawMessage `json:"timeout"`
+		// InstallationProxy is freshgo's own: curl_params, which is how
+		// FreshRSS writes the proxy of a feed, has no value for it.
+		InstallationProxy json.RawMessage `json:"installation_proxy"`
+		SSLVerify         json.RawMessage `json:"ssl_verify"`
+		Timeout           json.RawMessage `json:"timeout"`
 	}
 	if err := json.Unmarshal(attributes, &a); err != nil {
 		return Params{}, fmt.Errorf("feed attributes: %w", err)
 	}
 	// ssl_verify is three-valued: absent or null keeps verification on.
 	p.Insecure = present(a.SSLVerify) && !truthy(a.SSLVerify)
+	p.Installation = truthy(a.InstallationProxy)
 	if seconds, ok := integer(a.Timeout); ok && seconds > 0 {
 		p.Timeout = time.Duration(seconds) * time.Second
 	}
@@ -123,6 +131,10 @@ func FeedParams(httpAuth string, attributes json.RawMessage) (Params, error) {
 		p.NoRedirects = true
 	}
 
+	// The choice of the proxy of the installation leaves no other to read.
+	if p.Installation {
+		return p, nil
+	}
 	proxyType, _ := integer(curl[curlProxyType])
 	address := proxyScheme.ReplaceAllString(text(curl[curlProxy]), "")
 	if proxyType < 0 || proxyType == proxyTypeNoneLegacy {

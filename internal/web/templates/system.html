@@ -55,6 +55,11 @@
 <input type="text" id="proxy" name="proxy" value="{{.Data.System.Proxy}}" autocapitalize="off" spellcheck="false" aria-describedby="proxy-hint">
 <span class="hint" id="proxy-hint">{{.T "admin.system.proxy.hint"}}</span>
 </p>
+<p class="check">
+<input type="checkbox" id="proxy_chosen_only" name="proxy_chosen_only" value="1"{{if .Data.System.ProxyChosenOnly}} checked{{end}} aria-describedby="proxy-chosen-hint">
+<label for="proxy_chosen_only">{{.T "admin.system.proxy.chosen-only"}}</label>
+<span class="hint" id="proxy-chosen-hint">{{.T "admin.system.proxy.chosen-only.hint"}}</span>
+</p>
 <p>
 <label for="media_proxy">{{.T "admin.system.media"}}</label>
 <select id="media_proxy" name="media_proxy" aria-describedby="media-hint">

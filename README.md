@@ -352,7 +352,11 @@ A check that wants a click or a puzzle is not passed. The article then keeps the
 
 ### Proxy
 
-An administrator sets one proxy for all feeds on the page "System" of the administration: `http://`, `https://`, `socks5://` or `socks5h://`, with `user:password@` when it asks for them. Feeds, the pages of their articles and icons are then fetched through it, from the next request on. A feed keeps a proxy of its own, and can be set to go through none. The proxy of the environment (`HTTP_PROXY`) is not used.
+An administrator sets one proxy for all feeds on the page "System" of the administration: `http://`, `https://`, `socks5://` or `socks5h://`, with `user:password@` when it asks for them. Feeds, the pages of their articles and icons are then fetched through it, from the next request on. A feed keeps a proxy of its own, and can be set to go through none.
+
+When only a few feeds need the proxy, mark it on the same page as being for the feeds that choose it. Everything is then fetched directly, except the feeds whose settings say "That of the installation" under "Proxy": the address is typed once, for the installation, and not for every feed. A feed that chose the proxy fails with a message about it when the installation has none; it is not fetched directly instead.
+
+The proxy of the environment (`HTTP_PROXY`) is not used.
 
 ### WebSub
 

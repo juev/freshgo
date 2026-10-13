@@ -99,12 +99,26 @@ type Options struct {
 	MaxBodySize int64
 	// HostConcurrency is the number of simultaneous requests to one host.
 	HostConcurrency int
-	// Proxy tells the proxy of the installation, nil for none. It is asked
+	// Proxy tells the proxy of the installation; nil is none. It is asked
 	// before every request whose settings name no proxy and are not Direct.
 	// The address is the administrator's choice and is connected to whatever
 	// the Allowlist says.
-	Proxy func(context.Context) (*url.URL, error)
+	Proxy func(context.Context) (InstallationProxy, error)
 }
+
+// InstallationProxy is the proxy of the installation and whom it is for.
+type InstallationProxy struct {
+	// URL is its address, nil for none.
+	URL *url.URL
+	// ChosenOnly keeps it to the requests that choose it
+	// (Params.Installation); otherwise every request without a proxy of its
+	// own goes through it.
+	ChosenOnly bool
+}
+
+// ErrNoInstallationProxy is the failure of a request that chose the proxy of
+// the installation while none is set.
+var ErrNoInstallationProxy = errors.New("the feed is set to go through the proxy of the installation, and the installation has none")
 
 // Client fetches documents. It is safe for concurrent use and keeps
 // connections, the Retry-After pauses and the per-host limits between calls.
@@ -114,7 +128,7 @@ type Client struct {
 	maxBody   int64
 	perHost   int
 	guard     *guard
-	proxy     func(context.Context) (*url.URL, error)
+	proxy     func(context.Context) (InstallationProxy, error)
 	now       func() time.Time
 
 	mu         sync.Mutex
@@ -196,9 +210,20 @@ func (c *Client) Fetch(ctx context.Context, req Request) (*Response, error) {
 	}
 	p := req.Params
 	trusted := false
-	if p.Proxy == nil && !p.Direct && c.proxy != nil {
-		if p.Proxy, err = c.proxy(ctx); err != nil {
-			return nil, fmt.Errorf("proxy of the installation: %w", err)
+	if p.Proxy == nil && !p.Direct {
+		var installation InstallationProxy
+		if c.proxy != nil {
+			if installation, err = c.proxy(ctx); err != nil {
+				return nil, fmt.Errorf("proxy of the installation: %w", err)
+			}
+		}
+		switch {
+		case p.Installation && installation.URL == nil:
+			// Not fetched directly instead: a feed that needs the proxy
+			// would fail with whatever its site answers.
+			return nil, ErrNoInstallationProxy
+		case p.Installation || !installation.ChosenOnly:
+			p.Proxy = installation.URL
 		}
 		trusted = p.Proxy != nil
 	}
