@@ -1372,7 +1372,17 @@ func TestE2EToolbar(t *testing.T) {
 		b.until("the second entry open, the first closed", current(ids[1], true)+` && !document.querySelector('`+e(ids[0])+` details').open`)
 		b.press("k")
 		b.until("the first entry open", current(ids[0], true))
+		b.until("the first entry shown as read", `document.querySelector('`+e(ids[0])+`').classList.contains('read')`)
+		// What the server answers about the entry replaces its actions: the
+		// focus stays on the one it was on, a link or the button that folds.
+		b.tabTo(e(ids[0]) + " a.entry-page")
+		b.press("s")
+		b.until("the star shown, the focus still on the link to the page of the entry",
+			`document.querySelector('`+e(ids[0])+` .entry-state').textContent.includes('Starred') && document.activeElement.matches('`+e(ids[0])+` a.entry-page')`)
 		b.tabTo(e(ids[0]) + " button[data-fold]")
+		b.press("m")
+		b.until("the entry shown as unread, the focus still on the button that folds it",
+			`!document.querySelector('`+e(ids[0])+`').classList.contains('read') && document.activeElement.matches('`+e(ids[0])+` button[data-fold]')`)
 		b.press(kb.Enter)
 		b.until("the entry folded, the focus on its title",
 			`!document.querySelector('`+e(ids[0])+` details').open && document.activeElement.matches('`+e(ids[0])+` summary')`)
