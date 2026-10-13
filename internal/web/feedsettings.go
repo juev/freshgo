@@ -631,7 +631,7 @@ var errFormProblem = errors.New("web: the form cannot be stored as it is")
 // parsingKeys are the attributes of a feed that decide how it is fetched
 // and read.
 var parsingKeys = []string{
-	"xpath", "json_dotnotation", "xPathToJson", "curl_params", "ssl_verify", "timeout", "unicityCriteria",
+	"xpath", "json_dotnotation", "xPathToJson", "curl_params", attrInstallationProxy, "ssl_verify", "timeout", "unicityCriteria",
 	"unicityCriteriaForced", "hasBadGuids", "path_entries_auto", "path_entries_conditions", "path_entries_filter",
 	"content_action", "page_by_browser",
 }

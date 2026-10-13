@@ -438,6 +438,20 @@ func TestFeedSettings(t *testing.T) {
 			t.Errorf("after a change of the XPath: validators %q, %q, %d failures in a row, not before %d; want none",
 				got.HTTPETag, got.HTTPLastModified, got.Failures, got.NotBefore)
 		}
+		// The proxy of the installation is what a failing feed is given: it
+		// is tried at once, not after the wait its failures had earned.
+		failing = s.feed("alice", 4)
+		failing.Failures, failing.NotBefore, failing.HTTPETag = 5, 1<<40, `"etag"`
+		if err := s.db.UpdateFeed(context.Background(), failing); err != nil {
+			t.Fatal(err)
+		}
+		form.Set("proxy_type", "installation")
+		s.follow("/subscriptions/feeds/4", form)
+		if got := s.feed("alice", 4); got.HTTPETag != "" || got.Failures != 0 || got.NotBefore != 0 {
+			t.Errorf("after the proxy of the installation was chosen: validator %q, %d failures in a row, not before %d; want none",
+				got.HTTPETag, got.Failures, got.NotBefore)
+		}
+		form.Set("proxy_type", "")
 
 		// Every other setting.
 		form = s.feedForm(1)
