@@ -133,12 +133,23 @@ func (s *Service) Refresh(ctx context.Context, f *store.Feed) {
 	if custom(f) {
 		return
 	}
-	if err := s.refresh(ctx, source(f)); err != nil && ctx.Err() == nil {
+	if err := s.refresh(ctx, source(f), route(f)); err != nil && ctx.Err() == nil {
 		s.log.Warn("icon is not stored", "user_id", f.UserID, "feed", f.ID, "error", err)
 	}
 }
 
-func (s *Service) refresh(ctx context.Context, src string) error {
+// route is the way the requests for the icon of a feed take: the proxy the
+// feed goes through. Nothing else of the settings of the feed is taken: the
+// icon may be at another host, which is not to see the credentials, the
+// cookies or the headers the feed is requested with.
+func route(f *store.Feed) fetch.Params {
+	// Settings that cannot be read have failed the refresh of the feed
+	// before its icon is looked after.
+	p, _ := fetch.FeedParams("", f.Attributes)
+	return fetch.Params{Proxy: p.Proxy, Direct: p.Direct, Installation: p.Installation}
+}
+
+func (s *Service) refresh(ctx context.Context, src string, route fetch.Params) error {
 	salt, err := s.db.Salt(ctx)
 	if err != nil {
 		return err
@@ -155,7 +166,7 @@ func (s *Service) refresh(ctx context.Context, src string) error {
 	}
 	icon.Checked = now.Unix()
 	// A site that has stopped answering keeps the icon it had.
-	if content, contentType := s.find(ctx, src); content != nil && !bytes.Equal(content, icon.Content) {
+	if content, contentType := s.find(ctx, src, route); content != nil && !bytes.Equal(content, icon.Content) {
 		icon.Content, icon.ContentType, icon.Modified = content, contentType, now.Unix()
 	}
 	return s.db.PutIcon(ctx, icon)
@@ -164,8 +175,8 @@ func (s *Service) refresh(ctx context.Context, src string) error {
 // find returns the icon found starting at src and its media type, or nil.
 // src is taken as an image first, then as a page that names its icon, then
 // the same is tried at the root of the site, and last comes /favicon.ico.
-func (s *Service) find(ctx context.Context, src string) ([]byte, string) {
-	if content, contentType := s.fromPage(ctx, src); content != nil {
+func (s *Service) find(ctx context.Context, src string, route fetch.Params) ([]byte, string) {
+	if content, contentType := s.fromPage(ctx, src, route); content != nil {
 		return content, contentType
 	}
 	root := rootOf(src)
@@ -173,17 +184,17 @@ func (s *Service) find(ctx context.Context, src string) ([]byte, string) {
 		return nil, ""
 	}
 	if root != src {
-		if content, contentType := s.fromPage(ctx, root); content != nil {
+		if content, contentType := s.fromPage(ctx, root, route); content != nil {
 			return content, contentType
 		}
 	}
-	return s.image(ctx, root+"favicon.ico")
+	return s.image(ctx, root+"favicon.ico", route)
 }
 
 // fromPage fetches the address and returns it when it is an image, else the
 // first image among the icons the page links to.
-func (s *Service) fromPage(ctx context.Context, address string) ([]byte, string) {
-	resp, err := s.client.Fetch(ctx, fetch.Request{URL: address, Accept: fetch.AcceptHTML})
+func (s *Service) fromPage(ctx context.Context, address string, route fetch.Params) ([]byte, string) {
+	resp, err := s.client.Fetch(ctx, fetch.Request{URL: address, Accept: fetch.AcceptHTML, Params: route})
 	if err != nil {
 		return nil, ""
 	}
@@ -216,15 +227,15 @@ func (s *Service) fromPage(ctx context.Context, address string) ([]byte, string)
 		if err != nil {
 			return true
 		}
-		content, contentType = s.image(ctx, u.String())
+		content, contentType = s.image(ctx, u.String(), route)
 		return content == nil
 	})
 	return content, contentType
 }
 
 // image fetches the address and returns the body when it is an image.
-func (s *Service) image(ctx context.Context, address string) ([]byte, string) {
-	resp, err := s.client.Fetch(ctx, fetch.Request{URL: address, Accept: fetch.AcceptIcon})
+func (s *Service) image(ctx context.Context, address string, route fetch.Params) ([]byte, string) {
+	resp, err := s.client.Fetch(ctx, fetch.Request{URL: address, Accept: fetch.AcceptIcon, Params: route})
 	if err != nil {
 		return nil, ""
 	}

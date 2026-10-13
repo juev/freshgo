@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -289,6 +290,94 @@ func TestIconSearch(t *testing.T) {
 			})
 		})
 	}
+}
+
+// F37: the icon of a feed is requested through the proxy the feed goes
+// through, and with nothing else of the settings of the feed.
+func TestIconFollowsProxyOfFeed(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		// A proxy answers for sites that do not exist: nothing but it is
+		// connected to.
+		var mu sync.Mutex
+		asked := map[string]http.Header{}
+		proxy := func(name string) *httptest.Server {
+			p := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				asked[name+" "+r.URL.String()] = r.Header.Clone()
+				mu.Unlock()
+				_, _ = rw.Write(png)
+			}))
+			t.Cleanup(p.Close)
+			return p
+		}
+		own, installation := proxy("own"), proxy("installation")
+		installationURL, err := url.Parse(installation.URL)
+		if err != nil {
+			t.Fatal(err)
+		}
+		client, err := fetch.New(fetch.Options{
+			Allowlist: []string{"*"},
+			Proxy: func(context.Context) (fetch.InstallationProxy, error) {
+				return fetch.InstallationProxy{URL: installationURL, ChosenOnly: true}, nil
+			},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.service.client = client
+		icon := func(f *store.Feed) []byte {
+			t.Helper()
+			w.service.Refresh(ctx, f)
+			return body(t, w.get(f))
+		}
+
+		ownAddress := strings.TrimPrefix(own.URL, "http://")
+		f := w.feed(&store.Feed{
+			URL: "http://own.freshgo.test/feed.xml", HTTPAuth: "alice:secret",
+			Attributes: []byte(`{"curl_params":{"101":0,"10004":"` + ownAddress + `","10022":"session=1","10023":["X-Key: secret"]}}`),
+		})
+		if got := icon(f); !bytes.Equal(got, png) {
+			t.Errorf("a feed with a proxy of its own: icon %q, want the one its proxy answers with", got)
+		}
+		mu.Lock()
+		header, ok := asked["own http://own.freshgo.test/"]
+		mu.Unlock()
+		if !ok {
+			t.Fatalf("the proxy of the feed was not asked for the site: %v", asked)
+		}
+		for _, name := range []string{"Authorization", "Cookie", "X-Key"} {
+			if got := header.Get(name); got != "" {
+				t.Errorf("the request for the icon carries %s %q of the feed, want none", name, got)
+			}
+		}
+
+		f = w.feed(&store.Feed{URL: "http://chosen.freshgo.test/feed.xml", Attributes: []byte(`{"installation_proxy":true}`)})
+		if got := icon(f); !bytes.Equal(got, png) {
+			t.Errorf("a feed that chose the proxy of the installation: icon %q, want the one that proxy answers with", got)
+		}
+		mu.Lock()
+		_, ok = asked["installation http://chosen.freshgo.test/"]
+		mu.Unlock()
+		if !ok {
+			t.Errorf("the proxy of the installation was not asked for the site: %v", asked)
+		}
+
+		// A feed that chose nothing stays away from a proxy for chosen feeds.
+		s := newSite(t, map[string]string{"/favicon.ico": svg})
+		mu.Lock()
+		before := len(asked)
+		mu.Unlock()
+		f = w.feed(&store.Feed{URL: s.URL + "/feed.xml"})
+		if got := icon(f); string(got) != svg {
+			t.Errorf("a feed without a choice: icon %q, want the one of its site", got)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if len(asked) != before {
+			t.Errorf("a feed without a choice: a proxy was asked, %v", asked)
+		}
+	})
 }
 
 // R13: the icon a user chose is served as stored, and no site is asked.
