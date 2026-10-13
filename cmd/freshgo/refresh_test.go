@@ -68,7 +68,7 @@ func TestRefresh(t *testing.T) {
 
 	// The feed is on a loopback address, which is refused unless allowed.
 	code, stdout, stderr := runCLI(t, "refresh", "-database-url", database)
-	if code != 0 || stdout != "alice: 0 feeds refreshed, 1 failed, 0 new and 0 updated entries\n" {
+	if code != 0 || stdout != "alice: 0 feeds refreshed, 0 of them unchanged, 1 failed, 0 new and 0 updated entries\n" {
 		t.Errorf("refresh without the allowlist: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	if !strings.Contains(stderr, "address is not allowed") || hits.Load() != 0 {
@@ -76,17 +76,17 @@ func TestRefresh(t *testing.T) {
 	}
 
 	code, stdout, stderr = runCLI(t, "refresh", "-database-url", database, "-fetch-allowlist", host)
-	if code != 0 || stdout != "alice: 1 feeds refreshed, 0 failed, 2 new and 0 updated entries\n" {
+	if code != 0 || stdout != "alice: 1 feeds refreshed, 0 of them unchanged, 0 failed, 2 new and 0 updated entries\n" {
 		t.Errorf("refresh: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 
 	// Refreshed a moment ago: not due, unless forced.
 	code, stdout, _ = runCLI(t, "refresh", "-database-url", database, "-fetch-allowlist", host)
-	if code != 0 || stdout != "alice: 0 feeds refreshed, 0 failed, 0 new and 0 updated entries\n" || hits.Load() != 1 {
+	if code != 0 || stdout != "alice: 0 feeds refreshed, 0 of them unchanged, 0 failed, 0 new and 0 updated entries\n" || hits.Load() != 1 {
 		t.Errorf("second refresh: code %d, stdout %q, %d requests", code, stdout, hits.Load())
 	}
 	code, stdout, _ = runCLI(t, "refresh", "-database-url", database, "-fetch-allowlist", host, "-force")
-	if code != 0 || stdout != "alice: 1 feeds refreshed, 0 failed, 0 new and 0 updated entries\n" || hits.Load() != 2 {
+	if code != 0 || stdout != "alice: 1 feeds refreshed, 0 of them unchanged, 0 failed, 0 new and 0 updated entries\n" || hits.Load() != 2 {
 		t.Errorf("forced refresh: code %d, stdout %q, %d requests", code, stdout, hits.Load())
 	}
 
@@ -126,7 +126,7 @@ func TestRefreshThroughTheProxyOfTheInstallation(t *testing.T) {
 
 	// Neither the feed nor the proxy is on the allowlist.
 	code, stdout, stderr := runCLI(t, "refresh", "-database-url", database)
-	if code != 0 || stdout != "alice: 1 feeds refreshed, 0 failed, 2 new and 0 updated entries\n" {
+	if code != 0 || stdout != "alice: 1 feeds refreshed, 0 of them unchanged, 0 failed, 2 new and 0 updated entries\n" {
 		t.Errorf("refresh: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	if asked.Load() != 1 || hits.Load() != 0 {
