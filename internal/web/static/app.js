@@ -187,6 +187,10 @@
 		const focused = article.contains(document.activeElement) ? document.activeElement : null;
 		const form = focused && focused.closest('form.entry-action');
 		const action = form && form.getAttribute('action');
+		// The controls among the actions that belong to no form are told
+		// by what they are.
+		const kinds = ['.entry-actions > a.original', '.entry-actions > a.entry-page', 'details.share > summary', 'button[data-fold]'];
+		const kind = focused && kinds.find((selector) => focused.matches(selector));
 		article.classList.toggle('read', fresh.classList.contains('read'));
 		// The menu of sharing is among the actions that are replaced: it
 		// stays open if it was.
@@ -221,6 +225,8 @@
 			// The button that was pressed is gone; its successor takes the focus.
 			const button = article.querySelector(`form.entry-action[action="${CSS.escape(action)}"] button`);
 			(button || article).focus({ preventScroll: true });
+		} else if (kind) {
+			(article.querySelector(kind) || article).focus({ preventScroll: true });
 		} else if (focused && !article.contains(document.activeElement)) {
 			article.focus({ preventScroll: true });
 		}
