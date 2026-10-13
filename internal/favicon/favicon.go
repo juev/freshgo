@@ -31,13 +31,15 @@ import (
 const Path = "/favicon/"
 
 const (
-	// recheck is how long an icon is kept before its site is asked again.
-	recheck = 14 * 24 * time.Hour
+	// recheck is how long an icon is kept before its site is asked again,
+	// retry how long a site that had none is left alone.
+	recheck = 7 * 24 * time.Hour
+	retry   = 24 * time.Hour
 	// maxSize is the largest image accepted as an icon.
 	maxSize = 1 << 20
 	// Clients may keep an icon for iconMaxAge and the stand-in for a missing
 	// one for defaultMaxAge, in seconds.
-	iconMaxAge    = 14 * 24 * 3600
+	iconMaxAge    = 7 * 24 * 3600
 	defaultMaxAge = 1800
 )
 
@@ -137,8 +139,9 @@ func New(db *store.Store, client *fetch.Client, log *slog.Logger) *Service {
 	return &Service{db: db, client: client, log: log, now: time.Now}
 }
 
-// Refresh makes sure the icon of the feed is there and not older than two
-// weeks, asking the site when it is not. A failure is logged: the feed does
+// Refresh makes sure the icon of the feed is there and not older than a
+// week, asking the site when it is not; a site that had no icon is asked
+// again after a day. A failure is logged: the feed does
 // without an icon until the next attempt.
 func (s *Service) Refresh(ctx context.Context, f *store.Feed) {
 	if custom(f) {
@@ -173,7 +176,7 @@ func (s *Service) refresh(ctx context.Context, src string, route fetch.Params) e
 		icon = &store.Icon{Hash: hash, Source: src}
 	case err != nil:
 		return err
-	case now.Sub(time.Unix(icon.Checked, 0)) < recheck:
+	case now.Sub(time.Unix(icon.Checked, 0)) < wait(icon):
 		return nil
 	}
 	icon.Checked = now.Unix()
@@ -182,6 +185,14 @@ func (s *Service) refresh(ctx context.Context, src string, route fetch.Params) e
 		icon.Content, icon.ContentType, icon.Modified = content, contentType, now.Unix()
 	}
 	return s.db.PutIcon(ctx, icon)
+}
+
+// wait is how long the place of an icon is left alone after it was asked.
+func wait(icon *store.Icon) time.Duration {
+	if len(icon.Content) == 0 {
+		return retry
+	}
+	return recheck
 }
 
 // find returns the icon found starting at src and its media type, or nil.

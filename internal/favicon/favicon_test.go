@@ -167,7 +167,7 @@ func TestIconOfSite(t *testing.T) {
 		}
 		for name, want := range map[string]string{
 			"Content-Type":            "image/png",
-			"Cache-Control":           "max-age=1209600",
+			"Cache-Control":           "max-age=604800",
 			"X-Content-Type-Options":  "nosniff",
 			"Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; sandbox",
 			"Last-Modified":           "Tue, 06 Oct 2026 12:00:00 GMT",
@@ -189,7 +189,7 @@ func TestIconOfSite(t *testing.T) {
 	})
 }
 
-// The site is asked again only after two weeks, and an icon it had stays
+// The site is asked again only after a week, and an icon it had stays
 // when it stops answering.
 func TestIconIsKept(t *testing.T) {
 	eachEngine(t, func(t *testing.T, w *world) {
@@ -203,10 +203,10 @@ func TestIconIsKept(t *testing.T) {
 		if got := body(t, w.get(f)); !bytes.Equal(got, png) {
 			t.Fatalf("icon = %q, want /favicon.ico of the host", got)
 		}
-		w.clock = w.clock.Add(13 * 24 * time.Hour)
+		w.clock = w.clock.Add(6 * 24 * time.Hour)
 		w.service.Refresh(ctx, f)
 		if s.requests() != first {
-			t.Errorf("%d requests after 13 days, want none", s.requests()-first)
+			t.Errorf("%d requests after 6 days, want none", s.requests()-first)
 		}
 
 		// A new icon replaces the old one and is dated by the refresh.
@@ -215,21 +215,47 @@ func TestIconIsKept(t *testing.T) {
 		w.service.Refresh(ctx, f)
 		resp := w.get(f)
 		if got := body(t, resp); string(got) != svg || resp.Header.Get("Content-Type") != "image/svg+xml" ||
-			resp.Header.Get("Last-Modified") != "Wed, 21 Oct 2026 12:00:00 GMT" {
-			t.Errorf("after 15 days: body %q, headers %v; want the new icon dated by its refresh", got, resp.Header)
+			resp.Header.Get("Last-Modified") != "Wed, 14 Oct 2026 12:00:00 GMT" {
+			t.Errorf("after 8 days: body %q, headers %v; want the new icon dated by its refresh", got, resp.Header)
 		}
 
 		// The site is gone: the icon stays as it was.
-		w.clock = w.clock.Add(15 * 24 * time.Hour)
+		w.clock = w.clock.Add(8 * 24 * time.Hour)
 		s.set("/favicon.ico", "")
 		before := s.requests()
 		w.service.Refresh(ctx, f)
 		if s.requests() == before {
-			t.Error("the site was not asked after another 15 days")
+			t.Error("the site was not asked after another 8 days")
 		}
 		resp = w.get(f)
-		if got := body(t, resp); string(got) != svg || resp.Header.Get("Last-Modified") != "Wed, 21 Oct 2026 12:00:00 GMT" {
+		if got := body(t, resp); string(got) != svg || resp.Header.Get("Last-Modified") != "Wed, 14 Oct 2026 12:00:00 GMT" {
 			t.Errorf("after the site is gone: body %q, Last-Modified %q; want the icon it had", got, resp.Header.Get("Last-Modified"))
+		}
+	})
+}
+
+// A site that had no icon is asked again after a day, not after a week.
+func TestIconIsLookedForAgain(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		s := newSite(t, map[string]string{})
+		f := w.feed(&store.Feed{URL: s.URL + "/feed.xml"})
+
+		w.service.Refresh(ctx, f)
+		first := s.requests()
+		if got := body(t, w.get(f)); first == 0 || !bytes.Equal(got, defaultIcon) {
+			t.Fatalf("a site without an icon: %d requests, icon %q; want it asked and the built-in icon", first, got)
+		}
+		s.set("/favicon.ico", string(png))
+		w.clock = w.clock.Add(23 * time.Hour)
+		w.service.Refresh(ctx, f)
+		if s.requests() != first {
+			t.Errorf("%d requests after 23 hours, want none", s.requests()-first)
+		}
+		w.clock = w.clock.Add(2 * time.Hour)
+		w.service.Refresh(ctx, f)
+		if got := body(t, w.get(f)); !bytes.Equal(got, png) {
+			t.Errorf("after 25 hours: icon %q, want the one the site has by now", got)
 		}
 	})
 }
