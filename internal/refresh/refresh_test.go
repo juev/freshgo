@@ -996,6 +996,32 @@ func TestFreshUntil(t *testing.T) {
 			t.Errorf("%s: fresh until %d, want %d", name, got, c.want)
 		}
 	}
+	// What a cache on the way has held the answer for is spent of max-age,
+	// and of max-age alone: Expires is a moment already.
+	for name, c := range map[string]struct {
+		control, age, expires string
+		want                  int64
+	}{
+		"held for a part of max-age":      {"max-age=3600", "600", "", now + 3000},
+		"held for longer than max-age":    {"public, max-age=86400, must-revalidate", "185640", "", 0},
+		"held for all of max-age":         {"max-age=600", "600", "", 0},
+		"a long max-age held for a while": {"max-age=31536000", "86400", "", now + 86400},
+		"an age that is not a number":     {"max-age=3600", "long", "", now + 3600},
+		"an age below zero":               {"max-age=3600", "-600", "", now + 3600},
+		"an age beside Expires":           {"", "3600", date(7200), now + 7200},
+	} {
+		h := http.Header{}
+		if c.control != "" {
+			h.Set("Cache-Control", c.control)
+		}
+		h.Set("Age", c.age)
+		if c.expires != "" {
+			h.Set("Expires", c.expires)
+		}
+		if got := freshUntil(h, now); got != c.want {
+			t.Errorf("%s: fresh until %d, want %d", name, got, c.want)
+		}
+	}
 }
 
 func TestRetryWait(t *testing.T) {
