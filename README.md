@@ -356,6 +356,8 @@ An administrator sets one proxy for all feeds on the page "System" of the admini
 
 When only a few feeds need the proxy, mark it on the same page as being for the feeds that choose it. Everything is then fetched directly, except the feeds whose settings say "That of the installation" under "Proxy": the address is typed once, for the installation, and not for every feed. A feed that chose the proxy fails with a message about it when the installation has none; it is not fetched directly instead.
 
+Whether a feed needs the proxy can be found out in its settings: "Check that the feed answers" requests it without a proxy and through every proxy there is, and shows what each came to. A site that refuses the address of the server answers through the proxy and not directly; a feed that is gone answers by neither.
+
 The proxy of the environment (`HTTP_PROXY`) is not used.
 
 ### WebSub

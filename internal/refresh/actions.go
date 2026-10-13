@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/fulltext"
@@ -214,6 +215,58 @@ func (r *Refresher) PreviewArticle(ctx context.Context, u *store.User, feedID in
 		URL: entries[0].Link, Params: params, Selector: selector, Automatic: automatic, Filter: filter, ForceHTTPS: https.URL,
 		Read: r.reader(browser),
 	})
+}
+
+// The ways CheckFeed requests a feed by.
+const (
+	// WayDirect is without any proxy.
+	WayDirect = "direct"
+	// WayInstallation is through the proxy of the installation.
+	WayInstallation = "installation"
+	// WayOwn is through the proxy of the feed's own.
+	WayOwn = "own"
+)
+
+// FeedCheck is what requesting a feed by one way came to.
+type FeedCheck struct {
+	Way string
+	// Err is nil when the server answered with the document.
+	Err error
+}
+
+// CheckFeed requests the feed once by every way there is: without a proxy,
+// through the proxy of the installation when it has one, and through the
+// proxy of the feed when it has one. It tells a site that refuses the
+// address of the server from a feed that is gone. f is the feed as its form
+// has it and need not be stored; nothing is stored, and what the document
+// holds is not read. The error is for settings no request can be made by.
+func (r *Refresher) CheckFeed(ctx context.Context, f *store.Feed) ([]FeedCheck, error) {
+	params, err := fetch.FeedParams(f.HTTPAuth, f.Attributes)
+	if err != nil {
+		return nil, err
+	}
+	direct, installation := params, params
+	direct.Proxy, direct.Direct, direct.Installation = nil, true, false
+	installation.Proxy, installation.Direct, installation.Installation = nil, false, true
+	checks := []FeedCheck{{Way: WayDirect}, {Way: WayInstallation}}
+	ways := []fetch.Params{direct, installation}
+	if params.Proxy != nil {
+		checks, ways = append(checks, FeedCheck{Way: WayOwn}), append(ways, params)
+	}
+	var wg sync.WaitGroup
+	for i, p := range ways {
+		wg.Go(func() {
+			_, checks[i].Err = r.client.Fetch(ctx, fetch.Request{
+				URL: strings.TrimSuffix(f.URL, forceFeedSuffix), Accept: accept(f.Kind), Params: p,
+			})
+		})
+	}
+	wg.Wait()
+	// An installation without a proxy has no such way.
+	if errors.Is(checks[1].Err, fetch.ErrNoInstallationProxy) {
+		checks = append(checks[:1], checks[2:]...)
+	}
+	return checks, ctx.Err()
 }
 
 // RefreshOPML brings the feeds of a category in step with the OPML document

@@ -4,6 +4,15 @@
 {{if .Data.Failing}}<p class="alert">{{.T "feed.failing" .Data.Failing}}</p>{{end}}
 {{if .Data.Problem}}<p class="alert" role="alert" id="form-problem">{{.Data.Problem}}</p>{{end}}
 {{if .Data.PreviewNote}}<p class="alert" role="alert" tabindex="-1" autofocus>{{.Data.PreviewNote}}</p>{{end}}
+{{if .Data.Checks}}
+<section class="preview" aria-labelledby="check-heading" tabindex="-1" autofocus>
+<h2 id="check-heading">{{.T "feed.check.heading"}}</h2>
+<ul>
+{{range .Data.Checks}}<li>{{.Way}}: {{.Result}}</li>
+{{end}}</ul>
+{{if .Data.CheckHint}}<p>{{.Data.CheckHint}}</p>{{end}}
+</section>
+{{end}}
 {{if .Data.Preview}}
 <section class="preview" aria-labelledby="preview-heading" tabindex="-1" autofocus>
 <h2 id="preview-heading">{{.T "feed.preview.heading"}}</h2>
@@ -182,6 +191,8 @@
 <label for="proxy">{{.T "feed.proxy.address"}}</label>
 <input type="text" id="proxy" name="proxy" value="{{.Data.Proxy}}" autocapitalize="off" spellcheck="false">
 </p>
+<p><button type="submit" formaction="{{.URL "/subscriptions/feeds"}}/{{.Data.Feed.ID}}/check" aria-describedby="check-hint">{{.T "feed.check"}}</button>
+<span class="hint" id="check-hint">{{.T "feed.check.hint"}}</span></p>
 <p>
 <label for="user_agent">{{.T "feed.user-agent"}}</label>
 <input type="text" id="user_agent" name="user_agent" value="{{.Data.UserAgent}}" autocapitalize="off" spellcheck="false">

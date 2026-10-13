@@ -211,6 +211,7 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("GET /subscriptions/feeds/{id}", h.protect(members, h.feedPage))
 	h.mux.HandleFunc("POST /subscriptions/feeds/{id}", h.protect(members, h.saveFeed))
 	h.mux.HandleFunc("POST /subscriptions/feeds/{id}/preview", h.protect(members, h.previewFeed))
+	h.mux.HandleFunc("POST /subscriptions/feeds/{id}/check", h.protect(members, h.checkFeed))
 	h.mux.HandleFunc("POST /subscriptions/feeds/{id}/refresh", h.protect(members, h.feedAction(h.refreshFeed)))
 	h.mux.HandleFunc("POST /subscriptions/feeds/{id}/reload", h.protect(members, h.feedAction(h.reloadFeed)))
 	h.mux.HandleFunc("POST /subscriptions/feeds/{id}/truncate", h.protect(members, h.feedAction(h.truncateFeed)))
