@@ -223,12 +223,16 @@ func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options, hubs map
 	if err != nil {
 		return st, err
 	}
+	limit := DefaultMaxPeriod
+	if v, ok := get[int](readAttributes(j.user.Settings), "ttl_default"); ok && v > 0 {
+		limit = v
+	}
 	for _, f := range feeds {
 		if f.TTL >= 0 && f.WebSubTopic != "" && f.WebSubHub != "" {
 			hubs[f.WebSubTopic] = f.WebSubHub
 		}
 		f, ok := r.hooks.FeedBeforeActualize.Call(ctx, f)
-		if !ok || !due(f, published[f.ID], now, o.Force, j.pushing[f.WebSubTopic]) {
+		if !ok || !due(f, published[f.ID], now, limit, o.Force, j.pushing[f.WebSubTopic]) {
 			continue
 		}
 		select {
@@ -269,28 +273,32 @@ func lastAttempt(f *store.Feed) int64 {
 const pushedPeriod = 24 * 3600
 
 // A feed without a period of its own is asked as often as it has published
-// entries within frequencyWindow, and once in maxPeriod at least.
+// entries within frequencyWindow, and at least once in the period the user
+// has set for such feeds (ttl_default of FreshRSS), DefaultMaxPeriod without
+// one.
 const (
 	frequencyWindow = 7 * 24 * 3600
-	maxPeriod       = 24 * 3600
+	// DefaultMaxPeriod is that period, in seconds, of a user who has set none.
+	DefaultMaxPeriod = 3600
 )
 
 // period is the refresh period at the time now, in seconds, of a feed that
-// is not muted; published is what it has published within frequencyWindow.
+// is not muted; published is what it has published within frequencyWindow
+// and limit the longest a feed without a period of its own is left alone.
 //
 // The entries are taken to speak for the time since the oldest of them, not
 // for the whole window: a feed subscribed an hour ago has no more than its
 // document listed, and a feed that was silent and comes to life is not as
 // slow as its silence. The time runs on while nothing comes, so the period
 // of a feed that falls silent grows by itself.
-func period(f *store.Feed, published store.Published, now int64) int {
+func period(f *store.Feed, published store.Published, now int64, limit int) int {
 	if f.TTL > 0 {
 		return f.TTL
 	}
 	if published.Entries == 0 {
-		return maxPeriod
+		return limit
 	}
-	return int(min(maxPeriod, max(0, now-published.Oldest)/int64(published.Entries)))
+	return int(min(int64(limit), max(0, now-published.Oldest)/int64(published.Entries)))
 }
 
 // A feed that has failed twice in a row waits retryStep before it is tried
@@ -311,9 +319,10 @@ func retryWait(failures int) int64 {
 }
 
 // due reports whether the feed is to be refreshed at the time now. published
-// is what it has published within frequencyWindow; pushed says a WebSub hub
+// is what it has published within frequencyWindow, limit the longest a feed
+// without a period of its own is left alone; pushed says a WebSub hub
 // delivers its entries.
-func due(f *store.Feed, published store.Published, now int64, force, pushed bool) bool {
+func due(f *store.Feed, published store.Published, now int64, limit int, force, pushed bool) bool {
 	if f.TTL < 0 {
 		return false
 	}
@@ -323,7 +332,7 @@ func due(f *store.Feed, published store.Published, now int64, force, pushed bool
 	if now < f.NotBefore || now < f.Error+retryWait(f.Failures) {
 		return false
 	}
-	ttl := period(f, published, now)
+	ttl := period(f, published, now, limit)
 	if pushed {
 		ttl = max(ttl, pushedPeriod)
 	}

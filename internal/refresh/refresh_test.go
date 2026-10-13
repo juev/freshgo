@@ -559,9 +559,10 @@ func TestWhichFeedsAreRefreshed(t *testing.T) {
 			w.insert(u, entries...)
 		}
 		w.feed(u, "/never", func(f *store.Feed) { f.Name = "never" })
-		// A feed that has published nothing lately is asked once a day.
-		w.feed(u, "/quiet-fresh", func(f *store.Feed) { f.Name, f.LastUpdate = "quiet-fresh", now-86400 })
-		quiet := w.feed(u, "/quiet-stale", func(f *store.Feed) { f.Name, f.LastUpdate = "quiet-stale", now-86401 })
+		// A feed that has published nothing lately is asked once an hour by
+		// a user who has set no other period.
+		w.feed(u, "/quiet-fresh", func(f *store.Feed) { f.Name, f.LastUpdate = "quiet-fresh", now-3600 })
+		quiet := w.feed(u, "/quiet-stale", func(f *store.Feed) { f.Name, f.LastUpdate = "quiet-stale", now-3601 })
 		// What it published before the last week does not count, nor do
 		// entries dated ahead.
 		w.insert(u, &store.Entry{UserID: u.ID, FeedID: quiet.ID, GUID: "old", Published: now - 8*86400})
@@ -597,7 +598,7 @@ func TestWhichFeedsAreRefreshed(t *testing.T) {
 			}
 		}
 		// Longest without an attempt first.
-		if want := []string{"never", "muted", "quiet-stale", "quiet-fresh", "own-ttl-stale", "own-ttl-fresh", "stale", "fresh", "lately", "failed"}; !reflect.DeepEqual(order, want) {
+		if want := []string{"never", "muted", "own-ttl-stale", "own-ttl-fresh", "quiet-stale", "quiet-fresh", "stale", "fresh", "lately", "failed"}; !reflect.DeepEqual(order, want) {
 			t.Errorf("feeds were offered as %q, want %q", order, want)
 		}
 		if !reflect.DeepEqual(maintained, []string{"alice"}) {
@@ -620,25 +621,54 @@ func TestPeriodOfAFeed(t *testing.T) {
 	for name, c := range map[string]struct {
 		ttl, entries int
 		oldest       int64 // how long ago, in seconds
-		want         int
+		limit, want  int
 	}{
-		"nothing in the window":                     {0, 0, 0, 86400},
-		"an entry an hour for a week":               {0, 168, 168 * hour, hour},
-		"subscribed just now, a busy feed":          {0, 20, 18 * minute, 54},
-		"subscribed just now, an entry an hour":     {0, 25, 28 * hour, 4032},
-		"three entries a day ago, silence since":    {0, 3, 24 * hour, 8 * hour},
-		"one entry a minute ago":                    {0, 1, minute, minute},
-		"one entry six days ago":                    {0, 1, 6 * 24 * hour, 86400},
-		"entries of this very second":               {0, 20, 0, 0},
-		"a period of its own, nothing published":    {7200, 0, 0, 7200},
-		"a period of its own, a busy feed":          {7200, 2000, hour, 7200},
-		"a period of its own longer than the limit": {172800, 168, 168 * hour, 172800},
+		"nothing in the window":                     {0, 0, 0, hour, hour},
+		"nothing in the window, a limit of a day":   {0, 0, 0, 24 * hour, 24 * hour},
+		"an entry every two hours for a week":       {0, 84, 168 * hour, hour, hour},
+		"the same, a limit of four hours":           {0, 84, 168 * hour, 4 * hour, 2 * hour},
+		"subscribed just now, a busy feed":          {0, 20, 18 * minute, hour, 54},
+		"subscribed just now, two entries an hour":  {0, 25, 14 * hour, hour, 2016},
+		"three entries a day ago, silence since":    {0, 3, 24 * hour, 12 * hour, 8 * hour},
+		"one entry a minute ago":                    {0, 1, minute, hour, minute},
+		"one entry six days ago":                    {0, 1, 6 * 24 * hour, 24 * hour, 24 * hour},
+		"entries of this very second":               {0, 20, 0, hour, 0},
+		"a period of its own, nothing published":    {7200, 0, 0, hour, 7200},
+		"a period of its own, a busy feed":          {7200, 2000, hour, hour, 7200},
+		"a period of its own longer than the limit": {172800, 168, 168 * hour, hour, 172800},
 	} {
 		published := store.Published{Entries: c.entries, Oldest: now - c.oldest}
-		if got := period(&store.Feed{TTL: c.ttl}, published, now); got != c.want {
+		if got := period(&store.Feed{TTL: c.ttl}, published, now, c.limit); got != c.want {
 			t.Errorf("%s: period %d s, want %d", name, got, c.want)
 		}
 	}
+}
+
+// The longest a feed without a period of its own is left alone is what its
+// user has set, and an hour for a user who has set nothing usable.
+func TestPeriodLimitOfTheUser(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		now := start.Unix()
+		for _, path := range []string{"/four-fresh", "/four-stale", "/none-fresh", "/none-stale", "/bad-fresh", "/bad-stale"} {
+			w.serveBody(path, rssType, rss("Blog", item{guid: "a", title: "A", body: "x"}))
+		}
+		four := w.user("alice", `{"ttl_default":14400}`)
+		w.feed(four, "/four-fresh", func(f *store.Feed) { f.LastUpdate = now - 14400 })
+		w.feed(four, "/four-stale", func(f *store.Feed) { f.LastUpdate = now - 14401 })
+		none := w.user("bob", `{}`)
+		w.feed(none, "/none-fresh", func(f *store.Feed) { f.LastUpdate = now - 3600 })
+		w.feed(none, "/none-stale", func(f *store.Feed) { f.LastUpdate = now - 3601 })
+		bad := w.user("carol", `{"ttl_default":"often"}`)
+		w.feed(bad, "/bad-fresh", func(f *store.Feed) { f.LastUpdate = now - 3600 })
+		w.feed(bad, "/bad-stale", func(f *store.Feed) { f.LastUpdate = now - 3601 })
+
+		w.run(Options{})
+		for path, want := range map[string]int{"/four-fresh": 0, "/four-stale": 1, "/none-fresh": 0, "/none-stale": 1, "/bad-fresh": 0, "/bad-stale": 1} {
+			if got := w.hitCount(path); got != want {
+				t.Errorf("%s was requested %d times, want %d", path, got, want)
+			}
+		}
+	})
 }
 
 func TestUnchangedFeed(t *testing.T) {

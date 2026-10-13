@@ -412,8 +412,12 @@ func succeeded(fresh, fetched *store.Feed, resp *fetch.Response, now int64) {
 	}
 }
 
+// maxServerWait is the longest a server is believed when it says how long
+// to stay away, in seconds.
+const maxServerWait = 24 * 3600
+
 // freshUntil is the time up to which an answer received at now calls itself
-// fresh, by max-age of Cache-Control or else by Expires, maxPeriod from now at
+// fresh, by max-age of Cache-Control or else by Expires, maxServerWait from now at
 // most. It is zero for an answer that says nothing of it, or says that it is
 // not to be kept.
 func freshUntil(h http.Header, now int64) int64 {
@@ -433,9 +437,9 @@ func freshUntil(h http.Header, now int64) int64 {
 	}
 	until := int64(0)
 	if age >= 0 {
-		until = now + min(age, maxPeriod)
+		until = now + min(age, maxServerWait)
 	} else if expires, err := http.ParseTime(h.Get("Expires")); err == nil {
-		until = min(expires.Unix(), now+maxPeriod)
+		until = min(expires.Unix(), now+maxServerWait)
 	}
 	if until <= now {
 		return 0
@@ -444,7 +448,7 @@ func freshUntil(h http.Header, now int64) int64 {
 }
 
 // retryAt is the time before which the server asked not to be requested
-// again when a fetch at now failed with cause, maxPeriod from now at most;
+// again when a fetch at now failed with cause, maxServerWait from now at most;
 // zero when it asked nothing.
 func retryAt(cause error, now int64) int64 {
 	var (
@@ -461,7 +465,7 @@ func retryAt(cause error, now int64) int64 {
 	if wait <= 0 {
 		return 0
 	}
-	return now + min(int64(wait/time.Second), maxPeriod)
+	return now + min(int64(wait/time.Second), maxServerWait)
 }
 
 // fail marks the feed as failing and returns the cause. A feed that is gone
