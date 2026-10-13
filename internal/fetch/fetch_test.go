@@ -791,14 +791,19 @@ func TestInstallationProxy(t *testing.T) {
 	ownURL, _ := url.Parse(own.URL)
 
 	set := proxy.URL
-	var failure error
-	// Neither proxy is on the allowlist: only that of the feed is refused.
-	c := newClient(t, Options{Proxy: func(context.Context) (*url.URL, error) {
+	var (
+		failure    error
+		chosenOnly bool
+	)
+	installation := func(context.Context) (InstallationProxy, error) {
 		if failure != nil {
-			return nil, failure
+			return InstallationProxy{}, failure
 		}
-		return ParseProxy(set)
-	}}, direct)
+		address, err := ParseProxy(set)
+		return InstallationProxy{URL: address, ChosenOnly: chosenOnly}, err
+	}
+	// Neither proxy is on the allowlist: only that of the feed is refused.
+	c := newClient(t, Options{Proxy: installation}, direct)
 	body := func(req Request) string {
 		t.Helper()
 		res, err := c.Fetch(context.Background(), req)
@@ -818,15 +823,48 @@ func TestInstallationProxy(t *testing.T) {
 	if _, err := c.Fetch(context.Background(), Request{URL: target, Params: Params{Proxy: ownURL}}); !errors.Is(err, ErrForbiddenAddress) {
 		t.Errorf("a proxy of the feed on an internal address: %v, want ErrForbiddenAddress", err)
 	}
-	allowed := newClient(t, Options{Proxy: func(context.Context) (*url.URL, error) { return ParseProxy(set) }}, own)
+	allowed := newClient(t, Options{Proxy: installation}, own)
 	if res, err := allowed.Fetch(context.Background(), Request{URL: target, Params: Params{Proxy: ownURL}}); err != nil || string(res.Body) != "via its own" {
 		t.Errorf("a request with a proxy of its own: %v, %v", res, err)
 	}
+	// A request that chose the proxy goes through it, as every other does.
+	if got := body(Request{URL: target, Params: Params{Installation: true}}); got != "via the installation" {
+		t.Errorf("a request that chose the proxy of the installation: %q", got)
+	}
+
+	// A proxy for chosen requests only: the others go directly, their own
+	// proxy and "direct" are what they were.
+	chosenOnly = true
+	if got := body(Request{URL: direct.URL}); got != "direct" {
+		t.Errorf("a request without a choice, the proxy being for chosen ones: %q", got)
+	}
+	if got := body(Request{URL: target, Params: Params{Installation: true}}); got != "via the installation" {
+		t.Errorf("a request that chose the proxy, the proxy being for chosen ones: %q", got)
+	}
+	if got := body(Request{URL: direct.URL, Params: Params{Direct: true}}); got != "direct" {
+		t.Errorf("a request set to go direct, the proxy being for chosen ones: %q", got)
+	}
+	if res, err := allowed.Fetch(context.Background(), Request{URL: target, Params: Params{Proxy: ownURL}}); err != nil || string(res.Body) != "via its own" {
+		t.Errorf("a request with a proxy of its own, the proxy being for chosen ones: %v, %v", res, err)
+	}
+	chosenOnly = false
 
 	// The setting is read anew for every request.
 	set = ""
 	if got := body(Request{URL: direct.URL}); got != "direct" {
 		t.Errorf("after the proxy was taken away: %q", got)
+	}
+	// A request that chose the proxy does not go directly when there is
+	// none, whomever it would be for, nor in a client that is told of none.
+	for _, only := range []bool{false, true} {
+		chosenOnly = only
+		if _, err := c.Fetch(context.Background(), Request{URL: direct.URL, Params: Params{Installation: true}}); !errors.Is(err, ErrNoInstallationProxy) {
+			t.Errorf("a request that chose a proxy there is not (for chosen only: %v): %v, want ErrNoInstallationProxy", only, err)
+		}
+	}
+	chosenOnly = false
+	if _, err := newClient(t, Options{}, direct).Fetch(context.Background(), Request{URL: direct.URL, Params: Params{Installation: true}}); !errors.Is(err, ErrNoInstallationProxy) {
+		t.Errorf("a request that chose a proxy in a client without one: %v, want ErrNoInstallationProxy", err)
 	}
 	failure = errors.New("no database")
 	if _, err := c.Fetch(context.Background(), Request{URL: direct.URL}); !errors.Is(err, failure) {

@@ -68,6 +68,9 @@ type System struct {
 	// they have their own or are set to go through none: a URL with the
 	// scheme http, https, socks5 or socks5h. Empty for none.
 	Proxy string `json:"proxy"`
+	// ProxyChosenOnly keeps the proxy to the feeds that have chosen it;
+	// otherwise everything without a proxy of its own goes through it.
+	ProxyChosenOnly bool `json:"proxy_chosen_only"`
 }
 
 // OIDC is the client the installation is at an OpenID Connect provider.

@@ -56,6 +56,13 @@ func TestFeedParams(t *testing.T) {
 		{"post without a body", "", `{"curl_params":{"47":1}}`, Params{Post: true}},
 		{"post switched off keeps no body", "", `{"curl_params":{"47":false,"10015":"a=1"}}`, Params{}},
 
+		{"the proxy of the installation", "", `{"installation_proxy":true}`, Params{Installation: true}},
+		{"the proxy of the installation not chosen", "", `{"installation_proxy":false}`, Params{}},
+		{"the proxy of the installation beside one of its own", "", `{"installation_proxy":true,"curl_params":{"101":5,"10004":"127.0.0.1:1080","10018":"Agent"}}`,
+			Params{Installation: true, UserAgent: "Agent"}},
+		{"the proxy of the installation beside none", "", `{"installation_proxy":true,"curl_params":{"101":-1}}`, Params{Installation: true}},
+		{"the proxy of the installation beside empty curl_params", "", `{"installation_proxy":true,"curl_params":[]}`, Params{Installation: true}},
+
 		{"redirect limit", "", `{"curl_params":{"68":7,"52":true}}`, Params{MaxRedirects: 7}},
 		{"unlimited redirects", "", `{"curl_params":{"68":-1,"52":true}}`, Params{MaxRedirects: -1}},
 		{"no redirects by limit", "", `{"curl_params":{"68":0}}`, Params{NoRedirects: true}},
