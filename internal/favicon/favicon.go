@@ -70,7 +70,18 @@ func HashOf(salt string, f *store.Feed) string {
 	if custom(f) {
 		return CustomHash(salt, f.UserID, f.ID)
 	}
-	return Hash(salt, source(f))
+	return siteHash(salt, source(f), route(f))
+}
+
+// siteHash is what the icon looked for at src by the given way is served by.
+// What came through a proxy of a feed's own is kept apart: the proxy is the
+// choice of one user, and what it answers with is not for the feeds of the
+// others that look at the same place.
+func siteHash(salt, src string, route fetch.Params) string {
+	if route.Proxy != nil {
+		return digest(salt, "site\x00"+src+"\x00"+route.Proxy.String())
+	}
+	return Hash(salt, src)
 }
 
 type iconAttributes struct {
@@ -155,10 +166,11 @@ func (s *Service) refresh(ctx context.Context, src string, route fetch.Params) e
 		return err
 	}
 	now := s.now()
-	icon, err := s.db.Icon(ctx, Hash(salt, src))
+	hash := siteHash(salt, src, route)
+	icon, err := s.db.Icon(ctx, hash)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		icon = &store.Icon{Hash: Hash(salt, src), Source: src}
+		icon = &store.Icon{Hash: hash, Source: src}
 	case err != nil:
 		return err
 	case now.Sub(time.Unix(icon.Checked, 0)) < recheck:
