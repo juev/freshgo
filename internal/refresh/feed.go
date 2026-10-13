@@ -418,8 +418,9 @@ const maxServerWait = 24 * 3600
 
 // freshUntil is the time up to which an answer received at now calls itself
 // fresh, by max-age of Cache-Control or else by Expires, maxServerWait from now at
-// most. It is zero for an answer that says nothing of it, or says that it is
-// not to be kept.
+// most. Of max-age the time a cache on the way has held the answer already
+// (Age) is spent. It is zero for an answer that says nothing of it, or says
+// that it is not to be kept.
 func freshUntil(h http.Header, now int64) int64 {
 	age := int64(-1)
 	for _, value := range h.Values("Cache-Control") {
@@ -437,6 +438,9 @@ func freshUntil(h http.Header, now int64) int64 {
 	}
 	until := int64(0)
 	if age >= 0 {
+		if held, err := strconv.ParseInt(strings.TrimSpace(h.Get("Age")), 10, 64); err == nil && held > 0 {
+			age = max(0, age-held)
+		}
 		until = now + min(age, maxServerWait)
 	} else if expires, err := http.ParseTime(h.Get("Expires")); err == nil {
 		until = min(expires.Unix(), now+maxServerWait)
