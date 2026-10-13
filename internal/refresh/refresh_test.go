@@ -934,7 +934,7 @@ func TestServerSaysWhenToComeBack(t *testing.T) {
 		for name, c := range map[string]struct {
 			feed *store.Feed
 			want int64
-		}{"max-age of six hours": {sixHours, t0 + 21600}, "max-age of a minute": {minute, t0 + 60}, "max-age of a week": {week, t0 + 86400},
+		}{"max-age of six hours": {sixHours, t0 + 3600}, "max-age of a minute": {minute, t0 + 60}, "max-age of a week": {week, t0 + 3600},
 			"Retry-After of two hours": {busy, t0 + 7200}} {
 			if got := w.storedFeed(c.feed).NotBefore; got != c.want {
 				t.Errorf("%s: not before %d, want %d", name, got, c.want)
@@ -950,10 +950,12 @@ func TestServerSaysWhenToComeBack(t *testing.T) {
 			step time.Duration
 			want [4]int
 		}{
-			{time.Hour + time.Minute, [4]int{1, 2, 1, 1}},
-			{time.Hour, [4]int{1, 2, 1, 2}},      // 2:01, the pause of two hours is over
-			{4 * time.Hour, [4]int{2, 3, 1, 3}},  // 6:01
-			{18 * time.Hour, [4]int{3, 4, 2, 4}}, // 24:01
+			// The period of an hour the feeds were given is the last word:
+			// a max-age beyond it holds none of them back.
+			{time.Hour + time.Minute, [4]int{2, 2, 2, 1}},
+			{time.Hour, [4]int{2, 2, 2, 2}},      // 2:01, the pause of two hours is over
+			{4 * time.Hour, [4]int{3, 3, 3, 3}},  // 6:01
+			{18 * time.Hour, [4]int{4, 4, 4, 4}}, // 24:01
 		} {
 			w.clock = w.clock.Add(c.step)
 			w.runOne()
@@ -964,8 +966,52 @@ func TestServerSaysWhenToComeBack(t *testing.T) {
 
 		// A forced run asks whatever the server said.
 		w.run(Options{Force: true})
-		if got, want := hits(), [4]int{4, 5, 3, 5}; got != want {
+		if got, want := hits(), [4]int{5, 5, 5, 5}; got != want {
 			t.Errorf("after a forced run: requests %v, want %v", got, want)
+		}
+	})
+}
+
+// F12: a feed without a period of its own is put off by its server no
+// further than the period of its user.
+func TestServerWaitWithinPeriodOfUser(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		u := w.user("alice", `{"ttl_default":7200}`)
+		// Two entries dated by the first refresh: the feed is due after five
+		// minutes as far as its entries go.
+		body := rss("Blog", item{guid: "a", title: "A", body: "x"}, item{guid: "b", title: "B", body: "y"})
+		cached := func(control string) http.HandlerFunc {
+			return func(rw http.ResponseWriter, _ *http.Request) {
+				rw.Header().Set("Cache-Control", control)
+				rw.Header().Set("Content-Type", rssType)
+				_, _ = rw.Write([]byte(body))
+			}
+		}
+		w.serve("/half-hour", cached("max-age=1800"))
+		w.serve("/month", cached("public, max-age=2592000"))
+		halfHour, month := w.feed(u, "/half-hour", nil), w.feed(u, "/month", nil)
+		w.runOne()
+		t0 := start.Unix()
+		if got := w.storedFeed(halfHour).NotBefore; got != t0+1800 {
+			t.Errorf("max-age of half an hour: not before %d, want %d", got, t0+1800)
+		}
+		if got := w.storedFeed(month).NotBefore; got != t0+7200 {
+			t.Errorf("max-age of a month: not before %d, want the period of the user, %d", got, t0+7200)
+		}
+		for _, c := range []struct {
+			step time.Duration
+			want [2]int
+		}{
+			{20 * time.Minute, [2]int{1, 1}}, // 0:20, both servers still hold
+			{11 * time.Minute, [2]int{2, 1}}, // 0:31
+			{88 * time.Minute, [2]int{3, 1}}, // 1:59
+			{2 * time.Minute, [2]int{3, 2}},  // 2:01, the period of the user is over
+		} {
+			w.clock = w.clock.Add(c.step)
+			w.runOne()
+			if got := [2]int{w.hitCount("/half-hour"), w.hitCount("/month")}; got != c.want {
+				t.Errorf("%s after the first run: requests %v, want %v", w.clock.Sub(start), got, c.want)
+			}
 		}
 	})
 }
@@ -1001,7 +1047,7 @@ func TestFreshUntil(t *testing.T) {
 		if c.expires != "" {
 			h.Set("Expires", c.expires)
 		}
-		if got := freshUntil(h, now); got != c.want {
+		if got := freshUntil(h, now, 86400); got != c.want {
 			t.Errorf("%s: fresh until %d, want %d", name, got, c.want)
 		}
 	}
@@ -1027,7 +1073,7 @@ func TestFreshUntil(t *testing.T) {
 		if c.expires != "" {
 			h.Set("Expires", c.expires)
 		}
-		if got := freshUntil(h, now); got != c.want {
+		if got := freshUntil(h, now, 86400); got != c.want {
 			t.Errorf("%s: fresh until %d, want %d", name, got, c.want)
 		}
 	}
