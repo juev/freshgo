@@ -57,10 +57,7 @@ func subscribed(t *testing.T) (database, host string, hits *atomic.Int32) {
 	if err := db.CreateUser(ctx, u); err != nil {
 		t.Fatal(err)
 	}
-	// A period of its own: the items have no dates, so the entries are of
-	// the second of the refresh, and by them alone the feed would be due as
-	// soon as the clock shows another second.
-	if err := db.CreateFeed(ctx, &store.Feed{UserID: u.ID, URL: server.URL + "/feed", Name: "Blog", TTL: 3600}); err != nil {
+	if err := db.CreateFeed(ctx, &store.Feed{UserID: u.ID, URL: server.URL + "/feed", Name: "Blog"}); err != nil {
 		t.Fatal(err)
 	}
 	return "sqlite://" + path, strings.TrimPrefix(server.URL, "http://"), hits
@@ -83,7 +80,9 @@ func TestRefresh(t *testing.T) {
 		t.Errorf("refresh: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 
-	// Refreshed a moment ago: not due, unless forced.
+	// Refreshed a moment ago: not due, unless forced. Its entries have no
+	// dates and are of the second of the refresh; a feed is not asked twice
+	// within five minutes however fresh its entries are.
 	code, stdout, _ = runCLI(t, "refresh", "-database-url", database, "-fetch-allowlist", host)
 	if code != 0 || stdout != "alice: 0 feeds refreshed, 0 of them unchanged, 0 failed, 0 new and 0 updated entries\n" || hits.Load() != 1 {
 		t.Errorf("second refresh: code %d, stdout %q, %d requests", code, stdout, hits.Load())

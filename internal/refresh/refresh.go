@@ -280,9 +280,11 @@ const pushedPeriod = 24 * 3600
 // A feed without a period of its own is asked as often as it has published
 // entries within frequencyWindow, and at least once in the period the user
 // has set for such feeds (ttl_default of FreshRSS), DefaultMaxPeriod without
-// one.
+// one. It is not asked more often than once in minPeriod however much it
+// publishes, unless the period of the user is shorter still.
 const (
 	frequencyWindow = 7 * 24 * 3600
+	minPeriod       = 300
 	// DefaultMaxPeriod is that period, in seconds, of a user who has set none.
 	DefaultMaxPeriod = 3600
 )
@@ -296,6 +298,10 @@ const (
 // document listed, and a feed that was silent and comes to life is not as
 // slow as its silence. The time runs on while nothing comes, so the period
 // of a feed that falls silent grows by itself.
+//
+// Entries dated now would give a period of no time at all, and a feed just
+// refreshed would be due again at once: hence minPeriod. It is shorter than
+// the runs of the server are apart, so a busy feed is still due at each.
 func period(f *store.Feed, published store.Published, now int64, limit int) int {
 	if f.TTL > 0 {
 		return f.TTL
@@ -303,7 +309,7 @@ func period(f *store.Feed, published store.Published, now int64, limit int) int 
 	if published.Entries == 0 {
 		return limit
 	}
-	return int(min(int64(limit), max(0, now-published.Oldest)/int64(published.Entries)))
+	return int(min(int64(limit), max(minPeriod, (now-published.Oldest)/int64(published.Entries))))
 }
 
 // A feed that has failed twice in a row waits retryStep before it is tried
