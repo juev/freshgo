@@ -68,8 +68,9 @@
 {{define "branch"}}<a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}{{if .Failing}} class="failing"{{else if .Muted}} class="muted"{{end}}>{{.Name}}</a>{{end}}
 
 {{define "tree"}}
-<details open>
+<details>
 <summary>{{.T "tree.label"}}</summary>
+<div class="tree-body">
 <ul class="root">
 <li>{{template "branch" .Data.Tree.Root}}{{if .Data.Tree.Root.Unread}} <span class="count" title="{{.N "tree.unread" .Data.Tree.Root.Unread}}">{{.Data.Tree.Root.Unread}}</span>{{end}}</li>
 </ul>
@@ -96,6 +97,7 @@
 {{range .Data.Tree.Labels}}<li>{{template "branch" .}}{{if .Unread}} <span class="count" title="{{$.N "tree.unread" .Unread}}">{{.Unread}}</span>{{end}}</li>
 {{end}}</ul>
 {{end}}
+</div>
 </details>
 {{end}}
 

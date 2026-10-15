@@ -633,10 +633,13 @@
 				}
 			});
 		});
-		// On a narrow screen the tree stands above the list: fold it.
-		if (window.matchMedia('(max-width: 48rem)').matches) {
-			tree.querySelector('details').open = false;
-		}
+		// The tree unfolds over the stream: a click beside it folds it back.
+		document.addEventListener('click', (event) => {
+			const fold = tree.querySelector('details');
+			if (fold.open && !tree.contains(event.target)) {
+				fold.open = false;
+			}
+		});
 		setInterval(() => {
 			if (!document.hidden) {
 				refreshTree();
@@ -1000,7 +1003,7 @@
 		const typing = target.closest('input, textarea, select, [contenteditable]');
 		if (event.key === 'Escape') {
 			// Out of a field or a menu, back to the entry being read.
-			const menu = target.closest('details.menu[open]');
+			const menu = target.closest('details.menu[open], #tree > details[open]');
 			if (menu) {
 				menu.open = false;
 				menu.querySelector('summary').focus();
