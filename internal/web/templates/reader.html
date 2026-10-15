@@ -1,11 +1,9 @@
 {{define "content"}}
-<div class="reader">
+<section class="stream" aria-labelledby="stream-heading">
+<div class="stream-head">
 <nav class="tree" id="tree" aria-label="{{.T "tree.label"}}">
 {{template "tree" .}}
 </nav>
-
-<section class="stream" aria-labelledby="stream-heading">
-<div class="stream-head">
 <h1 id="stream-heading">{{.Heading}}</h1>
 {{template "stream-unread" .}}
 <button type="button" class="filters-toggle" aria-expanded="{{if .Data.Asked}}true{{else}}false{{end}}" aria-controls="stream-controls" hidden>{{.T "toolbar.filters"}}</button>
@@ -101,5 +99,4 @@
 </div>
 {{if .Data.Next}}<p class="more"><a href="{{.Data.Next}}" rel="next">{{.T "stream.next"}}</a></p>{{end}}
 </section>
-</div>
 {{end}}

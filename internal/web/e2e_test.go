@@ -477,7 +477,8 @@ func TestE2ETabOnly(t *testing.T) {
 			}
 			order = append(order, at)
 		}
-		if len(order) < 60 {
+		// The tree is folded, its links are not among the stops.
+		if len(order) < 40 {
 			t.Fatalf("Tab stops at %d elements of the reading screen", len(order))
 		}
 		for i := 1; i < len(order); i++ {
@@ -1410,12 +1411,17 @@ func TestE2EToolbar(t *testing.T) {
 		b.until("rows again", `document.querySelectorAll('.entries details[open]').length === 0`)
 
 		// A category is folded from the keyboard and stays folded on the
-		// next page; K and J pass over its feeds.
+		// next page; K and J pass over its feeds. The tree is folded on
+		// every page: t unfolds it.
+		b.press("t")
+		b.until("the tree unfolded", `document.querySelector('#tree details').open`)
 		b.tabTo("#tree details.branch summary")
 		b.press(kb.Enter)
 		b.until("the category folded", `!document.querySelector('#tree details.branch').open`)
 		b.open("/?state=all")
 		b.until("the category still folded", `!document.querySelector('#tree details.branch').open && document.querySelectorAll('#tree details.branch')[1].open`)
+		b.press("t")
+		b.until("the tree unfolded over the stream", `document.querySelector('#tree details').open`)
 		b.accessible("the tree with a category folded")
 		b.open("/categories/2")
 		b.press("J")

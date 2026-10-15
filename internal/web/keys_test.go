@@ -254,9 +254,9 @@ func TestPartsForTheScript(t *testing.T) {
 			t.Errorf("labels for the script: status %d, notice %q, cookie %v\n%s", a.status, notice, s.cookies[noticeCookie], a.body)
 		}
 
-		// The tree alone, as the stream asked for shows it.
+		// The tree alone, as the stream asked for shows it: folded.
 		a = s.part(http.MethodGet, "/feeds/1?state=all", "tree", nil)
-		if a.status != http.StatusOK || !strings.HasPrefix(strings.TrimSpace(a.body), "<details open>") || strings.Contains(a.body, "<article") ||
+		if a.status != http.StatusOK || !strings.HasPrefix(strings.TrimSpace(a.body), "<details>\n<summary>") || strings.Contains(a.body, "<article") ||
 			!strings.Contains(a.body, `<a href="/feeds/1?state=all" aria-current="page">Atom corpus</a> <span class="count" title="3 unread entries">3</span>`) {
 			t.Errorf("the tree for the script: status %d\n%s", a.status, a.body)
 		}
