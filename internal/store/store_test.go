@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -49,6 +51,53 @@ func mustFeed(t *testing.T, s *Store, userID int64, feedURL string) *Feed {
 		t.Fatalf("CreateFeed(%q): %v", feedURL, err)
 	}
 	return f
+}
+
+// A hundred requests at once on PostgreSQL wait for a connection of the pool
+// rather than open one each.
+func TestPostgresPoolIsBounded(t *testing.T) {
+	ctx := context.Background()
+	dsn, err := url.Parse(storetest.PostgresSchema(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The connections of this test are told apart from those of the others
+	// on the server by their name.
+	q := dsn.Query()
+	q.Set("application_name", "pool-test")
+	dsn.RawQuery = q.Encode()
+	s, err := Open(ctx, config.DriverPostgres, dsn.String())
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	t.Cleanup(func() { _ = s.Close() })
+	if got := s.db.Stats().MaxOpenConnections; got != postgresConns() || got < 10 {
+		t.Fatalf("MaxOpenConnections = %d; want %d, and at least 10", got, postgresConns())
+	}
+	var (
+		wg   sync.WaitGroup
+		peak atomic.Int64
+	)
+	for range 100 {
+		wg.Go(func() {
+			if _, err := s.exec(ctx, `SELECT pg_sleep(0.05)`); err != nil {
+				t.Error(err)
+			}
+			var n int64
+			if err := s.queryRow(ctx, `SELECT count(*) FROM pg_stat_activity WHERE application_name = 'pool-test'`).Scan(&n); err != nil {
+				t.Error(err)
+			}
+			for old := peak.Load(); n > old && !peak.CompareAndSwap(old, n); old = peak.Load() {
+			}
+		})
+	}
+	wg.Wait()
+	if got := peak.Load(); got > int64(postgresConns()) {
+		t.Errorf("the server saw %d connections; want at most %d", got, postgresConns())
+	}
+	if s.db.Stats().WaitCount == 0 {
+		t.Error("no request waited for a connection: the pool did not hold them back")
+	}
 }
 
 func TestOpenTwiceKeepsData(t *testing.T) {
