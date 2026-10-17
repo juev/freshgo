@@ -9,6 +9,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/juev/freshgo/internal/store"
 )
 
 // source reads the tables of one FreshRSS user. SQLite installations keep a
@@ -114,7 +116,7 @@ func sourceOpener(system *systemConfig, opts Options) (open func(user string) (*
 // be written to, such as a volume mounted read-only. When no log is left
 // beside it the file holds everything, and it is read as one nobody changes.
 func openSQLite(path string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite", "file:"+path+"?mode=ro")
+	db, err := sql.Open("sqlite", store.SQLiteURI(path, url.Values{"mode": {"ro"}}))
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +129,7 @@ func openSQLite(path string) (*sql.DB, error) {
 	if wal, err := os.Stat(path + "-wal"); err == nil && wal.Size() > 0 {
 		return nil, fmt.Errorf("%w; %s has changes FreshRSS has not written into the database yet, and reading them takes a directory that can be written to", probeErr, wal.Name())
 	}
-	return sql.Open("sqlite", "file:"+path+"?mode=ro&immutable=1")
+	return sql.Open("sqlite", store.SQLiteURI(path, url.Values{"mode": {"ro"}, "immutable": {"1"}}))
 }
 
 // postgresURL builds a connection URL from the db section of config.php,

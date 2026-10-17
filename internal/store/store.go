@@ -131,7 +131,18 @@ func sqliteDSN(path string) string {
 	q.Add("_pragma", "journal_mode(WAL)")
 	q.Add("_pragma", "busy_timeout(10000)")
 	q.Set("_txlock", "immediate")
-	return "file:" + path + "?" + q.Encode()
+	return SQLiteURI(path, q)
+}
+
+// sqlitePath escapes the characters that end or change the path of a URI.
+var sqlitePath = strings.NewReplacer("%", "%25", "?", "%3F", "#", "%23")
+
+// SQLiteURI is the URI of the database file at path with the query
+// parameters q. Written into the URI as is, a "?" or "#" of the path would cut
+// it there: SQLite would open another file, and the driver would read the
+// rest of the path as its parameters.
+func SQLiteURI(path string, q url.Values) string {
+	return "file:" + sqlitePath.Replace(path) + "?" + q.Encode()
 }
 
 // Close releases the database connections.
