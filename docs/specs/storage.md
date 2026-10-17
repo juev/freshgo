@@ -21,7 +21,7 @@ Out of scope: MySQL/MariaDB, going back to FreshRSS with a freshgo database, the
   - an explicit identifier is kept, and later issued identifiers are greater than it;
   - batches written for one user commit in identifier order: after a client has seen identifier N, no smaller identifier appears.
 - S6. `guid` is unique within a feed. Inserting a batch with a `guid` the feed already has fails with `ErrConflict` and adds nothing from the batch.
-- S7. A category, a feed and a label name are unique within a user for their kind. Besides, a label cannot take the name of an existing category, nor a category the name of an existing label, on creation and on renaming: both are addressed as `user/-/label/<name>` in the Google Reader API.
+- S7. A category, a feed and a label name are unique within a user for their kind. Besides, a label cannot take the name of an existing category, nor a category the name of an existing label, on creation and on renaming: both are addressed as `user/-/label/<name>` in the Google Reader API. This holds when a category and a label are given one name at once too: on PostgreSQL a transaction that creates or renames either takes an advisory lock on the names of the user first, SQLite has one writer. Verified by `TestCategoriesAndLabelsShareNamesAtOnce` under `make test-integration`.
 - S8. Errors: a missing row is `ErrNotFound`, a broken uniqueness rule is `ErrConflict`; both are matched with `errors.Is`.
 - S9. The schema is upgraded on `Open` by numbered migrations embedded in the binary. Pending migrations apply in one transaction. A database whose schema is newer than the binary is refused.
 - S10. Behaviour is the same on SQLite and PostgreSQL.

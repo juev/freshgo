@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/juev/freshgo/internal/config"
@@ -406,6 +408,82 @@ func TestCategoriesAndLabelsShareNames(t *testing.T) {
 		}
 		if err := s.UpdateCategory(ctx, &Category{UserID: alice, ID: 2, Name: "News"}); err != nil {
 			t.Errorf("UpdateCategory keeping the name: %v", err)
+		}
+	})
+}
+
+// A category and a label given one name at once: one of them gets it, the
+// other ErrConflict, however the two transactions interleave.
+func TestCategoriesAndLabelsShareNamesAtOnce(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		alice := mustUser(t, s, "alice").ID
+		ways := []struct {
+			name          string
+			category, tag func(name string) error
+		}{
+			{"create both", func(name string) error {
+				return s.CreateCategory(ctx, &Category{UserID: alice, Name: name})
+			}, func(name string) error {
+				return s.CreateTag(ctx, &Tag{UserID: alice, Name: name})
+			}},
+			{"rename the category", nil, func(name string) error {
+				return s.CreateTag(ctx, &Tag{UserID: alice, Name: name})
+			}},
+			{"rename the label", func(name string) error {
+				return s.CreateCategory(ctx, &Category{UserID: alice, Name: name})
+			}, nil},
+		}
+		const rounds = 30
+		for _, way := range ways {
+			t.Run(way.name, func(t *testing.T) {
+				for i := range rounds {
+					name := fmt.Sprintf("%s %d", way.name, i)
+					category, tag := way.category, way.tag
+					if category == nil {
+						c := &Category{UserID: alice, Name: name + " before"}
+						if err := s.CreateCategory(ctx, c); err != nil {
+							t.Fatal(err)
+						}
+						category = func(name string) error {
+							c.Name = name
+							return s.UpdateCategory(ctx, c)
+						}
+					}
+					if tag == nil {
+						l := &Tag{UserID: alice, Name: name + " before"}
+						if err := s.CreateTag(ctx, l); err != nil {
+							t.Fatal(err)
+						}
+						tag = func(name string) error { return s.RenameTag(ctx, alice, l.ID, name) }
+					}
+					var (
+						start = make(chan struct{})
+						errs  [2]error
+						wg    sync.WaitGroup
+					)
+					for j, give := range []func(string) error{category, tag} {
+						wg.Go(func() {
+							<-start
+							errs[j] = give(name)
+						})
+					}
+					close(start)
+					wg.Wait()
+					conflicts := 0
+					for _, err := range errs {
+						switch {
+						case errors.Is(err, ErrConflict):
+							conflicts++
+						case err != nil:
+							t.Fatalf("round %d: %v", i, err)
+						}
+					}
+					if conflicts != 1 {
+						t.Fatalf("round %d: category: %v, label: %v; want exactly one ErrConflict", i, errs[0], errs[1])
+					}
+				}
+			})
 		}
 	})
 }

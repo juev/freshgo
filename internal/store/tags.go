@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"slices"
+
+	"github.com/juev/freshgo/internal/config"
 )
 
 // CreateTag adds a user label. A zero t.ID is replaced with a new identifier.
@@ -96,9 +98,26 @@ func (s *Store) RenameTag(ctx context.Context, userID, id int64, name string) er
 	})
 }
 
+// labelNamesLockID is the first half of the PostgreSQL advisory lock on the
+// names of categories and labels of a user; the second is the user. The
+// value is arbitrary.
+const labelNamesLockID = 0x6c61626c // "labl"
+
 // nameFree gives ErrConflict when a row of the table, categories or tags,
 // already has the name: the two share the names of user/-/label/<name>.
+// No table holds both, so on PostgreSQL the transaction takes a lock on the
+// names of the user first and keeps it until it ends: a category and a label
+// given the same name at once are then checked one after the other. It has
+// to be called inside InTx, before the name is written. SQLite has a single
+// writer anyway.
 func (s *Store) nameFree(ctx context.Context, table string, userID int64, name string) error {
+	if s.driver == config.DriverPostgres {
+		// The user is folded into the 32 bits of the key; two users who
+		// share a key only wait for each other.
+		if _, err := s.exec(ctx, `SELECT pg_advisory_xact_lock(?, ?)`, int32(labelNamesLockID), int32(userID)); err != nil {
+			return fmt.Errorf("lock names: %w", err)
+		}
+	}
 	var taken int
 	err := s.queryRow(ctx, `SELECT COUNT(*) FROM `+table+` WHERE user_id = ? AND name = ?`, userID, name).Scan(&taken)
 	if err != nil {
