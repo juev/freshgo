@@ -271,6 +271,7 @@ freshrss-password "…"
 | `opml import -user <name> [<file>]`, `opml export -user <name>` | Reads subscriptions from a file or standard input; writes them to standard output. |
 | `doctor` | Checks the settings and what they name, and changes nothing: the flags, the database and the version of its schema, the settings of the installation, the SMTP server (it logs in and sends no letter), the browser, the translation service (it asks for the list of models), the OpenID Connect provider (its discovery document), the feeds set to a proxy freshgo does not go through (SOCKS4 and SOCKS4A, which FreshRSS allows), and the feeds whose last refresh failed, listed. Each check gets a line: `ok`, `FAIL`, `warn` or `skip`; the command exits with 1 when one failed. `serve`, `refresh` and `purge` do not start with settings of the installation that do not read, and say how to repair them. |
 | `healthcheck` | Asks the server at `-listen` whether it works, with `GET /healthz`, and exits with 1 when it does not. An address that listens on every interface is asked over loopback. The image runs it as its `HEALTHCHECK`. |
+| `completion bash\|zsh\|fish` | Prints a script that completes the commands, their actions and flags in that shell: `source <(freshgo completion bash)`, the same for zsh, `freshgo completion fish \| source`. |
 | `version` | Prints the version. |
 
 `freshgo <command> -h` lists the flags of a command.

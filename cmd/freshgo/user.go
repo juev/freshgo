@@ -23,11 +23,11 @@ const minPasswordLength = 7
 
 func userCommands() []command {
 	return []command{
-		{"create", "add a user; the password is read from standard input", runUserCreate},
-		{"passwd", "change the password of a user, read from standard input", runUserPasswd},
-		{"totp-off", "let a user who lost the app log in by the password alone", runUserTOTPOff},
-		{"list", "list the users", runUserList},
-		{"delete", "delete a user with all their feeds and entries", runUserDelete},
+		{"create", "add a user; the password is read from standard input", runUserCreate, nil},
+		{"passwd", "change the password of a user, read from standard input", runUserPasswd, nil},
+		{"totp-off", "let a user who lost the app log in by the password alone", runUserTOTPOff, nil},
+		{"list", "list the users", runUserList, nil},
+		{"delete", "delete a user with all their feeds and entries", runUserDelete, nil},
 	}
 }
 

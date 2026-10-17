@@ -11,7 +11,7 @@ import (
 
 func feedCommands() []command {
 	return []command{
-		{"add", "subscribe a user to a feed and fetch its entries", runFeedAdd},
+		{"add", "subscribe a user to a feed and fetch its entries", runFeedAdd, nil},
 	}
 }
 
