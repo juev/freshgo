@@ -46,6 +46,9 @@ type feedRow struct {
 	Muted    bool
 	// Since is when the feed began to fail, or brought its newest entry.
 	Since string
+	// State says, on the page of problems, how the refreshes of the feed
+	// go and when the next one is.
+	State []string
 }
 
 // categoryRow is a category in the list of subscriptions.
@@ -257,12 +260,25 @@ func (h *Handler) refreshNow(w http.ResponseWriter, r *http.Request) {
 // problemsPage is what the page of feeds that need a look shows.
 type problemsPage struct {
 	Failing []feedRow
-	Muted   []feedRow
-	Idle    []feedRow
+	// Held are the feeds whose server asked not to be requested before a
+	// time past their period.
+	Held  []feedRow
+	Muted []feedRow
+	Idle  []feedRow
 }
 
-// problems lists the feeds whose last refresh failed, the muted ones, and
-// those that have brought nothing for a month.
+// holds are the keys of the texts that say what puts a refresh off.
+var holds = map[refresh.Hold]string{
+	refresh.HoldPeriod:     "problems.hold.period",
+	refresh.HoldWebSub:     "problems.hold.websub",
+	refresh.HoldFresh:      "problems.hold.fresh",
+	refresh.HoldRetryAfter: "problems.hold.retry-after",
+	refresh.HoldBackoff:    "problems.hold.backoff",
+}
+
+// problems lists the feeds whose last refresh failed, those their server
+// holds back, the muted ones, and those that have brought nothing for a
+// month; each with how its refreshes go.
 func (h *Handler) problems(w http.ResponseWriter, r *http.Request) {
 	ctx, user := r.Context(), state(r).who.user
 	feeds, err := h.db.Feeds(ctx, user.ID)
@@ -276,18 +292,28 @@ func (h *Handler) problems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	loc, now := readReading(user).location(), h.now()
+	attempts, err := h.refresher.Attempts(ctx, user, feeds, now.Unix())
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	v := h.view(r, "subscriptions", "problems.heading")
 	day := func(seconds int64) string { return time.Unix(seconds, 0).In(loc).Format("2006-01-02") }
+	moment := func(seconds int64) string { return time.Unix(seconds, 0).In(loc).Format("2006-01-02 15:04") }
 	var page problemsPage
 	// The feed that has been silent longest comes first.
 	slices.SortStableFunc(feeds, func(a, b *store.Feed) int { return cmp.Compare(newest[a.ID], newest[b.ID]) })
 	for _, f := range feeds {
 		row := h.feedRow(f)
-		switch {
+		row.State = feedState(v, f, attempts[f.ID], now.Unix(), moment)
+		switch next := attempts[f.ID]; {
 		case f.TTL < 0:
 			page.Muted = append(page.Muted, row)
 		case f.Error != 0:
 			row.Since = day(f.Error)
 			page.Failing = append(page.Failing, row)
+		case next.Hold == refresh.HoldFresh && next.At > now.Unix():
+			page.Held = append(page.Held, row)
 		}
 		if last := newest[f.ID]; f.TTL >= 0 && now.Sub(time.Unix(last, 0)) > idleAfter {
 			if last != 0 {
@@ -298,9 +324,36 @@ func (h *Handler) problems(w http.ResponseWriter, r *http.Request) {
 			page.Idle = append(page.Idle, row)
 		}
 	}
-	v := h.view(r, "subscriptions", "problems.heading")
 	v.Data = page
 	h.render(w, r, http.StatusOK, "problems", v)
+}
+
+// feedState says how the refreshes of a feed go: when the last one
+// succeeded, what the last one failed with, and when the next one is and
+// what decides it. now is the time, moment writes one.
+func feedState(v *view, f *store.Feed, next refresh.Attempt, now int64, moment func(int64) string) []string {
+	var state []string
+	if f.LastUpdate != 0 {
+		state = append(state, v.T("problems.refreshed", moment(f.LastUpdate)))
+	} else {
+		state = append(state, v.T("problems.never"))
+	}
+	if f.Error != 0 {
+		message := f.ErrorMessage
+		if message == "" {
+			message = v.T("problems.no-message")
+		}
+		state = append(state, v.N("problems.failed", f.Failures, moment(f.Error), message))
+	}
+	switch {
+	case next.Hold == refresh.HoldMuted:
+		state = append(state, v.T("problems.next.muted"))
+	case next.At <= now:
+		state = append(state, v.T("problems.next.run"))
+	default:
+		state = append(state, v.T("problems.next", moment(next.At), v.T(holds[next.Hold])))
+	}
+	return state
 }
 
 // ownCategory finds the category a request names among those of the user.

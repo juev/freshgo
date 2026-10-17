@@ -7,7 +7,7 @@ import (
 )
 
 const feedColumns = `id, url, kind, category_id, name, website, description, last_update,
-	priority, path_entries, http_auth, error, ttl, attributes, http_etag, http_last_modified, websub_topic, websub_hub, failures, not_before`
+	priority, path_entries, http_auth, error, ttl, attributes, http_etag, http_last_modified, websub_topic, websub_hub, failures, not_before, error_message`
 
 // CreateFeed adds a feed. A zero f.ID is replaced with a new identifier, a
 // zero f.CategoryID with the default category, and attributes that are not
@@ -24,10 +24,10 @@ func (s *Store) CreateFeed(ctx context.Context, f *Feed) error {
 		}
 		_, err := tx.exec(ctx, `
 			INSERT INTO feeds (user_id, `+feedColumns+`)
-			VALUES (`+placeholders(21)+`)`,
+			VALUES (`+placeholders(22)+`)`,
 			f.UserID, f.ID, f.URL, f.Kind, f.CategoryID, f.Name, f.Website, f.Description, f.LastUpdate,
 			f.Priority, f.PathEntries, f.HTTPAuth, f.Error, f.TTL, jsonObject(f.Attributes), f.HTTPETag, f.HTTPLastModified,
-			f.WebSubTopic, f.WebSubHub, f.Failures, f.NotBefore)
+			f.WebSubTopic, f.WebSubHub, f.Failures, f.NotBefore, f.ErrorMessage)
 		if err != nil {
 			return fmt.Errorf("store: create feed %q: %w", f.URL, err)
 		}
@@ -70,11 +70,11 @@ func (s *Store) UpdateFeed(ctx context.Context, f *Feed) error {
 		UPDATE feeds SET url = ?, kind = ?, category_id = ?, name = ?, website = ?, description = ?,
 			last_update = ?, priority = ?, path_entries = ?, http_auth = ?, error = ?, ttl = ?,
 			attributes = ?, http_etag = ?, http_last_modified = ?, websub_topic = ?, websub_hub = ?,
-			failures = ?, not_before = ?
+			failures = ?, not_before = ?, error_message = ?
 		WHERE user_id = ? AND id = ?`,
 		f.URL, f.Kind, f.CategoryID, f.Name, f.Website, f.Description, f.LastUpdate, f.Priority,
 		f.PathEntries, f.HTTPAuth, f.Error, f.TTL, jsonObject(f.Attributes), f.HTTPETag, f.HTTPLastModified,
-		f.WebSubTopic, f.WebSubHub, f.Failures, f.NotBefore, f.UserID, f.ID)
+		f.WebSubTopic, f.WebSubHub, f.Failures, f.NotBefore, f.ErrorMessage, f.UserID, f.ID)
 	if err != nil {
 		return fmt.Errorf("store: update feed %d: %w", f.ID, err)
 	}
@@ -107,7 +107,7 @@ func scanFeed(userID int64, sc scanner) (*Feed, error) {
 	var attributes string
 	err := sc.Scan(&f.ID, &f.URL, &f.Kind, &f.CategoryID, &f.Name, &f.Website, &f.Description, &f.LastUpdate,
 		&f.Priority, &f.PathEntries, &f.HTTPAuth, &f.Error, &f.TTL, &attributes, &f.HTTPETag, &f.HTTPLastModified,
-		&f.WebSubTopic, &f.WebSubHub, &f.Failures, &f.NotBefore)
+		&f.WebSubTopic, &f.WebSubHub, &f.Failures, &f.NotBefore, &f.ErrorMessage)
 	if err != nil {
 		return nil, err
 	}

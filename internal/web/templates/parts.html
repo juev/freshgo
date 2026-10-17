@@ -211,7 +211,8 @@
 
 {{define "feed-rows"}}
 <ul class="feed-list">
-{{range .Feeds}}<li><a href="{{.Settings}}">{{.Name}}</a>{{if .Failing}} <span class="mark">{{$.Page.T "sub.failing"}}</span>{{end}}{{if .Muted}} <span class="muted">{{$.Page.T "sub.muted"}}</span>{{end}}{{if .Since}} <span class="muted">{{.Since}}</span>{{end}} <span class="feed-address">{{.Address}}</span></li>
+{{range .Feeds}}<li><a href="{{.Settings}}">{{.Name}}</a>{{if .Failing}} <span class="mark">{{$.Page.T "sub.failing"}}</span>{{end}}{{if .Muted}} <span class="muted">{{$.Page.T "sub.muted"}}</span>{{end}}{{if .Since}} <span class="muted">{{.Since}}</span>{{end}} <span class="feed-address">{{.Address}}</span>{{with .State}}
+<ul class="feed-state">{{range .}}<li>{{.}}</li>{{end}}</ul>{{end}}</li>
 {{end}}</ul>
 {{end}}
 
