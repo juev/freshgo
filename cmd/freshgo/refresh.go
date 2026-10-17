@@ -64,6 +64,12 @@ func fetchOptions(conf *config.Config, db *store.Store) fetch.Options {
 }
 
 func newServices(ctx context.Context, e env, conf *config.Config, db *store.Store) (*services, error) {
+	// Every request and every feed reads them: with settings that do not
+	// read, each would fail on its own.
+	if _, err := db.System(ctx); err != nil {
+		return nil, fmt.Errorf("%w\nThe settings of the installation are the row %q of the table settings: "+
+			"correct it, or delete it to go back to the defaults; \"freshgo doctor\" checks the rest", err, store.SettingSystem)
+	}
 	fetching := fetchOptions(conf, db)
 	client, err := fetch.New(fetching)
 	if err != nil {
