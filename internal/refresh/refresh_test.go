@@ -20,6 +20,8 @@ import (
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/storetest"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // start is the clock of a test at its beginning; every feed created by the
@@ -1332,6 +1334,59 @@ func TestLastRun(t *testing.T) {
 		}
 		if at, _ := w.r.LastRun(); !at.Equal(ended) {
 			t.Errorf("after a cancelled run: LastRun = %v, want %v", at, ended)
+		}
+	})
+}
+
+// The metrics of the runs count the feeds by result, with how long each
+// took, and the entries stored.
+func TestMetrics(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		u := w.user("alice", `{}`)
+		a := item{guid: "a", title: "First", link: "https://example.org/a", date: "Mon, 05 Oct 2026 10:00:00 GMT", body: "one"}
+		b := item{guid: "b", title: "Second", link: "https://example.org/b", date: "Tue, 06 Oct 2026 10:00:00 GMT", body: "two"}
+		w.serveBody("/feed", rssType, rss("Blog", b, a))
+		w.feed(u, "/feed", nil)
+		w.feed(u, "/missing", nil)
+		w.runOne()
+		b.body = "two, corrected"
+		w.serveBody("/feed", rssType, rss("Blog", b, a))
+		w.later()
+		w.runOne()
+
+		metrics := prometheus.NewRegistry()
+		metrics.MustRegister(w.r.Collectors()...)
+		families, err := metrics.Gather()
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]float64{}
+		for _, family := range families {
+			for _, m := range family.GetMetric() {
+				name := family.GetName()
+				for _, l := range m.GetLabel() {
+					name += " " + l.GetValue()
+				}
+				switch {
+				case m.Histogram != nil:
+					got[name] = float64(m.GetHistogram().GetSampleCount())
+				case m.Counter != nil:
+					got[name] = m.GetCounter().GetValue()
+				case m.Gauge != nil:
+					got[name] = m.GetGauge().GetValue()
+				}
+			}
+		}
+		want := map[string]float64{
+			"freshgo_refresh_feed_duration_seconds refreshed": 2,
+			"freshgo_refresh_feed_duration_seconds unchanged": 0,
+			"freshgo_refresh_feed_duration_seconds failed":    2,
+			"freshgo_refresh_entries_total new":               2,
+			"freshgo_refresh_entries_total updated":           1,
+			"freshgo_refresh_last_run_timestamp_seconds":      float64(w.clock.Unix()),
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("metrics:\n got %v\nwant %v", got, want)
 		}
 	})
 }

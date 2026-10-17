@@ -20,8 +20,8 @@ const (
 	EnvDatabaseURL = "FRESHGO_DATABASE_URL"
 	EnvListen      = "FRESHGO_LISTEN"
 	EnvBaseURL     = "FRESHGO_BASE_URL"
-	// EnvDebugListen names the address the profiles of the runtime are
-	// handed out at.
+	// EnvDebugListen names the address the profiles of the runtime and the
+	// metrics are handed out at.
 	EnvDebugListen = "FRESHGO_DEBUG_LISTEN"
 	// EnvFetchAllowlist and EnvRefreshInterval are read by the commands that
 	// refresh feeds.
@@ -76,8 +76,9 @@ type Config struct {
 	DatabaseURL string
 	// Listen is the address the HTTP server binds to.
 	Listen string
-	// DebugListen is the address the profiles of the Go runtime are handed
-	// out at, apart from the server. Empty: they are not handed out.
+	// DebugListen is the address the profiles of the Go runtime and the
+	// metrics are handed out at, apart from the server. Empty: they are not
+	// handed out.
 	DebugListen string
 	// BaseURL is the public address of the server, without a trailing slash.
 	// Empty means it is unknown: links are built from the request, WebSub is off.
@@ -131,7 +132,7 @@ func Bind(fs *flag.FlagSet, getenv func(string) string) *Config {
 	fs.StringVar(&c.Listen, "listen", envOr(getenv, EnvListen, defaultListen),
 		"HTTP listen address ($"+EnvListen+")")
 	fs.StringVar(&c.DebugListen, "debug-listen", getenv(EnvDebugListen),
-		"address to hand out the profiles of the Go runtime at, under /debug/pprof/; empty for none ($"+EnvDebugListen+")")
+		"address to hand out the profiles of the Go runtime at, under /debug/pprof/, and the metrics, under /metrics; empty for none ($"+EnvDebugListen+")")
 	fs.StringVar(&c.BaseURL, "base-url", getenv(EnvBaseURL),
 		"public URL of the server ($"+EnvBaseURL+")")
 	fs.StringVar(&c.FetchAllowlist, "fetch-allowlist", getenv(EnvFetchAllowlist),

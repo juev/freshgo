@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"math"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -11,11 +12,16 @@ import (
 	"sync"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/collectors"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	"github.com/juev/freshgo/internal/authguard"
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/greader"
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/mail"
+	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/sanitize"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/web"
@@ -100,16 +106,49 @@ func cleanStoredTexts(ctx context.Context, db *store.Store, log *slog.Logger) er
 	return db.SetSetting(ctx, store.SettingTextsCleaned, "1")
 }
 
-// profileHandler hands out the profiles of the Go runtime. They are on a
-// handler of their own, so that the address of the server never shows them.
-func profileHandler() http.Handler {
+// debugHandler hands out the profiles of the Go runtime and the metrics of
+// the server. They are on a handler of their own, so that the address of
+// the server never shows them.
+func debugHandler(metrics *prometheus.Registry) http.Handler {
 	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.HandlerFor(metrics, promhttp.HandlerOpts{}))
 	mux.HandleFunc("/debug/pprof/", pprof.Index)
 	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
 	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
 	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
 	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 	return mux
+}
+
+// databaseSizeTimeout bounds the query of the size of the database a scrape
+// makes.
+const databaseSizeTimeout = 5 * time.Second
+
+// newMetrics returns the registry of the metrics of the server: those of the
+// runtime and the process, of the refresh runs, the answers counted by
+// requests and the size of the database.
+func newMetrics(db *store.Store, refresher *refresh.Refresher, requests *prometheus.CounterVec, log *slog.Logger) *prometheus.Registry {
+	metrics := prometheus.NewRegistry()
+	metrics.MustRegister(
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
+		requests,
+		prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+			Name: "freshgo_database_size_bytes",
+			Help: "How many bytes the database takes: the SQLite file without its write-ahead log, or the PostgreSQL database.",
+		}, func() float64 {
+			ctx, cancel := context.WithTimeout(context.Background(), databaseSizeTimeout)
+			defer cancel()
+			size, err := db.Size(ctx)
+			if err != nil {
+				log.Error("metrics: the size of the database", "error", err)
+				return math.NaN()
+			}
+			return float64(size)
+		}),
+	)
+	metrics.MustRegister(refresher.Collectors()...)
+	return metrics
 }
 
 // runServe answers API clients and refreshes the feeds until the process is
@@ -162,6 +201,7 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	requests := requestCounter()
 	listener, err := net.Listen("tcp", conf.Listen)
 	if err != nil {
 		return err
@@ -173,8 +213,8 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 			_ = listener.Close()
 			return err
 		}
-		profiles = &http.Server{Handler: profileHandler(), ReadHeaderTimeout: 10 * time.Second}
-		s.log.Info("handing out profiles", "address", debugListener.Addr().String())
+		profiles = &http.Server{Handler: debugHandler(newMetrics(db, s.refresher, requests, s.log)), ReadHeaderTimeout: 10 * time.Second}
+		s.log.Info("handing out profiles and metrics", "address", debugListener.Addr().String())
 		go func() {
 			if err := profiles.Serve(debugListener); !errors.Is(err, http.ErrServerClosed) {
 				s.log.Error("the server of the profiles stopped", "error", err)
@@ -182,8 +222,8 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 		}()
 	}
 	server := &http.Server{
-		Handler: accessLog(routes(healthHandler(db.Ping, s.refresher.LastRun, s.log), api, s.icons, extensions(s.registry), hubs, pages),
-			s.log),
+		Handler: observe(routes(healthHandler(db.Ping, s.refresher.LastRun, s.log), api, s.icons, extensions(s.registry), hubs, pages),
+			s.log, requests),
 		ReadHeaderTimeout: 10 * time.Second,
 		// A request ends with the server, not with the signal: Shutdown
 		// gives it time first.

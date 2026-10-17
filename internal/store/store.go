@@ -98,6 +98,20 @@ func (s *Store) Ping(ctx context.Context) error {
 	return nil
 }
 
+// Size returns how many bytes the database takes: the file of SQLite
+// without its write-ahead log, the database of PostgreSQL.
+func (s *Store) Size(ctx context.Context) (int64, error) {
+	query := `SELECT page_count * page_size FROM pragma_page_count(), pragma_page_size()`
+	if s.driver == config.DriverPostgres {
+		query = `SELECT pg_database_size(current_database())`
+	}
+	var size int64
+	if err := s.queryRow(ctx, query).Scan(&size); err != nil {
+		return 0, fmt.Errorf("store: size: %w", err)
+	}
+	return size, nil
+}
+
 // InTx runs fn in a transaction and commits if fn returns nil. Called on a
 // Store that is already inside a transaction, it joins that transaction.
 func (s *Store) InTx(ctx context.Context, fn func(tx *Store) error) error {
