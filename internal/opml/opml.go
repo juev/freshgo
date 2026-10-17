@@ -128,24 +128,35 @@ func lines(raw json.RawMessage) string {
 var schemePrefix = regexp.MustCompile(`(?i)^https?://(www[.])?`)
 
 // displayName is the name of a feed, or its address without the scheme when
-// it has none.
-func displayName(f *store.Feed) string {
+// it has none. The name of a feed that has none is its address: a public
+// document must not tell what the address is requested with, any more than
+// the address itself does.
+func displayName(f *store.Feed, public bool) string {
 	if f.Name != "" {
 		return f.Name
 	}
-	return schemePrefix.ReplaceAllString(f.URL, "")
+	address := f.URL
+	if public {
+		address = withoutCredentials(address)
+	}
+	return schemePrefix.ReplaceAllString(address, "")
 }
 
 // outline returns the attributes of the outline of a feed, in the order
-// FreshRSS writes them. Empty ones are left out.
-func outline(f *store.Feed) []attribute {
+// FreshRSS writes them. Empty ones are left out. A public outline leaves out
+// what a feed is requested with, and the credentials in its addresses.
+func outline(f *store.Feed, public bool) []attribute {
 	attrs := readAttributes(f.Attributes)
 	kind, known := kindTypes[f.Kind]
 	if !known {
 		kind = "rss"
 	}
+	address, website := f.URL, f.Website
+	if public {
+		address, website = withoutCredentials(address), withoutCredentials(website)
+	}
 	out := []attribute{
-		{"text", displayName(f)}, {"type", kind}, {"xmlUrl", f.URL}, {"htmlUrl", f.Website}, {"description", f.Description},
+		{"text", displayName(f, public)}, {"type", kind}, {"xmlUrl", address}, {"htmlUrl", website}, {"description", f.Description},
 		{"frss:priority", priorityNames[f.Priority]},
 	}
 	if criteria := attrs.text("unicityCriteria"); criteria != "id" {
@@ -200,6 +211,11 @@ func outline(f *store.Feed) []attribute {
 		out = append(out, attribute{"frss:" + field.name, value})
 	}
 	out = append(out, attribute{"frss:CURLOPT_HTTPHEADER", lines(curl[curlHTTPHeader])})
+	if public {
+		out = slices.DeleteFunc(out, func(a attribute) bool {
+			return strings.HasPrefix(a.name, "frss:CURLOPT_") || a.name == "frss:ttl"
+		})
+	}
 	return slices.DeleteFunc(out, func(a attribute) bool { return a.value == "" })
 }
 
@@ -260,7 +276,9 @@ func ExportPart(ctx context.Context, db *store.Store, u *store.User, created tim
 		}
 		return order.CompareString(a.Name, b.Name)
 	})
-	slices.SortStableFunc(feeds, func(a, b *store.Feed) int { return order.CompareString(displayName(a), displayName(b)) })
+	slices.SortStableFunc(feeds, func(a, b *store.Feed) int {
+		return order.CompareString(displayName(a, part.Public), displayName(b, part.Public))
+	})
 
 	var b bytes.Buffer
 	b.WriteString(xml.Header)
@@ -269,13 +287,7 @@ func ExportPart(ctx context.Context, db *store.Store, u *store.User, created tim
 	b.WriteString("</title>\n    <dateCreated>" + created.Format(time.RFC1123Z) + "</dateCreated>\n  </head>\n  <body>\n")
 	writeFeed := func(indent string, f *store.Feed) {
 		b.WriteString(indent + "<outline")
-		for _, a := range outline(f) {
-			if part.Public && (strings.HasPrefix(a.name, "frss:CURLOPT_") || a.name == "frss:ttl") {
-				continue
-			}
-			if part.Public && a.name == "xmlUrl" {
-				a.value = withoutCredentials(a.value)
-			}
+		for _, a := range outline(f, part.Public) {
 			b.WriteString(" " + a.name + `="`)
 			escape(&b, a.value)
 			b.WriteString(`"`)
