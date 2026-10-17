@@ -111,6 +111,42 @@ func TestImportUsage(t *testing.T) {
 	}
 }
 
+// -config names a file with the settings of every command, which a flag
+// overrides.
+func TestConfigFile(t *testing.T) {
+	dir := t.TempDir()
+	databases := map[string]string{}
+	for _, name := range []string{"alice", "bob"} {
+		databases[name] = "sqlite://" + filepath.Join(dir, name+".sqlite")
+		if code, _, stderr := runCLIInput(t, "correct horse\n", "user", "create", "-database-url", databases[name], name); code != 0 {
+			t.Fatalf("user create %s: %s", name, stderr)
+		}
+	}
+	file := filepath.Join(dir, "freshgo.yaml")
+	if err := os.WriteFile(file, []byte("database-url: "+databases["alice"]+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, stdout, stderr := runCLI(t, "-config", file, "user", "list"); code != 0 || !strings.HasPrefix(stdout, "alice:") {
+		t.Errorf("-config: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	if code, stdout, stderr := runCLI(t, "-config="+file, "user", "list", "-database-url", databases["bob"]); code != 0 || !strings.HasPrefix(stdout, "bob:") {
+		t.Errorf("-config and a flag: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+
+	if err := os.WriteFile(file, []byte("database: x\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if code, _, stderr := runCLI(t, "-config", file, "user", "list"); code != 1 || !strings.Contains(stderr, `unknown setting "database"`) {
+		t.Errorf("a file with an unknown setting: code %d, stderr %q", code, stderr)
+	}
+	if code, _, stderr := runCLI(t, "-config"); code != 2 || !strings.Contains(stderr, "flag needs an argument") {
+		t.Errorf("-config without a file: code %d, stderr %q", code, stderr)
+	}
+	if code, stdout, _ := runCLI(t, "-h"); code != 0 || !strings.Contains(stdout, "[-config file]") {
+		t.Errorf("-h: code %d, stdout %q", code, stdout)
+	}
+}
+
 // The collector runs as the server sets it, unless the environment says
 // how it is to run.
 func TestTuneGC(t *testing.T) {
