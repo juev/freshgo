@@ -366,6 +366,11 @@ func Markup(n *html.Node) string {
 	return b.String()
 }
 
+// WriteMarkup writes a node to b as Markup does, without a string of its own.
+func WriteMarkup(b *strings.Builder, n *html.Node) {
+	write(b, n)
+}
+
 func write(b *strings.Builder, n *html.Node) {
 	switch n.Type {
 	case html.CommentNode:

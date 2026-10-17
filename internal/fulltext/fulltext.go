@@ -46,6 +46,9 @@ var (
 	ErrNoArticle = errors.New("fulltext: no article was found on the page")
 	// ErrEmptyPage is returned for a page without a body.
 	ErrEmptyPage = errors.New("fulltext: the page is empty")
+	// ErrTooLarge is returned when the selected elements repeat the page
+	// too many times over.
+	ErrTooLarge = errors.New("fulltext: the selected elements repeat the page too many times over")
 )
 
 // Request says what to take from which page.
@@ -104,6 +107,7 @@ func Article(ctx context.Context, client *fetch.Client, req Request) (string, er
 
 	pageURL := req.URL
 	var doc *goquery.Document
+	size := 0
 	for refreshes := 0; ; refreshes++ {
 		var r io.Reader
 		if req.Read != nil {
@@ -114,7 +118,7 @@ func Article(ctx context.Context, client *fetch.Client, req Request) (string, er
 			if strings.TrimSpace(markup) == "" {
 				return "", ErrEmptyPage
 			}
-			pageURL, r = final, strings.NewReader(markup)
+			pageURL, r, size = final, strings.NewReader(markup), len(markup)
 		} else {
 			resp, err := client.Fetch(ctx, fetch.Request{URL: pageURL, Accept: fetch.AcceptHTML, Params: req.Params})
 			if err != nil {
@@ -123,7 +127,7 @@ func Article(ctx context.Context, client *fetch.Client, req Request) (string, er
 			if len(bytes.TrimSpace(resp.Body)) == 0 {
 				return "", ErrEmptyPage
 			}
-			pageURL = resp.URL
+			pageURL, size = resp.URL, len(resp.Body)
 			if r, err = charset.NewReader(bytes.NewReader(resp.Body), resp.Header.Get("Content-Type")); err != nil {
 				return "", fmt.Errorf("fulltext: %w", err)
 			}
@@ -165,27 +169,35 @@ func Article(ctx context.Context, client *fetch.Client, req Request) (string, er
 	} else {
 		elements = doc.FindMatcher(pick)
 	}
+	// Elements nested in one another are each written whole, so the
+	// selected markup is held to a multiple of the page, as items are in
+	// internal/scrape.
+	budget := 16*size + 1<<20
 	var picked strings.Builder
 	found := 0
-	elements.Each(func(_ int, s *goquery.Selection) {
+	elements.EachWithBreak(func(_ int, s *goquery.Selection) bool {
 		found++
 		node := s.Get(0)
 		if drop != nil {
 			if s.IsMatcher(drop) {
-				return
+				return true
 			}
 			// Before cleaning, so that the filter sees the page as it is.
 			s.FindMatcher(drop).Remove()
 		}
 		// An element taken out together with an earlier one.
 		if node.Parent == nil {
-			return
+			return true
 		}
-		picked.WriteString(sanitize.Markup(node))
+		sanitize.WriteMarkup(&picked, node)
 		picked.WriteByte('\n')
+		return picked.Len() <= budget
 	})
 	if found == 0 {
 		return "", ErrNoElements
+	}
+	if picked.Len() > budget {
+		return "", ErrTooLarge
 	}
 	content := sanitize.HTML(picked.String(), base, req.ForceHTTPS)
 	if drop != nil {
