@@ -182,7 +182,8 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 		}()
 	}
 	server := &http.Server{
-		Handler:           routes(healthHandler(db.Ping, s.refresher.LastRun, s.log), api, s.icons, extensions(s.registry), hubs, pages),
+		Handler: accessLog(routes(healthHandler(db.Ping, s.refresher.LastRun, s.log), api, s.icons, extensions(s.registry), hubs, pages),
+			s.log),
 		ReadHeaderTimeout: 10 * time.Second,
 		// A request ends with the server, not with the signal: Shutdown
 		// gives it time first.

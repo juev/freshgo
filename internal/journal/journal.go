@@ -95,9 +95,10 @@ func (h *Handler) Close() {
 }
 
 // Enabled reports whether the handler in front of which this one stands
-// takes records of the level.
+// takes records of the level. Warnings and errors are kept whatever the log
+// leaves out.
 func (h *Handler) Enabled(ctx context.Context, level slog.Level) bool {
-	return h.next.Enabled(ctx, level)
+	return level >= slog.LevelWarn || h.next.Enabled(ctx, level)
 }
 
 // value spells an attribute the way the text log does.
@@ -109,9 +110,13 @@ func value(a slog.Attr) string {
 	return a.Key + "=" + text
 }
 
-// Handle passes the record on and keeps it when it is about a user.
+// Handle passes the record on, when the next handler takes its level, and
+// keeps it when it is about a user.
 func (h *Handler) Handle(ctx context.Context, r slog.Record) error {
-	err := h.next.Handle(ctx, r)
+	var err error
+	if h.next.Enabled(ctx, r.Level) {
+		err = h.next.Handle(ctx, r)
+	}
 	if r.Level < slog.LevelWarn {
 		return err
 	}

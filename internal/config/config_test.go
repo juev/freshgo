@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"io"
+	"log/slog"
 	"reflect"
 	"strings"
 	"testing"
@@ -240,5 +241,35 @@ func TestTrustedProxies(t *testing.T) {
 	}
 	if err := parse(t, nil, "-trusted-proxies", "proxy.lan").Validate(); err == nil {
 		t.Error("Validate accepted a proxy given by name")
+	}
+}
+
+// The log is written at the level and in the format asked for; anything
+// else is refused before the database is opened.
+func TestLog(t *testing.T) {
+	var out strings.Builder
+	c := parse(t, map[string]string{EnvLogLevel: "warn", EnvLogFormat: "json"})
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	log := slog.New(c.LogHandler(&out))
+	log.Info("left out")
+	log.Warn("kept", "n", 1)
+	if got := out.String(); strings.Contains(got, "left out") || !strings.Contains(got, `"msg":"kept","n":1`) {
+		t.Errorf("warn, json: log %q", got)
+	}
+	out.Reset()
+	c = parse(t, nil, "-log-level", "debug")
+	if err := c.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	slog.New(c.LogHandler(&out)).Debug("seen")
+	if got := out.String(); !strings.Contains(got, "level=DEBUG msg=seen") {
+		t.Errorf("debug, text: log %q", got)
+	}
+	for _, args := range [][]string{{"-log-level", "loud"}, {"-log-format", "xml"}} {
+		if err := parse(t, nil, args...).Validate(); err == nil {
+			t.Errorf("%v: no error", args)
+		}
 	}
 }

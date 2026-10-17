@@ -5,6 +5,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/netip"
 	"net/url"
 	"strconv"
@@ -43,6 +45,10 @@ const (
 	EnvBrowserURL = "FRESHGO_BROWSER_URL"
 	// EnvTrustedProxies is read by the web interface.
 	EnvTrustedProxies = "FRESHGO_TRUSTED_PROXIES"
+	// EnvLogLevel and EnvLogFormat say what the log holds and how it is
+	// written.
+	EnvLogLevel  = "FRESHGO_LOG_LEVEL"
+	EnvLogFormat = "FRESHGO_LOG_FORMAT"
 )
 
 const (
@@ -106,6 +112,11 @@ type Config struct {
 	// that runs already, for the feeds whose pages only a browser gets.
 	// Empty: no page is read by a browser.
 	BrowserURL string
+	// LogLevel is the least level a record of the log needs: debug, info,
+	// warn or error; empty is info. At debug every request is logged.
+	LogLevel string
+	// LogFormat is text or json; empty is text.
+	LogFormat string
 
 	// invalid is what was wrong with the environment, reported by Validate.
 	invalid error
@@ -160,6 +171,10 @@ func Bind(fs *flag.FlagSet, getenv func(string) string) *Config {
 		"key of the API that translates entries ($"+EnvTranslateKey+")")
 	fs.StringVar(&c.TranslateModel, "translate-model", getenv(EnvTranslateModel),
 		"model that translates entries ($"+EnvTranslateModel+")")
+	fs.StringVar(&c.LogLevel, "log-level", envOr(getenv, EnvLogLevel, "info"),
+		"least level of what is logged: debug, info, warn or error; debug logs every request ($"+EnvLogLevel+")")
+	fs.StringVar(&c.LogFormat, "log-format", envOr(getenv, EnvLogFormat, "text"),
+		"format of the log: text or json ($"+EnvLogFormat+")")
 	// The help of a command prints the default of every flag, and these
 	// variables carry passwords: it shows what is built in instead.
 	fs.Lookup("database-url").DefValue = defaultDatabaseURL
@@ -228,6 +243,12 @@ func (c *Config) Validate() error {
 	if _, err := c.Proxies(); err != nil {
 		return err
 	}
+	if _, err := c.logLevel(); err != nil {
+		return err
+	}
+	if c.LogFormat != "" && c.LogFormat != "text" && c.LogFormat != "json" {
+		return fmt.Errorf("log format %q: want text or json", c.LogFormat)
+	}
 	if c.BaseURL != "" {
 		u, err := url.Parse(c.BaseURL)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
@@ -236,6 +257,28 @@ func (c *Config) Validate() error {
 		c.BaseURL = strings.TrimRight(c.BaseURL, "/")
 	}
 	return nil
+}
+
+func (c *Config) logLevel() (slog.Level, error) {
+	var level slog.Level
+	if c.LogLevel == "" {
+		return slog.LevelInfo, nil
+	}
+	if err := level.UnmarshalText([]byte(c.LogLevel)); err != nil {
+		return 0, fmt.Errorf("log level %q: want debug, info, warn or error", c.LogLevel)
+	}
+	return level, nil
+}
+
+// LogHandler returns the handler that writes the log to w as LogLevel and
+// LogFormat say. It is called after Validate.
+func (c *Config) LogHandler(w io.Writer) slog.Handler {
+	level, _ := c.logLevel()
+	opts := &slog.HandlerOptions{Level: level}
+	if c.LogFormat == "json" {
+		return slog.NewJSONHandler(w, opts)
+	}
+	return slog.NewTextHandler(w, opts)
 }
 
 // Database splits DatabaseURL into the engine and the value its driver wants:
