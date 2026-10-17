@@ -162,7 +162,7 @@ freshgo opml import -user alice subscriptions.opml
 freshgo serve
 ```
 
-`feed add` takes the address of a feed or of a site that announces one. `user create` and `user passwd` ask for the password at a terminal and otherwise read it from the first line of standard input; it must be at least 7 characters long. The password is for the web interface and for API clients alike. The first user of an installation is its administrator; `user create -admin` makes further ones. Changing the password invalidates the tokens clients hold and ends the user's logins.
+`feed add` takes the address of a feed or of a site that announces one. `user create` and `user passwd` ask for the password at a terminal and otherwise read it from the first line of standard input; it must be at least 7 characters long. The password is for the web interface and for API clients alike. The first user of an installation is its administrator; `user create -admin` makes further ones. Changing the password invalidates the tokens clients hold and ends the user's logins. With `-smtp-url` set, a user who forgot the web password can also reset it from the login page: a letter with a link valid once, for an hour, goes to the confirmed address of their profile, and the new password ends their logins.
 
 ## Web interface
 
@@ -272,7 +272,7 @@ Every setting is a flag and an environment variable; the flag wins. The help of 
 | `-translate-key` | `FRESHGO_TRANSLATE_KEY` | | Key of that API. |
 | `-translate-model` | `FRESHGO_TRANSLATE_MODEL` | | Model that translates. |
 | `-browser-url` | `FRESHGO_BROWSER_URL` | | Websocket of the DevTools protocol of a browser that reads the pages of the feeds set to it: `ws://host:port`; see "Pages only a browser gets". |
-| `-smtp-url` | `FRESHGO_SMTP_URL` | | SMTP server for the letters that confirm e-mail addresses: `smtp[s]://user:password@host:port?from=address`. Without it, confirmation cannot be required. |
+| `-smtp-url` | `FRESHGO_SMTP_URL` | | SMTP server for the letters that confirm e-mail addresses and reset forgotten passwords: `smtp[s]://user:password@host:port?from=address`. Without it, confirmation cannot be required and passwords are reset only by an administrator or `freshgo user passwd`. |
 
 The garbage collector of Go runs with `GOGC=200` unless the variable `GOGC` is set: the heap grows to three times what is in use before a collection, where the runtime of Go lets it grow to twice. An answer of the API takes about a third less time for it, and the process about 8 MB more memory. `GOGC=100` gives the memory back.
 

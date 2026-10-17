@@ -1,0 +1,33 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{template "problem" .Data.Problem}}
+{{if .Data.Token}}
+<form method="post" action="{{.URL "/reset/password"}}" class="form">
+<input type="hidden" name="user" value="{{.Data.Name}}">
+<input type="hidden" name="token" value="{{.Data.Token}}">
+<input type="text" name="username" value="{{.Data.Name}}" autocomplete="username" hidden>
+<p>
+<label for="new">{{.T "settings.password.new"}}</label>
+<input type="password" id="new" name="new" autocomplete="new-password" minlength="7" required autofocus aria-describedby="new-hint">
+<span class="hint" id="new-hint">{{.T "settings.password.hint"}}</span>
+</p>
+<p>
+<label for="again">{{.T "settings.password.again"}}</label>
+<input type="password" id="again" name="again" autocomplete="new-password" minlength="7" required>
+</p>
+<p><button type="submit">{{.T "settings.password.submit"}}</button></p>
+</form>
+{{else if .Data.Sent}}
+<p role="status">{{.T "reset.sent"}}</p>
+<p><a href="{{.URL "/login"}}">{{.T "login.heading"}}</a></p>
+{{else}}
+<p>{{.T "reset.intro"}}</p>
+<form method="post" action="{{.URL "/reset"}}" class="form">
+<p>
+<label for="username">{{.T "login.username"}}</label>
+<input type="text" id="username" name="username" required autocomplete="username" autocapitalize="none" spellcheck="false" autofocus>
+</p>
+<p><button type="submit">{{.T "reset.submit"}}</button></p>
+</form>
+{{end}}
+{{end}}

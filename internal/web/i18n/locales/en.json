@@ -370,6 +370,7 @@
   "log.older": "Older records",
   "log.time": "Time",
   "login.failed": "Wrong user name or password.",
+  "login.forgot": "Forgot the password?",
   "login.heading": "Sign in",
   "login.locked": {
     "one": "Too many failed attempts. Try again in %d minute.",
@@ -451,6 +452,7 @@
   "notice.opml-none": "The category has no OPML document.",
   "notice.opml-refreshed": "The OPML document was read.",
   "notice.password": "Password changed.",
+  "notice.password-reset": "The password is changed. Sign in with it.",
   "notice.purged": {
     "one": "%d entry deleted.",
     "other": "%d entries deleted."
@@ -552,6 +554,12 @@
   "register.no-mail": "Nobody can register here: the server cannot send the letter that confirms an address.",
   "register.problem.terms": "The terms have to be accepted.",
   "register.submit": "Create the account",
+  "reset.heading": "Reset the password",
+  "reset.intro": "Enter your user name. If the account has a confirmed e-mail address, a letter with a link to choose a new password goes there.",
+  "reset.mail.body": "Hello %s,\n\nsomebody, probably you, asked for a new password of your account at %s.\nTo choose one, open this link within an hour:\n\n%s\n\nIf it was not you, do nothing: the password stays as it is.\n",
+  "reset.mail.subject": "A new password — %s",
+  "reset.sent": "If the account has a confirmed e-mail address, a letter with a link is on its way. The link works once, for an hour.",
+  "reset.submit": "Send the letter",
   "retention.favorites": "Never delete starred entries",
   "retention.labels": "Never delete entries with labels",
   "retention.legend": "Keeping entries",
