@@ -231,7 +231,7 @@ func TestUsersFromTheCommandLine(t *testing.T) {
 	}
 
 	code, stdout, stderr = runCLI(t, append([]string{"user", "delete"}, append(db, "alice")...)...)
-	if code != 0 || stdout != "user alice deleted\n" {
+	if code != 0 || stdout != "user alice deleted; bob is now the default user and an administrator\n" {
 		t.Fatalf("user delete: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	if login(t, address, "alice", "tr0ub4dor&3") != "" {
@@ -378,5 +378,82 @@ func TestUserCreateAdmin(t *testing.T) {
 			t.Errorf("%s: administrator %v, web hash %q, API hash %q; want administrator %v and one hash for both",
 				name, settings.IsAdmin, settings.PasswordHash, u.APIPasswordHash, want)
 		}
+	}
+}
+
+// Deleting the default user leaves the installation with another one, an
+// administrator, and takes the journal records of the deleted user along.
+func TestUserDeleteDefault(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "freshgo.sqlite")
+	db := []string{"-database-url", "sqlite://" + path}
+	ctx := context.Background()
+	inStore := func(do func(s *store.Store)) {
+		t.Helper()
+		s, err := store.Open(ctx, config.DriverSQLite, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = s.Close() }()
+		do(s)
+	}
+	create := func(name string) {
+		t.Helper()
+		if code, _, stderr := runCLIInput(t, "long enough\n", append(append([]string{"user", "create"}, db...), name)...); code != 0 {
+			t.Fatalf("user create %s: code %d, stderr %q", name, code, stderr)
+		}
+	}
+	remove := func(name, want string) {
+		t.Helper()
+		code, stdout, stderr := runCLI(t, append(append([]string{"user", "delete"}, db...), name)...)
+		if code != 0 || stdout != want {
+			t.Fatalf("user delete %s: code %d, stdout %q, stderr %q; want %q", name, code, stdout, stderr, want)
+		}
+	}
+	defaultUser := func() (name string) {
+		t.Helper()
+		inStore(func(s *store.Store) {
+			system, err := s.System(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			name = system.DefaultUser
+		})
+		return name
+	}
+
+	for _, name := range []string{"alice", "bob", "carol"} {
+		create(name)
+	}
+	inStore(func(s *store.Store) {
+		for _, name := range []string{"alice", "bob"} {
+			if err := s.AddLog(ctx, &store.Log{Time: 1, Level: "WARN", User: name, Message: "feed failed"}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
+
+	remove("carol", "user carol deleted\n")
+	if got := defaultUser(); got != "alice" {
+		t.Errorf("default user after deleting another user = %q, want alice", got)
+	}
+	remove("alice", "user alice deleted; bob is now the default user and an administrator\n")
+	if got := defaultUser(); got != "bob" {
+		t.Errorf("default user after deleting alice = %q, want bob", got)
+	}
+	inStore(func(s *store.Store) {
+		logs, err := s.Logs(ctx, store.LogQuery{})
+		if err != nil || len(logs) != 1 || logs[0].User != "bob" {
+			t.Errorf("journal after deleting alice = %+v, %v; want the record about bob only", logs, err)
+		}
+	})
+
+	// The last user goes, and the next one created becomes the default.
+	remove("bob", "user bob deleted\n")
+	if got := defaultUser(); got != "" {
+		t.Errorf("default user with no users = %q, want none", got)
+	}
+	create("dave")
+	if got := defaultUser(); got != "dave" {
+		t.Errorf("default user after creating a user into an empty installation = %q, want dave", got)
 	}
 }

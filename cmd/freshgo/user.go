@@ -233,9 +233,36 @@ func runUserDelete(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	if err := db.DeleteUser(ctx, u.ID); err != nil {
+	// The default user, if it was them, passes to another one.
+	successor, wasDefault := "", false
+	err = db.InTx(ctx, func(tx *store.Store) error {
+		system, err := tx.System(ctx)
+		if err != nil {
+			return err
+		}
+		wasDefault = system.DefaultUser == u.Name
+		if err := tx.DeleteUser(ctx, u.ID); err != nil {
+			return err
+		}
+		if err := tx.DeleteLogs(ctx, u.Name); err != nil {
+			return err
+		}
+		if !wasDefault {
+			return nil
+		}
+		if system, err = tx.System(ctx); err != nil {
+			return err
+		}
+		successor = system.DefaultUser
+		return tx.SetSystem(ctx, system)
+	})
+	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(e.stdout, "user %s deleted\n", name)
+	line := fmt.Sprintf("user %s deleted", name)
+	if wasDefault && successor != "" {
+		line += fmt.Sprintf("; %s is now the default user and an administrator", successor)
+	}
+	_, err = fmt.Fprintln(e.stdout, line)
 	return err
 }

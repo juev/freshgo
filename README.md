@@ -246,7 +246,7 @@ freshrss-password "…"
 | `refresh [-force]` | Refreshes the feeds that are due once, for cron; `-force` takes all of them. |
 | `purge` | Deletes old articles by the retention settings without waiting for a refresh. |
 | `import -data <dir>` | Imports a FreshRSS installation into an empty database. |
-| `user create [-admin]\|passwd\|delete <name>`, `user list` | Manages users. Deleting a user deletes their feeds and articles. |
+| `user create [-admin]\|passwd\|delete <name>`, `user list` | Manages users. Deleting a user deletes their feeds and articles; deleting the default user makes the oldest remaining user the default user and an administrator. |
 | `feed add -user <name> [-category <name>] <address>` | Subscribes a user to a feed and fetches it. |
 | `opml import -user <name> [<file>]`, `opml export -user <name>` | Reads subscriptions from a file or standard input; writes them to standard output. |
 | `version` | Prints the version. |
