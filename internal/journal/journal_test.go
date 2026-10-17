@@ -82,3 +82,35 @@ func TestHandler(t *testing.T) {
 		})
 	}
 }
+
+// A log that leaves warnings out still has them kept for the user.
+func TestHandlerBelowTheLevelOfTheLog(t *testing.T) {
+	ctx := context.Background()
+	driver, dsn := storetest.Engines()[0].New(t)
+	db, err := store.Open(ctx, driver, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	var out bytes.Buffer
+	h := New(slog.NewTextHandler(&out, &slog.HandlerOptions{Level: slog.LevelError}), db)
+	log := slog.New(h)
+	log.Info("feeds refreshed", "user", "alice")
+	log.Warn("feed failed", "user", "alice")
+	log.Error("request failed", "user", "alice")
+	h.Close()
+	logs, err := db.Logs(ctx, store.LogQuery{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, l := range logs {
+		got = append(got, l.Level+" "+l.Message)
+	}
+	if want := []string{"ERROR request failed", "WARN feed failed"}; strings.Join(got, "\n") != strings.Join(want, "\n") {
+		t.Errorf("records kept: %q, want %q", got, want)
+	}
+	if text := out.String(); strings.Count(text, "\n") != 1 || !strings.Contains(text, "request failed") {
+		t.Errorf("the log of the server:\n%s\nwant the error alone", text)
+	}
+}

@@ -72,7 +72,7 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 		return nil, err
 	}
 	// What goes wrong for a user is kept for the user to read as well.
-	kept := journal.New(slog.NewTextHandler(e.stderr, nil), db)
+	kept := journal.New(conf.LogHandler(e.stderr), db)
 	s := &services{registry: newHooks(), log: slog.New(kept), close: kept.Close, images: images}
 	s.registry.Init.Call(ctx, struct{}{})
 	s.icons = favicon.New(db, client, s.log)
