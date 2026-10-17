@@ -41,6 +41,8 @@ func (s *Store) CreateUser(ctx context.Context, u *User) error {
 		if err != nil {
 			return fmt.Errorf("store: create user %q: %w", u.Name, err)
 		}
+		// The default user may have been one who is gone.
+		tx.changedSystem()
 		system, err := tx.System(ctx)
 		if err != nil {
 			return err
@@ -149,6 +151,8 @@ func (s *Store) DeleteUser(ctx context.Context, userID int64) error {
 	if n == 0 {
 		return fmt.Errorf("store: delete user %d: %w", userID, ErrNotFound)
 	}
+	// They may have been the default user.
+	s.changedSystem()
 	return nil
 }
 

@@ -2,9 +2,12 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
+	"time"
 )
 
 // SettingSystem holds System as a JSON object.
@@ -123,7 +126,71 @@ func DefaultSystem() System {
 // defaults. A default user who is gone is replaced by the user created
 // first among those left, or by none, so that an installation keeps an
 // administrator as long as it has users.
+//
+// Every request asks for them, so outside a transaction they come from
+// what was read last: a change made through this Store is seen at once,
+// one made by another process, such as a command of freshgo run next to
+// the server, within systemTTL.
 func (s *Store) System(ctx context.Context) (System, error) {
+	if _, ok := s.q.(*sql.Tx); ok {
+		return s.readSystem(ctx)
+	}
+	return s.system.get(s.now(), func() (System, error) { return s.readSystem(ctx) })
+}
+
+// systemTTL is how long System answers from what it read.
+const systemTTL = 5 * time.Second
+
+// systemCache holds what System read last. A Store shares it with the
+// Stores of its transactions.
+type systemCache struct {
+	mu    sync.Mutex
+	value System
+	// read is when value was read; zero when there is none.
+	read time.Time
+	// version counts the changes, so that a value read before one is not
+	// kept after it.
+	version uint64
+}
+
+func (c *systemCache) get(now time.Time, read func() (System, error)) (System, error) {
+	c.mu.Lock()
+	if !c.read.IsZero() && now.Sub(c.read) < systemTTL {
+		defer c.mu.Unlock()
+		return c.value, nil
+	}
+	version := c.version
+	c.mu.Unlock()
+	value, err := read()
+	if err != nil {
+		return System{}, err
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.version == version {
+		c.value, c.read = value, now
+	}
+	return value, nil
+}
+
+func (c *systemCache) forget() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.read = time.Time{}
+	c.version++
+}
+
+// changedSystem tells the cache of System that what it holds is out of
+// date: at once, or when the transaction is committed.
+func (s *Store) changedSystem() {
+	if s.systemChanged != nil {
+		*s.systemChanged = true
+		return
+	}
+	s.system.forget()
+}
+
+func (s *Store) readSystem(ctx context.Context) (System, error) {
 	system := DefaultSystem()
 	stored, err := s.Setting(ctx, SettingSystem)
 	if errors.Is(err, ErrNotFound) {
