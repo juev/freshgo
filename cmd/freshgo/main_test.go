@@ -3,6 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"runtime/debug"
 	"strings"
@@ -86,9 +89,19 @@ func TestImport(t *testing.T) {
 }
 
 func TestImportUsage(t *testing.T) {
-	database := "sqlite://" + filepath.Join(t.TempDir(), "freshgo.sqlite")
+	path := filepath.Join(t.TempDir(), "freshgo.sqlite")
+	database := "sqlite://" + path
 	if code, _, stderr := runCLI(t, "import", "-database-url", database); code != 1 || !strings.Contains(stderr, "-data is required") {
 		t.Errorf("import without -data: code %d, stderr %q", code, stderr)
+	}
+	for _, data := range []string{filepath.Join(t.TempDir(), "missing"), t.TempDir(), "main_test.go"} {
+		if code, _, stderr := runCLI(t, "import", "-database-url", database, "-data", data); code != 1 || !strings.Contains(stderr, "not a FreshRSS data directory") {
+			t.Errorf("import from %s: code %d, stderr %q", data, code, stderr)
+		}
+	}
+	// The database is checked before it is made.
+	if _, err := os.Stat(path); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("a refused import left %s behind: %v", path, err)
 	}
 	if code, _, stderr := runCLI(t, "import", "-database-url", "mysql://x", "-data", "."); code != 1 || !strings.Contains(stderr, "unknown scheme") {
 		t.Errorf("import into MySQL: code %d, stderr %q", code, stderr)
