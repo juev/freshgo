@@ -103,6 +103,10 @@ type Handler struct {
 	guard       *authguard.Guard
 	// letters holds back letters to one user after the first few.
 	letters authguard.Guard
+	// registrants holds back registrations from one address after the
+	// first few, registered caps them for everybody.
+	registrants authguard.Guard
+	registered  window
 	decoys  authguard.Decoys
 	now     func() time.Time
 	images  Fetcher

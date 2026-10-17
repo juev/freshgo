@@ -541,9 +541,14 @@
   "refresh.submit": "Refresh",
   "register.accept": "I accept the",
   "register.again": "Password, again",
+  "register.busy": "Too many accounts were made here in the last hour. Try again later.",
   "register.closed": "Nobody can register here at the moment. Ask the administrator for an account.",
   "register.email.hint": "A letter with a link goes to this address; the account works once the link is followed.",
   "register.heading": "Create an account",
+  "register.locked": {
+    "one": "Too many accounts from your address. Try again in %d minute.",
+    "other": "Too many accounts from your address. Try again in %d minutes."
+  },
   "register.no-mail": "Nobody can register here: the server cannot send the letter that confirms an address.",
   "register.problem.terms": "The terms have to be accepted.",
   "register.submit": "Create the account",
