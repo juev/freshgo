@@ -44,6 +44,16 @@ func Engines() []Engine {
 func PostgresSchema(t testing.TB) string {
 	t.Helper()
 	admin, base := postgresAdmin(t)
+	// An extension is one per database. Created by the migrations of a test,
+	// it would be in the schema of that test and go with it, and take the
+	// indexes of the other tests along.
+	if _, err := admin.Exec("CREATE EXTENSION IF NOT EXISTS pg_trgm SCHEMA public"); err != nil {
+		// Another test, in a process of its own, may have created it meanwhile.
+		var created bool
+		if found := admin.QueryRow("SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm')").Scan(&created); found != nil || !created {
+			t.Fatalf("create extension pg_trgm: %v", err)
+		}
+	}
 	schema := uniqueName()
 	if _, err := admin.Exec("CREATE SCHEMA " + schema); err != nil {
 		t.Fatalf("create schema: %v", err)

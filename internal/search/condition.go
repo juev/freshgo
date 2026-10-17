@@ -31,16 +31,22 @@ const (
 	CondPublished
 	CondModified
 	CondUserModified
+	// CondTitle and CondContent hold when the title, or the content, folded
+	// by Fold contains Text. Match has the last word on texts: these only
+	// let a database leave out what cannot match.
+	CondTitle
+	CondContent
 )
 
-// Condition is a test on what a database keeps of an entry apart from its
-// texts: identifiers, labels and times.
+// Condition is a test on what a database keeps of an entry: identifiers,
+// labels, times, and the texts as far as an index can tell.
 type Condition struct {
 	Kind     ConditionKind
 	Of       []*Condition
 	IDs      []int64
 	Names    []string
 	Min, Max int64
+	Text     string
 }
 
 func always() *Condition { return &Condition{Kind: CondAnd} }
@@ -87,8 +93,8 @@ func oneOf(kind ConditionKind, ids []int64) *Condition {
 }
 
 // Condition returns a test every entry the query matches passes. It is as
-// narrow as the query allows without looking at texts, so that a database
-// can leave out the entries that cannot match before Match reads the rest.
+// narrow as the query allows without matching texts, so that a database can
+// leave out the entries that cannot match before Match reads the rest.
 func (q *Query) Condition() *Condition {
 	c, _ := q.condition()
 	if c.size() > maxConditionSize {
@@ -201,6 +207,22 @@ func (t *term) condition() (c *Condition, exact bool) {
 		if d.excluded.max != 0 {
 			add(not(&Condition{Kind: d.kind, Max: d.excluded.max}))
 		}
+	}
+
+	// Strings the title or the content has to contain narrow the entries
+	// down; what they must not contain, and expressions, are left to Match.
+	inTitle := func(needle string) *Condition { return &Condition{Kind: CondTitle, Text: Fold(needle)} }
+	inContent := func(needle string) *Condition {
+		return &Condition{Kind: CondContent, Text: Fold(inHTML.Replace(needle))}
+	}
+	for _, needle := range t.intitle.plain {
+		add(inTitle(needle))
+	}
+	for _, needle := range t.intext.plain {
+		add(inContent(needle))
+	}
+	for _, needle := range t.search.plain {
+		add(either(inTitle(needle), inContent(needle)))
 	}
 
 	for _, texts := range []texts{

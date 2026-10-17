@@ -24,6 +24,12 @@ type migration struct {
 	sql     string
 }
 
+// migrationSteps are what a migration needs done beside its SQL: filling
+// what SQL cannot compute. They run after the SQL, in its transaction.
+var migrationSteps = map[int]func(ctx context.Context, tx *Store) error{
+	16: func(ctx context.Context, tx *Store) error { return tx.indexAllTexts(ctx) },
+}
+
 // loadMigrations reads migrations/<engine>/NNNN_<name>.sql in version order.
 func loadMigrations(driver config.Driver) ([]migration, error) {
 	dir := "migrations/" + string(driver)
@@ -104,6 +110,11 @@ func (s *Store) migrate(ctx context.Context) error {
 			// No arguments: both drivers then accept several statements at once.
 			if _, err := tx.q.ExecContext(ctx, m.sql); err != nil {
 				return fmt.Errorf("store: migration %d: %w", m.version, err)
+			}
+			if step := migrationSteps[m.version]; step != nil {
+				if err := step(ctx, tx); err != nil {
+					return fmt.Errorf("store: migration %d: %w", m.version, err)
+				}
 			}
 			if _, err := tx.exec(ctx, "INSERT INTO schema_migrations (version) VALUES (?)", m.version); err != nil {
 				return fmt.Errorf("store: migration %d: %w", m.version, err)

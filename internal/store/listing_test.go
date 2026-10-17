@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/juev/freshgo/internal/config"
 	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/storetest"
 )
@@ -417,6 +418,145 @@ func TestSearchListsWhatMatches(t *testing.T) {
 			t.Errorf("a search among the unread of a feed: %v, want %v", got, want)
 		}
 	})
+}
+
+// The strings of a search are looked up in the index of the texts before
+// the entries are matched: whatever the index takes a string for, a search
+// lists what Match picks, and only among the entries the index names.
+func TestSearchNarrowsByIndex(t *testing.T) {
+	texts := []struct{ title, content string }{
+		{"Trusted sources", "<p>nothing here</p>"},
+		{"Привет", "<p>МИР &amp; дружба</p>"},
+		{`Say "hi" 100% of_the time`, `<p>a\b</p>`},
+		{"Go", "<p>ÉCOLE</p>"},
+		{"plain", "<p>plain</p>"},
+		{"abcd bcda", "<p>x</p>"},
+	}
+	queries := []string{
+		"rust", "TRUST", "intitle:sources", "intext:sources", "привет", "мир", "intext:мир", `"мир & дружба"`, `"& д"`,
+		`"say ""hi"""`, `'"hi"'`, `intitle:'"hi" 1'`, "100%", "of_the", "f_t", `a\b`, "école", "go", "o", "plain OR rust",
+		"-rust", "!rust", "rust OR -plain", "/rust/i", "intitle:/^go$/i plain", "nowhere", "(rust) (sources)",
+		// The trigrams of the string are all in a title, but the string is not.
+		"abcda",
+		// More trigrams than are asked of the index.
+		`"trusted sources trusted sources trusted sources trusted"`, `"` + strings.Repeat("trusted ", 40) + `"`,
+	}
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		u := mustUser(t, s, "alice")
+		f := mustFeed(t, s, u.ID, "https://example.org/feed")
+		var entries []*Entry
+		for i, text := range texts {
+			entries = append(entries, &Entry{FeedID: f.ID, GUID: strconv.Itoa(i), Title: text.title, Content: text.content})
+		}
+		if err := s.InsertEntries(ctx, u.ID, entries); err != nil {
+			t.Fatal(err)
+		}
+		check := func(stage string, entries []*Entry) {
+			t.Helper()
+			for _, text := range queries {
+				q, err := search.Parse(text, search.Options{})
+				if err != nil {
+					t.Fatalf("%q: %v", text, err)
+				}
+				var want []int64
+				for _, e := range slices.Backward(entries) {
+					if q.Match(&search.Entry{ID: e.ID, FeedID: e.FeedID, Title: e.Title, Content: e.Content}) {
+						want = append(want, e.ID)
+					}
+				}
+				if got, _ := pages(t, s, u.ID, Listing{Search: q}); !reflect.DeepEqual(got, want) {
+					t.Errorf("%s: %q lists %v; Match picks %v", stage, text, got, want)
+				}
+			}
+		}
+		check("as added", entries)
+
+		// A text that changes is looked up as it is now.
+		entries[0].Title, entries[0].Content = "Rusty", "<p>sources</p>"
+		if err := s.UpdateEntry(ctx, entries[0]); err != nil {
+			t.Fatal(err)
+		}
+		check("after an update", entries)
+
+		// What the index does not hold is not found, unless the string is
+		// too short for the index to be asked.
+		if _, err := s.exec(ctx, `DELETE FROM entry_texts WHERE user_id = ? AND entry_id = ?`, u.ID, entries[0].ID); err != nil {
+			t.Fatal(err)
+		}
+		for text, want := range map[string]int{"rusty": 0, "sources": 0, "ru": 1} {
+			q, err := search.Parse(text, search.Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, _ := pages(t, s, u.ID, Listing{Search: q}); len(got) != want {
+				t.Errorf("%q with the texts of the entry out of the index: %v; want %d entries", text, got, want)
+			}
+		}
+
+		// An entry that is deleted leaves the index with it.
+		if err := s.DeleteFeed(ctx, u.ID, f.ID); err != nil {
+			t.Fatal(err)
+		}
+		var left int
+		if err := s.queryRow(ctx, `SELECT COUNT(*) FROM entry_texts`).Scan(&left); err != nil || left != 0 {
+			t.Errorf("after the feed was deleted: %d texts indexed, %v; want none", left, err)
+		}
+		if s.driver == config.DriverSQLite {
+			if err := s.queryRow(ctx, `SELECT COUNT(*) FROM entry_search WHERE entry_search MATCH '"pla"'`).Scan(&left); err != nil || left != 0 {
+				t.Errorf("after the feed was deleted: %d rows of the trigrams find plain, %v; want none", left, err)
+			}
+		}
+	})
+}
+
+// The migration that adds the index of the texts fills it with the entries
+// stored before it.
+func TestMigrationIndexesTexts(t *testing.T) {
+	ctx := context.Background()
+	for _, e := range storetest.Engines() {
+		t.Run(e.Name, func(t *testing.T) {
+			driver, dsn := e.New(t)
+			s, err := Open(ctx, driver, dsn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			u := mustUser(t, s, "alice")
+			f := mustFeed(t, s, u.ID, "https://example.org/feed")
+			var entries []*Entry
+			// More than one batch.
+			for i := range textBatch + 1 {
+				entries = append(entries, &Entry{FeedID: f.ID, GUID: strconv.Itoa(i), Title: "Entry " + strconv.Itoa(i), Content: "<p>Body</p>"})
+			}
+			entries[textBatch].Content = "<p>Xylophone</p>"
+			if err := s.InsertEntries(ctx, u.ID, entries); err != nil {
+				t.Fatal(err)
+			}
+			for _, q := range []string{"DROP TABLE entry_texts", "DROP TABLE IF EXISTS entry_search", "DELETE FROM schema_migrations WHERE version >= 16"} {
+				if _, err := s.exec(ctx, q); err != nil {
+					t.Fatalf("%s: %v", q, err)
+				}
+			}
+			if err := s.Close(); err != nil {
+				t.Fatal(err)
+			}
+
+			s, err = Open(ctx, driver, dsn)
+			if err != nil {
+				t.Fatalf("Open again: %v", err)
+			}
+			t.Cleanup(func() { _ = s.Close() })
+			for text, want := range map[string]int{"xylophone": 1, "body": textBatch, "entry 1": 111} {
+				q, err := search.Parse(`"`+text+`"`, search.Options{})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got, _ := pages(t, s, u.ID, Listing{Search: q}); len(got) != want {
+					t.Errorf("%q after the migration: %d entries; want %d", text, len(got), want)
+				}
+			}
+		})
+	}
 }
 
 // R6: on 100 000 entries the first page of a search that one entry matches,
