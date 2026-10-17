@@ -532,6 +532,9 @@ func (u *userImport) feeds() error {
 		}
 		f.Attributes = u.attributes(attributes.String, "feed %d", f.ID)
 		u.checkAttributeFilters(f.Attributes, fmt.Sprintf("feed %d (%s)", f.ID, f.URL))
+		if err := fetch.FeedProxy(f.Attributes); errors.Is(err, fetch.ErrUnsupportedProxy) {
+			u.warnf("feed %d (%s): %v; the feed fails to refresh until another proxy is chosen in its settings", f.ID, f.URL, err)
+		}
 		if err := u.dst.CreateFeed(u.ctx, f); err != nil {
 			return err
 		}

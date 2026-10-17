@@ -413,10 +413,8 @@ func (c *Client) do(ctx context.Context, u *url.URL, h *hop) (status int, header
 func (c *Client) transport(p Params, trusted bool) (*http.Transport, error) {
 	key := transportKey{insecure: p.Insecure, trusted: trusted}
 	if p.Proxy != nil {
-		switch p.Proxy.Scheme {
-		case "http", "https", "socks5", "socks5h":
-		default:
-			return nil, fmt.Errorf("%w: %s", ErrUnsupportedProxy, p.Proxy.Scheme)
+		if err := checkScheme(p.Proxy); err != nil {
+			return nil, err
 		}
 		key.proxy = p.Proxy.String()
 	}

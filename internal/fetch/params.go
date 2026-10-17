@@ -175,11 +175,31 @@ func ParseProxy(address string) (*url.URL, error) {
 	if err != nil || proxy.Host == "" {
 		return nil, fmt.Errorf("proxy address is malformed")
 	}
+	if err := checkScheme(proxy); err != nil {
+		return nil, err
+	}
+	return proxy, nil
+}
+
+// checkScheme tells whether requests can go through proxy.
+func checkScheme(proxy *url.URL) error {
 	switch proxy.Scheme {
 	case "http", "https", "socks5", "socks5h":
-		return proxy, nil
+		return nil
 	}
-	return nil, fmt.Errorf("%w: %s", ErrUnsupportedProxy, proxy.Scheme)
+	return fmt.Errorf("%w: %s", ErrUnsupportedProxy, proxy.Scheme)
+}
+
+// FeedProxy tells whether the proxy the attributes of a feed name is one
+// requests can go through. A feed of FreshRSS may keep a SOCKS4 or SOCKS4A
+// proxy, which FeedParams reads so that nothing of the feed is requested
+// past it, and every request of the feed fails with ErrUnsupportedProxy.
+func FeedProxy(attributes json.RawMessage) error {
+	p, err := FeedParams("", attributes)
+	if err != nil || p.Proxy == nil {
+		return err
+	}
+	return checkScheme(p.Proxy)
 }
 
 // headers reads a list of "Name: value" lines. After FreshRSS has filtered

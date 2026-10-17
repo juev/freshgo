@@ -127,6 +127,24 @@ func TestFeedParamsErrors(t *testing.T) {
 	}
 }
 
+// A proxy no request goes through is told before a request is made.
+func TestFeedProxy(t *testing.T) {
+	for attributes, unusable := range map[string]bool{
+		``: false,
+		`{"curl_params":{"101":5,"10004":"127.0.0.1:1080"}}`:                           false,
+		`{"curl_params":{"101":-1}}`:                                                   false,
+		`{"curl_params":{"101":4}}`:                                                    false,
+		`{"curl_params":{"101":4,"10004":"127.0.0.1:1080"}}`:                           true,
+		`{"curl_params":{"101":6,"10004":"127.0.0.1:1080"}}`:                           true,
+		`{"curl_params":{"101":42,"10004":"127.0.0.1:1080"}}`:                          true,
+		`{"installation_proxy":true,"curl_params":{"101":4,"10004":"127.0.0.1:1080"}}`: false,
+	} {
+		if err := FeedProxy(json.RawMessage(attributes)); errors.Is(err, ErrUnsupportedProxy) != unusable {
+			t.Errorf("%s: %v, want unusable %v", attributes, err, unusable)
+		}
+	}
+}
+
 // The settings read from a feed reach the wire.
 func TestFeedParamsApplied(t *testing.T) {
 	var got *http.Request

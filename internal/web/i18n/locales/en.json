@@ -209,6 +209,7 @@
   "feed.priority.hidden": "Hidden: on the page of the feed only",
   "feed.priority.important": "In the main stream, as important",
   "feed.priority.main": "In the main stream",
+  "feed.problem.proxy": "The server does not go through SOCKS4 and SOCKS4A proxies: the feed fails at every refresh until another kind of proxy is chosen, SOCKS5 for instance.",
   "feed.proxy": "Proxy",
   "feed.proxy.address": "Address of the proxy",
   "feed.proxy.direct": "None, whatever the installation has",

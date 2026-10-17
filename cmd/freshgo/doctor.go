@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -44,6 +45,11 @@ func (c *checkup) fail(name string, err error) {
 
 func (c *checkup) skip(name, why string) {
 	c.line("skip  %s: %s", name, why)
+}
+
+// warn reports what works, but not as the administrator may think.
+func (c *checkup) warn(name, text string) {
+	c.line("warn  %s: %s", name, text)
 }
 
 // check runs one check against another server, within doctorTimeout.
@@ -153,6 +159,7 @@ func (c *checkup) databaseChecks(ctx context.Context, db *store.Store, oidcSecre
 		}
 	}
 
+	c.feedProxies(ctx, db)
 	failing, err := db.FailingFeeds(ctx)
 	if err != nil {
 		c.fail("feeds", err)
@@ -170,6 +177,38 @@ func (c *checkup) databaseChecks(ctx context.Context, db *store.Store, oidcSecre
 	c.fail("feeds", fmt.Errorf("%d of %d fail", len(failing), total))
 	for _, f := range failing {
 		c.line("      %s  %d  %s  since %s", f.User, f.ID, withoutCredentials(f.URL), time.Unix(f.Since, 0).UTC().Format(time.DateTime))
+	}
+}
+
+// feedProxies lists the feeds set to a proxy no request goes through, as
+// FreshRSS lets SOCKS4 be: they fail at every refresh until another is
+// chosen.
+func (c *checkup) feedProxies(ctx context.Context, db *store.Store) {
+	users, err := db.Users(ctx)
+	if err != nil {
+		c.fail("proxies", err)
+		return
+	}
+	var unusable []string
+	for _, u := range users {
+		feeds, err := db.Feeds(ctx, u.ID)
+		if err != nil {
+			c.fail("proxies", err)
+			return
+		}
+		for _, f := range feeds {
+			if err := fetch.FeedProxy(f.Attributes); errors.Is(err, fetch.ErrUnsupportedProxy) {
+				unusable = append(unusable, fmt.Sprintf("      %s  %d  %s  %v", u.Name, f.ID, withoutCredentials(f.URL), err))
+			}
+		}
+	}
+	if len(unusable) == 0 {
+		c.ok("proxies", "every proxy of a feed is one freshgo goes through")
+		return
+	}
+	c.warn("proxies", fmt.Sprintf("%d feeds fail until another proxy is chosen in their settings", len(unusable)))
+	for _, l := range unusable {
+		c.line("%s", l)
 	}
 }
 

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -659,6 +660,7 @@ func TestImportWarnings(t *testing.T) {
 	sourceExec(t, dir, "alice", `UPDATE feed SET httpAuth = 'dXNlcjpwYXNz!!!' WHERE id = 5`)
 	// A filter with a backreference, which Go's regular expressions lack, next to one that is fine.
 	sourceExec(t, dir, "alice", `UPDATE feed SET attributes = '{"filters":[{"search":"intitle:/(a)\\1/ ads","actions":["read"]},{"search":"intitle:ads","actions":["read"]}]}' WHERE id = 6`)
+	sourceExec(t, dir, "alice", `UPDATE feed SET attributes = '{"curl_params":{"101":4,"10004":"10.0.0.1:1080"}}' WHERE id = 7`)
 	if err := os.Mkdir(filepath.Join(dir, "users", "leftover"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -706,6 +708,7 @@ func TestImportWarnings(t *testing.T) {
 		"user alice: feed 5 (http://feeds.freshgo.test/feed.json): HTTP credentials are not valid base64",
 		"users/leftover has no config.php",
 		`user alice: feed 6 (http://feeds.freshgo.test/api.json): filter "intitle:/(a)\\1/ ads": search: regular expression is not supported`,
+		"user alice: feed 7 (",
 	} {
 		found := false
 		for _, w := range report.Warnings {
@@ -715,8 +718,13 @@ func TestImportWarnings(t *testing.T) {
 			t.Errorf("no warning starting with %q in %q", want, report.Warnings)
 		}
 	}
-	if len(report.Warnings) != 8 {
-		t.Errorf("%d warnings, want 8: %q", len(report.Warnings), report.Warnings)
+	if len(report.Warnings) != 9 {
+		t.Errorf("%d warnings, want 9: %q", len(report.Warnings), report.Warnings)
+	}
+	if w := report.Warnings; !slices.ContainsFunc(w, func(w string) bool {
+		return strings.HasPrefix(w, "user alice: feed 7 (") && strings.Contains(w, "unsupported proxy type: socks4;")
+	}) {
+		t.Errorf("no warning names the SOCKS4 proxy of feed 7: %q", w)
 	}
 
 	alice, err := dst.UserByName(ctx, "alice")

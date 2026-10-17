@@ -52,6 +52,7 @@ func TestDoctor(t *testing.T) {
 	for _, f := range []*store.Feed{
 		{UserID: alice.ID, URL: "https://example.org/feed"},
 		{UserID: alice.ID, URL: "https://reader:secret@example.org/private", Error: 1760000000},
+		{UserID: alice.ID, URL: "https://example.org/behind", Attributes: json.RawMessage(`{"curl_params":{"101":4,"10004":"10.0.0.1:1080"}}`)},
 	} {
 		if err := db.CreateFeed(ctx, f); err != nil {
 			t.Fatal(err)
@@ -103,7 +104,8 @@ func TestDoctor(t *testing.T) {
 		"settings":      "ok    settings:",
 		"oidc":          "FAIL  oidc: ",
 		"translate":     "FAIL  translate: ",
-		"feeds":         "FAIL  feeds: 1 of 2 fail",
+		"proxies":       "warn  proxies: 1 feeds fail until another proxy is chosen",
+		"feeds":         "FAIL  feeds: 1 of 3 fail",
 	} {
 		if got := line(lines, name); !strings.HasPrefix(got, want) {
 			t.Errorf("%s: %q, want %q…", name, got, want)
@@ -112,6 +114,9 @@ func TestDoctor(t *testing.T) {
 	output := strings.Join(lines, "\n")
 	if !strings.Contains(output, "alice  2  https://example.org/private  since 2025-10-09 08:53:20") {
 		t.Errorf("the failing feed is not listed:\n%s", output)
+	}
+	if !strings.Contains(output, "alice  3  https://example.org/behind  unsupported proxy type: socks4") {
+		t.Errorf("the feed behind SOCKS4 is not listed:\n%s", output)
 	}
 	if strings.Contains(output, "secret") {
 		t.Errorf("the output shows a password:\n%s", output)
