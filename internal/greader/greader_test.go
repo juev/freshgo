@@ -271,6 +271,100 @@ func TestHiddenFeed(t *testing.T) {
 	})
 }
 
+// A15: a listing without a limit answers everything, in pages read one after
+// another, and the answer goes out as the pages are read.
+func TestUnlimitedListing(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		f := w.feed(w.alice, &store.Feed{Name: "Feed", Priority: priorityMain})
+		const total = 250 // more than one chunk of a listing
+		entries := make([]*store.Entry, total)
+		for i := range entries {
+			entries[i] = &store.Entry{ID: int64(i+1) * second, FeedID: f.ID, Title: fmt.Sprintf("entry %d", i), Content: "text"}
+		}
+		w.entries(w.alice, entries...)
+
+		id := func(n int) string { return itemPrefix + fmt.Sprintf("%016x", int64(n)*second) }
+		listing := "/reader/api/0/stream/contents/user/-/state/com.google/reading-list"
+
+		var answer struct {
+			Items        []shownItem
+			Continuation string
+		}
+		w.json(listing+"?n=0", &answer)
+		if len(answer.Items) != total {
+			t.Fatalf("n=0 answered %d items, want %d", len(answer.Items), total)
+		}
+		for i, it := range answer.Items {
+			if want := id(total - i); it.ID != want {
+				t.Fatalf("item %d of n=0 = %s, want %s", i, it.ID, want)
+			}
+		}
+		if want := strconv.FormatInt(1*second, 10); answer.Continuation != want {
+			t.Errorf("continuation of n=0 = %q, want %q", answer.Continuation, want)
+		}
+
+		// The oldest first reads the chunks in the other direction.
+		answer.Items, answer.Continuation = nil, ""
+		w.json(listing+"?n=0&r=o", &answer)
+		if len(answer.Items) != total || answer.Items[0].ID != id(1) || answer.Items[total-1].ID != id(total) {
+			t.Fatalf("n=0 with r=o answered %d items, first %v", len(answer.Items), answer.Items)
+		}
+		if want := strconv.FormatInt(total*second, 10); answer.Continuation != want {
+			t.Errorf("continuation of n=0 with r=o = %q, want %q", answer.Continuation, want)
+		}
+
+		// A bound of time keeps the entries it selects, across chunks too.
+		answer.Items, answer.Continuation = nil, ""
+		w.json(listing+"?n=0&ot=100", &answer)
+		if selected := total - 99; len(answer.Items) != selected ||
+			answer.Items[0].ID != id(total) || answer.Items[len(answer.Items)-1].ID != id(100) {
+			t.Errorf("n=0 with ot answered %d items, from %v", len(answer.Items), answer.Items)
+		}
+
+		// A page ends inside a chunk and the next one starts at its last item.
+		var first, next struct {
+			Items        []shownItem
+			Continuation string
+		}
+		w.json(listing+"?n=100", &first)
+		if len(first.Items) != 100 || first.Items[0].ID != id(total) || first.Items[99].ID != id(total-99) {
+			t.Fatalf("n=100 answered %d items", len(first.Items))
+		}
+		if want := strconv.FormatInt(int64(total-99)*second, 10); first.Continuation != want {
+			t.Fatalf("continuation of n=100 = %q, want %q", first.Continuation, want)
+		}
+		w.json(listing+"?n=100&c="+first.Continuation, &next)
+		if len(next.Items) != 100 || next.Items[0].ID != id(total-100) || next.Items[99].ID != id(total-199) {
+			t.Fatalf("the page after %q answered %d items", first.Continuation, len(next.Items))
+		}
+
+		// The layout is the one FreshRSS writes: one item per line, the
+		// opening and the closing of the list lines of their own.
+		status, body := w.get(w.auth, listing+"?n=0")
+		if status != http.StatusOK {
+			t.Fatalf("n=0: status %d, body %q", status, body)
+		}
+		lines := strings.Split(body, "\n")
+		if len(lines) != total+8 {
+			t.Fatalf("n=0 answered %d lines, want %d:\n%s", len(lines), total+8, body)
+		}
+		if lines[0] != "{" || lines[1] != "\t\"id\": \""+stateReadingList+"\"," ||
+			!strings.HasPrefix(lines[2], "\t\"updated\": ") || lines[3] != "\t\"items\": [" {
+			t.Errorf("the opening of the answer:\n%s", strings.Join(lines[:4], "\n"))
+		}
+		for i, line := range lines[4 : 4+total] {
+			// The comma that separates the items belongs to the line of the
+			// item before the next one.
+			if !json.Valid([]byte(strings.TrimSuffix(line, ","))) {
+				t.Fatalf("item %d is not one line of JSON: %q", i, line)
+			}
+		}
+		if lines[4+total] != "\t]," || !strings.HasPrefix(lines[5+total], "\t\"continuation\": \"") || lines[6+total] != "}" {
+			t.Errorf("the closing of the answer:\n%s", strings.Join(lines[4+total:], "\n"))
+		}
+	})
+}
+
 // How an entry is shown when it lacks a title or a link, and how a feed
 // without a name is called.
 func TestItemFallbacks(t *testing.T) {
