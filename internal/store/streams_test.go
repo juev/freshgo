@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -194,9 +195,9 @@ func TestMarkEntries(t *testing.T) {
 		}
 
 		// Entry 1 is read already: only entry 2 changes and is stamped.
-		n, err := s.SetEntriesRead(ctx, lib.alice.ID, []int64{e1, e2, 12345}, true, 77)
-		if err != nil || n != 1 {
-			t.Errorf("SetEntriesRead = %d, %v; want 1 changed entry", n, err)
+		changed, err := s.SetEntriesRead(ctx, lib.alice.ID, []int64{e1, e2, 12345}, true, 77)
+		if slices.Sort(changed); err != nil || !reflect.DeepEqual(changed, []int64{e2}) {
+			t.Errorf("SetEntriesRead = %v, %v; want entry 2 changed", changed, err)
 		}
 		if got := entry(lib.alice, e1); !got.IsRead || got.LastUserModified != 0 {
 			t.Errorf("entry 1 = read %v, changed by the user at %d; want read and untouched", got.IsRead, got.LastUserModified)
@@ -204,8 +205,8 @@ func TestMarkEntries(t *testing.T) {
 		if got := entry(lib.alice, e2); !got.IsRead || got.LastUserModified != 77 {
 			t.Errorf("entry 2 = read %v, changed by the user at %d; want read at 77", got.IsRead, got.LastUserModified)
 		}
-		if n, err := s.SetEntriesRead(ctx, lib.alice.ID, []int64{e1, e2}, false, 78); err != nil || n != 2 {
-			t.Errorf("SetEntriesRead(unread) = %d, %v; want 2", n, err)
+		if changed, err := s.SetEntriesRead(ctx, lib.alice.ID, []int64{e1, e2}, false, 78); err != nil || len(changed) != 2 {
+			t.Errorf("SetEntriesRead(unread) = %v, %v; want 2", changed, err)
 		}
 
 		// Starring stamps every entry, changed or not.
@@ -244,22 +245,22 @@ func TestMarkSetRead(t *testing.T) {
 		}
 		// Unread at the start: entries 2, 4, 5 and 6.
 		for _, step := range []struct {
-			name  string
-			set   EntrySet
-			maxID int64
-			count int
-			left  []int64
+			name    string
+			set     EntrySet
+			maxID   int64
+			changed []int64
+			left    []int64
 		}{
-			{"a feed up to an entry", EntrySet{FeedID: 2}, e3, 0, []int64{e2, e4, e5, e6}},
-			{"a category without its important feeds", EntrySet{CategoryID: 2, MinPriority: intPtr(0), BelowPriority: intPtr(20)}, e7, 1, []int64{e2, e5, e6}},
-			{"a label", EntrySet{LabelID: 1}, e7, 1, []int64{e5, e6}},
-			{"everything shown up to an entry", EntrySet{MinPriority: intPtr(-9)}, e4, 0, []int64{e5, e6}},
-			{"everything shown", EntrySet{MinPriority: intPtr(-9)}, e7, 1, []int64{e6}},
-			{"everything", EntrySet{}, e7, 1, nil},
+			{"a feed up to an entry", EntrySet{FeedID: 2}, e3, nil, []int64{e2, e4, e5, e6}},
+			{"a category without its important feeds", EntrySet{CategoryID: 2, MinPriority: intPtr(0), BelowPriority: intPtr(20)}, e7, []int64{e4}, []int64{e2, e5, e6}},
+			{"a label", EntrySet{LabelID: 1}, e7, []int64{e2}, []int64{e5, e6}},
+			{"everything shown up to an entry", EntrySet{MinPriority: intPtr(-9)}, e4, nil, []int64{e5, e6}},
+			{"everything shown", EntrySet{MinPriority: intPtr(-9)}, e7, []int64{e5}, []int64{e6}},
+			{"everything", EntrySet{}, e7, []int64{e6}, nil},
 		} {
-			n, err := s.MarkSetRead(ctx, lib.alice.ID, step.set, step.maxID, 90)
-			if err != nil || n != step.count {
-				t.Errorf("%s: MarkSetRead = %d, %v; want %d", step.name, n, err, step.count)
+			changed, err := s.MarkSetRead(ctx, lib.alice.ID, step.set, step.maxID, 90)
+			if slices.Sort(changed); err != nil || !reflect.DeepEqual(changed, step.changed) {
+				t.Errorf("%s: MarkSetRead = %v, %v; want %v", step.name, changed, err, step.changed)
 			}
 			if got := unread(lib.alice); !reflect.DeepEqual(got, step.left) {
 				t.Errorf("%s: unread = %v, want %v", step.name, got, step.left)

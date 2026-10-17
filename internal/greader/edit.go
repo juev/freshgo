@@ -40,8 +40,8 @@ func (h *Handler) editTag(ctx context.Context, q *request) error {
 	ids := entryIDs(q.posted("i"))
 	now := h.now().Unix()
 	setRead := func(read bool) error {
-		n, err := h.db.SetEntriesRead(ctx, q.user.ID, ids, read, now)
-		if err == nil && n > 0 {
+		changed, err := h.db.SetEntriesRead(ctx, q.user.ID, ids, read, now)
+		if err == nil && len(changed) > 0 {
 			h.hooks.EntriesRead.Call(ctx, hooks.EntriesRead{UserID: q.user.ID, IDs: ids, IsRead: read})
 		}
 		return err

@@ -575,14 +575,15 @@ func (h *Handler) saveCategory(w http.ResponseWriter, r *http.Request) {
 
 // categoryAction does something to a category and sends the reader on with
 // what came of it.
-func (h *Handler) categoryAction(act func(ctx context.Context, user *store.User, c *store.Category) (notice string, n int, target string, err error)) http.HandlerFunc {
+// An action that can be taken back returns what does it, nil otherwise.
+func (h *Handler) categoryAction(act func(ctx context.Context, user *store.User, c *store.Category) (notice string, n int, target string, undo func(ctx context.Context) error, err error)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, user := r.Context(), state(r).who.user
 		c, ok := h.ownCategory(w, r)
 		if !ok || !h.form(w, r) {
 			return
 		}
-		notice, n, target, err := act(ctx, user, c)
+		notice, n, target, undo, err := act(ctx, user, c)
 		if ctx.Err() != nil {
 			return
 		}
@@ -590,54 +591,74 @@ func (h *Handler) categoryAction(act func(ctx context.Context, user *store.User,
 			h.broken(w, r, err)
 			return
 		}
-		h.notify(w, r, notice, n)
+		h.notifyUndo(w, r, notice, n, undo)
 		http.Redirect(w, r, h.url(target), http.StatusSeeOther)
 	}
 }
 
 // deleteCategory removes a category; its feeds go to the default one.
-func (h *Handler) deleteCategory(ctx context.Context, user *store.User, c *store.Category) (string, int, string, error) {
+func (h *Handler) deleteCategory(ctx context.Context, user *store.User, c *store.Category) (string, int, string, func(ctx context.Context) error, error) {
 	settings := "/subscriptions/categories/" + strconv.FormatInt(c.ID, 10)
 	if c.ID == store.DefaultCategoryID {
-		return "notice.category-default", 0, settings, nil
+		return "notice.category-default", 0, settings, nil, nil
 	}
-	return "notice.category-deleted", 0, "/subscriptions", h.db.DeleteCategory(ctx, user.ID, c.ID)
+	removed, err := h.db.RemoveCategory(ctx, user.ID, c.ID)
+	if err != nil {
+		return "", 0, "", nil, err
+	}
+	return "notice.category-deleted", 0, "/subscriptions", func(ctx context.Context) error { return h.db.RestoreCategory(ctx, removed) }, nil
 }
 
 // emptyCategory unsubscribes the user from every feed of a category.
-func (h *Handler) emptyCategory(ctx context.Context, user *store.User, c *store.Category) (string, int, string, error) {
+func (h *Handler) emptyCategory(ctx context.Context, user *store.User, c *store.Category) (string, int, string, func(ctx context.Context) error, error) {
 	feeds, err := h.db.Feeds(ctx, user.ID)
-	n := 0
+	var removed []*store.RemovedFeed
 	for _, f := range feeds {
 		if err != nil || f.CategoryID != c.ID {
 			continue
 		}
-		if err = h.db.DeleteFeed(ctx, user.ID, f.ID); errors.Is(err, store.ErrNotFound) {
+		var one *store.RemovedFeed
+		if one, err = h.db.RemoveFeed(ctx, user.ID, f.ID); errors.Is(err, store.ErrNotFound) {
 			err = nil
 		} else if err == nil {
-			n++
+			removed = append(removed, one)
 		}
 	}
-	return "notice.category-emptied", n, "/subscriptions/categories/" + strconv.FormatInt(c.ID, 10), err
+	// Taking it back puts back the feeds that went, also those that went
+	// before a failure.
+	var undo func(ctx context.Context) error
+	if len(removed) > 0 {
+		undo = func(ctx context.Context) error {
+			return h.db.InTx(ctx, func(tx *store.Store) error {
+				for _, one := range removed {
+					if err := tx.RestoreFeed(ctx, one); err != nil {
+						return err
+					}
+				}
+				return nil
+			})
+		}
+	}
+	return "notice.category-emptied", len(removed), "/subscriptions/categories/" + strconv.FormatInt(c.ID, 10), undo, err
 }
 
 // refreshCategoryOPML reads the OPML document of a category now.
-func (h *Handler) refreshCategoryOPML(ctx context.Context, user *store.User, c *store.Category) (string, int, string, error) {
+func (h *Handler) refreshCategoryOPML(ctx context.Context, user *store.User, c *store.Category) (string, int, string, func(ctx context.Context) error, error) {
 	settings := "/subscriptions/categories/" + strconv.FormatInt(c.ID, 10)
 	err := h.refresher.RefreshOPML(ctx, user, c.ID)
 	switch {
 	case err == nil:
-		return "notice.opml-refreshed", 0, settings, nil
+		return "notice.opml-refreshed", 0, settings, nil, nil
 	case errors.Is(err, refresh.ErrNoOPML):
-		return "notice.opml-none", 0, settings, nil
+		return "notice.opml-none", 0, settings, nil, nil
 	case errors.Is(err, refresh.ErrTooManyFeeds):
-		return "sub.problem.limit", 0, settings, nil
+		return "sub.problem.limit", 0, settings, nil, nil
 	case errors.Is(err, store.ErrNotFound) || ctx.Err() != nil:
-		return "", 0, settings, err
+		return "", 0, settings, nil, err
 	}
 	// The document does not answer, or is not OPML: nothing the server did.
 	h.log.Warn("OPML of a category was not read", "user", user.Name, "category", c.ID, "error", err)
-	return "notice.opml-failed", 0, settings, nil
+	return "notice.opml-failed", 0, settings, nil, nil
 }
 
 // ownLabel finds the label a request names among those of the user.
@@ -752,10 +773,15 @@ func (h *Handler) deleteLabel(w http.ResponseWriter, r *http.Request) {
 	if !ok || !h.form(w, r) {
 		return
 	}
-	if err := h.db.DeleteTag(r.Context(), l.UserID, l.ID); err != nil {
+	removed, err := h.db.RemoveTag(r.Context(), l.UserID, l.ID)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		h.broken(w, r, err)
 		return
 	}
-	h.notify(w, r, "notice.label-deleted", 0)
+	var undo func(ctx context.Context) error
+	if removed != nil {
+		undo = func(ctx context.Context) error { return h.db.RestoreTag(ctx, removed) }
+	}
+	h.notifyUndo(w, r, "notice.label-deleted", 0, undo)
 	http.Redirect(w, r, h.url("/subscriptions"), http.StatusSeeOther)
 }

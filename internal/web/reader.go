@@ -1052,12 +1052,12 @@ func (h *Handler) markEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	read := r.PostForm.Get("read") != "0"
-	n, err := h.db.SetEntriesRead(ctx, user.ID, []int64{e.ID}, read, h.now().Unix())
+	changed, err := h.db.SetEntriesRead(ctx, user.ID, []int64{e.ID}, read, h.now().Unix())
 	if err != nil {
 		h.broken(w, r, err)
 		return
 	}
-	if n > 0 {
+	if len(changed) > 0 {
 		h.hooks.EntriesRead.Call(ctx, hooks.EntriesRead{UserID: user.ID, IDs: []int64{e.ID}, IsRead: read})
 	}
 	h.back(w, r, e.ID, "")
@@ -1276,11 +1276,11 @@ func (h *Handler) markAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var n int
+	var marked []int64
 	set := s.set
 	set.OnlyFavorite = set.OnlyFavorite || showing.state == stateStar
 	if query == nil {
-		n, err = h.db.MarkSetRead(ctx, user.ID, set, before, now.Unix())
+		marked, err = h.db.MarkSetRead(ctx, user.ID, set, before, now.Unix())
 	} else {
 		// The entries a search picks are known only one by one.
 		unread := false
@@ -1293,13 +1293,22 @@ func (h *Handler) markAll(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if err == nil {
-			n, err = h.db.SetEntriesRead(ctx, user.ID, ids, true, now.Unix())
+			marked, err = h.db.SetEntriesRead(ctx, user.ID, ids, true, now.Unix())
 		}
 	}
 	if err != nil {
 		h.broken(w, r, err)
 		return
 	}
-	h.notify(w, r, "notice.marked", n)
+	// Taking it back makes unread again the entries it made read, and no
+	// other.
+	var undo func(ctx context.Context) error
+	if len(marked) > 0 {
+		undo = func(ctx context.Context) error {
+			_, err := h.db.SetEntriesRead(ctx, user.ID, marked, false, h.now().Unix())
+			return err
+		}
+	}
+	h.notifyUndo(w, r, "notice.marked", len(marked), undo)
 	http.Redirect(w, r, h.localTarget(r.PostForm.Get("next")), http.StatusSeeOther)
 }

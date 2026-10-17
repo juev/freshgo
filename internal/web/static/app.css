@@ -458,6 +458,10 @@ button.link {
 	background: var(--bg-raised);
 }
 
+.messages .undo button {
+	margin-left: var(--space);
+}
+
 /* What the script has to say lies over the page and moves nothing. */
 .messages p.said {
 	position: fixed;

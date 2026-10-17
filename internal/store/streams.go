@@ -267,24 +267,41 @@ func (s *Store) EntryLabels(ctx context.Context, userID int64, ids []int64) (map
 
 // SetEntriesRead makes the given entries read or unread, records at as the
 // time of the user's change on those whose state it changed, and returns
-// their number.
-func (s *Store) SetEntriesRead(ctx context.Context, userID int64, ids []int64, read bool, at int64) (int, error) {
-	total := 0
+// their identifiers.
+func (s *Store) SetEntriesRead(ctx context.Context, userID int64, ids []int64, read bool, at int64) ([]int64, error) {
+	var changed []int64
 	err := s.InTx(ctx, func(tx *Store) error {
-		total = 0
+		changed = nil
 		for chunk := range slices.Chunk(ids, idChunk) {
-			n, err := tx.affected(ctx, `
+			some, err := tx.ids(ctx, `
 				UPDATE entries SET is_read = ?, last_user_modified = ?
-				WHERE user_id = ? AND is_read <> ? AND id IN (`+placeholders(len(chunk))+`)`,
+				WHERE user_id = ? AND is_read <> ? AND id IN (`+placeholders(len(chunk))+`)
+				RETURNING id`,
 				idArgs(chunk, read, at, userID, read)...)
 			if err != nil {
 				return fmt.Errorf("store: mark entries read: %w", err)
 			}
-			total += n
+			changed = append(changed, some...)
 		}
 		return nil
 	})
-	return total, err
+	if err != nil {
+		return nil, err
+	}
+	return changed, nil
+}
+
+// ids runs a query whose rows are identifiers and returns them.
+func (s *Store) ids(ctx context.Context, query string, args ...any) ([]int64, error) {
+	rows, err := s.query(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	return collect(rows, func(sc scanner) (int64, error) {
+		var id int64
+		err := sc.Scan(&id)
+		return id, err
+	})
 }
 
 // SetEntriesFavorite stars or unstars the given entries and records at as the
@@ -306,17 +323,18 @@ func (s *Store) SetEntriesFavorite(ctx context.Context, userID int64, ids []int6
 
 // MarkSetRead makes read the unread entries of a set whose identifier is at
 // most maxID, records at as the time of the user's change and returns their
-// number.
-func (s *Store) MarkSetRead(ctx context.Context, userID int64, set EntrySet, maxID, at int64) (int, error) {
+// identifiers.
+func (s *Store) MarkSetRead(ctx context.Context, userID int64, set EntrySet, maxID, at int64) ([]int64, error) {
 	where, args := set.where(userID)
-	n, err := s.affected(ctx, `
+	ids, err := s.ids(ctx, `
 		UPDATE entries SET is_read = ?, last_user_modified = ?
-		WHERE user_id = ? AND NOT is_read AND id <= ?`+where,
+		WHERE user_id = ? AND NOT is_read AND id <= ?`+where+`
+		RETURNING id`,
 		append([]any{true, at, userID, maxID}, args...)...)
 	if err != nil {
-		return 0, fmt.Errorf("store: mark entries read: %w", err)
+		return nil, fmt.Errorf("store: mark entries read: %w", err)
 	}
-	return n, nil
+	return ids, nil
 }
 
 // Counts is what the entries of a feed or of a label add up to.
