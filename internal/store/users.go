@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -27,6 +29,11 @@ func (s *Store) LockUsers(ctx context.Context) error {
 }
 
 func (s *Store) CreateUser(ctx context.Context, u *User) error {
+	settings, err := withFeedToken(u.Settings)
+	if err != nil {
+		return fmt.Errorf("store: create user %q: %w", u.Name, err)
+	}
+	u.Settings = settings
 	return s.InTx(ctx, func(tx *Store) error {
 		err := tx.queryRow(ctx, `
 			INSERT INTO users (name, api_password_hash, settings) VALUES (?, ?, ?)
@@ -46,6 +53,35 @@ func (s *Store) CreateUser(ctx context.Context, u *User) error {
 		}
 		return tx.CreateCategory(ctx, &Category{UserID: u.ID, ID: DefaultCategoryID, Name: DefaultCategoryName})
 	})
+}
+
+// withFeedToken returns settings with a random "token", the secret of the
+// public feeds of the user, when they have none or an empty one: a new user
+// has the addresses of those feeds from the start.
+func withFeedToken(settings json.RawMessage) (json.RawMessage, error) {
+	members := map[string]json.RawMessage{}
+	if err := json.Unmarshal([]byte(jsonObject(settings)), &members); err != nil {
+		return nil, fmt.Errorf("settings: %w", err)
+	}
+	var token string
+	if raw, ok := members["token"]; ok && json.Unmarshal(raw, &token) == nil && token != "" {
+		return settings, nil
+	}
+	token, err := NewFeedToken()
+	if err != nil {
+		return nil, err
+	}
+	members["token"], _ = json.Marshal(token)
+	return json.Marshal(members)
+}
+
+// NewFeedToken returns a random secret for the public feeds of a user.
+func NewFeedToken() (string, error) {
+	random := make([]byte, 16)
+	if _, err := rand.Read(random); err != nil {
+		return "", fmt.Errorf("feed token: %w", err)
+	}
+	return hex.EncodeToString(random), nil
 }
 
 // UserByName returns the user with the given name or ErrNotFound.

@@ -258,6 +258,7 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /settings/privacy", h.protect(members, h.savePrivacy))
 	h.mux.HandleFunc("GET /settings/profile", h.protect(members, h.profilePage))
 	h.mux.HandleFunc("POST /settings/profile", h.protect(members, h.saveProfile))
+	h.mux.HandleFunc("POST /settings/profile/token", h.protect(members, h.regenerateToken))
 	h.mux.HandleFunc("POST /settings/profile/password", h.protect(members, h.changePassword))
 	h.mux.HandleFunc("POST /settings/profile/totp", h.protect(members, h.changeTOTP))
 	h.mux.HandleFunc("POST /settings/profile/api-password", h.protect(members, h.changeAPIPassword))

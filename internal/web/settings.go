@@ -504,6 +504,27 @@ func (h *Handler) saveProfile(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// regenerateToken gives the public feeds of the user a new random token;
+// the addresses with the old one stop working.
+func (h *Handler) regenerateToken(w http.ResponseWriter, r *http.Request) {
+	if !h.form(w, r) {
+		return
+	}
+	token, err := store.NewFeedToken()
+	if err == nil {
+		err = h.db.UpdateUserSettings(r.Context(), state(r).who.user.ID, func(settings map[string]json.RawMessage) error {
+			attrs(settings).set("token", token)
+			return nil
+		})
+	}
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	h.notify(w, r, "notice.token-regenerated", 0)
+	http.Redirect(w, r, h.url("/settings/profile"), http.StatusSeeOther)
+}
+
 // profileProblem answers with the page of the profile and what is wrong.
 func (h *Handler) profileProblem(w http.ResponseWriter, r *http.Request, status int, problem string) {
 	s := userSettings(r)

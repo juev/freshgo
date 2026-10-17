@@ -474,6 +474,7 @@
     "other": "Feeds refreshed: %d new entries."
   },
   "notice.saved": "Saved.",
+  "notice.token-regenerated": "The token has changed; the old addresses of your feeds no longer work.",
   "notice.totp-off": "Signing in takes the password alone again.",
   "notice.totp-on": "Signing in now asks for the code of your app.",
   "notice.translate-failed": "The entry could not be translated. The log of the server says why.",
@@ -662,6 +663,8 @@
   "settings.token": "Token",
   "settings.token.hint": "Whoever has the token can read your entries as a feed without signing in. Empty for nobody.",
   "settings.token.links": "With the token your entries and subscriptions are at these addresses:",
+  "settings.token.regenerate": "Regenerate token",
+  "settings.token.regenerate.hint": "Makes a new random token. The addresses with the old one stop working, so feed readers that use them need the new ones.",
   "settings.totp": "Code from an app",
   "settings.totp.intro": "With this on, signing in by password also asks for the code an authenticator app shows. Scan the picture with the app, or type the secret into it, then enter the code it shows.",
   "settings.totp.on": "Signing in by password asks for the code of your app. To turn this off, enter your password and a code of the app.",
