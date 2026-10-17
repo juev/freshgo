@@ -22,20 +22,25 @@ func newFlagSet(e env, name string) (*flag.FlagSet, *config.Config) {
 // name. operands is how many arguments the subcommand takes after its flags;
 // they are left in fs.Args.
 func openStore(ctx context.Context, fs *flag.FlagSet, conf *config.Config, args []string, operands int) (*store.Store, error) {
-	if err := fs.Parse(args); err != nil {
-		return nil, err
-	}
-	if fs.NArg() > operands {
-		return nil, fmt.Errorf("unexpected argument %q", fs.Arg(operands))
-	}
-	if err := conf.Validate(); err != nil {
-		return nil, err
-	}
-	driver, dsn, err := conf.Database()
+	driver, dsn, err := parseDatabase(fs, conf, args, operands)
 	if err != nil {
 		return nil, err
 	}
 	return store.Open(ctx, driver, dsn)
+}
+
+// parseDatabase is openStore without the opening.
+func parseDatabase(fs *flag.FlagSet, conf *config.Config, args []string, operands int) (config.Driver, string, error) {
+	if err := fs.Parse(args); err != nil {
+		return "", "", err
+	}
+	if fs.NArg() > operands {
+		return "", "", fmt.Errorf("unexpected argument %q", fs.Arg(operands))
+	}
+	if err := conf.Validate(); err != nil {
+		return "", "", err
+	}
+	return conf.Database()
 }
 
 func runImport(ctx context.Context, e env, args []string) (err error) {

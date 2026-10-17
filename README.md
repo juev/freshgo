@@ -93,7 +93,21 @@ To update, pull the new image and start the container again: `docker compose pul
 
 The first start of a version after 0.2.5 also cleans the texts of the articles that are stored: until then the pages cleaned a text each time they showed it, and now they show what is stored. It takes a few seconds for some thousands of articles, and the log says how many texts changed. What the cleaning takes out of a text is gone from the database, so back it up before this update.
 
-To back up a SQLite installation, stop the container and copy the volume: next to `freshgo.sqlite` lie the files `-wal` and `-shm`, and a copy taken from a running server may miss what they hold.
+To back up, run `freshgo backup` next to the running server; it does not need a stop. With SQLite it writes the whole database, with what the `-wal` file holds, to one file; it refuses to write over a file that exists. With PostgreSQL it runs `pg_dump` and fails with the command to run when `pg_dump` is not on `PATH`; the image has no `pg_dump`, so run it from a machine that has one.
+
+```sh
+docker exec freshgo /freshgo backup -to /data/freshgo-2026-10-17.sqlite
+```
+
+A daily copy from the crontab of the host (`%` must be escaped there):
+
+```
+0 3 * * * docker exec freshgo /freshgo backup -to /data/freshgo-$(date +\%F).sqlite
+```
+
+Before a copy is put in place, check it: `freshgo restore -check <file>` opens it read-only, checks that it is whole and that its schema is not newer than the binary, and prints the numbers of users, feeds and articles. It does not touch the database of the server. To restore, stop the server, replace `freshgo.sqlite` with the copy, remove the `-wal` and `-shm` files next to it, and start the server again.
+
+Without the command, stop the container and copy the volume: next to `freshgo.sqlite` lie the files `-wal` and `-shm`, and a copy taken from a running server may miss what they hold.
 
 ### Without Docker
 
@@ -246,6 +260,8 @@ freshrss-password "…"
 | `refresh [-force]` | Refreshes the feeds that are due once, for cron; `-force` takes all of them. |
 | `purge` | Deletes old articles by the retention settings without waiting for a refresh. |
 | `import -data <dir>` | Imports a FreshRSS installation into an empty database. |
+| `backup -to <file>` | Copies the database while the server runs: SQLite by itself, PostgreSQL with `pg_dump`. |
+| `restore -check <file>` | Checks a SQLite copy before it is put in place, without touching the database of the server. |
 | `user create [-admin]\|passwd\|delete <name>`, `user list` | Manages users. Deleting a user deletes their feeds and articles; deleting the default user makes the oldest remaining user the default user and an administrator. |
 | `feed add -user <name> [-category <name>] <address>` | Subscribes a user to a feed and fetches it. |
 | `opml import -user <name> [<file>]`, `opml export -user <name>` | Reads subscriptions from a file or standard input; writes them to standard output. |
