@@ -9,7 +9,10 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
 
+	"github.com/juev/freshgo/internal/authguard"
 	"github.com/juev/freshgo/internal/sanitize"
 	"github.com/juev/freshgo/internal/store"
 )
@@ -94,6 +97,48 @@ func (h *Handler) registerPage(w http.ResponseWriter, r *http.Request) {
 
 var errRegistrationClosed = errors.New("web: nobody can register")
 
+// registrationsPerHour is how many accounts visitors can make in an hour,
+// from wherever they come.
+const registrationsPerHour = 10
+
+// window counts events over a span of time that moves on.
+type window struct {
+	mu     sync.Mutex
+	events []time.Time
+}
+
+// take counts an event at now if fewer than limit happened in the span
+// before it, and returns zero; otherwise it counts nothing and returns how
+// long until the oldest of them leaves the span.
+func (c *window) take(now time.Time, limit int, span time.Duration) time.Duration {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	kept := c.events[:0]
+	for _, at := range c.events {
+		if now.Sub(at) < span {
+			kept = append(kept, at)
+		}
+	}
+	c.events = kept
+	if len(c.events) >= limit {
+		return span - now.Sub(c.events[0])
+	}
+	c.events = append(c.events, now)
+	return 0
+}
+
+// give forgets an event that take counted at the time.
+func (c *window) give(at time.Time) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for i, event := range c.events {
+		if event.Equal(at) {
+			c.events = append(c.events[:i], c.events[i+1:]...)
+			return
+		}
+	}
+}
+
 // register makes an account for the visitor and logs them in.
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	ctx, s := r.Context(), state(r)
@@ -127,12 +172,37 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 		h.showRegister(w, r, http.StatusBadRequest, page, problem)
 		return
 	}
+	// Only a form that can make an account is counted: one with a mistake
+	// in it makes nothing, and its author has to be able to correct it.
+	v := h.view(r, "", "register.heading")
+	now := h.now()
+	wait := h.registrants.Attempt(authguard.ClientAddr(r, h.proxies), now)
+	if wait == 0 {
+		wait = h.registered.take(now, registrationsPerHour, time.Hour)
+	} else {
+		page.Problem = v.N("register.locked", int((wait+time.Minute-1)/time.Minute))
+	}
+	if wait > 0 {
+		if page.Problem == "" {
+			page.Problem = v.T("register.busy")
+		}
+		w.Header().Set("Retry-After", authguard.RetryAfter(wait))
+		h.showRegister(w, r, http.StatusTooManyRequests, page, "")
+		return
+	}
+	// A place among the registrations of the hour is taken until the
+	// account is made; one that is not made gives it back.
+	made := false
+	defer func() {
+		if !made {
+			h.registered.give(now)
+		}
+	}()
 	hash, err := hashPassword(form.Get("password"))
 	if err != nil {
 		h.broken(w, r, err)
 		return
 	}
-	v := h.view(r, "", "register.heading")
 	settings := attrs{}
 	settings.set("passwordHash", hash)
 	settings.set("language", v.Lang())
@@ -173,6 +243,7 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 		h.broken(w, r, err)
 		return
 	}
+	made = true
 	h.log.Info("user registered", "name", name)
 	if token != "" {
 		h.sendValidation(r, v, user.Name, email, token)

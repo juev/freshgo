@@ -229,6 +229,64 @@ func TestRegistrationLimitHolds(t *testing.T) {
 	})
 }
 
+// Registrations from one address are held back after the first few, like
+// failed logins, and those of everybody after ten in an hour. A form with a
+// mistake in it is not counted, and an account that is not made gives its
+// place back.
+func TestRegistrationsAreHeldBack(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		s.system(func(system *store.System) { system.Limits.MaxRegistrations = 0 })
+		now := s.clock()
+		n := 0
+		register := func(addr, name string) answer {
+			t.Helper()
+			form := url.Values{"username": {name}, "password": {"long-password"}, "again": {"long-password"}}
+			r := httptest.NewRequest(http.MethodPost, "/register", strings.NewReader(form.Encode()))
+			r.RemoteAddr = addr + ":4000"
+			return (&site{t: t, db: s.db, h: s.h}).send(r, map[string]string{"Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Site": "same-origin"})
+		}
+		fresh := func(addr string) answer {
+			n++
+			return register(addr, "visitor"+strconv.Itoa(n))
+		}
+
+		for range 5 {
+			if a := fresh("198.51.100.1"); a.status != http.StatusSeeOther {
+				t.Fatalf("registration %d from one address: status %d", n, a.status)
+			}
+		}
+		a := fresh("198.51.100.1")
+		if a.status != http.StatusTooManyRequests || a.header.Get("Retry-After") != "31" || !strings.Contains(a.body, "Too many accounts from your address. Try again in 1 minute.") {
+			t.Errorf("sixth registration from one address: status %d, Retry-After %q\n%s", a.status, a.header.Get("Retry-After"), a.body)
+		}
+		// A mistake is still shown for what it is.
+		if a := register("198.51.100.1", "no spaces"); a.status != http.StatusBadRequest {
+			t.Errorf("a form with a mistake from an address held back: status %d", a.status)
+		}
+
+		// A name that is taken makes no account and takes no place.
+		if a := register("198.51.100.2", "alice"); a.status != http.StatusBadRequest {
+			t.Errorf("a taken name: status %d", a.status)
+		}
+		for i := range 5 {
+			*now = now.Add(time.Minute)
+			if a := fresh("198.51.100." + strconv.Itoa(10+i)); a.status != http.StatusSeeOther {
+				t.Fatalf("registration %d of the hour: status %d", 6+i, a.status)
+			}
+		}
+		a = fresh("198.51.100.20")
+		if a.status != http.StatusTooManyRequests || a.header.Get("Retry-After") != strconv.Itoa(int((55*time.Minute)/time.Second)+1) ||
+			!strings.Contains(a.body, "Too many accounts were made here in the last hour.") {
+			t.Errorf("eleventh registration of the hour: status %d, Retry-After %q\n%s", a.status, a.header.Get("Retry-After"), a.body)
+		}
+
+		*now = now.Add(55 * time.Minute)
+		if a := fresh("198.51.100.20"); a.status != http.StatusSeeOther {
+			t.Errorf("registration once the hour has passed: status %d", a.status)
+		}
+	})
+}
+
 // R16: one user does not have the server write letter after letter, and a
 // form that is refused sends none.
 func TestLettersAreHeldBack(t *testing.T) {
