@@ -186,15 +186,22 @@ func TestUsers(t *testing.T) {
 		if !reflect.DeepEqual(got, bob) {
 			t.Errorf("UserByName = %+v, want %+v", got, bob)
 		}
-		if string(alice.Settings) != "" {
-			t.Fatalf("test setup: alice.Settings = %q", alice.Settings)
-		}
+		// A new user gets a random token for the public feeds, unless the
+		// settings bring one.
 		gotAlice, err := s.UserByName(ctx, "alice")
 		if err != nil {
 			t.Fatal(err)
 		}
-		if string(gotAlice.Settings) != "{}" {
-			t.Errorf("empty settings stored as %q, want {}", gotAlice.Settings)
+		var aliceSettings, bobSettings struct{ Token, Language string }
+		if err := json.Unmarshal(gotAlice.Settings, &aliceSettings); err != nil || len(aliceSettings.Token) != 32 {
+			t.Errorf("empty settings stored as %s, want a token of 32 characters", gotAlice.Settings)
+		}
+		if err := json.Unmarshal(got.Settings, &bobSettings); err != nil || len(bobSettings.Token) != 32 || bobSettings.Token == aliceSettings.Token || bobSettings.Language != "ru" {
+			t.Errorf("settings of bob stored as %s, want the language and a token of their own", got.Settings)
+		}
+		carol := &User{Name: "carol", Settings: json.RawMessage(`{"token":"chosen"}`)}
+		if err := s.CreateUser(ctx, carol); err != nil || string(carol.Settings) != `{"token":"chosen"}` {
+			t.Errorf("a token of the settings: %v, settings %s", err, carol.Settings)
 		}
 
 		if _, err := s.UserByName(ctx, "nobody"); !errors.Is(err, ErrNotFound) {
@@ -212,7 +219,7 @@ func TestUsers(t *testing.T) {
 		for _, u := range users {
 			names = append(names, u.Name)
 		}
-		if want := []string{"alice", "bob"}; !reflect.DeepEqual(names, want) {
+		if want := []string{"alice", "bob", "carol"}; !reflect.DeepEqual(names, want) {
 			t.Errorf("Users = %v, want %v", names, want)
 		}
 
@@ -1322,11 +1329,13 @@ func TestSessions(t *testing.T) {
 func TestUpdateUserSettings(t *testing.T) {
 	eachEngine(t, func(t *testing.T, s *Store) {
 		ctx := context.Background()
-		alice := &User{Name: "alice", Settings: json.RawMessage(`{"language":"ru","queries":[{"name":"a"}]}`)}
-		if err := s.CreateUser(ctx, alice); err != nil {
-			t.Fatal(err)
+		alice := &User{Name: "alice", Settings: json.RawMessage(`{"language":"ru","queries":[{"name":"a"}],"token":"a"}`)}
+		bob := &User{Name: "bob", Settings: json.RawMessage(`{"token":"b"}`)}
+		for _, u := range []*User{alice, bob} {
+			if err := s.CreateUser(ctx, u); err != nil {
+				t.Fatal(err)
+			}
 		}
-		bob := mustUser(t, s, "bob")
 		err := s.UpdateUserSettings(ctx, alice.ID, func(settings map[string]json.RawMessage) error {
 			if string(settings["language"]) != `"ru"` {
 				t.Errorf("settings handed to the change = %s", settings)
@@ -1346,11 +1355,11 @@ func TestUpdateUserSettings(t *testing.T) {
 		if err := json.Unmarshal(got.Settings, &settings); err != nil {
 			t.Fatal(err)
 		}
-		want := map[string]any{"language": "en", "darkMode": "dark", "queries": []any{map[string]any{"name": "a"}}}
+		want := map[string]any{"language": "en", "darkMode": "dark", "queries": []any{map[string]any{"name": "a"}}, "token": "a"}
 		if !reflect.DeepEqual(settings, want) {
 			t.Errorf("settings = %v, want %v", settings, want)
 		}
-		if other, err := s.UserByID(ctx, bob.ID); err != nil || string(other.Settings) != "{}" {
+		if other, err := s.UserByID(ctx, bob.ID); err != nil || string(other.Settings) != `{"token":"b"}` {
 			t.Errorf("settings of the other user = %s, %v", other.Settings, err)
 		}
 
@@ -1391,9 +1400,9 @@ func TestUpdateUserSettings(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		var keys map[string]bool
-		if err := json.Unmarshal(final.Settings, &keys); err != nil || len(keys) != 8 {
-			t.Errorf("settings after 8 concurrent changes = %s, %v; want 8 keys", final.Settings, err)
+		var keys map[string]any
+		if err := json.Unmarshal(final.Settings, &keys); err != nil || len(keys) != 9 {
+			t.Errorf("settings after 8 concurrent changes = %s, %v; want the token and 8 keys", final.Settings, err)
 		}
 	})
 }

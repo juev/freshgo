@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"html"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -94,6 +95,22 @@ func TestRegistration(t *testing.T) {
 		if a := s.get("/register"); a.status != http.StatusSeeOther {
 			t.Errorf("GET /register while logged in: status %d", a.status)
 		}
+		// The new user has the addresses of their public feeds without typing
+		// a token; a new token takes the old addresses away.
+		feed := publicFeed(t, s.page("/settings/profile"))
+		if a := s.get(feed); a.status != http.StatusOK {
+			t.Errorf("GET %s of a new user: status %d", feed, a.status)
+		}
+		if _, body := s.follow("/settings/profile/token", nil); notice(body) != "The token has changed; the old addresses of your feeds no longer work." {
+			t.Errorf("regenerating the token: notice %q", notice(body))
+		}
+		renewed := publicFeed(t, s.page("/settings/profile"))
+		if a := s.get(feed); renewed == feed || a.status != http.StatusForbidden {
+			t.Errorf("the old address after regenerating: status %d, the new one %s", a.status, renewed)
+		}
+		if a := s.get(renewed); a.status != http.StatusOK {
+			t.Errorf("GET %s after regenerating: status %d", renewed, a.status)
+		}
 		// Now the installation is full again.
 		s.cookies = nil
 		form.Set("username", "dave")
@@ -106,6 +123,19 @@ func TestRegistration(t *testing.T) {
 			t.Errorf("registering where users are told apart by the proxy: status %d", a.status)
 		}
 	})
+}
+
+var publicFeedLink = regexp.MustCompile(`<a href="[^"]*(/rss\?[^"]+)">RSS</a>`)
+
+// publicFeed is the address of the public feed the page of the profile
+// links to, relative to the site.
+func publicFeed(t *testing.T, profile string) string {
+	t.Helper()
+	m := publicFeedLink.FindStringSubmatch(profile)
+	if m == nil {
+		t.Fatalf("the profile links to no public feed:\n%s", profile)
+	}
+	return html.UnescapeString(m[1])
 }
 
 // R16: where addresses have to be confirmed, a new user gets a letter with
