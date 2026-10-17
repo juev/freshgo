@@ -634,6 +634,38 @@ func TestFeedFormKeepsRequestSettings(t *testing.T) {
 	})
 }
 
+// A SOCKS4 proxy, which no request goes through, is said to fail on the
+// page of a feed that came with one, and is not taken for one that has not.
+func TestFeedFormSOCKS4(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		s.asAlice()
+		const problem = "The server does not go through SOCKS4 and SOCKS4A proxies"
+		if page := s.get("/subscriptions/feeds/1"); strings.Contains(page.body, problem) {
+			t.Errorf("the page of a feed without a proxy speaks of SOCKS4:\n%s", page.body)
+		}
+		form := s.feedForm(1)
+		form.Set("proxy_type", "4")
+		form.Set("proxy", "proxy.example:1080")
+		if a := s.post("/subscriptions/feeds/1", form); a.status != http.StatusBadRequest || !strings.Contains(a.body, problem) {
+			t.Errorf("SOCKS4 chosen: status %d\n%s", a.status, a.body)
+		}
+		if curl := readAttrs(s.feed("alice", 1).Attributes)["curl_params"]; strings.Contains(string(curl), "proxy.example") {
+			t.Errorf("SOCKS4 chosen was stored: %s", curl)
+		}
+
+		f := s.feed("alice", 1)
+		a := readAttrs(f.Attributes)
+		a["curl_params"] = json.RawMessage(`{"101":6,"10004":"proxy.example:1080"}`)
+		f.Attributes = a.raw()
+		if err := s.db.UpdateFeed(t.Context(), f); err != nil {
+			t.Fatal(err)
+		}
+		if page := s.get("/subscriptions/feeds/1"); !strings.Contains(page.body, problem) {
+			t.Errorf("the page of a feed behind SOCKS4A does not say it fails:\n%s", page.body)
+		}
+	})
+}
+
 // R9: a feed gets an icon of the user's own and gives it up.
 func TestFeedIcon(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {

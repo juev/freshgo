@@ -75,7 +75,8 @@ const (
 )
 
 // freshgo goes through the first four; the two SOCKS4 kinds are kept for
-// feeds that came with them and fail until the kind is changed.
+// feeds that came with them, which the form says fail until the kind is
+// changed. They are not to be chosen anew.
 var proxyTypes = []struct{ value, name string }{
 	{"0", "HTTP"}, {"2", "HTTPS"}, {"5", "SOCKS5"}, {"7", "SOCKS5H"}, {"4", "SOCKS4"}, {"6", "SOCKS4A"},
 }
@@ -324,6 +325,11 @@ func (h *Handler) showFeed(w http.ResponseWriter, r *http.Request, status int, f
 	}
 	for _, p := range proxyTypes {
 		page.ProxyTypes = append(page.ProxyTypes, option{p.value, p.name, hasProxy && strconv.Itoa(proxyType) == p.value})
+	}
+	// A feed may have come from FreshRSS with a kind of proxy that fails
+	// every refresh: said here rather than left to the failures.
+	if page.Problem == "" && errors.Is(fetch.FeedProxy(f.Attributes), fetch.ErrUnsupportedProxy) {
+		page.Problem = v.T("feed.problem.proxy")
 	}
 	page.Proxy, page.Cookie = curlText(curl[curlProxy]), curlText(curl[curlCookie])
 	_, page.CookieFile = curl[curlCookieFile]
@@ -691,6 +697,12 @@ func (h *Handler) editFeed(ctx context.Context, r *http.Request, db *store.Store
 	}
 	before := *f
 	problem = applyFeed(r, f, categories, h.refresher.Browser != nil)
+	// Such a proxy is not to be chosen; one the feed came with stays, so
+	// that the rest of its settings can be changed.
+	if problem == "" && errors.Is(fetch.FeedProxy(f.Attributes), fetch.ErrUnsupportedProxy) &&
+		!errors.Is(fetch.FeedProxy(before.Attributes), fetch.ErrUnsupportedProxy) {
+		problem = "feed.problem.proxy"
+	}
 	// The copy the validators stand for was fetched and read otherwise, and
 	// what the feed failed with may be what has just been set right.
 	if !sameParsing(&before, f) {
