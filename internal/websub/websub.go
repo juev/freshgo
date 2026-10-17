@@ -50,10 +50,11 @@ const (
 	minLease = 60
 )
 
-// Pusher stores a pushed document as the new content of every feed that
-// announces the topic and returns the number of feeds it reached.
+// Pusher stores a document a hub pushed for one subscription. It returns 1
+// when the feed the subscription belongs to took it, and 0 when the feed is
+// gone, muted or its user is disabled.
 type Pusher interface {
-	Push(ctx context.Context, topic string, document []byte, contentType string) (int, error)
+	Push(ctx context.Context, sub *store.WebSub, document []byte, contentType string) (int, error)
 }
 
 // Service keeps the subscriptions and answers the hubs.
@@ -100,58 +101,55 @@ func public(baseURL string) bool {
 	return true
 }
 
-// Working returns the topics whose hub can be relied on at the moment: it
-// has pushed since it was subscribed to, and the lease has not run out.
-func (s *Service) Working(ctx context.Context) (map[string]bool, error) {
-	subs, err := s.db.WebSubs(ctx)
+// Working returns the feeds whose hub can be relied on at the moment: it has
+// pushed since the feed was subscribed, and the lease has not run out.
+func (s *Service) Working(ctx context.Context, userID int64) (map[int64]bool, error) {
+	subs, err := s.db.WebSubsOfUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 	now := s.Now().Unix()
-	working := map[string]bool{}
+	working := map[int64]bool{}
 	for _, sub := range subs {
 		if !sub.Error && (sub.LeaseEnd == 0 || sub.LeaseEnd > now) {
-			working[sub.Topic] = true
+			working[sub.FeedID] = true
 		}
 	}
 	return working, nil
 }
 
-// Distrust records that the hub of a topic missed an entry: its feeds go
+// Distrust records that the hub of a feed missed an entry: the feed goes
 // back to being polled until a push arrives again.
-func (s *Service) Distrust(ctx context.Context, topic string) {
-	sub, err := s.db.WebSubByTopic(ctx, topic)
+func (s *Service) Distrust(ctx context.Context, userID, feedID int64) {
+	sub, err := s.db.WebSubByFeed(ctx, userID, feedID)
 	if err != nil || sub.Error {
 		return
 	}
 	sub.Error = true
 	if err := s.db.PutWebSub(ctx, sub); err != nil {
-		s.log.Warn("WebSub subscription is not updated", "topic", topic, "error", err)
+		s.log.Warn("WebSub subscription is not updated", "user", userID, "feed", feedID, "error", err)
 		return
 	}
-	s.log.Warn("an entry was found by polling although the hub should have pushed it", "topic", topic)
+	s.log.Warn("an entry was found by polling although the hub should have pushed it", "user", userID, "feed", feedID)
 }
 
-// Ensure makes sure the hub of a topic has been asked to push: the first
-// time a feed announces the topic, when the lease is about to run out, and
-// again a day after a failure. A hub that fails is logged; the feeds are
+// Ensure makes sure the hub of a feed has been asked to push: the first time
+// the feed announces the topic, when the lease is about to run out, and
+// again a day after a failure. A hub that fails is logged; the feed is
 // polled as before.
-func (s *Service) Ensure(ctx context.Context, topic, hub string) {
-	if err := s.ensure(ctx, topic, hub); err != nil && ctx.Err() == nil {
-		s.log.Warn("WebSub subscription failed", "topic", topic, "hub", hub, "error", err)
+func (s *Service) Ensure(ctx context.Context, userID, feedID int64, topic, hub string) {
+	if err := s.ensure(ctx, userID, feedID, topic, hub); err != nil && ctx.Err() == nil {
+		s.log.Warn("WebSub subscription failed", "user", userID, "feed", feedID, "topic", topic, "hub", hub, "error", err)
 	}
 }
 
-func (s *Service) ensure(ctx context.Context, topic, hub string) error {
+func (s *Service) ensure(ctx context.Context, userID, feedID int64, topic, hub string) error {
 	now := s.Now()
-	sub, err := s.db.WebSubByTopic(ctx, topic)
+	sub, err := s.db.WebSubByFeed(ctx, userID, feedID)
 	switch {
 	case errors.Is(err, store.ErrNotFound):
-		sub = &store.WebSub{Topic: topic, Hub: hub, Error: true}
-		if sub.Key, err = random(); err != nil {
-			return err
-		}
-		if sub.Secret, err = random(); err != nil {
+		sub = &store.WebSub{UserID: userID, FeedID: feedID, Topic: topic, Hub: hub, Error: true}
+		if sub.Key, sub.Secret, err = newKeySecret(); err != nil {
 			return err
 		}
 	case err != nil:
@@ -161,9 +159,9 @@ func (s *Service) ensure(ctx context.Context, topic, hub string) error {
 		rested := sinceAsked >= retryAfter
 		expiring := sub.LeaseEnd != 0 && time.Unix(sub.LeaseEnd, 0).Sub(now) < renewBefore
 		unconfirmed := sub.Error || sub.LeaseEnd == 0
-		// A feed that names another hub is asked at the new one, no more
-		// often than a hub that failed.
-		moved := sub.Hub != hub
+		// A feed that names another topic or hub is asked at the new one, no
+		// more often than a hub that failed.
+		moved := sub.Topic != topic || sub.Hub != hub
 		// A hub in good standing gets a moment to confirm a renewal before
 		// it is asked again; FreshRSS asks on every refresh.
 		renew := expiring && (rested || !sub.Error && sinceAsked >= renewPause)
@@ -171,7 +169,15 @@ func (s *Service) ensure(ctx context.Context, topic, hub string) error {
 		if !renew && !retry {
 			return nil
 		}
-		sub.Hub = hub
+		if moved {
+			// The new hub gets a secret of its own, and the old key stops
+			// working, so an old hub cannot keep pushing.
+			if sub.Key, sub.Secret, err = newKeySecret(); err != nil {
+				return err
+			}
+			sub.Topic, sub.Hub = topic, hub
+			sub.Error, sub.LeaseEnd = true, 0
+		}
 	}
 	// Recorded before asking, so that a hub that does not answer is not
 	// asked again by every refresh.
@@ -194,14 +200,26 @@ func (s *Service) ensure(ctx context.Context, topic, hub string) error {
 	}
 	if err != nil {
 		// The hub may have confirmed and then failed: read before writing.
-		if fresh, readErr := s.db.WebSubByTopic(ctx, topic); readErr == nil {
+		if fresh, readErr := s.db.WebSubByFeed(ctx, userID, feedID); readErr == nil {
 			fresh.Error = true
 			_ = s.db.PutWebSub(ctx, fresh)
 		}
 		return err
 	}
-	s.log.Info("asked the WebSub hub to push", "topic", topic, "hub", hub)
+	s.log.Info("asked the WebSub hub to push", "user", userID, "feed", feedID, "topic", topic, "hub", hub)
 	return nil
+}
+
+// newKeySecret returns the callback key and the signing secret of a new
+// subscription.
+func newKeySecret() (key, secret string, err error) {
+	if key, err = random(); err != nil {
+		return "", "", err
+	}
+	if secret, err = random(); err != nil {
+		return "", "", err
+	}
+	return key, secret, nil
 }
 
 // random returns 32 random bytes as hexadecimal digits.
@@ -253,14 +271,16 @@ func (s *Service) verify(ctx context.Context, w http.ResponseWriter, r *http.Req
 		http.Error(w, "Not the topic of this subscription", http.StatusNotFound)
 		return
 	}
-	feeds, err := s.db.FeedsByTopic(ctx, sub.Topic)
-	if err != nil {
+	feed, err := s.db.FeedByID(ctx, sub.UserID, sub.FeedID)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		s.fail(w, err)
 		return
 	}
+	// A muted feed is nobody's to read, and a feed that is gone is not read.
+	reads := err == nil && feed.TTL >= 0
 	switch q.Get("hub.mode") {
 	case "subscribe":
-		if len(feeds) == 0 {
+		if !reads {
 			http.Error(w, "Nobody reads this feed", http.StatusNotFound)
 			return
 		}
@@ -275,12 +295,12 @@ func (s *Service) verify(ctx context.Context, w http.ResponseWriter, r *http.Req
 			return
 		}
 	case "unsubscribe":
-		// Wanted only when nobody reads the feed any more.
-		if len(feeds) > 0 {
+		// Wanted only when the feed is gone or muted.
+		if reads {
 			http.Error(w, "The subscription is in use", http.StatusNotFound)
 			return
 		}
-		if err := s.db.DeleteWebSub(ctx, sub.Topic); err != nil {
+		if err := s.db.DeleteWebSub(ctx, sub.UserID, sub.FeedID); err != nil {
 			s.fail(w, err)
 			return
 		}
@@ -290,7 +310,8 @@ func (s *Service) verify(ctx context.Context, w http.ResponseWriter, r *http.Req
 			s.fail(w, err)
 			return
 		}
-		s.log.Warn("WebSub hub denied the subscription", "topic", sub.Topic, "reason", q.Get("hub.reason"))
+		s.log.Warn("WebSub hub denied the subscription", "user", sub.UserID, "feed", sub.FeedID,
+			"topic", sub.Topic, "reason", q.Get("hub.reason"))
 	default:
 		http.Error(w, "Unknown hub.mode", http.StatusBadRequest)
 		return
@@ -299,7 +320,8 @@ func (s *Service) verify(ctx context.Context, w http.ResponseWriter, r *http.Req
 }
 
 // push takes a document from the hub. It has to carry the signature made
-// with the secret of the subscription and be about its topic.
+// with the secret of the subscription, be about its topic, and is stored in
+// the feed the subscription belongs to.
 func (s *Service) push(ctx context.Context, w http.ResponseWriter, r *http.Request, sub *store.WebSub) {
 	body, err := io.ReadAll(io.LimitReader(r.Body, maxPayload+1))
 	if err != nil {
@@ -311,7 +333,7 @@ func (s *Service) push(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if !signed(body, sub.Secret, r.Header.Get("X-Hub-Signature")) {
-		s.log.Warn("WebSub push without a valid signature", "topic", sub.Topic)
+		s.log.Warn("WebSub push without a valid signature", "user", sub.UserID, "feed", sub.FeedID, "topic", sub.Topic)
 		http.Error(w, "Invalid signature", http.StatusForbidden)
 		return
 	}
@@ -329,29 +351,29 @@ func (s *Service) push(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		self = fromHeader
 	}
 	if self != "" && !sameTopic(self, sub.Topic) {
-		s.log.Warn("WebSub push for another address", "topic", sub.Topic, "self", self)
+		s.log.Warn("WebSub push for another address", "user", sub.UserID, "feed", sub.FeedID, "topic", sub.Topic, "self", self)
 		http.Error(w, "Self URL does not match the subscription", http.StatusUnprocessableEntity)
 		return
 	}
-	n, err := s.Pusher.Push(ctx, sub.Topic, body, contentType)
+	n, err := s.Pusher.Push(ctx, sub, body, contentType)
 	if err != nil {
 		s.fail(w, err)
 		return
 	}
 	if n == 0 {
-		// Nobody reads the feed any more: the hub may stop, and so may we.
-		if err := s.db.DeleteWebSub(ctx, sub.Topic); err != nil {
-			s.log.Warn("WebSub subscription is not deleted", "topic", sub.Topic, "error", err)
+		// The feed is gone or muted: the hub may stop, and so may we.
+		if err := s.db.DeleteWebSub(ctx, sub.UserID, sub.FeedID); err != nil {
+			s.log.Warn("WebSub subscription is not deleted", "user", sub.UserID, "feed", sub.FeedID, "error", err)
 		}
 		http.Error(w, "Nobody reads this feed any more", http.StatusGone)
 		return
 	}
 	if sub.Error {
 		// Read again: storing the entries took time.
-		if fresh, err := s.db.WebSubByTopic(ctx, sub.Topic); err == nil {
+		if fresh, err := s.db.WebSubByFeed(ctx, sub.UserID, sub.FeedID); err == nil {
 			fresh.Error = false
 			if err := s.db.PutWebSub(ctx, fresh); err != nil {
-				s.log.Warn("WebSub subscription is not updated", "topic", sub.Topic, "error", err)
+				s.log.Warn("WebSub subscription is not updated", "user", sub.UserID, "feed", sub.FeedID, "error", err)
 			}
 		}
 	}

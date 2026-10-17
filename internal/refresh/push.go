@@ -2,6 +2,7 @@ package refresh
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -9,60 +10,46 @@ import (
 	"github.com/juev/freshgo/internal/store"
 )
 
-// Push stores a document a WebSub hub sent about a topic into every feed
-// that announces the topic, whoever reads it, and returns the number of
-// feeds it was stored for. Muted feeds and feeds of disabled users are
-// passed over. A feed the document cannot be stored for is logged and not
-// counted; the error is for what stops the push as a whole.
-func (r *Refresher) Push(ctx context.Context, topic string, document []byte, contentType string) (int, error) {
-	feeds, err := r.db.FeedsByTopic(ctx, topic)
-	if err != nil || len(feeds) == 0 {
+// Push stores a document a WebSub hub sent for one subscription into the
+// feed the subscription belongs to, and returns 1 when the feed took it.
+// A feed that is gone, muted, or belongs to a disabled user takes nothing
+// and returns 0. The error is for a document that cannot be read or stored:
+// the subscription stays, and the hub may try again.
+func (r *Refresher) Push(ctx context.Context, sub *store.WebSub, document []byte, contentType string) (int, error) {
+	f, err := r.db.FeedByID(ctx, sub.UserID, sub.FeedID)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return 0, nil
+	case err != nil:
 		return 0, err
+	case f.TTL < 0:
+		return 0, nil
 	}
-	users, err := r.db.Users(ctx)
+	u, err := r.db.UserByID(ctx, f.UserID)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return 0, nil
+	case err != nil:
+		return 0, err
+	case !readUserSettings(u.Settings).enabled:
+		return 0, nil
+	}
+	j, err := r.userJob(ctx, u)
 	if err != nil {
 		return 0, err
 	}
-	byID := map[int64]*store.User{}
-	for _, u := range users {
-		byID[u.ID] = u
+	params, err := fetch.FeedParams(f.HTTPAuth, f.Attributes)
+	if err != nil {
+		return 0, err
 	}
-	stored := 0
-	jobs := map[int64]*job{}
-	for _, f := range feeds {
-		u := byID[f.UserID]
-		if u == nil || f.TTL < 0 {
-			continue
-		}
-		j := jobs[u.ID]
-		if j == nil {
-			if !readUserSettings(u.Settings).enabled {
-				continue
-			}
-			if j, err = r.userJob(ctx, u); err != nil {
-				return stored, err
-			}
-			jobs[u.ID] = j
-		}
-		params, err := fetch.FeedParams(f.HTTPAuth, f.Attributes)
-		if err != nil {
-			r.log.Warn("pushed document is not stored", "user", u.Name, "feed", f.ID, "error", err)
-			continue
-		}
-		// What a request for the feed would have answered.
-		resp := &fetch.Response{
-			URL:    strings.TrimSuffix(f.URL, forceFeedSuffix),
-			Header: http.Header{"Content-Type": {contentType}},
-			Body:   document,
-		}
-		if _, err := r.storeFetched(ctx, j, f, params, resp, r.now().Unix(), true); err != nil {
-			if ctx.Err() != nil {
-				return stored, ctx.Err()
-			}
-			r.log.Warn("pushed document is not stored", "user", u.Name, "feed", f.ID, "error", err)
-			continue
-		}
-		stored++
+	// What a request for the feed would have answered.
+	resp := &fetch.Response{
+		URL:    strings.TrimSuffix(f.URL, forceFeedSuffix),
+		Header: http.Header{"Content-Type": {contentType}},
+		Body:   document,
 	}
-	return stored, nil
+	if _, err := r.storeFetched(ctx, j, f, params, resp, r.now().Unix(), true); err != nil {
+		return 0, err
+	}
+	return 1, nil
 }

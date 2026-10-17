@@ -325,10 +325,10 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 	})
 	if err == nil && r.WebSub != nil && topic != "" {
 		// A hub that is trusted pushes every entry before a poll finds it.
-		if res.added > 0 && j.pushing[topic] {
-			r.WebSub.Distrust(ctx, topic)
+		if res.added > 0 && j.pushing[f.ID] {
+			r.WebSub.Distrust(ctx, f.UserID, f.ID)
 		}
-		r.WebSub.Ensure(ctx, topic, hub)
+		r.WebSub.Ensure(ctx, f.UserID, f.ID, topic, hub)
 	}
 	return res, err
 }

@@ -5,9 +5,12 @@ import (
 	"fmt"
 )
 
-// WebSub is a subscription to the hub of a topic. It is shared by every
-// feed, of any user, that announces the topic.
+// WebSub is a subscription to the hub of the topic one feed announces. Its
+// key and secret belong to that feed alone: a document pushed for it is
+// stored into the feed and no other.
 type WebSub struct {
+	UserID int64
+	FeedID int64
 	// Topic is the address the feed gives as its own.
 	Topic string
 	Hub   string
@@ -25,26 +28,28 @@ type WebSub struct {
 	Error bool
 }
 
-const webSubColumns = `topic, hub, key, secret, lease_start, lease_end, error`
+const webSubColumns = `user_id, feed_id, topic, hub, key, secret, lease_start, lease_end, error`
 
-// PutWebSub stores a subscription, replacing the one of the same topic.
+// PutWebSub stores a subscription, replacing the one of the same feed.
 func (s *Store) PutWebSub(ctx context.Context, w *WebSub) error {
 	_, err := s.exec(ctx, `
-		INSERT INTO websub_subscriptions (`+webSubColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT (topic) DO UPDATE SET hub = excluded.hub, key = excluded.key, secret = excluded.secret,
-			lease_start = excluded.lease_start, lease_end = excluded.lease_end, error = excluded.error`,
-		w.Topic, w.Hub, w.Key, w.Secret, w.LeaseStart, w.LeaseEnd, w.Error)
+		INSERT INTO websub_subscriptions (`+webSubColumns+`) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT (user_id, feed_id) DO UPDATE SET topic = excluded.topic, hub = excluded.hub,
+			key = excluded.key, secret = excluded.secret, lease_start = excluded.lease_start,
+			lease_end = excluded.lease_end, error = excluded.error`,
+		w.UserID, w.FeedID, w.Topic, w.Hub, w.Key, w.Secret, w.LeaseStart, w.LeaseEnd, w.Error)
 	if err != nil {
-		return fmt.Errorf("store: WebSub subscription %q: %w", w.Topic, err)
+		return fmt.Errorf("store: WebSub subscription of feed %d: %w", w.FeedID, err)
 	}
 	return nil
 }
 
-// WebSubByTopic returns the subscription of a topic or ErrNotFound.
-func (s *Store) WebSubByTopic(ctx context.Context, topic string) (*WebSub, error) {
-	w, err := scanWebSub(s.queryRow(ctx, `SELECT `+webSubColumns+` FROM websub_subscriptions WHERE topic = ?`, topic))
+// WebSubByFeed returns the subscription of a feed or ErrNotFound.
+func (s *Store) WebSubByFeed(ctx context.Context, userID, feedID int64) (*WebSub, error) {
+	w, err := scanWebSub(s.queryRow(ctx, `
+		SELECT `+webSubColumns+` FROM websub_subscriptions WHERE user_id = ? AND feed_id = ?`, userID, feedID))
 	if err != nil {
-		return nil, fmt.Errorf("store: WebSub subscription %q: %w", topic, err)
+		return nil, fmt.Errorf("store: WebSub subscription of feed %d: %w", feedID, err)
 	}
 	return w, nil
 }
@@ -59,30 +64,32 @@ func (s *Store) WebSubByKey(ctx context.Context, key string) (*WebSub, error) {
 	return w, nil
 }
 
-// WebSubs returns every subscription, ordered by topic.
-func (s *Store) WebSubs(ctx context.Context) ([]*WebSub, error) {
-	rows, err := s.query(ctx, `SELECT `+webSubColumns+` FROM websub_subscriptions ORDER BY topic`)
+// WebSubsOfUser returns the subscriptions of a user's feeds, ordered by feed.
+func (s *Store) WebSubsOfUser(ctx context.Context, userID int64) ([]*WebSub, error) {
+	rows, err := s.query(ctx, `
+		SELECT `+webSubColumns+` FROM websub_subscriptions WHERE user_id = ? ORDER BY feed_id`, userID)
 	if err != nil {
-		return nil, fmt.Errorf("store: WebSub subscriptions: %w", err)
+		return nil, fmt.Errorf("store: WebSub subscriptions of user %d: %w", userID, err)
 	}
 	subs, err := collect(rows, scanWebSub)
 	if err != nil {
-		return nil, fmt.Errorf("store: WebSub subscriptions: %w", err)
+		return nil, fmt.Errorf("store: WebSub subscriptions of user %d: %w", userID, err)
 	}
 	return subs, nil
 }
 
-// DeleteWebSub removes the subscription of a topic.
-func (s *Store) DeleteWebSub(ctx context.Context, topic string) error {
-	if _, err := s.exec(ctx, `DELETE FROM websub_subscriptions WHERE topic = ?`, topic); err != nil {
-		return fmt.Errorf("store: delete WebSub subscription %q: %w", topic, err)
+// DeleteWebSub removes the subscription of a feed.
+func (s *Store) DeleteWebSub(ctx context.Context, userID, feedID int64) error {
+	if _, err := s.exec(ctx, `DELETE FROM websub_subscriptions WHERE user_id = ? AND feed_id = ?`, userID, feedID); err != nil {
+		return fmt.Errorf("store: delete WebSub subscription of feed %d: %w", feedID, err)
 	}
 	return nil
 }
 
 func scanWebSub(sc scanner) (*WebSub, error) {
 	w := &WebSub{}
-	if err := sc.Scan(&w.Topic, &w.Hub, &w.Key, &w.Secret, &w.LeaseStart, &w.LeaseEnd, &w.Error); err != nil {
+	if err := sc.Scan(&w.UserID, &w.FeedID, &w.Topic, &w.Hub, &w.Key, &w.Secret,
+		&w.LeaseStart, &w.LeaseEnd, &w.Error); err != nil {
 		return nil, err
 	}
 	return w, nil

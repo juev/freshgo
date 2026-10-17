@@ -127,39 +127,6 @@ func (s *Store) DeleteFeed(ctx context.Context, userID, id int64) error {
 	return nil
 }
 
-// FeedsByTopic returns the feeds of all users that announced the WebSub
-// topic, ordered by user and identifier.
-func (s *Store) FeedsByTopic(ctx context.Context, topic string) ([]*Feed, error) {
-	rows, err := s.query(ctx, `
-		SELECT user_id, `+feedColumns+` FROM feeds WHERE websub_topic = ? ORDER BY user_id, id`, topic)
-	if err != nil {
-		return nil, fmt.Errorf("store: feeds of topic %q: %w", topic, err)
-	}
-	feeds, err := collect(rows, func(sc scanner) (*Feed, error) {
-		var userID int64
-		f, err := scanFeed(0, prefixed{sc, &userID})
-		if err != nil {
-			return nil, err
-		}
-		f.UserID = userID
-		return f, nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("store: feeds of topic %q: %w", topic, err)
-	}
-	return feeds, nil
-}
-
-// prefixed scans one leading column into first and the rest as asked.
-type prefixed struct {
-	sc    scanner
-	first any
-}
-
-func (p prefixed) Scan(dest ...any) error {
-	return p.sc.Scan(append([]any{p.first}, dest...)...)
-}
-
 // DeleteFeedEntries removes every entry of a feed, the feed stays. It
 // returns how many entries there were.
 func (s *Store) DeleteFeedEntries(ctx context.Context, userID, feedID int64) (int, error) {
