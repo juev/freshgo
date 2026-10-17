@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/juev/freshgo/internal/favicon"
@@ -54,6 +55,9 @@ type Refresher struct {
 	// running keeps one run at a time: a second one would find the same
 	// feeds due and fetch them again.
 	running sync.Mutex
+	// lastRun is when the last run that reached every user ended, in Unix
+	// seconds; zero before the first.
+	lastRun atomic.Int64
 }
 
 // New returns a Refresher. Handlers of the registry are called from several
@@ -122,7 +126,18 @@ func (r *Refresher) Run(ctx context.Context, o Options) ([]Stats, error) {
 			"new", st.NewEntries, "updated", st.UpdatedEntries)
 	}
 	r.subscribe(ctx, hubs)
+	r.lastRun.Store(r.now().Unix())
 	return all, nil
+}
+
+// LastRun returns when the last run that reached every user ended, and false
+// before the first.
+func (r *Refresher) LastRun() (time.Time, bool) {
+	at := r.lastRun.Load()
+	if at == 0 {
+		return time.Time{}, false
+	}
+	return time.Unix(at, 0), true
 }
 
 // subscribe makes sure the hubs of the feeds have been asked to push. It is

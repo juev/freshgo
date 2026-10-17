@@ -11,7 +11,7 @@ Out of scope: the frontend of FreshRSS, PHP extensions, languages other than Eng
 
 ## Requirements
 
-- U1. Whatever path no other part of the server owns (`/accounts/`, `/reader/`, `/api/greader.php`, `/api/misc.php`, `/favicon/`, `/websub/`) belongs to the interface. A path it has no page for is answered with an HTML page and status 404, a method a page does not take with 405.
+- U1. Whatever path no other part of the server owns (`/healthz`, `/accounts/`, `/reader/`, `/api/greader.php`, `/api/misc.php`, `/favicon/`, `/websub/`) belongs to the interface. A path it has no page for is answered with an HTML page and status 404, a method a page does not take with 405.
 - U2. Every page has the same frame: a link to the content as the first thing `Tab` reaches, the name of the installation, the main menu with the current section marked `aria-current="page"`, a live region for messages (`#messages`, `role="status"`), and the content in `main#content`, which can take focus.
 - U3. The language of a page is the best match among, in this order, what the browser asks for (`Accept-Language`) and the language of the installation (`language` of the system settings); English when neither is a language of the interface. A language only related to one of ours is not a match. `<html lang>` says which was chosen.
 - U4. The interface speaks English and Russian. Every text exists in both, takes the same values in both, and a text that depends on a number has every plural form its language tells apart. A text missing in a language is shown in English.

@@ -90,6 +90,14 @@ func (s *Store) Close() error {
 	return s.db.Close()
 }
 
+// Ping checks that the database answers.
+func (s *Store) Ping(ctx context.Context) error {
+	if err := s.db.PingContext(ctx); err != nil {
+		return fmt.Errorf("store: ping: %w", err)
+	}
+	return nil
+}
+
 // InTx runs fn in a transaction and commits if fn returns nil. Called on a
 // Store that is already inside a transaction, it joins that transaction.
 func (s *Store) InTx(ctx context.Context, fn func(tx *Store) error) error {
