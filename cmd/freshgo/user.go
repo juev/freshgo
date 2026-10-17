@@ -25,6 +25,7 @@ func userCommands() []command {
 	return []command{
 		{"create", "add a user; the password is read from standard input", runUserCreate},
 		{"passwd", "change the password of a user, read from standard input", runUserPasswd},
+		{"totp-off", "let a user who lost the app log in by the password alone", runUserTOTPOff},
 		{"list", "list the users", runUserList},
 		{"delete", "delete a user with all their feeds and entries", runUserDelete},
 	}
@@ -141,6 +142,34 @@ func runUserCreate(ctx context.Context, e env, args []string) (err error) {
 		return err
 	}
 	_, err = fmt.Fprintf(e.stdout, "user %s created\n", name)
+	return err
+}
+
+func runUserTOTPOff(ctx context.Context, e env, args []string) (err error) {
+	fs, conf := newFlagSet(e, "user totp-off")
+	synopsis(fs, e, "user totp-off [flags] <name>")
+	db, err := openStore(ctx, fs, conf, args, 1)
+	if err != nil {
+		return err
+	}
+	defer func() { err = errors.Join(err, db.Close()) }()
+	name, err := operand(fs, "a user name")
+	if err != nil {
+		return err
+	}
+	u, err := findUser(ctx, db, name)
+	if err != nil {
+		return err
+	}
+	err = db.UpdateUserSettings(ctx, u.ID, func(settings map[string]json.RawMessage) error {
+		delete(settings, "totp_secret")
+		delete(settings, "totp_last")
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	_, err = fmt.Fprintf(e.stdout, "%s logs in by the password alone\n", name)
 	return err
 }
 

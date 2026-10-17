@@ -420,7 +420,11 @@ type profilePage struct {
 	// HasPassword and HasAPI say which passwords the user has; CanDelete is
 	// false for the default user, who stays.
 	HasPassword, HasAPI, CanDelete bool
-	Problem                        string
+	// TOTP says a login by password takes the code of an app as well;
+	// Setup is what turning that on shows, nil while it is on.
+	TOTP    bool
+	Setup   *totpSetup
+	Problem string
 }
 
 var (
@@ -433,7 +437,15 @@ func (h *Handler) showProfile(w http.ResponseWriter, r *http.Request, status int
 	v := h.settingsView(r, "profile")
 	page := profilePage{
 		Email: email, Token: token, HasPassword: s.who.prefs.PasswordHash != "", HasAPI: s.who.user.APIPasswordHash != "",
-		CanDelete: s.who.user.Name != s.system.DefaultUser,
+		CanDelete: s.who.user.Name != s.system.DefaultUser, TOTP: s.who.prefs.TOTPSecret != "",
+	}
+	if page.HasPassword && !page.TOTP {
+		setup, err := newTOTPSetup(s.system.Title, s.who.user.Name, r.PostFormValue("totp_secret"))
+		if err != nil {
+			h.broken(w, r, err)
+			return
+		}
+		page.Setup = setup
 	}
 	if stored := s.who.prefs.Token; stored != "" {
 		address := "?" + url.Values{"user": {s.who.user.Name}, "token": {stored}}.Encode()

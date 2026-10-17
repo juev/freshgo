@@ -200,8 +200,10 @@ type userPage struct {
 	// administrator cannot disable, demote or delete: their own and that of
 	// the default user.
 	Self, Protected bool
-	Email           string
-	Problem         string
+	// TOTP says the user's login by password takes the code of an app.
+	TOTP    bool
+	Email   string
+	Problem string
 }
 
 // namedUser finds the user a request names.
@@ -239,7 +241,7 @@ func (h *Handler) showUser(w http.ResponseWriter, r *http.Request, status int, u
 			Feeds: totals[u.ID].Feeds, Entries: totals[u.ID].Entries,
 		},
 		Self: u.ID == s.who.user.ID, Protected: isDefault || u.ID == s.who.user.ID,
-		Email: readAttrs(u.Settings).text("mail_login"),
+		TOTP: prefs.TOTPSecret != "", Email: readAttrs(u.Settings).text("mail_login"),
 	}
 	if problem != "" {
 		page.Problem = v.T(problem)
@@ -307,6 +309,9 @@ func (h *Handler) updateUser(w http.ResponseWriter, r *http.Request) {
 		if err = setting("enabled", false); err == nil {
 			err = h.db.DeleteUserSessions(ctx, u.ID, "")
 		}
+	case "totp-off":
+		// For a user who lost the app.
+		err = h.turnOffTOTP(ctx, u.ID)
 	case "promote":
 		err = setting("is_admin", true)
 	case "demote":

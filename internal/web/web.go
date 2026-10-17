@@ -101,6 +101,8 @@ type Handler struct {
 	// another site.
 	crossOrigin *http.CrossOriginProtection
 	guard       *authguard.Guard
+	// codeLogins are the logins that wait for the code of an app.
+	codeLogins codeLogins
 	// letters holds back letters to one user after the first few.
 	letters authguard.Guard
 	// registrants holds back registrations from one address after the
@@ -257,6 +259,7 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("GET /settings/profile", h.protect(members, h.profilePage))
 	h.mux.HandleFunc("POST /settings/profile", h.protect(members, h.saveProfile))
 	h.mux.HandleFunc("POST /settings/profile/password", h.protect(members, h.changePassword))
+	h.mux.HandleFunc("POST /settings/profile/totp", h.protect(members, h.changeTOTP))
 	h.mux.HandleFunc("POST /settings/profile/api-password", h.protect(members, h.changeAPIPassword))
 	h.mux.HandleFunc("POST /settings/profile/delete", h.protect(members, h.deleteAccount))
 	h.mux.HandleFunc("GET /log", h.protect(members, h.journal))
@@ -288,6 +291,7 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /reset/password", h.saveReset)
 	h.mux.HandleFunc("GET /login", h.loginPage)
 	h.mux.HandleFunc("POST /login", h.login)
+	h.mux.HandleFunc("POST /login/code", h.loginCode)
 	h.mux.HandleFunc("POST /logout", h.logout)
 	return h, nil
 }

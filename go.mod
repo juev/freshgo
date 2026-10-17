@@ -14,6 +14,7 @@ require (
 	github.com/chromedp/chromedp/remote v0.2.0
 	github.com/coreos/go-oidc/v3 v3.21.0
 	github.com/jackc/pgx/v5 v5.11.0
+	github.com/pquerna/otp v1.5.0
 	github.com/prometheus/client_golang v1.25.0
 	golang.org/x/crypto v0.57.0
 	golang.org/x/net v0.59.0
@@ -26,6 +27,7 @@ require (
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
