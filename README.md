@@ -221,7 +221,7 @@ An administrator chooses on the page "Signing in":
 
 Anonymous reading, a separate switch, lets visitors who are not logged in read what the default user reads and change nothing.
 
-Behind a reverse proxy set `-base-url` to the public address. If the address has a path, such as `https://example.org/rss`, the proxy has to strip that path from requests; links are written with it. The server counts failed logins per address and takes the address of the browser from `X-Forwarded-For` only when the connection comes from a trusted proxy.
+Behind a reverse proxy set `-base-url` to the public address. If the address has a path, such as `https://example.org/rss`, the proxy has to strip that path from requests; links are written with it. The server counts failed logins per address and takes the address of the browser from `X-Forwarded-For` only when the connection comes from a trusted proxy. Over HTTPS the session cookie is `Secure` and every answer carries `Strict-Transport-Security`; the server knows the browser came over HTTPS from `-base-url` with `https://`, or from `X-Forwarded-Proto: https` sent by a trusted proxy.
 
 A saved query can be handed out without a login at `/shared/<token>.rss`, `.atom`, `.html`, `.opml` or `.json`; the addresses FreshRSS gave for shared queries and for the feed of a user (`/api/query.php`, `/i/?a=rss`) keep answering.
 

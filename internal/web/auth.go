@@ -276,9 +276,23 @@ func tokenHash(token string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// secure reports whether the browser reaches the server over HTTPS.
+// secure reports whether the browser reaches the server over HTTPS: the
+// connection is TLS, the public address is https, or a trusted proxy says in
+// X-Forwarded-Proto that it took the request over HTTPS.
 func (h *Handler) secure(r *http.Request) bool {
-	return r.TLS != nil || strings.HasPrefix(h.baseURL, "https://")
+	if r.TLS != nil || strings.HasPrefix(h.baseURL, "https://") {
+		return true
+	}
+	if !authguard.FromProxy(r, h.proxies) {
+		return false
+	}
+	// A proxy behind another adds its own word last.
+	forwarded := r.Header.Values("X-Forwarded-Proto")
+	if len(forwarded) == 0 {
+		return false
+	}
+	hops := strings.Split(forwarded[len(forwarded)-1], ",")
+	return strings.EqualFold(strings.TrimSpace(hops[len(hops)-1]), "https")
 }
 
 // setSession hands the browser the secret of a login, or takes it back when

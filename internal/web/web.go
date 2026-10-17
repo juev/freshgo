@@ -291,11 +291,18 @@ func New(o Options) (*Handler, error) {
 const contentSecurityPolicy = "default-src 'self'; img-src * data: blob:; media-src *; frame-src *; " +
 	"object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
 
+// hsts tells a browser that reached the server over HTTPS to come back only
+// that way for a year.
+const hsts = "max-age=31536000"
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	header := w.Header()
 	header.Set("Content-Security-Policy", contentSecurityPolicy)
 	header.Set("X-Content-Type-Options", "nosniff")
 	header.Set("Referrer-Policy", "same-origin")
+	if h.secure(r) {
+		header.Set("Strict-Transport-Security", hsts)
+	}
 
 	// Static files and the images of entries are the same for everybody.
 	if !strings.HasPrefix(r.URL.Path, StaticPath) && !strings.HasPrefix(r.URL.Path, mediaproxy.Path) {
