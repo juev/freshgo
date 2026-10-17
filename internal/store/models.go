@@ -62,6 +62,8 @@ type Feed struct {
 	HTTPAuth string
 	// Error is the time of the last failed refresh, zero if the last one succeeded.
 	Error int64
+	// ErrorMessage is what the last refresh failed with, empty if it succeeded.
+	ErrorMessage string
 	// Failures is the number of refreshes that have failed in a row.
 	Failures int
 	// NotBefore is the time before which the server of the feed asked not

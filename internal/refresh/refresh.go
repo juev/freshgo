@@ -430,15 +430,80 @@ func due(f *store.Feed, published store.Published, now int64, limit int, force, 
 	if f.TTL < 0 {
 		return false
 	}
-	if force {
-		return true
-	}
-	if now < f.NotBefore || now < f.Error+retryWait(f.Failures) {
-		return false
-	}
+	return force || now >= next(f, published, now, limit, pushed).At
+}
+
+// Hold is what puts the next refresh of a feed off until it is due.
+type Hold int
+
+const (
+	// HoldPeriod is the refresh period of the feed.
+	HoldPeriod Hold = iota
+	// HoldWebSub is the period of a feed whose hub delivers its entries.
+	HoldWebSub
+	// HoldFresh is how long the server called its last answer fresh
+	// (Cache-Control max-age or Expires).
+	HoldFresh
+	// HoldRetryAfter is the pause the server asked for with its failure
+	// (Retry-After).
+	HoldRetryAfter
+	// HoldBackoff is the wait after refreshes that failed in a row.
+	HoldBackoff
+	// HoldMuted is a muted feed, which is not refreshed.
+	HoldMuted
+)
+
+// Attempt is when a feed is due to be refreshed next and what decides it.
+type Attempt struct {
+	// At is the time from which the feed is due, zero for a muted feed. The
+	// next run of the server at or after it refreshes the feed.
+	At   int64
+	Hold Hold
+}
+
+// next is when a feed that is not muted is due to be refreshed, by the
+// rules of due.
+func next(f *store.Feed, published store.Published, now int64, limit int, pushed bool) Attempt {
 	ttl := period(f, published, now, limit)
-	if pushed {
-		ttl = max(ttl, pushedPeriod)
+	a := Attempt{At: f.LastUpdate + int64(ttl) + 1, Hold: HoldPeriod}
+	if pushed && pushedPeriod > ttl {
+		a = Attempt{At: f.LastUpdate + pushedPeriod + 1, Hold: HoldWebSub}
 	}
-	return now > f.LastUpdate+int64(ttl)
+	if f.NotBefore > a.At {
+		// A feed whose last refresh failed has the pause of that failure;
+		// otherwise it is what the last answer said of itself.
+		a = Attempt{At: f.NotBefore, Hold: HoldFresh}
+		if f.Error != 0 {
+			a.Hold = HoldRetryAfter
+		}
+	}
+	if wait := f.Error + retryWait(f.Failures); wait > a.At {
+		a = Attempt{At: wait, Hold: HoldBackoff}
+	}
+	return a
+}
+
+// Attempts returns, by identifier, when the feeds of the user are due to be
+// refreshed next, as it stands at the time now, and what decides it.
+func (r *Refresher) Attempts(ctx context.Context, u *store.User, feeds []*store.Feed, now int64) (map[int64]Attempt, error) {
+	published, err := r.db.PublishedBetween(ctx, u.ID, now-frequencyWindow, now)
+	if err != nil {
+		return nil, err
+	}
+	var pushing map[int64]bool
+	if r.WebSub != nil {
+		if pushing, err = r.WebSub.Working(ctx, u.ID); err != nil {
+			return nil, err
+		}
+	}
+	limit := maxPeriod(u)
+	attempts := make(map[int64]Attempt, len(feeds))
+	for _, f := range feeds {
+		if f.TTL < 0 {
+			attempts[f.ID] = Attempt{Hold: HoldMuted}
+			continue
+		}
+		attempts[f.ID] = next(f, published[f.ID], now, limit, pushing[f.ID])
+	}
+	return attempts, nil
 }

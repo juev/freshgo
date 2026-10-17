@@ -498,6 +498,9 @@ func TestWebSubPollsLessOften(t *testing.T) {
 		if hits := w.hitCount("/feed.xml"); hits != 2 {
 			t.Errorf("%d requests in the ten hours after a push, want none: the hub delivers", hits-2)
 		}
+		if got := w.attempt(u, f); got.Hold != HoldWebSub || got.At != w.storedFeed(f).LastUpdate+pushedPeriod+1 {
+			t.Errorf("next attempt of a feed the hub delivers: %+v, want a day after the last poll", got)
+		}
 		// A forced run does not wait.
 		w.run(Options{Force: true})
 		if hits := w.hitCount("/feed.xml"); hits != 3 {

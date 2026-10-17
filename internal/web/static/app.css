@@ -1233,6 +1233,14 @@ input[type="file"] {
 	overflow-wrap: anywhere;
 }
 
+.feed-state {
+	color: var(--text-muted);
+	font-size: 0.875rem;
+	margin: calc(var(--space) / 4) 0 0;
+	overflow-wrap: anywhere;
+	padding-left: calc(var(--space) * 2);
+}
+
 .feed-icon {
 	vertical-align: baseline;
 }

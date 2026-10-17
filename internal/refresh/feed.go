@@ -299,7 +299,7 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 		}
 
 		if pushed {
-			fresh.Error, fresh.Failures = 0, 0
+			fresh.Error, fresh.ErrorMessage, fresh.Failures = 0, "", 0
 		} else {
 			succeeded(fresh, f, resp, now, longestPeriod(j.user, fresh))
 			fresh.WebSubTopic, fresh.WebSubHub = topic, hub
@@ -391,7 +391,7 @@ func (r *Refresher) storeUnchanged(ctx context.Context, j *job, f *store.Feed, r
 // server may put the next request off, in seconds.
 func succeeded(fresh, fetched *store.Feed, resp *fetch.Response, now, longest int64) {
 	fresh.LastUpdate = now
-	fresh.Error, fresh.Failures = 0, 0
+	fresh.Error, fresh.ErrorMessage, fresh.Failures = 0, "", 0
 	fresh.NotBefore = freshUntil(resp.Header, now, longest)
 	// A 304 need not repeat the validators.
 	if !resp.NotModified || resp.Header.Get("ETag") != "" {
@@ -492,7 +492,7 @@ func (r *Refresher) fail(ctx context.Context, j *job, f *store.Feed, now int64, 
 		if err != nil {
 			return err
 		}
-		fresh.Error = now
+		fresh.Error, fresh.ErrorMessage = now, errorMessage(cause)
 		fresh.Failures++
 		fresh.NotBefore = retryAt(cause, now)
 		if gone && fresh.TTL >= 0 {
@@ -504,6 +504,20 @@ func (r *Refresher) fail(ctx context.Context, j *job, f *store.Feed, now int64, 
 		cause = fmt.Errorf("%w; the feed is muted", cause)
 	}
 	return errors.Join(cause, err)
+}
+
+// maxErrorMessage bounds, in characters, what a feed keeps of the cause of
+// its last failure.
+const maxErrorMessage = 500
+
+// errorMessage is what a feed keeps of the cause of its failed refresh:
+// text a database takes, which has no NUL for PostgreSQL.
+func errorMessage(cause error) string {
+	message := strings.ReplaceAll(strings.ToValidUTF8(cause.Error(), "\uFFFD"), "\x00", "")
+	if runes := []rune(message); len(runes) > maxErrorMessage {
+		return string(runes[:maxErrorMessage-1]) + "…"
+	}
+	return message
 }
 
 // muted is the TTL of a muted feed whose TTL was ttl, which is not negative.

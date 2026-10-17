@@ -182,6 +182,16 @@ func (w *world) later() {
 	w.clock = w.clock.Add(25 * time.Hour)
 }
 
+// attempt is when the refresher says the feed is due next and why then.
+func (w *world) attempt(u *store.User, f *store.Feed) Attempt {
+	w.t.Helper()
+	attempts, err := w.r.Attempts(context.Background(), u, []*store.Feed{w.storedFeed(f)}, w.clock.Unix())
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	return attempts[f.ID]
+}
+
 func (w *world) storedFeed(f *store.Feed) *store.Feed {
 	w.t.Helper()
 	got, err := w.db.FeedByID(context.Background(), f.UserID, f.ID)
@@ -826,6 +836,15 @@ func TestFailedFeed(t *testing.T) {
 		if got := w.storedFeed(gone); got.Error != start.Unix() || got.TTL != store.MutedTTL {
 			t.Errorf("410: error %d, ttl %d; want the feed muted", got.Error, got.TTL)
 		}
+		if got := w.storedFeed(broken); !strings.Contains(got.ErrorMessage, "500") || got.Failures != 1 {
+			t.Errorf("500: the feed keeps %q after %d failures, want the cause", got.ErrorMessage, got.Failures)
+		}
+		if got := w.attempt(u, broken); got != (Attempt{At: start.Unix(), Hold: HoldBackoff}) {
+			t.Errorf("500: next attempt %+v, want the next run", got)
+		}
+		if got := w.attempt(u, gone); got != (Attempt{Hold: HoldMuted}) {
+			t.Errorf("410: next attempt %+v, want none", got)
+		}
 		if got := w.storedFeed(goneOwnTTL); got.TTL != -7200 {
 			t.Errorf("410 with a period of its own: ttl %d, want -7200", got.TTL)
 		}
@@ -844,7 +863,7 @@ func TestFailedFeed(t *testing.T) {
 		if st.Refreshed != 1 || st.Failed != 3 {
 			t.Errorf("next run: stats %+v, want 1 recovered and 3 failed", st)
 		}
-		if got := w.storedFeed(broken); got.Error != 0 || got.Failures != 0 || got.LastUpdate != w.clock.Unix() || len(w.entries(broken)) != 1 {
+		if got := w.storedFeed(broken); got.Error != 0 || got.ErrorMessage != "" || got.Failures != 0 || got.LastUpdate != w.clock.Unix() || len(w.entries(broken)) != 1 {
 			t.Errorf("recovered feed: %+v", got)
 		}
 		if w.hitCount("/gone") != 1 || w.hitCount("/gone-own-ttl") != 1 {
@@ -875,6 +894,7 @@ func TestFailingFeedWaits(t *testing.T) {
 		}{
 			{"the first attempt", 0, Options{}, 1, 1},
 			{"the run after the first failure", time.Minute, Options{}, 2, 2},
+			{"the wait", 0, Options{}, 2, 2},
 			{"nine minutes after the second failure", 9 * time.Minute, Options{}, 2, 2},
 			{"ten minutes after the second failure", time.Minute, Options{}, 3, 3},
 			{"nineteen minutes after the third failure", 19 * time.Minute, Options{}, 3, 3},
@@ -883,6 +903,11 @@ func TestFailingFeedWaits(t *testing.T) {
 		} {
 			if hits, failures := after(c.step, c.o); hits != c.hits || failures != c.failures {
 				t.Errorf("%s: %d requests and %d failures in a row, want %d and %d", c.what, hits, failures, c.hits, c.failures)
+			}
+			if c.what == "the wait" {
+				if got, want := w.attempt(u, f), (Attempt{At: w.clock.Unix() + 600, Hold: HoldBackoff}); got != want {
+					t.Errorf("after the second failure: next attempt %+v, want %+v", got, want)
+				}
 			}
 		}
 
@@ -942,6 +967,16 @@ func TestServerSaysWhenToComeBack(t *testing.T) {
 				t.Errorf("%s: not before %d, want %d", name, got, c.want)
 			}
 		}
+		// A pause no longer than the period holds nothing back.
+		for name, c := range map[string]struct {
+			feed *store.Feed
+			want Attempt
+		}{"max-age of six hours": {sixHours, Attempt{t0 + 3601, HoldPeriod}}, "max-age of a minute": {minute, Attempt{t0 + 3601, HoldPeriod}},
+			"Retry-After of two hours": {busy, Attempt{t0 + 7200, HoldRetryAfter}}} {
+			if got := w.attempt(u, c.feed); got != c.want {
+				t.Errorf("%s: next attempt %+v, want %+v", name, got, c.want)
+			}
+		}
 
 		// A new process knows the pauses from the feeds alone.
 		w.r = w.refresher()
@@ -999,6 +1034,14 @@ func TestServerWaitWithinPeriodOfUser(t *testing.T) {
 		}
 		if got := w.storedFeed(month).NotBefore; got != t0+7200 {
 			t.Errorf("max-age of a month: not before %d, want the period of the user, %d", got, t0+7200)
+		}
+		for name, c := range map[string]struct {
+			feed *store.Feed
+			want Attempt
+		}{"max-age of half an hour": {halfHour, Attempt{t0 + 1800, HoldFresh}}, "max-age of a month": {month, Attempt{t0 + 7200, HoldFresh}}} {
+			if got := w.attempt(u, c.feed); got != c.want {
+				t.Errorf("%s: next attempt %+v, want %+v", name, got, c.want)
+			}
 		}
 		for _, c := range []struct {
 			step time.Duration

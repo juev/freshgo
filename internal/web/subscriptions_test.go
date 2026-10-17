@@ -12,9 +12,11 @@ import (
 	"os"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	pagebrowser "github.com/juev/freshgo/internal/browser"
 	"github.com/juev/freshgo/internal/favicon"
@@ -680,6 +682,74 @@ func TestFeedIcon(t *testing.T) {
 		}
 		if f := s.feed("alice", 1); decoded(t, f.Attributes)["customFavicon"] != nil {
 			t.Errorf("feed after giving up its icon = %s", f.Attributes)
+		}
+	})
+}
+
+// U52: the page of problems says of each feed when it was refreshed, what
+// it failed with, and when and why it is refreshed next; a feed its server
+// holds back past its period has a section of its own.
+func TestProblemsExplainRefreshes(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		ctx := context.Background()
+		now := s.clock().Unix()
+		s.asAlice()
+		loc := readReading(s.user("alice")).location()
+		moment := func(seconds int64) string { return time.Unix(seconds, 0).In(loc).Format("2006-01-02 15:04") }
+		feeds := s.feeds("alice")
+		failing, paused, held, muted := feeds[0], feeds[1], feeds[2], feeds[3]
+		for f, change := range map[*store.Feed]func(f *store.Feed){
+			// The third failure in a row waits twenty minutes.
+			failing: func(f *store.Feed) {
+				f.LastUpdate, f.Error, f.ErrorMessage, f.Failures, f.NotBefore = now-7200, now-600, "https://example.org/feed: HTTP 503 <Service Unavailable>", 3, 0
+			},
+			paused: func(f *store.Feed) { f.LastUpdate, f.Error, f.Failures, f.NotBefore = 0, now-60, 1, now+3*3600 },
+			held:   func(f *store.Feed) { f.LastUpdate, f.NotBefore = now-60, now+7200 },
+			muted:  func(f *store.Feed) { f.TTL = -3600 },
+		} {
+			f.TTL, f.Error, f.ErrorMessage, f.Failures, f.NotBefore = 3600, 0, "", 0, 0
+			change(f)
+			if err := s.db.UpdateFeed(ctx, f); err != nil {
+				t.Fatal(err)
+			}
+		}
+		body := s.shown("/subscriptions/problems")
+		section := func(heading string) string {
+			_, after, _ := strings.Cut(body, "<h2>"+heading+"</h2>")
+			part, _, _ := strings.Cut(after, "<h2>")
+			return part
+		}
+		for name, c := range map[string]struct {
+			heading string
+			feed    *store.Feed
+			state   []string
+		}{
+			"failing": {"The last refresh failed", failing, []string{
+				"Last refreshed at " + moment(now-7200) + ".",
+				"Failed at " + moment(now-600) + ", 3 times in a row: https://example.org/feed: HTTP 503 &lt;Service Unavailable&gt;",
+				"Next refresh after " + moment(now+600) + ": it waits longer after each failure in a row.",
+			}},
+			"paused": {"The last refresh failed", paused, []string{
+				"Never refreshed.",
+				"Failed at " + moment(now-60) + ", 1 time in a row: the cause is in the log of the server",
+				"Next refresh after " + moment(now+3*3600) + ": its server asked not to be requested before then (Retry-After).",
+			}},
+			"held": {"Held back by the server", held, []string{
+				"Last refreshed at " + moment(now-60) + ".",
+				"Next refresh after " + moment(now+7200) + ": its server called the last answer fresh until then (Cache-Control or Expires).",
+			}},
+			"muted": {"Muted", muted, []string{"Not refreshed while muted."}},
+		} {
+			want := `<a href="/subscriptions/feeds/` + strconv.FormatInt(c.feed.ID, 10) + `">`
+			part := section(c.heading)
+			_, row, found := strings.Cut(part, want)
+			row, _, _ = strings.Cut(row, "</ul></li>")
+			if !found || !strings.Contains(row, "<li>"+strings.Join(c.state, "</li><li>")+"</li>") {
+				t.Errorf("%s: under %q the feed is shown as\n%s\nwant %q", name, c.heading, row, c.state)
+			}
+		}
+		if strings.Contains(section("Held back by the server"), `/subscriptions/feeds/`+strconv.FormatInt(failing.ID, 10)+`"`) {
+			t.Error("a failing feed is among those the server holds back")
 		}
 	})
 }
