@@ -338,7 +338,9 @@ func TestOIDCProviderDown(t *testing.T) {
 // holds them up once.
 func TestOIDCSlowProvider(t *testing.T) {
 	withProvider(t, func(t *testing.T, s *site, p *provider) {
+		// The provider serves every engine: count the requests of this one.
 		p.hold = make(chan struct{})
+		p.held.Store(0)
 		const visitors = 5
 		// The sign-ins ask at once, without the database between them and
 		// the provider, so that all of them find the reading under way.
