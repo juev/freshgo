@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -201,5 +202,38 @@ func TestReadInPlaceOfARequest(t *testing.T) {
 	failure := errors.New("behind a check")
 	if _, err := article(Request{Selector: "h1", Read: read("", failure)}); !errors.Is(err, failure) {
 		t.Errorf("a page that was not read: %v, want the error of the reader", err)
+	}
+}
+
+// Matches nested in one another are each written whole; a page made of them
+// is refused before the markup it multiplies into is held in memory.
+func TestNestedMatchesAreBounded(t *testing.T) {
+	block := strings.Repeat("<article>", 500) + "x" + strings.Repeat("</article>", 500)
+	page := "<html><body>" + strings.Repeat("<div>"+block+"</div>", 400) + "</body></html>"
+	article := func(selector, markup string) (string, error) {
+		read := func(context.Context, string) (string, string, error) {
+			return "https://site.example/", markup, nil
+		}
+		return Article(context.Background(), nil, Request{URL: "https://site.example/", Selector: selector, Read: read})
+	}
+
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+	_, err := article("article", page)
+	runtime.ReadMemStats(&after)
+	if !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("error = %v, want ErrTooLarge", err)
+	}
+	// Unbounded, the markup alone would be some 400 × 500²/2 × 20 bytes,
+	// about a gigabyte. Held to the budget, it is 60 MiB, and the builder
+	// that grows to it allocates some five times that on the way.
+	if allocated, budget := after.TotalAlloc-before.TotalAlloc, uint64(16*len(page)+1<<20); allocated > 8*budget {
+		t.Errorf("allocated %d MiB for a page of %d KiB", allocated>>20, len(page)>>10)
+	}
+
+	// Within the budget nested matches are still written again (T5).
+	got, err := article("article", "<html><body>"+strings.Repeat("<article>", 3)+"x"+strings.Repeat("</article>", 3)+"</body></html>")
+	if err != nil || strings.Count(got, "x") != 3 {
+		t.Errorf("three nested matches: %q, %v", got, err)
 	}
 }
