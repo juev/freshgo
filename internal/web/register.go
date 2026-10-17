@@ -213,7 +213,7 @@ func (h *Handler) absolute(r *http.Request, path string) string {
 		return strings.TrimSuffix(h.baseURL, "/") + path
 	}
 	scheme := "http"
-	if r.TLS != nil {
+	if h.secure(r) {
 		scheme = "https"
 	}
 	return scheme + "://" + r.Host + h.url(path)

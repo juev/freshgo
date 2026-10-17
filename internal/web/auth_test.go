@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
@@ -519,6 +520,59 @@ func TestBehindProxy(t *testing.T) {
 			t.Errorf("GET / when logged in: status %d, body\n%s", a.status, a.body)
 		}
 	})
+}
+
+// A proxy that takes the browser over HTTPS and passes the request on over
+// HTTP says so in X-Forwarded-Proto: the cookie is then for HTTPS only and
+// the browser is told to come back only that way. The header counts only from
+// a trusted proxy.
+func TestHTTPSBehindProxy(t *testing.T) {
+	proxies := []netip.Prefix{netip.MustParsePrefix("127.0.0.1/32")}
+	imported(t, Options{TrustedProxies: proxies}, func(t *testing.T, s *site) {
+		login := func(remote, proto string) answer {
+			form := url.Values{"username": {"alice"}, "password": {"alice-web-password"}}
+			r := httptest.NewRequest(http.MethodPost, "http://rss.example.org/login", strings.NewReader(form.Encode()))
+			r.RemoteAddr = remote
+			header := map[string]string{"Content-Type": "application/x-www-form-urlencoded"}
+			if proto != "" {
+				header["X-Forwarded-Proto"] = proto
+			}
+			return s.send(r, header)
+		}
+		for _, c := range []struct {
+			remote, proto string
+			secure        bool
+		}{
+			{"127.0.0.1:5000", "https", true},
+			{"127.0.0.1:5000", "http, https", true},
+			{"127.0.0.1:5000", "https, http", false},
+			{"127.0.0.1:5000", "", false},
+			{"192.0.2.9:5000", "https", false},
+		} {
+			a := login(c.remote, c.proto)
+			if a.status != http.StatusSeeOther {
+				t.Fatalf("login from %s with %q: status %d", c.remote, c.proto, a.status)
+			}
+			cookie, sts := a.header.Get("Set-Cookie"), a.header.Get("Strict-Transport-Security")
+			if strings.Contains(cookie, "; Secure") != c.secure || (sts == hsts) != c.secure || (!c.secure && sts != "") {
+				t.Errorf("login from %s with %q: Set-Cookie %q, Strict-Transport-Security %q, want HTTPS %v", c.remote, c.proto, cookie, sts, c.secure)
+			}
+		}
+	})
+}
+
+// Every page of an installation with an https public address tells the
+// browser to come back only over HTTPS; one reached over HTTP does not.
+func TestStrictTransportSecurity(t *testing.T) {
+	for baseURL, want := range map[string]string{"https://rss.example.org": hsts, "": ""} {
+		t.Run(fmt.Sprintf("base %q", baseURL), func(t *testing.T) {
+			imported(t, Options{BaseURL: baseURL}, func(t *testing.T, s *site) {
+				if a := s.get("/login"); a.header.Get("Strict-Transport-Security") != want {
+					t.Errorf("GET /login: Strict-Transport-Security %q, want %q", a.header.Get("Strict-Transport-Security"), want)
+				}
+			})
+		})
+	}
 }
 
 // The language and the colours of a page are the user's own.
