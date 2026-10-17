@@ -34,22 +34,26 @@ type command struct {
 	name    string
 	summary string
 	run     func(ctx context.Context, e env, args []string) error
+	// actions are those of a command that only hands its arguments over to
+	// one of them, which has no run of its own.
+	actions []command
 }
 
 func commands() []command {
 	return []command{
-		{"serve", "run the HTTP server and the refresh scheduler", runServe},
-		{"refresh", "refresh feeds once and exit", runRefresh},
-		{"purge", "delete old entries according to the archiving settings", runPurge},
-		{"import", "import a FreshRSS installation into an empty database", runImport},
-		{"backup", "copy the database to a file while the server runs", runBackup},
-		{"restore", "check a copy made by backup before it is put in place", runRestore},
-		{"user", "manage users: create, passwd, list, delete", group("user", userCommands())},
-		{"feed", "manage feeds: add", group("feed", feedCommands())},
-		{"opml", "import or export subscriptions as OPML", group("opml", opmlCommands())},
-		{"doctor", "check the configuration, the database and the services it names, changing nothing", runDoctor},
-		{"healthcheck", "ask the running server whether it works, for the health check of a container", runHealthcheck},
-		{"version", "print the version", runVersion},
+		{"serve", "run the HTTP server and the refresh scheduler", runServe, nil},
+		{"refresh", "refresh feeds once and exit", runRefresh, nil},
+		{"purge", "delete old entries according to the archiving settings", runPurge, nil},
+		{"import", "import a FreshRSS installation into an empty database", runImport, nil},
+		{"backup", "copy the database to a file while the server runs", runBackup, nil},
+		{"restore", "check a copy made by backup before it is put in place", runRestore, nil},
+		{"user", "manage users: create, passwd, list, delete", nil, userCommands()},
+		{"feed", "manage feeds: add", nil, feedCommands()},
+		{"opml", "import or export subscriptions as OPML", nil, opmlCommands()},
+		{"doctor", "check the configuration, the database and the services it names, changing nothing", runDoctor, nil},
+		{"healthcheck", "ask the running server whether it works, for the health check of a container", runHealthcheck, nil},
+		{"completion", "print a script that completes the commands and their flags in bash, zsh or fish", runCompletion, nil},
+		{"version", "print the version", runVersion, nil},
 	}
 }
 
@@ -110,7 +114,11 @@ func run(ctx context.Context, e env, args []string) int {
 		if c.name != args[0] {
 			continue
 		}
-		err := c.run(ctx, e, args[1:])
+		run := c.run
+		if c.actions != nil {
+			run = group(c.name, c.actions)
+		}
+		err := run(ctx, e, args[1:])
 		switch {
 		case err == nil:
 			return 0

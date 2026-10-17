@@ -13,8 +13,8 @@ import (
 
 func opmlCommands() []command {
 	return []command{
-		{"import", "add the subscriptions of an OPML file, or of standard input, to those of a user", runOPMLImport},
-		{"export", "write the subscriptions of a user as OPML to standard output", runOPMLExport},
+		{"import", "add the subscriptions of an OPML file, or of standard input, to those of a user", runOPMLImport, nil},
+		{"export", "write the subscriptions of a user as OPML to standard output", runOPMLExport, nil},
 	}
 }
 
