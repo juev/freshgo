@@ -57,7 +57,7 @@ func CheckBackup(ctx context.Context, path string) (BackupReport, error) {
 		return report, err
 	}
 	report.Supported = len(migrations)
-	db, err := sql.Open("sqlite", "file:"+path+"?"+url.Values{"mode": {"ro"}}.Encode())
+	db, err := sql.Open("sqlite", SQLiteURI(path, url.Values{"mode": {"ro"}}))
 	if err != nil {
 		return report, fmt.Errorf("store: check: %w", err)
 	}

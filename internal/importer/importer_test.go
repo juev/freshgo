@@ -587,6 +587,38 @@ func TestImportFromReadOnlyDirectory(t *testing.T) {
 	checkImport(t, dst, report, sqliteReferenceDir, sqliteReference(sqliteReferenceDir))
 }
 
+// A "#" or "?" in the path of a user's database belongs to the path.
+func TestOpenSQLitePathWithURICharacters(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "a#b?c%23d")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "db.sqlite")
+	db, err := sql.Open("sqlite", store.SQLiteURI(path, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Exec(`CREATE TABLE feed (id INTEGER)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	src, err := openSQLite(path)
+	if err != nil {
+		t.Fatalf("openSQLite: %v", err)
+	}
+	defer func() { _ = src.Close() }()
+	var tables int
+	if err := src.QueryRow(`SELECT count(*) FROM sqlite_master WHERE name = 'feed'`).Scan(&tables); err != nil {
+		t.Fatal(err)
+	}
+	if tables != 1 {
+		t.Errorf("openSQLite opened another file: %d feed tables", tables)
+	}
+}
+
 // Changes still in the log cannot be read without writing next to the
 // database; the import says so instead of leaving them out.
 func TestImportRefusesUnreadableLog(t *testing.T) {

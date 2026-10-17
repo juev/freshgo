@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -213,6 +214,58 @@ func TestOpenRefusesNewerSchema(t *testing.T) {
 				t.Error("Open of a database with a newer schema: no error")
 			}
 		})
+	}
+}
+
+func TestOpenPathWithURICharacters(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	dir := filepath.Join(root, "a#b?c%23d")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "freshgo.sqlite")
+	s, err := Open(ctx, config.DriverSQLite, path)
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	mustUser(t, s, "alice")
+	var foreignKeys int
+	if err := s.queryRow(ctx, "PRAGMA foreign_keys").Scan(&foreignKeys); err != nil {
+		t.Fatal(err)
+	}
+	if foreignKeys != 1 {
+		t.Errorf("foreign_keys = %d, want 1", foreignKeys)
+	}
+	var journal string
+	if err := s.queryRow(ctx, "PRAGMA journal_mode").Scan(&journal); err != nil {
+		t.Fatal(err)
+	}
+	if journal != "wal" {
+		t.Errorf("journal_mode = %q, want wal", journal)
+	}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := os.Stat(path); err != nil {
+		t.Errorf("database file: %v", err)
+	}
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if e.Name() != filepath.Base(dir) {
+			t.Errorf("file %q written beside the directory of the database", e.Name())
+		}
+	}
+	report, err := CheckBackup(ctx, path)
+	if err != nil {
+		t.Fatalf("CheckBackup: %v", err)
+	}
+	if report.Users != 1 {
+		t.Errorf("CheckBackup: %d users, want 1", report.Users)
 	}
 }
 
