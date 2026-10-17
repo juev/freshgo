@@ -3,6 +3,7 @@ package favicon
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -316,6 +317,79 @@ func TestIconSearch(t *testing.T) {
 			})
 		})
 	}
+}
+
+// A page of many icon links costs a few requests: only the first maxLinks
+// distinct links are tried, and a link named again is not tried again.
+func TestIconLinksAreBounded(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		var many, repeated strings.Builder
+		for i := range 1000 {
+			fmt.Fprintf(&many, `<link rel="icon" href="/icon/%d.png">`, i)
+		}
+		many.WriteString(`<link rel="icon" href="/ok.png">`)
+		for range maxLinks {
+			repeated.WriteString(`<link rel="icon" href="/missing.png"><link rel="icon" href="missing.png">`)
+		}
+		repeated.WriteString(`<link rel="icon" href="/ok.png">`)
+		s := newSite(t, map[string]string{"/many": many.String(), "/repeated": repeated.String(), "/ok.png": string(png)})
+
+		f := w.feed(&store.Feed{URL: s.URL + "/many.xml", Website: s.URL + "/many"})
+		w.service.Refresh(context.Background(), f)
+		if got := body(t, w.get(f)); !bytes.Equal(got, defaultIcon) {
+			t.Errorf("a page of 1000 links: icon %.60q, want the built-in one", got)
+		}
+		// The page and its links, the root and /favicon.ico.
+		if got, want := s.requests(), 1+maxLinks+2; got != want {
+			t.Errorf("a page of 1000 links: %d requests, want %d", got, want)
+		}
+
+		f = w.feed(&store.Feed{URL: s.URL + "/repeated.xml", Website: s.URL + "/repeated"})
+		w.service.Refresh(context.Background(), f)
+		if got := body(t, w.get(f)); !bytes.Equal(got, png) {
+			t.Errorf("a page that names one link again and again: icon %.60q, want the next link", got)
+		}
+	})
+}
+
+// A site that does not answer holds the refresh of its feed for no longer
+// than the search may take, and is left alone for a day like a site without
+// an icon.
+func TestIconSearchHasDeadline(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		var mu sync.Mutex
+		requests := 0
+		s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			mu.Lock()
+			requests++
+			mu.Unlock()
+			if r.URL.Path == "/" {
+				_, _ = io.WriteString(w, strings.Repeat(`<link rel="icon" href="/slow.png">`, 10))
+				return
+			}
+			<-r.Context().Done()
+		}))
+		t.Cleanup(s.Close)
+		w.service.timeout = 200 * time.Millisecond
+		f := w.feed(&store.Feed{URL: s.URL + "/feed.xml"})
+
+		start := time.Now()
+		w.service.Refresh(ctx, f)
+		if elapsed := time.Since(start); elapsed > 5*time.Second {
+			t.Errorf("the search took %v, want it cut at %v", elapsed, w.service.timeout)
+		}
+		mu.Lock()
+		first := requests
+		mu.Unlock()
+		w.clock = w.clock.Add(23 * time.Hour)
+		w.service.Refresh(ctx, f)
+		mu.Lock()
+		defer mu.Unlock()
+		if requests != first {
+			t.Errorf("%d requests 23 hours after a search that ran out of time, want none", requests-first)
+		}
+	})
 }
 
 // F37: the icon of a feed is requested through the proxy the feed goes
