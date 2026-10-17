@@ -5,6 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/juev/freshgo/internal/config"
 	"github.com/juev/freshgo/internal/importer"
@@ -49,14 +52,20 @@ func runImport(ctx context.Context, e env, args []string) (err error) {
 	fs.StringVar(&opts.DataDir, "data", "", "FreshRSS data directory, the one with config.php and users/ (required)")
 	fs.StringVar(&opts.SourceDatabaseURL, "source-database-url", "",
 		"PostgreSQL URL of the FreshRSS database, when it differs from what its config.php says")
-	db, err := openStore(ctx, fs, conf, args, 0)
+	driver, dsn, err := parseDatabase(fs, conf, args, 0)
+	if err != nil {
+		return err
+	}
+	// Opening makes and migrates the database: a mistyped -data would leave
+	// an empty one behind, which the next import refuses as not empty.
+	if err := checkDataDir(opts.DataDir); err != nil {
+		return err
+	}
+	db, err := store.Open(ctx, driver, dsn)
 	if err != nil {
 		return err
 	}
 	defer func() { err = errors.Join(err, db.Close()) }()
-	if opts.DataDir == "" {
-		return errors.New("-data is required")
-	}
 
 	report, err := importer.Run(ctx, db, opts)
 	if err != nil {
@@ -72,6 +81,31 @@ func runImport(ctx context.Context, e env, args []string) (err error) {
 		if _, err := fmt.Fprintln(e.stderr, "warning:", w); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+// checkDataDir tells whether dir is a FreshRSS data directory that can be
+// read: one with a directory users/ in it.
+func checkDataDir(dir string) error {
+	if dir == "" {
+		return errors.New("-data is required")
+	}
+	users := filepath.Join(dir, "users")
+	info, err := os.Stat(users)
+	if err != nil {
+		return fmt.Errorf("-data %s is not a FreshRSS data directory: %w", dir, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("-data %s is not a FreshRSS data directory: %s is not a directory", dir, users)
+	}
+	list, err := os.Open(users)
+	if err != nil {
+		return fmt.Errorf("-data %s: %w", dir, err)
+	}
+	defer func() { _ = list.Close() }()
+	if _, err := list.Readdirnames(1); err != nil && !errors.Is(err, io.EOF) {
+		return fmt.Errorf("-data %s: %w", dir, err)
 	}
 	return nil
 }
