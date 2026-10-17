@@ -7,6 +7,7 @@
 package refresh
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -98,8 +99,8 @@ func (r *Refresher) Run(ctx context.Context, o Options) ([]Stats, error) {
 		return nil, fmt.Errorf("refresh: %w", err)
 	}
 	var all []Stats
-	// hubs are the hubs of the topics the feeds of this run announce.
-	hubs := map[string]string{}
+	// hubs are the subscriptions the feeds of this run announced.
+	hubs := map[feedRef]announcement{}
 	for _, u := range users {
 		conf := readUserSettings(u.Settings)
 		if !conf.enabled {
@@ -124,18 +125,25 @@ func (r *Refresher) Run(ctx context.Context, o Options) ([]Stats, error) {
 	return all, nil
 }
 
-// subscribe makes sure the hubs of topics have been asked to push. It is
+// subscribe makes sure the hubs of the feeds have been asked to push. It is
 // not left to the polls: a feed that answers 304 names no hub, and its
 // subscription is to be made and renewed all the same.
-func (r *Refresher) subscribe(ctx context.Context, hubs map[string]string) {
+func (r *Refresher) subscribe(ctx context.Context, hubs map[feedRef]announcement) {
 	if r.WebSub == nil {
 		return
 	}
-	for _, topic := range slices.Sorted(maps.Keys(hubs)) {
+	refs := slices.SortedFunc(maps.Keys(hubs), func(a, b feedRef) int {
+		if byUser := cmp.Compare(a.user, b.user); byUser != 0 {
+			return byUser
+		}
+		return cmp.Compare(a.feed, b.feed)
+	})
+	for _, ref := range refs {
 		if ctx.Err() != nil {
 			return
 		}
-		r.WebSub.Ensure(ctx, topic, hubs[topic])
+		what := hubs[ref]
+		r.WebSub.Ensure(ctx, ref.user, ref.feed, what.topic, what.hub)
 	}
 }
 
@@ -164,6 +172,16 @@ func (r *Refresher) httpsDomains(ctx context.Context) (*feed.HTTPSDomains, error
 	return feed.NewHTTPSDomains(strings.Split(extra, "\n")), nil
 }
 
+// feedRef names a feed of a user across the users of a run.
+type feedRef struct {
+	user, feed int64
+}
+
+// announcement is what a feed last said about its topic and hub.
+type announcement struct {
+	topic, hub string
+}
+
 // job is what the feeds of one user have in common during a run.
 type job struct {
 	user  *store.User
@@ -177,8 +195,8 @@ type job struct {
 	search search.Options
 	rules  []search.Rule
 	labels []labelRules
-	// pushing are the WebSub topics whose hub can be relied on.
-	pushing map[string]bool
+	// pushing are the feeds whose WebSub hub can be relied on, by identifier.
+	pushing map[int64]bool
 }
 
 // newJob reads what the feeds of the user have in common.
@@ -192,7 +210,7 @@ func (r *Refresher) newJob(ctx context.Context, u *store.User, conf userSettings
 		return nil, err
 	}
 	if r.WebSub != nil {
-		if j.pushing, err = r.WebSub.Working(ctx); err != nil {
+		if j.pushing, err = r.WebSub.Working(ctx, u.ID); err != nil {
 			return nil, err
 		}
 	}
@@ -202,7 +220,7 @@ func (r *Refresher) newJob(ctx context.Context, u *store.User, conf userSettings
 // refreshUser refreshes the due feeds of the user of the job. Into hubs go
 // the topics and hubs the user's feeds announced when they were last read
 // whole, muted feeds left out: nothing is pushed into those.
-func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options, hubs map[string]string) (Stats, error) {
+func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options, hubs map[feedRef]announcement) (Stats, error) {
 	st := Stats{User: j.user.Name}
 	feeds, err := r.db.Feeds(ctx, j.user.ID)
 	if err != nil {
@@ -228,10 +246,10 @@ func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options, hubs map
 	limit := maxPeriod(j.user)
 	for _, f := range feeds {
 		if f.TTL >= 0 && f.WebSubTopic != "" && f.WebSubHub != "" {
-			hubs[f.WebSubTopic] = f.WebSubHub
+			hubs[feedRef{f.UserID, f.ID}] = announcement{f.WebSubTopic, f.WebSubHub}
 		}
 		f, ok := r.hooks.FeedBeforeActualize.Call(ctx, f)
-		if !ok || !due(f, published[f.ID], now, limit, o.Force, j.pushing[f.WebSubTopic]) {
+		if !ok || !due(f, published[f.ID], now, limit, o.Force, j.pushing[f.ID]) {
 			continue
 		}
 		select {

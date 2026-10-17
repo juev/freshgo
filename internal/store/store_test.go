@@ -106,7 +106,8 @@ func TestMigrationWebSubHub(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err := s.PutWebSub(ctx, &WebSub{Topic: "https://example.org/feed", Hub: "https://hub.example.org/", Key: "k", Secret: "s"}); err != nil {
+			if err := s.PutWebSub(ctx, &WebSub{UserID: u.ID, FeedID: subscribed.ID,
+				Topic: "https://example.org/feed", Hub: "https://hub.example.org/", Key: "k", Secret: "s"}); err != nil {
 				t.Fatal(err)
 			}
 			// Back to the schema before the migration; those after it run again.

@@ -477,83 +477,84 @@ func TestSalt(t *testing.T) {
 func TestWebSubSubscriptions(t *testing.T) {
 	eachEngine(t, func(t *testing.T, s *Store) {
 		ctx := context.Background()
-		if _, err := s.WebSubByTopic(ctx, "https://example.org/feed"); !errors.Is(err, ErrNotFound) {
-			t.Errorf("WebSubByTopic(unset) error = %v, want ErrNotFound", err)
-		}
-		if _, err := s.WebSubByKey(ctx, "k1"); !errors.Is(err, ErrNotFound) {
-			t.Errorf("WebSubByKey(unset) error = %v, want ErrNotFound", err)
-		}
-		for _, want := range []*WebSub{
-			{Topic: "https://example.org/feed", Hub: "https://hub.example/", Key: "k1", Secret: "s1", LeaseStart: 5, Error: true},
-			{Topic: "https://example.org/feed", Hub: "https://hub2.example/", Key: "k1", Secret: "s1", LeaseStart: 6, LeaseEnd: 99},
-		} {
-			if err := s.PutWebSub(ctx, want); err != nil {
-				t.Fatalf("PutWebSub: %v", err)
-			}
-			for name, get := range map[string]func() (*WebSub, error){
-				"topic": func() (*WebSub, error) { return s.WebSubByTopic(ctx, want.Topic) },
-				"key":   func() (*WebSub, error) { return s.WebSubByKey(ctx, want.Key) },
-			} {
-				if got, err := get(); err != nil || !reflect.DeepEqual(got, want) {
-					t.Errorf("by %s = %+v, %v; want %+v", name, got, err, want)
-				}
-			}
-		}
-		other := &WebSub{Topic: "https://example.org/a", Hub: "https://hub.example/", Key: "k0", Secret: "s0"}
-		if err := s.PutWebSub(ctx, other); err != nil {
-			t.Fatal(err)
-		}
-		// A key leads to one subscription.
-		if err := s.PutWebSub(ctx, &WebSub{Topic: "https://example.org/b", Hub: "h", Key: "k0", Secret: "s"}); !errors.Is(err, ErrConflict) {
-			t.Errorf("PutWebSub with a taken key: error = %v, want ErrConflict", err)
-		}
-		all, err := s.WebSubs(ctx)
-		if err != nil || len(all) != 2 || all[0].Topic != other.Topic {
-			t.Errorf("WebSubs = %+v, %v; want the two by topic", all, err)
-		}
-		if err := s.DeleteWebSub(ctx, other.Topic); err != nil {
-			t.Fatal(err)
-		}
-		if all, err := s.WebSubs(ctx); err != nil || len(all) != 1 {
-			t.Errorf("WebSubs after a deletion = %+v, %v; want one", all, err)
-		}
-
-		// Feeds of every user that announce a topic.
 		alice, bob := mustUser(t, s, "alice"), mustUser(t, s, "bob")
-		for _, f := range []*Feed{
-			{UserID: bob.ID, URL: "https://example.org/1", WebSubTopic: "https://example.org/feed", WebSubHub: "https://hub.example.org/"},
-			{UserID: alice.ID, URL: "https://example.org/1", WebSubTopic: "https://example.org/feed"},
-			{UserID: alice.ID, URL: "https://example.org/2", WebSubTopic: "https://example.org/other"},
-			{UserID: alice.ID, URL: "https://example.org/3"},
-		} {
+		first := &Feed{UserID: alice.ID, URL: "https://example.org/1", WebSubTopic: "https://example.org/feed", WebSubHub: "https://hub.example/"}
+		second := &Feed{UserID: alice.ID, URL: "https://example.org/2", WebSubTopic: "https://example.org/other", WebSubHub: "https://hub.example/"}
+		third := &Feed{UserID: bob.ID, URL: "https://example.org/3", WebSubTopic: "https://example.org/feed", WebSubHub: "https://hub.example/"}
+		for _, f := range []*Feed{first, second, third} {
 			if err := s.CreateFeed(ctx, f); err != nil {
 				t.Fatal(err)
 			}
 		}
-		feeds, err := s.FeedsByTopic(ctx, "https://example.org/feed")
-		if err != nil || len(feeds) != 2 || feeds[0].UserID != alice.ID || feeds[1].UserID != bob.ID ||
-			feeds[0].URL != "https://example.org/1" || feeds[0].WebSubTopic != "https://example.org/feed" {
-			t.Errorf("FeedsByTopic = %+v, %v; want the feed of each user, whole", feeds, err)
+		if _, err := s.WebSubByFeed(ctx, alice.ID, first.ID); !errors.Is(err, ErrNotFound) {
+			t.Errorf("WebSubByFeed(unset) error = %v, want ErrNotFound", err)
 		}
-		if feeds, err := s.FeedsByTopic(ctx, ""); err != nil || len(feeds) != 1 {
-			t.Errorf("FeedsByTopic(no topic) = %d feeds, %v", len(feeds), err)
+		if _, err := s.WebSubByKey(ctx, "k1"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("WebSubByKey(unset) error = %v, want ErrNotFound", err)
 		}
-		if feeds[0].WebSubHub != "" || feeds[1].WebSubHub != "https://hub.example.org/" {
-			t.Errorf("hubs of the feeds = %q, %q; want that of bob only", feeds[0].WebSubHub, feeds[1].WebSubHub)
+
+		want := &WebSub{UserID: alice.ID, FeedID: first.ID, Topic: "https://example.org/feed",
+			Hub: "https://hub.example/", Key: "k1", Secret: "s1", LeaseStart: 5, Error: true}
+		if err := s.PutWebSub(ctx, want); err != nil {
+			t.Fatalf("PutWebSub: %v", err)
 		}
-		feeds[1].WebSubHub = "https://other.example.org/"
-		if err := s.UpdateFeed(ctx, feeds[1]); err != nil {
+		for name, get := range map[string]func() (*WebSub, error){
+			"feed": func() (*WebSub, error) { return s.WebSubByFeed(ctx, want.UserID, want.FeedID) },
+			"key":  func() (*WebSub, error) { return s.WebSubByKey(ctx, want.Key) },
+		} {
+			if got, err := get(); err != nil || !reflect.DeepEqual(got, want) {
+				t.Errorf("by %s = %+v, %v; want %+v", name, got, err, want)
+			}
+		}
+
+		// Another hub and key replace the subscription of the same feed.
+		moved := *want
+		moved.Hub, moved.Key, moved.Secret = "https://hub2.example/", "k2", "s2"
+		moved.LeaseStart, moved.LeaseEnd, moved.Error = 6, 99, false
+		if err := s.PutWebSub(ctx, &moved); err != nil {
 			t.Fatal(err)
 		}
-		if got, err := s.FeedByID(ctx, bob.ID, feeds[1].ID); err != nil || got.WebSubHub != "https://other.example.org/" {
-			t.Errorf("the feed after its hub changed = %+v, %v", got, err)
+		if got, err := s.WebSubByFeed(ctx, moved.UserID, moved.FeedID); err != nil || !reflect.DeepEqual(got, &moved) {
+			t.Errorf("the replaced subscription = %+v, %v; want %+v", got, err, &moved)
 		}
-		feeds[0].WebSubTopic = ""
-		if err := s.UpdateFeed(ctx, feeds[0]); err != nil {
+		if _, err := s.WebSubByKey(ctx, "k1"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("the old key still leads to a subscription: %v", err)
+		}
+
+		// A second feed gets a subscription of its own; the first is untouched.
+		other := &WebSub{UserID: alice.ID, FeedID: second.ID, Topic: second.WebSubTopic,
+			Hub: "https://hub.example/", Key: "k3", Secret: "s3"}
+		if err := s.PutWebSub(ctx, other); err != nil {
 			t.Fatal(err)
 		}
-		if feeds, err := s.FeedsByTopic(ctx, "https://example.org/feed"); err != nil || len(feeds) != 1 {
-			t.Errorf("FeedsByTopic after a feed dropped the topic = %d feeds, %v; want 1", len(feeds), err)
+		// A key leads to one subscription, whoever asks for it.
+		if err := s.PutWebSub(ctx, &WebSub{UserID: bob.ID, FeedID: third.ID, Topic: third.WebSubTopic,
+			Hub: "https://hub.example/", Key: "k3", Secret: "s"}); !errors.Is(err, ErrConflict) {
+			t.Errorf("PutWebSub with a taken key: error = %v, want ErrConflict", err)
+		}
+		all, err := s.WebSubsOfUser(ctx, alice.ID)
+		if err != nil || len(all) != 2 || all[0].FeedID != first.ID || all[1].FeedID != second.ID {
+			t.Errorf("WebSubsOfUser = %+v, %v; want the two by feed", all, err)
+		}
+		if all, err := s.WebSubsOfUser(ctx, bob.ID); err != nil || len(all) != 0 {
+			t.Errorf("WebSubsOfUser of a user without subscriptions = %+v, %v; want none", all, err)
+		}
+
+		if err := s.DeleteWebSub(ctx, other.UserID, other.FeedID); err != nil {
+			t.Fatal(err)
+		}
+		if all, err := s.WebSubsOfUser(ctx, alice.ID); err != nil || len(all) != 1 {
+			t.Errorf("WebSubsOfUser after a deletion = %+v, %v; want one", all, err)
+		}
+		// Deleting a feed takes its subscription with it.
+		if err := s.DeleteFeed(ctx, first.UserID, first.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.WebSubByFeed(ctx, first.UserID, first.ID); !errors.Is(err, ErrNotFound) {
+			t.Errorf("the subscription of a deleted feed: error = %v, want ErrNotFound", err)
+		}
+		if all, err := s.WebSubsOfUser(ctx, alice.ID); err != nil || len(all) != 0 {
+			t.Errorf("WebSubsOfUser after the feed was deleted = %+v, %v; want none", all, err)
 		}
 	})
 }

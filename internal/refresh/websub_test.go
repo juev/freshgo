@@ -90,11 +90,11 @@ func (h *hubWorld) requests() []url.Values {
 	return append([]url.Values(nil), h.asked...)
 }
 
-func (h *hubWorld) subscription() *store.WebSub {
+func (h *hubWorld) subscription(f *store.Feed) *store.WebSub {
 	h.t.Helper()
-	sub, err := h.db.WebSubByTopic(context.Background(), h.topic)
+	sub, err := h.db.WebSubByFeed(context.Background(), f.UserID, f.ID)
 	if err != nil {
-		h.t.Fatalf("subscription: %v", err)
+		h.t.Fatalf("subscription of feed %d: %v", f.ID, err)
 	}
 	return sub
 }
@@ -112,22 +112,29 @@ func (h *hubWorld) call(method, target, body string, header ...string) (int, str
 }
 
 // confirm plays the hub checking that the subscription is wanted.
-func (h *hubWorld) confirm(lease int) {
+func (h *hubWorld) confirm(f *store.Feed, lease int) {
 	h.t.Helper()
 	target := fmt.Sprintf("/websub/%s?hub.mode=subscribe&hub.topic=%s&hub.challenge=c-123&hub.lease_seconds=%d",
-		h.subscription().Key, url.QueryEscape(h.topic), lease)
+		h.subscription(f).Key, url.QueryEscape(h.topic), lease)
 	if status, body := h.call(http.MethodGet, target, ""); status != http.StatusOK || body != "c-123" {
 		h.t.Fatalf("confirmation: status %d, body %q; want the challenge back", status, body)
 	}
 }
 
-// push plays the hub sending a document, signed with the given secret.
-func (h *hubWorld) push(document, secret string, header ...string) (int, string) {
+// push plays the hub sending a document to the subscription of a feed,
+// signed with the given secret.
+func (h *hubWorld) push(f *store.Feed, document, secret string, header ...string) (int, string) {
+	h.t.Helper()
+	return h.pushKey(h.subscription(f).Key, document, secret, header...)
+}
+
+// pushKey plays the hub sending a document to a callback key.
+func (h *hubWorld) pushKey(key, document, secret string, header ...string) (int, string) {
 	h.t.Helper()
 	mac := hmac.New(sha256.New, []byte(secret))
 	mac.Write([]byte(document))
 	header = append(header, "Content-Type", "application/atom+xml", "X-Hub-Signature", "sha256="+hex.EncodeToString(mac.Sum(nil)))
-	return h.call(http.MethodPost, "/websub/"+h.subscription().Key, document, header...)
+	return h.call(http.MethodPost, "/websub/"+key, document, header...)
 }
 
 func (h *hubWorld) titles(f *store.Feed) []string {
@@ -159,7 +166,7 @@ func TestWebSubSubscribes(t *testing.T) {
 		if len(asked) != 1 {
 			t.Fatalf("the hub was asked %d times, want once: %v", len(asked), asked)
 		}
-		sub := h.subscription()
+		sub := h.subscription(f)
 		form := asked[0]
 		if form.Get("hub.mode") != "subscribe" || form.Get("hub.topic") != h.topic ||
 			form.Get("hub.callback") != publicBase+"/websub/"+sub.Key || form.Get("hub.secret") != sub.Secret {
@@ -174,9 +181,12 @@ func TestWebSubSubscribes(t *testing.T) {
 		if got := w.storedFeed(plain).WebSubTopic; got != "" {
 			t.Errorf("topic of a feed without a hub = %q, want none", got)
 		}
+		if _, err := w.db.WebSubByFeed(context.Background(), u.ID, plain.ID); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("a feed without a hub has a subscription: %v", err)
+		}
 
-		h.confirm(864000)
-		sub = h.subscription()
+		h.confirm(f, 864000)
+		sub = h.subscription(f)
 		if sub.LeaseEnd != start.Unix()+864000 || !sub.Error {
 			t.Errorf("subscription after the confirmation = %+v; want the lease recorded and no trust before the first push", sub)
 		}
@@ -204,9 +214,9 @@ func TestWebSubSubscribes(t *testing.T) {
 	})
 }
 
-// R14: a signed push stores the new entry for every user who reads the
-// feed, without a request to the feed; what the push does not list is left
-// alone.
+// R14: a signed push stores the new entry for the feed of its subscription,
+// without a request to the feed; what the push does not list is left alone,
+// and another feed of the same topic is untouched.
 func TestWebSubPush(t *testing.T) {
 	eachEngine(t, func(t *testing.T, w *world) {
 		h := newHubWorld(t, w)
@@ -216,26 +226,36 @@ func TestWebSubPush(t *testing.T) {
 		bob := w.user("bob", "")
 		carol := w.user("carol", `{"enabled":false}`)
 		mine := w.feed(alice, "/feed.xml", nil)
-		theirs := w.feed(bob, "/feed.xml", nil)
+		// Bob's feed is another address that claims the same topic: the
+		// subscription it gets must take only its own pushes.
+		theirs := w.feed(bob, "/evil.xml", nil)
+		w.serveBody("/evil.xml", "application/atom+xml", h.document(h.topic, "a", "b"))
 		muted := w.feed(bob, "/feed.xml", func(f *store.Feed) { f.URL += "?again"; f.TTL = -3600; f.WebSubTopic = h.topic })
 		disabled := w.feed(carol, "/feed.xml", func(f *store.Feed) { f.WebSubTopic = h.topic })
-		w.serve("/feed.xml", nil)
 		h.publish("a", "b")
 		w.run(Options{})
-		h.confirm(864000)
+		h.confirm(mine, 864000)
+		h.confirm(theirs, 864000)
 		polled := w.hitCount("/feed.xml")
 		lastUpdate := w.storedFeed(mine).LastUpdate
 
-		w.clock = w.clock.Add(time.Minute)
-		secret := h.subscription().Secret
-		status, body := h.push(h.document(h.topic, "c"), secret)
-		if status != http.StatusOK || body != "Done: 2\n" {
-			t.Fatalf("push: status %d, body %q; want it stored for the two feeds that take it", status, body)
+		// Each feed has a subscription of its own: its own key and secret.
+		mineSub, theirSub := h.subscription(mine), h.subscription(theirs)
+		if mineSub.Topic != theirSub.Topic || mineSub.Key == theirSub.Key || mineSub.Secret == theirSub.Secret {
+			t.Errorf("two feeds of one topic: %+v and %+v; want the same topic and secrets of their own", mineSub, theirSub)
 		}
-		for name, f := range map[string]*store.Feed{"alice": mine, "bob": theirs} {
-			if got := h.titles(f); len(got) != 3 || got[2] != "c" {
-				t.Errorf("entries of %s after the push = %v, want a, b and c", name, got)
-			}
+
+		w.clock = w.clock.Add(time.Minute)
+		secret := h.subscription(mine).Secret
+		status, body := h.push(mine, h.document(h.topic, "c"), secret)
+		if status != http.StatusOK || body != "Done: 1\n" {
+			t.Fatalf("push: status %d, body %q; want it stored for the feed of the subscription only", status, body)
+		}
+		if got := h.titles(mine); len(got) != 3 || got[2] != "c" {
+			t.Errorf("entries of alice after the push = %v, want a, b and c", got)
+		}
+		if got := h.titles(theirs); len(got) != 2 {
+			t.Errorf("entries of bob after a push to alice = %v, want only a and b", got)
 		}
 		for _, e := range w.entries(mine) {
 			if e.IsRead {
@@ -245,14 +265,33 @@ func TestWebSubPush(t *testing.T) {
 		if len(w.entries(muted)) != 0 || len(w.entries(disabled)) != 0 {
 			t.Error("a muted feed or the feed of a disabled user took the push")
 		}
+		for name, f := range map[string]*store.Feed{"muted": muted, "disabled": disabled} {
+			if _, err := w.db.WebSubByFeed(context.Background(), f.UserID, f.ID); !errors.Is(err, store.ErrNotFound) {
+				t.Errorf("a subscription was made for the %s feed: %v", name, err)
+			}
+		}
 		if w.hitCount("/feed.xml") != polled {
 			t.Errorf("the feed was requested %d more times for the push", w.hitCount("/feed.xml")-polled)
 		}
 		if got := w.storedFeed(mine); got.LastUpdate != lastUpdate {
 			t.Errorf("last poll of the feed moved from %d to %d by a push", lastUpdate, got.LastUpdate)
 		}
-		if h.subscription().Error {
-			t.Error("the hub is still not trusted after its first push")
+		if h.subscription(mine).Error {
+			t.Error("alice's hub is still not trusted after its first push")
+		}
+		if !h.subscription(theirs).Error {
+			t.Error("bob's hub is trusted before it has pushed anything")
+		}
+
+		// Bob's own subscription takes the same entry for him.
+		if status, body := h.push(theirs, h.document(h.topic, "c"), h.subscription(theirs).Secret); status != http.StatusOK || body != "Done: 1\n" {
+			t.Fatalf("push to bob: status %d, body %q", status, body)
+		}
+		if got := h.titles(theirs); len(got) != 3 || got[2] != "c" {
+			t.Errorf("entries of bob after his push = %v, want a, b and c", got)
+		}
+		if h.subscription(theirs).Error {
+			t.Error("bob's hub is still not trusted after its first push")
 		}
 
 		// The same document again changes nothing; a signature by SHA-1 is
@@ -260,9 +299,9 @@ func TestWebSubPush(t *testing.T) {
 		mac := hmac.New(sha1.New, []byte(secret))
 		document := h.document(h.topic, "c")
 		mac.Write([]byte(document))
-		status, body = h.call(http.MethodPost, "/websub/"+h.subscription().Key, document,
+		status, body = h.call(http.MethodPost, "/websub/"+h.subscription(mine).Key, document,
 			"Content-Type", "application/atom+xml", "X-Hub-Signature", "sha1="+hex.EncodeToString(mac.Sum(nil)))
-		if status != http.StatusOK || body != "Done: 2\n" || len(w.entries(mine)) != 3 {
+		if status != http.StatusOK || body != "Done: 1\n" || len(w.entries(mine)) != 3 {
 			t.Errorf("repeated push: status %d, body %q, %d entries", status, body, len(w.entries(mine)))
 		}
 	})
@@ -276,8 +315,8 @@ func TestWebSubRefusesPushes(t *testing.T) {
 		u := w.user("alice", "")
 		f := w.feed(u, "/feed.xml", nil)
 		w.runOne()
-		h.confirm(864000)
-		sub := h.subscription()
+		h.confirm(f, 864000)
+		sub := h.subscription(f)
 		document := h.document(h.topic, "c")
 		target := "/websub/" + sub.Key
 
@@ -288,7 +327,7 @@ func TestWebSubRefusesPushes(t *testing.T) {
 			"no signature": {http.StatusForbidden, func() (int, string) {
 				return h.call(http.MethodPost, target, document, "Content-Type", "application/atom+xml")
 			}},
-			"a signature with another secret": {http.StatusForbidden, func() (int, string) { return h.push(document, "guess") }},
+			"a signature with another secret": {http.StatusForbidden, func() (int, string) { return h.push(f, document, "guess") }},
 			"a signature of another document": {http.StatusForbidden, func() (int, string) {
 				mac := hmac.New(sha256.New, []byte(sub.Secret))
 				mac.Write([]byte("other"))
@@ -301,14 +340,14 @@ func TestWebSubRefusesPushes(t *testing.T) {
 				return h.call(http.MethodPost, "/websub/"+strings.Repeat("f", 64), document, "X-Hub-Signature", "sha256=00")
 			}},
 			"another feed in the document": {http.StatusUnprocessableEntity, func() (int, string) {
-				return h.push(h.document("http://other.example/feed.xml", "c"), sub.Secret)
+				return h.push(f, h.document("http://other.example/feed.xml", "c"), sub.Secret)
 			}},
 			"another feed in the Link header": {http.StatusUnprocessableEntity, func() (int, string) {
-				return h.push(document, sub.Secret, "Link", `<http://hub.example/>; rel="hub", <http://other.example/feed.xml>; rel="self"`)
+				return h.push(f, document, sub.Secret, "Link", `<http://hub.example/>; rel="hub", <http://other.example/feed.xml>; rel="self"`)
 			}},
-			"an empty body": {http.StatusUnprocessableEntity, func() (int, string) { return h.push("", sub.Secret) }},
+			"an empty body": {http.StatusUnprocessableEntity, func() (int, string) { return h.push(f, "", sub.Secret) }},
 			"a body too large": {http.StatusRequestEntityTooLarge, func() (int, string) {
-				return h.push(document+strings.Repeat(" ", 3<<20), sub.Secret)
+				return h.push(f, document+strings.Repeat(" ", 3<<20), sub.Secret)
 			}},
 		} {
 			if status, body := tc.call(); status != tc.status {
@@ -318,11 +357,11 @@ func TestWebSubRefusesPushes(t *testing.T) {
 		if got := h.titles(f); len(got) != 2 {
 			t.Errorf("entries after the refused pushes = %v, want only a and b", got)
 		}
-		if !h.subscription().Error {
+		if !h.subscription(f).Error {
 			t.Error("the hub became trusted by pushes that were refused")
 		}
 		// The address in the Link header may differ from the topic by its scheme only.
-		if status, body := h.push(document, sub.Secret, "Link", `<https://blog.example/feed.xml>; rel="self"`); status != http.StatusOK {
+		if status, body := h.push(f, document, sub.Secret, "Link", `<https://blog.example/feed.xml>; rel="self"`); status != http.StatusOK {
 			t.Errorf("push with the https form of the topic: status %d (%q), want 200", status, body)
 		}
 	})
@@ -334,13 +373,13 @@ func TestWebSubRenews(t *testing.T) {
 	eachEngine(t, func(t *testing.T, w *world) {
 		h := newHubWorld(t, w)
 		u := w.user("alice", "")
-		w.feed(u, "/feed.xml", hourly)
+		f := w.feed(u, "/feed.xml", hourly)
 		w.runOne()
-		h.confirm(2 * 24 * 3600)
-		key := h.subscription().Key
+		h.confirm(f, 2*24*3600)
+		key := h.subscription(f).Key
 		// A hub that has not pushed yet is asked again every 23 hours; this
 		// one has delivered.
-		if status, body := h.push(h.document(h.topic, "c"), h.subscription().Secret); status != http.StatusOK {
+		if status, body := h.push(f, h.document(h.topic, "c"), h.subscription(f).Secret); status != http.StatusOK {
 			t.Fatalf("push: status %d (%q)", status, body)
 		}
 		h.publish("a", "b", "c")
@@ -369,13 +408,65 @@ func TestWebSubRenews(t *testing.T) {
 		if n := len(h.requests()); n != 3 {
 			t.Errorf("a failing hub was asked %d times in six hours, want once more (3 in all)", n)
 		}
-		if !h.subscription().Error {
+		if !h.subscription(f).Error {
 			t.Error("a hub that failed is trusted")
 		}
 		w.clock = w.clock.Add(24 * time.Hour)
 		w.runOne()
 		if n := len(h.requests()); n != 4 {
 			t.Errorf("a failing hub was asked %d times after a day, want once more (4 in all)", n)
+		}
+	})
+}
+
+// W3: a feed that names another hub gets a subscription of its own there,
+// with a new key and secret; the old hub can no longer push.
+func TestWebSubHubChange(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		h := newHubWorld(t, w)
+		u := w.user("alice", "")
+		f := w.feed(u, "/feed.xml", hourly)
+		w.runOne()
+		h.confirm(f, 864000)
+		first := h.subscription(f)
+
+		var (
+			mu    sync.Mutex
+			asked []url.Values
+		)
+		w.serve("/hub2", func(rw http.ResponseWriter, req *http.Request) {
+			body, _ := io.ReadAll(req.Body)
+			form, _ := url.ParseQuery(string(body))
+			mu.Lock()
+			asked = append(asked, form)
+			mu.Unlock()
+			rw.WriteHeader(http.StatusAccepted)
+		})
+		w.serveBody("/feed.xml", "application/atom+xml",
+			strings.Replace(h.document(h.topic, "a", "b"), h.server.URL+"/hub", h.server.URL+"/hub2", 1))
+
+		w.clock = w.clock.Add(24 * time.Hour)
+		w.runOne()
+		second := h.subscription(f)
+		if second.Key == first.Key || second.Secret == first.Secret || second.Hub != h.server.URL+"/hub2" {
+			t.Fatalf("subscription after the hub changed = %+v, was %+v; want a new key, secret and hub", second, first)
+		}
+		mu.Lock()
+		forms := append([]url.Values(nil), asked...)
+		mu.Unlock()
+		if len(forms) != 1 || forms[0].Get("hub.mode") != "subscribe" || forms[0].Get("hub.topic") != h.topic ||
+			forms[0].Get("hub.callback") != publicBase+"/websub/"+second.Key || forms[0].Get("hub.secret") != second.Secret {
+			t.Errorf("the new hub was asked %v; want the topic, the new callback and the new secret", forms)
+		}
+		if _, err := w.db.WebSubByKey(ctx, first.Key); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("the old callback key still leads to a subscription: %v", err)
+		}
+		if status, _ := h.pushKey(second.Key, h.document(h.topic, "c"), first.Secret); status != http.StatusForbidden {
+			t.Errorf("a push signed with the old secret: status %d, want 403", status)
+		}
+		if status, body := h.push(f, h.document(h.topic, "c"), second.Secret); status != http.StatusOK || body != "Done: 1\n" {
+			t.Errorf("a push signed with the new secret: status %d (%q), want 200 and one feed", status, body)
 		}
 	})
 }
@@ -388,7 +479,7 @@ func TestWebSubPollsLessOften(t *testing.T) {
 		u := w.user("alice", "")
 		f := w.feed(u, "/feed.xml", hourly)
 		w.runOne()
-		h.confirm(30 * 24 * 3600)
+		h.confirm(f, 30*24*3600)
 
 		// Confirmed but silent: no trust yet, polled by its own period.
 		w.clock = w.clock.Add(2 * time.Hour)
@@ -396,7 +487,7 @@ func TestWebSubPollsLessOften(t *testing.T) {
 		if hits := w.hitCount("/feed.xml"); hits != 2 {
 			t.Fatalf("%d requests before the first push, want 2: an untried hub does not spare polls", hits)
 		}
-		if status, body := h.push(h.document(h.topic, "c"), h.subscription().Secret); status != http.StatusOK {
+		if status, body := h.push(f, h.document(h.topic, "c"), h.subscription(f).Secret); status != http.StatusOK {
 			t.Fatalf("push: status %d (%q)", status, body)
 		}
 		h.publish("a", "b", "c")
@@ -420,7 +511,7 @@ func TestWebSubPollsLessOften(t *testing.T) {
 		if got := h.titles(f); len(got) != 4 {
 			t.Fatalf("entries after the daily poll = %v, want the missed one too", got)
 		}
-		if !h.subscription().Error {
+		if !h.subscription(f).Error {
 			t.Error("the hub is still trusted after a poll found an entry it did not push")
 		}
 		before := w.hitCount("/feed.xml")
@@ -441,8 +532,8 @@ func TestWebSubEndsWithItsReaders(t *testing.T) {
 		u := w.user("alice", "")
 		f := w.feed(u, "/feed.xml", nil)
 		w.runOne()
-		h.confirm(864000)
-		sub := h.subscription()
+		h.confirm(f, 864000)
+		sub := h.subscription(f)
 		if err := w.db.DeleteFeed(ctx, u.ID, f.ID); err != nil {
 			t.Fatal(err)
 		}
@@ -452,10 +543,10 @@ func TestWebSubEndsWithItsReaders(t *testing.T) {
 		if status, _ := h.call(http.MethodGet, target+"&hub.mode=subscribe", ""); status != http.StatusNotFound {
 			t.Errorf("confirmation of a subscription nobody needs: status %d, want 404", status)
 		}
-		if status, body := h.push(h.document(h.topic, "c"), sub.Secret); status != http.StatusGone {
+		if status, body := h.pushKey(sub.Key, h.document(h.topic, "c"), sub.Secret); status != http.StatusGone {
 			t.Errorf("push for a feed nobody reads: status %d (%q), want 410", status, body)
 		}
-		if _, err := w.db.WebSubByTopic(ctx, h.topic); !errors.Is(err, store.ErrNotFound) {
+		if _, err := w.db.WebSubByFeed(ctx, u.ID, f.ID); !errors.Is(err, store.ErrNotFound) {
 			t.Errorf("subscription after the push: error = %v, want it deleted", err)
 		}
 	})
@@ -474,7 +565,7 @@ func TestWebSubSwitchedOn(t *testing.T) {
 		h := newHubWorld(t, w)
 		w.r.WebSub = nil
 		u := w.user("alice", "")
-		w.feed(u, "/feed.xml", hourly)
+		f := w.feed(u, "/feed.xml", hourly)
 		w.serveBody("/muted.xml", "application/atom+xml", h.document("http://blog.example/muted.xml", "m"))
 		muted := w.feed(u, "/muted.xml", hourly)
 		w.runOne()
@@ -492,6 +583,12 @@ func TestWebSubSwitchedOn(t *testing.T) {
 		if len(asked) != 1 || asked[0].Get("hub.topic") != h.topic || asked[0].Get("hub.mode") != "subscribe" {
 			t.Fatalf("the hub was asked %v; want one subscription, to %s", asked, h.topic)
 		}
+		if got := h.subscription(f); got.Topic != h.topic || got.Hub != h.server.URL+"/hub" {
+			t.Errorf("subscription of the feed that was read with WebSub off: %+v", got)
+		}
+		if _, err := w.db.WebSubByFeed(context.Background(), u.ID, muted.ID); !errors.Is(err, store.ErrNotFound) {
+			t.Errorf("a subscription was made for a muted feed: %v", err)
+		}
 		w.clock = w.clock.Add(2 * time.Hour)
 		w.runOne()
 		if n := len(h.requests()); n != 1 {
@@ -506,10 +603,10 @@ func TestWebSubRenewsWithoutADocument(t *testing.T) {
 	eachEngine(t, func(t *testing.T, w *world) {
 		h := newHubWorld(t, w)
 		u := w.user("alice", "")
-		w.feed(u, "/feed.xml", nil)
+		f := w.feed(u, "/feed.xml", nil)
 		w.runOne()
-		h.confirm(2 * 24 * 3600)
-		if status, body := h.push(h.document(h.topic, "c"), h.subscription().Secret); status != http.StatusOK {
+		h.confirm(f, 2*24*3600)
+		if status, body := h.push(f, h.document(h.topic, "c"), h.subscription(f).Secret); status != http.StatusOK {
 			t.Fatalf("push: status %d (%q)", status, body)
 		}
 		h.unchanged()
@@ -558,6 +655,12 @@ func TestWebSubLinkHeaders(t *testing.T) {
 		}
 		if got := w.storedFeed(overruled); got.WebSubTopic != "http://blog.example/moved.xml" || got.WebSubHub != h.server.URL+"/hub" {
 			t.Errorf("a feed whose header names another address: topic %q, hub %q", got.WebSubTopic, got.WebSubHub)
+		}
+		if got := h.subscription(fromHeaders); got.Topic != "http://blog.example/headers.xml" || got.Hub != h.server.URL+"/hub" {
+			t.Errorf("subscription of the feed that names its hub in headers: %+v", got)
+		}
+		if got := h.subscription(overruled); got.Topic != "http://blog.example/moved.xml" || got.Hub != h.server.URL+"/hub" {
+			t.Errorf("subscription of the feed whose header names another address: %+v", got)
 		}
 		topics := map[string]bool{}
 		for _, form := range h.requests() {
