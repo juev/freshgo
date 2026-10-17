@@ -119,6 +119,8 @@ type Handler struct {
 	// oidcSecret and oidc are what signing in through a provider takes.
 	oidcSecret string
 	oidc       oidcProviders
+	// versions are the versions of the public documents handed out.
+	versions versions
 }
 
 // New returns the interface, or an error when what is built into the binary

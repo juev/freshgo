@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
@@ -426,6 +427,105 @@ func TestSharedQuery(t *testing.T) {
 			}
 		}
 	})
+}
+
+// A reader that asks for a shared document again with what it was told of
+// the version it has gets 304 and no document, as long as only the time the
+// document is made at has moved. A changed document is sent whole.
+func TestSharedConditionalGet(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		clock := s.clock()
+		s.asAlice()
+		s.follow("/queries", url.Values{"name": {"Blogs"}, "stream": {"/categories/2"}, "state": {"all"}})
+		form := s.formAt("/settings/queries/0", "/settings/queries/0")
+		form.Set("share_rss", "1")
+		form.Set("share_opml", "1")
+		s.follow("/settings/queries/0", form)
+		token, _ := s.queries("alice")[0]["token"].(string)
+		base := "/shared/" + token
+		s.cookies = nil
+
+		first := map[string]answer{}
+		for _, format := range []string{"rss", "atom", "json", "opml"} {
+			// A version is dated with a second of its own.
+			*clock = clock.Add(time.Second)
+			target := base + "." + format
+			a := s.get(target)
+			etag, modified := a.header.Get("ETag"), a.header.Get("Last-Modified")
+			if a.status != http.StatusOK || !strings.HasPrefix(etag, `W/"`) || modified == "" {
+				t.Fatalf("GET %s: status %d, ETag %q, Last-Modified %q", target, a.status, etag, modified)
+			}
+			first[format] = a
+		}
+		if vary := first["rss"].header.Get("Vary"); !strings.Contains(vary, "Accept-Language") {
+			t.Errorf("the feed varies by %q; its description is in the language of the reader", vary)
+		}
+
+		// The documents carry the time they are made at; that is no change.
+		*clock = clock.Add(time.Hour)
+		for format, a := range first {
+			target := base + "." + format
+			for name, value := range map[string]string{"If-None-Match": a.header.Get("ETag"), "If-Modified-Since": a.header.Get("Last-Modified")} {
+				again := s.do(http.MethodGet, target, map[string]string{name: value})
+				if again.status != http.StatusNotModified || again.body != "" || again.header.Get("ETag") != a.header.Get("ETag") ||
+					again.header.Get("Cache-Control") != "public, max-age=60" {
+					t.Errorf("GET %s with %s: status %d, ETag %q, %d bytes; want 304, the same ETag and nothing",
+						target, name, again.status, again.header.Get("ETag"), len(again.body))
+				}
+			}
+		}
+
+		// A new name changes every document of the query but the OPML,
+		// which lists the subscriptions.
+		s.asAlice()
+		form = s.formAt("/settings/queries/0", "/settings/queries/0")
+		form.Set("name", "Blogs, renamed")
+		s.follow("/settings/queries/0", form)
+		s.cookies = nil
+		for format, a := range first {
+			target := base + "." + format
+			for name, value := range map[string]string{"If-None-Match": a.header.Get("ETag"), "If-Modified-Since": a.header.Get("Last-Modified")} {
+				again := s.do(http.MethodGet, target, map[string]string{name: value})
+				if format == "opml" {
+					if again.status != http.StatusNotModified {
+						t.Errorf("GET %s with %s after the query was renamed: status %d, want 304", target, name, again.status)
+					}
+					continue
+				}
+				if again.status != http.StatusOK || again.header.Get("ETag") == a.header.Get("ETag") || !strings.Contains(again.body, "Blogs, renamed") {
+					t.Errorf("GET %s with the %s of the old version: status %d, ETag %q", target, name, again.status, again.header.Get("ETag"))
+				}
+			}
+		}
+	})
+}
+
+// Every version of a document gets a second of its own, never one ahead of
+// the clock, and keeps it.
+func TestVersionsLastModified(t *testing.T) {
+	var v versions
+	now := time.Date(2026, 10, 6, 12, 0, 0, 500_000_000, time.UTC)
+	second := now.Truncate(time.Second)
+	if got := v.lastModified("a", now); !got.Equal(second) {
+		t.Errorf("first version: %v; want %v", got, second)
+	}
+	// A second version in the same second may not be dated yet.
+	if got := v.lastModified("b", now); !got.IsZero() {
+		t.Errorf("second version in the same second: %v; want none", got)
+	}
+	later := now.Add(time.Second)
+	if got := v.lastModified("b", later); !got.Equal(second.Add(time.Second)) {
+		t.Errorf("second version a second later: %v; want %v", got, second.Add(time.Second))
+	}
+	if got := v.lastModified("a", later.Add(time.Hour)); !got.Equal(second) {
+		t.Errorf("first version asked again: %v; want %v", got, second)
+	}
+	for i := range maxVersions {
+		v.lastModified(strconv.Itoa(i), later)
+	}
+	if _, kept := v.since["a"]; kept || len(v.since) > maxVersions {
+		t.Errorf("after %d more versions %d are remembered, the first among them: %v", maxVersions, len(v.since), kept)
+	}
 }
 
 // R12: the token of a user opens their entries as a feed and their

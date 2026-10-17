@@ -2,7 +2,9 @@ package web
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/juev/freshgo/internal/opml"
@@ -290,10 +293,27 @@ func (h *Handler) serveShared(w http.ResponseWriter, r *http.Request, sh *shared
 	// A document is the same for everybody and may be kept for a minute.
 	// The page is not: it has the name and the menu of whoever is logged
 	// in, and an error is nobody's to keep.
-	document := func(contentType string, body []byte) {
+	//
+	// A reader that asks again with the ETag or the Last-Modified it got is
+	// answered 304 while the document stays the same. The time it is made
+	// at is no change: version is the document made at the zero time, and
+	// dated, when the document has a time, makes the one handed out.
+	document := func(contentType string, version []byte, dated func(now time.Time) ([]byte, error)) {
+		sum := sha256.Sum256(version)
+		etag := `W/"` + base64.RawURLEncoding.EncodeToString(sum[:18]) + `"`
+		now := h.now()
+		body := version
+		if dated != nil {
+			var err error
+			if body, err = dated(now); err != nil {
+				h.broken(w, r, err)
+				return
+			}
+		}
 		header.Set("Content-Type", contentType)
 		header.Set("Cache-Control", "public, max-age=60")
-		_, _ = w.Write(body)
+		header.Set("ETag", etag)
+		http.ServeContent(w, r, "", h.versions.lastModified(etag, now), bytes.NewReader(body))
 	}
 
 	if format == "opml" {
@@ -301,12 +321,14 @@ func (h *Handler) serveShared(w http.ResponseWriter, r *http.Request, sh *shared
 			plain(w, http.StatusNotFound, "OPML not allowed for this user query!")
 			return
 		}
-		exported, err := opml.ExportPart(ctx, h.db, sh.owner, h.now(), sh.opml)
+		version, err := opml.ExportPart(ctx, h.db, sh.owner, time.Time{}, sh.opml)
 		if err != nil {
 			h.broken(w, r, err)
 			return
 		}
-		document("application/xml; charset=utf-8", exported)
+		document("application/xml; charset=utf-8", version, func(now time.Time) ([]byte, error) {
+			return opml.ExportPart(ctx, h.db, sh.owner, now, sh.opml)
+		})
 		return
 	}
 
@@ -343,7 +365,7 @@ func (h *Handler) serveShared(w http.ResponseWriter, r *http.Request, sh *shared
 			h.broken(w, r, err)
 			return
 		}
-		document("application/json; charset=utf-8", out.Bytes())
+		document("application/json; charset=utf-8", out.Bytes(), nil)
 		return
 	}
 
@@ -364,10 +386,16 @@ func (h *Handler) serveShared(w http.ResponseWriter, r *http.Request, sh *shared
 		description = v.T("shared.feed-of", sh.title)
 	}
 	switch format {
-	case "rss":
-		document("application/rss+xml; charset=utf-8", rssDocument(sh, description, shown, entries, h.now()))
-	case "atom":
-		document("application/atom+xml; charset=utf-8", atomDocument(sh, description, shown, entries, h.now()))
+	case "rss", "atom":
+		write, contentType := rssDocument, "application/rss+xml; charset=utf-8"
+		if format == "atom" {
+			write, contentType = atomDocument, "application/atom+xml; charset=utf-8"
+		}
+		// The description of a feed without one is in the language of the reader.
+		header.Set("Vary", "Accept-Language, Cookie")
+		document(contentType, write(sh, description, shown, entries, time.Time{}), func(now time.Time) ([]byte, error) {
+			return write(sh, description, shown, entries, now), nil
+		})
 	default:
 		v.Heading = sh.title
 		v.Data = sharedPage{
@@ -589,4 +617,42 @@ func atomDocument(sh *shared, description string, shown []article, entries []*st
 	}
 	b.WriteString("</feed>\n")
 	return b.Bytes()
+}
+
+// versions remembers when the server first handed out each version of a
+// public document, which is what it gives as Last-Modified. Versions are
+// told apart by their ETag. HTTP dates are in whole seconds, so no two
+// versions get the same second: a reader holding the older one would be
+// told the newer one had not changed.
+type versions struct {
+	mu    sync.Mutex
+	since map[string]time.Time
+	last  time.Time
+}
+
+// maxVersions bounds what versions remembers. When it is full it forgets
+// everything: a version it no longer knows gets a new time, and a reader
+// that asks with the old one is sent the document again.
+const maxVersions = 4096
+
+// lastModified returns the time of the version with the ETag, or the zero
+// time when that time is still ahead of now and may not be given.
+func (v *versions) lastModified(etag string, now time.Time) time.Time {
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	since, ok := v.since[etag]
+	if !ok {
+		if v.since == nil || len(v.since) >= maxVersions {
+			v.since = map[string]time.Time{}
+		}
+		since = now.Truncate(time.Second)
+		if !since.After(v.last) {
+			since = v.last.Add(time.Second)
+		}
+		v.since[etag], v.last = since, since
+	}
+	if since.After(now) {
+		return time.Time{}
+	}
+	return since
 }
