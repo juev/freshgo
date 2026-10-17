@@ -1,12 +1,20 @@
 package main
 
 import (
+	"context"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/juev/freshgo/internal/config"
+	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/hooks"
+	"github.com/juev/freshgo/internal/refresh"
+	"github.com/juev/freshgo/internal/store"
 )
 
 // Every path goes to the part of the server it belongs to, and the address
@@ -70,5 +78,56 @@ func TestRoutes(t *testing.T) {
 		if resp.StatusCode != want.status || string(body) != want.body {
 			t.Errorf("GET %s: status %d, body %q; want %d, %q", path, resp.StatusCode, body, want.status, want.body)
 		}
+	}
+}
+
+// The debug address hands out the metrics without a login, next to the
+// profiles.
+func TestDebugHandler(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.Open(ctx, config.DriverSQLite, filepath.Join(t.TempDir(), "freshgo.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	client, err := fetch.New(fetch.Options{UserAgent: "freshgo/test"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	log := slog.New(slog.DiscardHandler)
+	refresher := refresh.New(db, client, &hooks.Registry{}, log)
+	requests := requestCounter()
+	requests.WithLabelValues("200").Add(3)
+	server := httptest.NewServer(debugHandler(newMetrics(db, refresher, requests, log)))
+	defer server.Close()
+
+	resp, err := http.Get(server.URL + "/metrics")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /metrics: %d", resp.StatusCode)
+	}
+	for _, want := range []string{
+		`freshgo_http_requests_total{code="200"} 3`,
+		`freshgo_refresh_feed_duration_seconds_count{result="failed"} 0`,
+		`freshgo_refresh_entries_total{change="new"} 0`,
+		"freshgo_refresh_last_run_timestamp_seconds 0",
+		"freshgo_database_size_bytes ",
+		"go_goroutines ",
+	} {
+		if !strings.Contains(string(body), want) {
+			t.Errorf("the metrics have no %q", want)
+		}
+	}
+	if strings.Contains(string(body), "freshgo_database_size_bytes NaN") {
+		t.Error("the size of the database is unknown")
+	}
+	if resp, err := http.Get(server.URL + "/debug/pprof/"); err != nil || resp.StatusCode != http.StatusOK {
+		t.Errorf("GET /debug/pprof/: %v, %v", resp, err)
+	} else {
+		_ = resp.Body.Close()
 	}
 }

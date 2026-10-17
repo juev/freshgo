@@ -278,7 +278,7 @@ Every setting is a flag and an environment variable; the flag wins. The help of 
 |---|---|---|---|
 | `-database-url` | `FRESHGO_DATABASE_URL` | `sqlite://freshgo.sqlite` | `sqlite://<path>` or `postgres://<dsn>`. |
 | `-listen` | `FRESHGO_LISTEN` | `127.0.0.1:8080` | Address the HTTP server binds to. |
-| `-debug-listen` | `FRESHGO_DEBUG_LISTEN` | | Address the profiles of the Go runtime are handed out at, under `/debug/pprof/`, apart from the server: `127.0.0.1:6060`. They show what the server does and can keep it busy, so the address is not one for the public. |
+| `-debug-listen` | `FRESHGO_DEBUG_LISTEN` | | Address the profiles of the Go runtime, under `/debug/pprof/`, and the Prometheus metrics, under `/metrics`, are handed out at, apart from the server and without a login: `127.0.0.1:6060`. They show what the server does and can keep it busy, so the address is not one for the public; see "Metrics". |
 | `-base-url` | `FRESHGO_BASE_URL` | | Public address of the server. Set it behind a reverse proxy: links to feed icons are built from it, and WebSub needs it. |
 | `-refresh-interval` | `FRESHGO_REFRESH_INTERVAL` | `10m` | How often `serve` looks for feeds that are due. |
 | `-fetch-allowlist` | `FRESHGO_FETCH_ALLOWLIST` | | Internal destinations feeds may be fetched from: `host:port`, a CIDR range, or `*`, separated by commas. Without it, requests to private and loopback addresses are refused. |
@@ -382,6 +382,18 @@ The proxy of the environment (`HTTP_PROXY`) is not used.
 ### WebSub
 
 With `-websub` and a `-base-url` that hubs can reach, a feed that announces a hub, in its document or in the `Link` headers of the answer, is subscribed to at the next refresh, and new articles arrive when the hub pushes them; such a feed is then polled once a day. The path `/websub/` must be reachable from outside without authentication. Pushes are accepted only with a valid signature. Without a public address the server logs one warning and polls all feeds as usual.
+
+### Metrics
+
+With `-debug-listen`, `/metrics` at that address has, besides the metrics of the Go runtime and of the process:
+
+| Metric | What it is |
+|---|---|
+| `freshgo_refresh_feed_duration_seconds{result}` | How long the refresh of a feed took, a histogram by `result`: `refreshed`, `unchanged` (the site answered 304) or `failed`. Its `_count` is the number of feeds. |
+| `freshgo_refresh_entries_total{change}` | Articles the refresh stored, `new` or `updated`. |
+| `freshgo_refresh_last_run_timestamp_seconds` | When the last refresh of the feeds of every user ended, in Unix seconds; 0 before the first. |
+| `freshgo_http_requests_total{code}` | Requests the server answered, by status. |
+| `freshgo_database_size_bytes` | Size of the database, read at each scrape: the SQLite file without its `-wal`, or the PostgreSQL database. |
 
 ### Paths the server answers
 

@@ -7,11 +7,13 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus/testutil"
 )
 
-// At the level debug every request is logged without its query; above it
-// none is.
-func TestAccessLog(t *testing.T) {
+// Every request is counted by its status. At the level debug it is logged
+// without its query as well; above it none is.
+func TestObserve(t *testing.T) {
 	page := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/missing":
@@ -24,8 +26,9 @@ func TestAccessLog(t *testing.T) {
 		}
 	})
 	for _, level := range []slog.Level{slog.LevelDebug, slog.LevelInfo} {
+		requests := requestCounter()
 		var logs strings.Builder
-		server := httptest.NewServer(accessLog(page, slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: level}))))
+		server := httptest.NewServer(observe(page, slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: level})), requests))
 		for _, path := range []string{"/missing?token=secret", "/stream", "/empty"} {
 			resp, err := http.Get(server.URL + path)
 			if err != nil {
@@ -34,6 +37,9 @@ func TestAccessLog(t *testing.T) {
 			_ = resp.Body.Close()
 		}
 		server.Close()
+		if found, ok := testutil.ToFloat64(requests.WithLabelValues("404")), testutil.ToFloat64(requests.WithLabelValues("200")); found != 1 || ok != 2 {
+			t.Errorf("level %s: counted %v answers 404 and %v answers 200, want 1 and 2", level, found, ok)
+		}
 		text := logs.String()
 		if level > slog.LevelDebug {
 			if text != "" {

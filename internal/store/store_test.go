@@ -1414,3 +1414,22 @@ func TestFirstUserIsTheDefault(t *testing.T) {
 		}
 	})
 }
+
+// The size of the database grows with what it holds.
+func TestSize(t *testing.T) {
+	ctx := context.Background()
+	for _, e := range storetest.Engines() {
+		t.Run(e.Name, func(t *testing.T) {
+			driver, dsn := e.New(t)
+			db, err := Open(ctx, driver, dsn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = db.Close() })
+			size, err := db.Size(ctx)
+			if err != nil || size <= 0 {
+				t.Errorf("Size = %d, %v; want a positive size", size, err)
+			}
+		})
+	}
+}

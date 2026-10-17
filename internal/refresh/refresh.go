@@ -20,6 +20,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/feed"
 	"github.com/juev/freshgo/internal/fetch"
@@ -58,12 +60,46 @@ type Refresher struct {
 	// lastRun is when the last run that reached every user ended, in Unix
 	// seconds; zero before the first.
 	lastRun atomic.Int64
+
+	// feeds times the feeds runs refresh, by result: refreshed, unchanged
+	// or failed. entries counts the entries they store, by change: new or
+	// updated.
+	feeds   *prometheus.HistogramVec
+	entries *prometheus.CounterVec
 }
 
 // New returns a Refresher. Handlers of the registry are called from several
 // goroutines at once.
 func New(db *store.Store, client *fetch.Client, registry *hooks.Registry, log *slog.Logger) *Refresher {
-	return &Refresher{db: db, client: client, hooks: registry, log: log, now: time.Now}
+	r := &Refresher{db: db, client: client, hooks: registry, log: log, now: time.Now}
+	r.feeds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name: "freshgo_refresh_feed_duration_seconds",
+		Help: "How long the refresh of a feed in a run took, by result: refreshed, unchanged or failed.",
+		// A feed is fetched within a second or two, or waits for a slow
+		// site up to the timeout of the client.
+		Buckets: []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60},
+	}, []string{"result"})
+	r.entries = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "freshgo_refresh_entries_total",
+		Help: "Entries stored by refresh runs, by change: new or updated.",
+	}, []string{"change"})
+	for _, result := range []string{"refreshed", "unchanged", "failed"} {
+		r.feeds.WithLabelValues(result)
+	}
+	for _, change := range []string{"new", "updated"} {
+		r.entries.WithLabelValues(change)
+	}
+	return r
+}
+
+// Collectors returns the metrics of the runs: the feeds they refreshed, the
+// entries they stored and when the last one ended.
+func (r *Refresher) Collectors() []prometheus.Collector {
+	lastRun := prometheus.NewGaugeFunc(prometheus.GaugeOpts{
+		Name: "freshgo_refresh_last_run_timestamp_seconds",
+		Help: "When the last refresh run that reached every user ended, in Unix seconds; 0 before the first.",
+	}, func() float64 { return float64(r.lastRun.Load()) })
+	return []prometheus.Collector{r.feeds, r.entries, lastRun}
 }
 
 // Options select what a run refreshes.
@@ -278,12 +314,15 @@ func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options, hubs map
 		go func() {
 			defer wg.Done()
 			defer func() { <-slots }()
+			began := time.Now()
 			res, err := r.refreshFeed(ctx, j, f)
+			took := time.Since(began).Seconds()
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
 				if ctx.Err() == nil {
 					st.Failed++
+					r.feeds.WithLabelValues("failed").Observe(took)
 					r.log.Warn("feed failed", "user", j.user.Name, "feed", f.ID, "url", withoutCredentials(f.URL), "error", err)
 				}
 				return
@@ -291,9 +330,14 @@ func (r *Refresher) refreshUser(ctx context.Context, j *job, o Options, hubs map
 			st.Refreshed++
 			if res.unchanged {
 				st.Unchanged++
+				r.feeds.WithLabelValues("unchanged").Observe(took)
+			} else {
+				r.feeds.WithLabelValues("refreshed").Observe(took)
 			}
 			st.NewEntries += res.added
 			st.UpdatedEntries += res.updated
+			r.entries.WithLabelValues("new").Add(float64(res.added))
+			r.entries.WithLabelValues("updated").Add(float64(res.updated))
 		}()
 	}
 	wg.Wait()
