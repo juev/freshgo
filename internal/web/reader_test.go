@@ -663,7 +663,7 @@ func TestMarkAllRead(t *testing.T) {
 		if got := unread(store.EntrySet{FeedID: 1}); !reflect.DeepEqual(got, []int64{today, recent}) {
 			t.Errorf("unread of the feed after marking what is older than a week: %v, want %v", got, []int64{today, recent})
 		}
-		if got := notice("/feeds/1"); got != "<p>4 entries marked as read.</p>" {
+		if got := notice("/feeds/1"); got != `<form method="post" action="/undo" class="undo"><p>4 entries marked as read. <input type="hidden" name="next" value="/feeds/1"><button type="submit">Undo</button></p></form>` {
 			t.Errorf("notice %q", got)
 		}
 		if got := len(unread(store.EntrySet{FeedID: 2})); got != 4 {
@@ -674,7 +674,7 @@ func TestMarkAllRead(t *testing.T) {
 		if got := unread(store.EntrySet{FeedID: 1}); !reflect.DeepEqual(got, []int64{today}) {
 			t.Errorf("unread of the feed after marking what is older than a day: %v, want %v", got, []int64{today})
 		}
-		if got := notice("/feeds/1"); got != "<p>1 entry marked as read.</p>" {
+		if got := notice("/feeds/1"); got != `<form method="post" action="/undo" class="undo"><p>1 entry marked as read. <input type="hidden" name="next" value="/feeds/1"><button type="submit">Undo</button></p></form>` {
 			t.Errorf("notice %q", got)
 		}
 

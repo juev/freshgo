@@ -162,12 +162,15 @@ func decoded(t *testing.T, raw json.RawMessage) map[string]any {
 }
 
 // notice is what a page says about the action before it.
+// notice is the text of the notice of a page, without the button that
+// undoes its action (offered).
 func notice(body string) string {
 	m := messages.FindStringSubmatch(body)
 	if m == nil {
 		return ""
 	}
-	return strings.TrimSpace(regexp.MustCompile(`<[^>]+>`).ReplaceAllString(m[1], ""))
+	text := regexp.MustCompile(`<button[^>]*>[^<]*</button>`).ReplaceAllString(m[1], "")
+	return strings.TrimSpace(regexp.MustCompile(`<[^>]+>`).ReplaceAllString(text, ""))
 }
 
 // rawKey finds a text that was not found and is shown as its key.

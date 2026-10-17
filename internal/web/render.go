@@ -85,6 +85,9 @@ type view struct {
 	Wide bool
 	// Notice is what the action before this page has to say.
 	Notice string
+	// Undo, when not empty, is where the button that takes back the action
+	// of the notice sends the reader after it: this page.
+	Undo string
 	// Config is what the script needs to know, as JSON.
 	Config string
 	// Data is what the page itself shows.
@@ -173,13 +176,18 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, status int, pag
 }
 
 // noticeCookie carries what an action has to say to the page the reader is
-// sent to after it: the key of a text and a number for it.
+// sent to after it: the key of a text, a number for it, and the number of
+// the action when it can be taken back (notifyUndo).
 const noticeCookie = "freshgo_notice"
 
 // notify leaves a notice for the next page.
 func (h *Handler) notify(w http.ResponseWriter, r *http.Request, key string, n int) {
+	h.setNotice(w, r, key+":"+strconv.Itoa(n))
+}
+
+func (h *Handler) setNotice(w http.ResponseWriter, r *http.Request, value string) {
 	http.SetCookie(w, &http.Cookie{
-		Name: noticeCookie, Value: key + ":" + strconv.Itoa(n), Path: h.prefix + "/", MaxAge: 60,
+		Name: noticeCookie, Value: value, Path: h.prefix + "/", MaxAge: 60,
 		HttpOnly: true, Secure: h.secure(r), SameSite: http.SameSiteLaxMode,
 	})
 }
@@ -195,12 +203,19 @@ func (h *Handler) notice(w http.ResponseWriter, r *http.Request, v *view) string
 		HttpOnly: true, Secure: h.secure(r), SameSite: http.SameSiteLaxMode,
 	})
 	key, number, _ := strings.Cut(cookie.Value, ":")
+	number, action, _ := strings.Cut(number, ":")
 	// What a form could not do is said by the text that names the problem.
 	if !strings.HasPrefix(key, "notice.") && !strings.HasPrefix(key, "sub.problem.") {
 		return ""
 	}
 	n, _ := strconv.Atoi(number)
-	return noticeText(v, key, n)
+	text := noticeText(v, key, n)
+	if id, err := strconv.ParseUint(action, 10, 64); err == nil && text != "" {
+		if s := state(r); s.who != nil && !s.who.anonymous && h.undos.offers(s.who.user.ID, id, h.now()) {
+			v.Undo = r.URL.RequestURI()
+		}
+	}
+	return text
 }
 
 // noticeText is the text of a notice about n things, empty when there is

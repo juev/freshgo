@@ -103,6 +103,8 @@ type Handler struct {
 	guard       *authguard.Guard
 	// codeLogins are the logins that wait for the code of an app.
 	codeLogins codeLogins
+	// undos are the last actions of users that can be taken back.
+	undos undoing
 	// letters holds back letters to one user after the first few.
 	letters authguard.Guard
 	// registrants holds back registrations from one address after the
@@ -214,6 +216,7 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /entries/{id}/labels", h.protect(members, h.labelEntry))
 	h.mux.HandleFunc("POST /entries/{id}/save", h.protect(members, h.saveEntry))
 	h.mux.HandleFunc("POST /read-all", h.protect(members, h.markAll))
+	h.mux.HandleFunc("POST /undo", h.protect(members, h.undo))
 	h.mux.HandleFunc("POST /settings/view", h.protect(members, h.saveView))
 	h.mux.HandleFunc("POST /refresh", h.protect(readers, h.refreshNow))
 	h.mux.HandleFunc("GET /palette", h.protect(readers, h.palette))

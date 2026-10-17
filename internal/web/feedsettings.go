@@ -946,10 +946,15 @@ func (h *Handler) deleteFeed(w http.ResponseWriter, r *http.Request) {
 	if !ok || !h.form(w, r) {
 		return
 	}
-	if err := h.db.DeleteFeed(r.Context(), f.UserID, f.ID); err != nil && !errors.Is(err, store.ErrNotFound) {
+	removed, err := h.db.RemoveFeed(r.Context(), f.UserID, f.ID)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		h.broken(w, r, err)
 		return
 	}
-	h.notify(w, r, "notice.feed-deleted", 0)
+	var undo func(ctx context.Context) error
+	if removed != nil {
+		undo = func(ctx context.Context) error { return h.db.RestoreFeed(ctx, removed) }
+	}
+	h.notifyUndo(w, r, "notice.feed-deleted", 0, undo)
 	http.Redirect(w, r, h.url("/subscriptions"), http.StatusSeeOther)
 }
