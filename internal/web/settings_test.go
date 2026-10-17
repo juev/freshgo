@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/juev/freshgo/internal/authguard"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -240,12 +241,12 @@ func TestProfile(t *testing.T) {
 
 		// Guesses of the current password are slowed down like logins.
 		guess := url.Values{"password": {"guess"}, "new": {"other-password"}, "again": {"other-password"}}
-		for range freeFailures {
+		for range authguard.FreeFailures {
 			s.post("/settings/profile/password", guess)
 		}
 		guess.Set("password", "new-password")
 		if a := s.post("/settings/profile/password", guess); a.status != http.StatusTooManyRequests {
-			t.Errorf("after %d wrong passwords: status %d, want 429", freeFailures, a.status)
+			t.Errorf("after %d wrong passwords: status %d, want 429", authguard.FreeFailures, a.status)
 		}
 		*now = now.Add(time.Hour)
 		// The default user stays; bob goes with everything he has.

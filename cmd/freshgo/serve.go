@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/juev/freshgo/internal/authguard"
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/greader"
 	"github.com/juev/freshgo/internal/hooks"
@@ -126,17 +127,21 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	if err := cleanStoredTexts(ctx, db, s.log); err != nil {
 		return err
 	}
+	proxies, err := conf.Proxies()
+	if err != nil {
+		return err
+	}
+	// One guard for every way in, so that moving from the interface to the
+	// API does not start the count of failed logins anew.
+	guard := &authguard.Guard{}
 	api := greader.New(greader.Options{
 		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL, MediaProxy: true,
+		Guard: guard, TrustedProxies: proxies,
 	})
 	// A nil service must not become a handler that is not nil.
 	var hubs http.Handler
 	if s.webSub != nil {
 		hubs = s.webSub
-	}
-	proxies, err := conf.Proxies()
-	if err != nil {
-		return err
 	}
 	// A nil sender must not become a mailer that is not nil.
 	var mailer web.Mailer
@@ -150,7 +155,7 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	pages, err := web.New(web.Options{
 		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL, Version: buildVersion(),
 		TrustedProxies: proxies, FetchAllowlist: conf.Allowlist(), Mailer: mailer, OIDCClientSecret: conf.OIDCClientSecret, Images: s.images, Services: s.images,
-		Translator: s.translator,
+		Translator: s.translator, Guard: guard,
 	})
 	if err != nil {
 		return err

@@ -9,18 +9,13 @@ import (
 	"encoding/json"
 	"errors"
 	"html/template"
-	"net"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"slices"
-	"strconv"
 	"strings"
-	"sync"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
-
+	"github.com/juev/freshgo/internal/authguard"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -223,7 +218,7 @@ func sessionLife(persistent bool, system store.System) time.Duration {
 // from, created on the spot if the installation allows it; nil when the
 // proxy names nobody, is not trusted, or names a user there is not.
 func (h *Handler) proxyUser(r *http.Request, system store.System) (*store.User, error) {
-	if !h.fromProxy(r) {
+	if !authguard.FromProxy(r, h.proxies) {
 		return nil, nil
 	}
 	name := ""
@@ -266,26 +261,6 @@ func (h *Handler) userOrNew(ctx context.Context, name string, system store.Syste
 	return user, nil
 }
 
-// fromProxy reports whether the request was made by a reverse proxy whose
-// word is taken.
-func (h *Handler) fromProxy(r *http.Request) bool {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return false
-	}
-	addr, err := netip.ParseAddr(host)
-	if err != nil {
-		return false
-	}
-	addr = addr.Unmap()
-	for _, proxy := range h.proxies {
-		if proxy.Contains(addr) {
-			return true
-		}
-	}
-	return false
-}
-
 // newToken returns the secret of a new login.
 func newToken() (string, error) {
 	random := make([]byte, 32)
@@ -322,34 +297,6 @@ func (h *Handler) setSession(w http.ResponseWriter, r *http.Request, token strin
 	http.SetCookie(w, cookie)
 }
 
-// decoys are hashes no password matches, by bcrypt cost: comparing against
-// one takes as long as comparing against the hash of a user.
-type decoys struct {
-	mu     sync.Mutex
-	byCost map[int][]byte
-}
-
-func (d *decoys) withCost(cost int) []byte {
-	if cost < bcrypt.MinCost || cost > bcrypt.MaxCost {
-		cost = bcrypt.DefaultCost
-	}
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	if hash, ok := d.byCost[cost]; ok {
-		return hash
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte("nobody has this password"), cost)
-	if err != nil {
-		// Nothing compares equal to no hash at all, only faster.
-		return nil
-	}
-	if d.byCost == nil {
-		d.byCost = map[int][]byte{}
-	}
-	d.byCost[cost] = hash
-	return hash
-}
-
 // checkPassword returns the user with the name if the password is theirs
 // and they may log in, nil otherwise.
 //
@@ -368,122 +315,20 @@ func (h *Handler) checkPassword(ctx context.Context, system store.System, name, 
 	}
 	if user != nil {
 		if prefs := readPreferences(user); prefs.enabled() && prefs.PasswordHash != "" {
-			if bcrypt.CompareHashAndPassword([]byte(prefs.PasswordHash), []byte(password)) != nil {
+			if !authguard.Password(prefs.PasswordHash, password) {
 				return nil, nil
 			}
 			return user, nil
 		}
 	}
-	cost := bcrypt.DefaultCost
+	cost := authguard.Cost("")
 	if model, err := h.userNamed(ctx, system.DefaultUser); err != nil {
 		return nil, err
 	} else if model != nil {
-		if c, err := bcrypt.Cost([]byte(readPreferences(model).PasswordHash)); err == nil {
-			cost = c
-		}
+		cost = authguard.Cost(readPreferences(model).PasswordHash)
 	}
-	_ = bcrypt.CompareHashAndPassword(h.decoys.withCost(cost), []byte(password))
+	h.decoys.Refuse(password, cost)
 	return nil, nil
-}
-
-// Failed logins that are let through before a pause is imposed, and the
-// pauses: the first, then twice as long with every further failure, up to
-// the longest.
-const (
-	freeFailures = 5
-	firstPause   = 30 * time.Second
-	longestPause = 15 * time.Minute
-	// knownFailures bounds what the guard remembers.
-	knownFailures = 10000
-)
-
-// guard slows down guessing of passwords: after a run of failed logins for
-// a name from an address, further ones from there have to wait.
-type guard struct {
-	mu       sync.Mutex
-	failures map[string]*failure
-}
-
-type failure struct {
-	count int
-	// until is when the next attempt is heard; last when the last failed.
-	until, last time.Time
-}
-
-// attempt asks whether a login for the name from the address may be tried
-// now. It returns how long the attempt has to wait, or zero after counting
-// it as failed: the count is taken before the password is looked at, so
-// that attempts made at once cannot all slip through, and is dropped by
-// succeeded.
-func (g *guard) attempt(key string, now time.Time) time.Duration {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if g.failures == nil {
-		g.failures = map[string]*failure{}
-	}
-	f := g.failures[key]
-	if f != nil && now.Before(f.until) {
-		return f.until.Sub(now)
-	}
-	if f == nil && len(g.failures) >= knownFailures {
-		// Forget what no longer holds anybody back, and everything if that
-		// is not enough: memory is not what an attacker gets to fill.
-		for k, old := range g.failures {
-			if now.Sub(old.last) > longestPause {
-				delete(g.failures, k)
-			}
-		}
-		if len(g.failures) >= knownFailures {
-			clear(g.failures)
-		}
-	}
-	if f == nil || now.Sub(f.last) > longestPause {
-		f = &failure{}
-		g.failures[key] = f
-	}
-	f.count++
-	f.last = now
-	if f.count >= freeFailures {
-		pause := firstPause << min(f.count-freeFailures, 10)
-		f.until = now.Add(min(pause, longestPause))
-	}
-	return 0
-}
-
-// succeeded forgets the attempts before a login that worked, that one
-// included.
-func (g *guard) succeeded(key string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	delete(g.failures, key)
-}
-
-// guardKey tells attempts apart by name and by where they come from. The
-// name is one a user can have, so the key is short.
-func (h *Handler) guardKey(r *http.Request, name string) string {
-	return strings.ToLower(name) + "\x00" + h.clientAddr(r)
-}
-
-// clientAddr returns the address a request comes from: behind a trusted
-// reverse proxy the one the proxy says it took the request from, which is
-// the last it added to X-Forwarded-For.
-func (h *Handler) clientAddr(r *http.Request) string {
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		host = r.RemoteAddr
-	}
-	if !h.fromProxy(r) {
-		return host
-	}
-	forwarded := r.Header.Values("X-Forwarded-For")
-	if len(forwarded) == 0 {
-		return host
-	}
-	hops := strings.Split(forwarded[len(forwarded)-1], ",")
-	if client, err := netip.ParseAddr(strings.TrimSpace(hops[len(hops)-1])); err == nil {
-		return client.Unmap().String()
-	}
-	return host
 }
 
 // localTarget returns where to go after logging in: the page the visitor
@@ -562,9 +407,9 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		refuse(http.StatusUnauthorized, texts.T("login.failed"))
 		return
 	}
-	key := h.guardKey(r, name)
-	if wait := h.guard.attempt(key, now); wait > 0 {
-		w.Header().Set("Retry-After", strconv.Itoa(int(wait/time.Second)+1))
+	key := authguard.Key(name, authguard.ClientAddr(r, h.proxies))
+	if wait := h.guard.Attempt(key, now); wait > 0 {
+		w.Header().Set("Retry-After", authguard.RetryAfter(wait))
 		refuse(http.StatusTooManyRequests, texts.N("login.locked", int((wait+time.Minute-1)/time.Minute)))
 		return
 	}
@@ -579,7 +424,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		refuse(http.StatusUnauthorized, texts.T("login.failed"))
 		return
 	}
-	h.guard.succeeded(key)
+	h.guard.Succeeded(key)
 
 	if err := h.startSession(w, r, user, r.PostFormValue("remember") != ""); err != nil {
 		h.broken(w, r, err)

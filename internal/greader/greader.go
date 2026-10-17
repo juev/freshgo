@@ -15,13 +15,13 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
-
+	"github.com/juev/freshgo/internal/authguard"
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/store"
@@ -47,6 +47,13 @@ type Options struct {
 	// MediaProxy says the server hands out the images of entries from its
 	// own address, so that their addresses in the answers may lead there.
 	MediaProxy bool
+	// Guard counts the failures of a login; the server shares it with the
+	// web interface, so that moving from one to the other does not start
+	// the count anew. Nil, and the API has one of its own.
+	Guard *authguard.Guard
+	// TrustedProxies are the reverse proxies whose word is taken for the
+	// address a request comes from.
+	TrustedProxies []netip.Prefix
 }
 
 // Handler answers the requests of the Google Reader API.
@@ -57,12 +64,22 @@ type Handler struct {
 	log       *slog.Logger
 	baseURL   string
 	media     bool
+	guard     *authguard.Guard
+	decoys    authguard.Decoys
+	proxies   []netip.Prefix
 	now       func() time.Time
 }
 
 // New returns a Handler.
 func New(o Options) *Handler {
-	return &Handler{db: o.DB, refresher: o.Refresher, hooks: o.Hooks, log: o.Log, baseURL: o.BaseURL, media: o.MediaProxy, now: time.Now}
+	guard := o.Guard
+	if guard == nil {
+		guard = &authguard.Guard{}
+	}
+	return &Handler{
+		db: o.DB, refresher: o.Refresher, hooks: o.Hooks, log: o.Log, baseURL: o.BaseURL, media: o.MediaProxy,
+		guard: guard, proxies: o.TrustedProxies, now: time.Now,
+	}
 }
 
 // request is one API call: what was asked and by whom.
@@ -358,6 +375,13 @@ func unauthorized(w http.ResponseWriter) {
 	text(w, http.StatusUnauthorized, "Unauthorized!")
 }
 
+// tooManyRequests is the answer while a name and address have to wait, with
+// how long in Retry-After.
+func tooManyRequests(w http.ResponseWriter, wait time.Duration) {
+	w.Header().Set("Retry-After", authguard.RetryAfter(wait))
+	text(w, http.StatusTooManyRequests, "Too Many Requests!")
+}
+
 // writeJSON answers with a JSON document followed by a line break.
 func writeJSON(w http.ResponseWriter, v any) error {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -463,22 +487,40 @@ func (h *Handler) validToken(want, sent string) bool {
 	return false
 }
 
+// clientLogin takes the password of a user and gives out the token of their
+// account.
+//
+// A guess is slowed down and counted like one at the web login: the same
+// guard, under the same name and address, and a refusal that takes the time
+// a comparison would have taken, so that the answer tells neither which
+// names exist nor how often one of them has been tried.
 func (h *Handler) clientLogin(ctx context.Context, q *request) {
 	name, password := q.either("Email"), q.either("Passwd")
 	if !store.ValidUserName(name) {
 		badRequest(q.w)
 		return
 	}
-	user, err := h.db.UserByName(ctx, name)
-	if errors.Is(err, store.ErrNotFound) {
-		unauthorized(q.w)
+	key := authguard.Key(name, authguard.ClientAddr(q.r, h.proxies))
+	if wait := h.guard.Attempt(key, h.now()); wait > 0 {
+		tooManyRequests(q.w, wait)
 		return
 	}
-	if err != nil {
+	user, err := h.db.UserByName(ctx, name)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		h.fail(q.w, err)
 		return
 	}
-	if user.APIPasswordHash == "" || bcrypt.CompareHashAndPassword([]byte(user.APIPasswordHash), []byte(password)) != nil {
+	hash := ""
+	if user != nil {
+		hash = user.APIPasswordHash
+	}
+	if hash == "" {
+		// No password to compare: the refusal takes the work of one.
+		h.refusePassword(q, password)
+		unauthorized(q.w)
+		return
+	}
+	if !authguard.Password(hash, password) {
 		h.log.Warn("password API mismatch", "name", name)
 		unauthorized(q.w)
 		return
@@ -487,6 +529,7 @@ func (h *Handler) clientLogin(ctx context.Context, q *request) {
 		unauthorized(q.w)
 		return
 	}
+	h.guard.Succeeded(key)
 	secret, err := h.authToken(ctx, user)
 	if err != nil {
 		h.fail(q.w, err)
@@ -495,6 +538,19 @@ func (h *Handler) clientLogin(ctx context.Context, q *request) {
 	auth := name + "/" + secret
 	// LSID is for Vienna RSS.
 	text(q.w, http.StatusOK, "SID="+auth+"\nLSID=null\nAuth="+auth+"\n")
+}
+
+// refusePassword spends on a refusal the work a comparison against the hash
+// of the user would have spent: that of the API hashes of the installation,
+// which the accounts share.
+func (h *Handler) refusePassword(q *request, password string) {
+	cost := authguard.Cost("")
+	if model, err := h.db.UserByName(q.r.Context(), q.system.DefaultUser); err == nil {
+		cost = authguard.Cost(model.APIPasswordHash)
+	} else if !errors.Is(err, store.ErrNotFound) {
+		h.log.Warn("no default user to take the cost of a refusal from", "error", err)
+	}
+	h.decoys.Refuse(password, cost)
 }
 
 func (h *Handler) userInfo(q *request) error {

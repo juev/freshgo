@@ -12,12 +12,14 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 	"unicode/utf8"
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/juev/freshgo/internal/authguard"
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/hooks"
@@ -39,8 +41,11 @@ type world struct {
 	t        *testing.T
 	db       *store.Store
 	registry *hooks.Registry
+	handler  *Handler
 	server   *httptest.Server
-	alice    *store.User
+	// now is what the handler takes the time to be, in nanoseconds.
+	now   atomic.Int64
+	alice *store.User
 	// auth is the Authorization header of alice.
 	auth string
 }
@@ -56,14 +61,17 @@ func eachEngine(t *testing.T, test func(t *testing.T, w *world)) {
 			}
 			t.Cleanup(func() { _ = db.Close() })
 			w := &world{t: t, db: db, registry: &hooks.Registry{}}
+			w.now.Store(time.Unix(1_000_000, 0).UnixNano())
 			client, err := fetch.New(fetch.Options{Allowlist: []string{"*"}})
 			if err != nil {
 				t.Fatal(err)
 			}
 			log := slog.New(slog.NewTextHandler(io.Discard, nil))
-			w.server = httptest.NewServer(New(Options{
+			w.handler = New(Options{
 				DB: db, Refresher: refresh.New(db, client, w.registry, log), Hooks: w.registry, Log: log,
-			}))
+			})
+			w.handler.now = func() time.Time { return time.Unix(0, w.now.Load()) }
+			w.server = httptest.NewServer(w.handler)
 			t.Cleanup(w.server.Close)
 			w.alice = w.user("alice", "")
 			w.auth = w.login("alice")
@@ -752,6 +760,102 @@ func TestDepartures(t *testing.T) {
 		w.ok("/reader/api/0/subscription/edit", "ac=edit&s=feed/1&a=user/-/label/taken")
 		if got, err := w.db.FeedByID(ctx, w.alice.ID, f.ID); err != nil || got.CategoryID != store.DefaultCategoryID {
 			t.Errorf("feed moved to a category named like a label = %+v, %v; want it in the default category", got, err)
+		}
+	})
+}
+
+// clientLogin tries a password and returns the answer with its headers.
+func (w *world) clientLogin(name, password string) (*http.Response, string) {
+	w.t.Helper()
+	resp, err := http.PostForm(w.server.URL+"/accounts/ClientLogin", url.Values{"Email": {name}, "Passwd": {password}})
+	if err != nil {
+		w.t.Fatalf("ClientLogin of %s: %v", name, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		w.t.Fatalf("ClientLogin of %s: %v", name, err)
+	}
+	return resp, string(body)
+}
+
+// fastest is the least of what a request takes, which the noise of the
+// machine hardly touches.
+func fastest(attempt func()) time.Duration {
+	var best time.Duration
+	for range 3 {
+		start := time.Now()
+		attempt()
+		if took := time.Since(start); best == 0 || took < best {
+			best = took
+		}
+	}
+	return best
+}
+
+// A name nobody has is refused as slowly as a wrong password, so that the
+// time of the answer does not tell which names exist.
+func TestClientLoginRefusesAlike(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		unknown := fastest(func() {
+			if resp, _ := w.clientLogin("nobody", "guess"); resp.StatusCode != http.StatusUnauthorized {
+				t.Fatalf("login with a name nobody has: status %d", resp.StatusCode)
+			}
+		})
+		wrong := fastest(func() {
+			if resp, _ := w.clientLogin("alice", "wrong"); resp.StatusCode != http.StatusUnauthorized {
+				t.Fatalf("login with a wrong password: status %d", resp.StatusCode)
+			}
+		})
+		// The fixture hashes with the cheapest cost, as an installation
+		// imported from FreshRSS may; a comparison against a hash of the
+		// default cost is what a refusal that ignores the installation's
+		// hashes would take.
+		hash, err := bcrypt.GenerateFromPassword([]byte("some password"), bcrypt.DefaultCost)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reference := fastest(func() { _ = bcrypt.CompareHashAndPassword(hash, []byte("guess")) })
+		for name, took := range map[string]time.Duration{"a name nobody has": unknown, "a wrong password": wrong} {
+			if took > reference/3 {
+				t.Errorf("a refusal for %s took %s, where a hash of the default cost takes %s: the work of the installation's hashes was not done", name, took, reference)
+			}
+		}
+	})
+}
+
+// A run of failures pauses the login for a name from an address, the right
+// password included, and names nobody has are counted too.
+func TestClientLoginIsGuarded(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		w.user("bob", "")
+		for i := range authguard.FreeFailures {
+			if resp, body := w.clientLogin("alice", "wrong"); resp.StatusCode != http.StatusUnauthorized {
+				t.Fatalf("failure %d: status %d, body %q", i+1, resp.StatusCode, body)
+			}
+		}
+		resp, body := w.clientLogin("alice", "alice-password")
+		if resp.StatusCode != http.StatusTooManyRequests || resp.Header.Get("Retry-After") != "31" || body != "Too Many Requests!" {
+			t.Fatalf("login after %d failures: status %d, Retry-After %q, body %q; want 429, 31, %q",
+				authguard.FreeFailures, resp.StatusCode, resp.Header.Get("Retry-After"), body, "Too Many Requests!")
+		}
+		// Another name is not held back.
+		if resp, body := w.clientLogin("bob", "bob-password"); resp.StatusCode != http.StatusOK {
+			t.Errorf("login of another user meanwhile: status %d, body %q", resp.StatusCode, body)
+		}
+		// A name nobody has is refused and counted like one that exists.
+		for range authguard.FreeFailures {
+			if resp, _ := w.clientLogin("nobody", "guess"); resp.StatusCode != http.StatusUnauthorized {
+				t.Fatalf("login with a name nobody has: status %d", resp.StatusCode)
+			}
+		}
+		if resp, _ := w.clientLogin("nobody", "guess"); resp.StatusCode != http.StatusTooManyRequests {
+			t.Errorf("guesses at a name nobody has were not counted: status %d", resp.StatusCode)
+		}
+		// Once the pause is over, the right password is let in.
+		w.now.Add(int64(authguard.FirstPause + time.Second))
+		if resp, body := w.clientLogin("alice", "alice-password"); resp.StatusCode != http.StatusOK {
+			t.Errorf("login after the pause: status %d, body %q", resp.StatusCode, body)
 		}
 	})
 }

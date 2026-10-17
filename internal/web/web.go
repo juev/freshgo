@@ -19,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/juev/freshgo/internal/authguard"
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/mediaproxy"
 	"github.com/juev/freshgo/internal/refresh"
@@ -69,6 +70,10 @@ type Options struct {
 	// Translator translates entries; nil when the server was given no
 	// service for it, and then no entry offers to be translated.
 	Translator *translate.Translator
+	// Guard counts the failures of a login; the server shares it with the
+	// API, so that moving from one to the other does not start the count
+	// anew. Nil, and the interface has one of its own.
+	Guard *authguard.Guard
 }
 
 // Handler serves the interface.
@@ -95,10 +100,10 @@ type Handler struct {
 	// crossOrigin turns down requests that change something and come from
 	// another site.
 	crossOrigin *http.CrossOriginProtection
-	guard       guard
+	guard       *authguard.Guard
 	// letters holds back letters to one user after the first few.
-	letters guard
-	decoys  decoys
+	letters authguard.Guard
+	decoys  authguard.Decoys
 	now     func() time.Time
 	images  Fetcher
 	// services is Options.Services.
@@ -111,9 +116,14 @@ type Handler struct {
 // New returns the interface, or an error when what is built into the binary
 // does not hold together.
 func New(o Options) (*Handler, error) {
+	guard := o.Guard
+	if guard == nil {
+		guard = &authguard.Guard{}
+	}
 	h := &Handler{
 		db: o.DB, log: o.Log, refresher: o.Refresher, translator: o.Translator, baseURL: o.BaseURL, version: o.Version, assets: map[string]string{},
 		proxies: o.TrustedProxies, allowlist: o.FetchAllowlist, mailer: o.Mailer, crossOrigin: http.NewCrossOriginProtection(), now: time.Now, hooks: o.Hooks,
+		guard: guard,
 	}
 	if h.hooks == nil {
 		h.hooks = &hooks.Registry{}
