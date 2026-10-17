@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"sync"
 	"time"
 
@@ -200,20 +201,22 @@ func (h *Handler) oidcCallback(w http.ResponseWriter, r *http.Request) {
 		h.oidcRefused(w, r, http.StatusForbidden, attempt.Next, fmt.Errorf("%w: the provider answered %q", errOIDC, problem))
 		return
 	}
-	name, err := h.oidcUserName(r, s.system, attempt, query.Get("code"))
+	identity, err := h.oidcIdentity(r, s.system, attempt, query.Get("code"))
 	if err != nil {
 		h.oidcRefused(w, r, http.StatusBadGateway, attempt.Next, err)
 		return
 	}
-	var user *store.User
-	if store.ValidUserName(name) {
-		if user, err = h.userOrNew(r.Context(), name, s.system, "user created on the word of the provider"); err != nil {
-			h.broken(w, r, err)
-			return
-		}
+	user, err := h.oidcUser(r.Context(), s.system, identity)
+	if errors.Is(err, errOIDC) {
+		h.oidcRefused(w, r, http.StatusForbidden, attempt.Next, err)
+		return
 	}
-	if user == nil || !readPreferences(user).enabled() {
-		h.oidcRefused(w, r, http.StatusForbidden, attempt.Next, fmt.Errorf("%w: no user %q may sign in", errOIDC, name))
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	if !readPreferences(user).enabled() {
+		h.oidcRefused(w, r, http.StatusForbidden, attempt.Next, fmt.Errorf("%w: user %q is disabled", errOIDC, user.Name))
 		return
 	}
 	// The login the browser had ends: who signs in now may be another user.
@@ -230,35 +233,119 @@ func (h *Handler) oidcCallback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, h.localTarget(attempt.Next), http.StatusSeeOther)
 }
 
-// oidcUserName trades the code of the provider for its tokens and returns
-// the name the ID token gives the user.
-func (h *Handler) oidcUserName(r *http.Request, system store.System, attempt oidcAttempt, code string) (string, error) {
+// oidcClaims is who the ID token says signs in.
+type oidcClaims struct {
+	// Issuer and Subject are who the user is at the provider; Name is the
+	// name a new user takes.
+	Issuer  string `json:"iss"`
+	Subject string `json:"sub"`
+	Name    string `json:"preferred_username"`
+	// Groups are the groups the provider puts the user in, a list or a
+	// single name.
+	Groups json.RawMessage `json:"groups"`
+}
+
+// inGroup reports whether the claims put the user in the group.
+func (c oidcClaims) inGroup(group string) bool {
+	var groups []string
+	if json.Unmarshal(c.Groups, &groups) != nil {
+		var one string
+		if json.Unmarshal(c.Groups, &one) != nil {
+			return false
+		}
+		groups = []string{one}
+	}
+	return slices.Contains(groups, group)
+}
+
+// oidcIdentity trades the code of the provider for its tokens and returns
+// what the ID token says about the user.
+func (h *Handler) oidcIdentity(r *http.Request, system store.System, attempt oidcAttempt, code string) (oidcClaims, error) {
+	var claims oidcClaims
 	ctx, config, verifier, err := h.oidcClient(r, system)
 	if err != nil {
-		return "", err
+		return claims, err
 	}
 	token, err := config.Exchange(ctx, code, oauth2.VerifierOption(attempt.Verifier))
 	if err != nil {
-		return "", err
+		return claims, err
 	}
 	raw, _ := token.Extra("id_token").(string)
 	if raw == "" {
-		return "", fmt.Errorf("%w: the provider gave no ID token", errOIDC)
+		return claims, fmt.Errorf("%w: the provider gave no ID token", errOIDC)
 	}
 	idToken, err := verifier.Verify(ctx, raw)
 	if err != nil {
-		return "", err
+		return claims, err
 	}
 	if subtle.ConstantTimeCompare([]byte(idToken.Nonce), []byte(attempt.Nonce)) != 1 {
-		return "", fmt.Errorf("%w: the ID token belongs to another sign-in", errOIDC)
-	}
-	var claims struct {
-		Name string `json:"preferred_username"`
+		return claims, fmt.Errorf("%w: the ID token belongs to another sign-in", errOIDC)
 	}
 	if err := idToken.Claims(&claims); err != nil {
-		return "", err
+		return claims, err
 	}
-	return claims.Name, nil
+	claims.Issuer, claims.Subject = idToken.Issuer, idToken.Subject
+	if claims.Subject == "" {
+		return claims, fmt.Errorf("%w: the ID token names no subject", errOIDC)
+	}
+	return claims, nil
+}
+
+// oidcUser returns the user the claims are of: the one the subject belongs
+// to. A subject nobody has yet goes to the user named preferred_username,
+// made if need be, unless that user already has another subject at the
+// provider. With an administrators' group set, the user is an administrator
+// exactly when the provider puts them in it. An error that wraps errOIDC
+// is a user who may not sign in.
+func (h *Handler) oidcUser(ctx context.Context, system store.System, claims oidcClaims) (*store.User, error) {
+	var user *store.User
+	id, err := h.db.OIDCUser(ctx, claims.Issuer, claims.Subject)
+	switch {
+	case err == nil:
+		if user, err = h.db.UserByID(ctx, id); err != nil {
+			return nil, err
+		}
+	case !errors.Is(err, store.ErrNotFound):
+		return nil, err
+	default:
+		if !store.ValidUserName(claims.Name) {
+			return nil, fmt.Errorf("%w: subject %q has no name a user can have", errOIDC, claims.Subject)
+		}
+		if user, err = h.userOrNew(ctx, claims.Name, system, "user created on the word of the provider"); err != nil {
+			return nil, err
+		}
+		if user == nil {
+			return nil, fmt.Errorf("%w: no user %q", errOIDC, claims.Name)
+		}
+		switch err := h.db.BindOIDC(ctx, claims.Issuer, claims.Subject, user.ID); {
+		case errors.Is(err, store.ErrConflict):
+			// Another sign-in of the same subject may have been quicker.
+			if id, err := h.db.OIDCUser(ctx, claims.Issuer, claims.Subject); err == nil && id == user.ID {
+				break
+			}
+			return nil, fmt.Errorf("%w: user %q is another subject at the provider", errOIDC, user.Name)
+		case err != nil:
+			return nil, err
+		}
+		h.log.Info("user bound to the provider", "user", user.Name, "subject", claims.Subject)
+	}
+	if group := system.OIDC.AdminGroup; group != "" {
+		admin := claims.inGroup(group)
+		if readPreferences(user).IsAdmin != admin {
+			err := h.db.UpdateUserSettings(ctx, user.ID, func(settings map[string]json.RawMessage) error {
+				settings["is_admin"], _ = json.Marshal(admin)
+				return nil
+			})
+			if err != nil {
+				return nil, err
+			}
+			h.log.Info("administration changed on the word of the provider", "user", user.Name, "admin", admin)
+			if user, err = h.db.UserByID(ctx, user.ID); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return user, nil
 }
 
 // oidcRefused shows the login page with the message of a sign-in through

@@ -21,6 +21,11 @@
 <label for="oidc_client_id">{{.T "admin.auth.oidc.client-id"}}</label>
 <input type="text" id="oidc_client_id" name="oidc_client_id" value="{{.Data.System.OIDC.ClientID}}" autocapitalize="off" spellcheck="false">
 </p>
+<p>
+<label for="oidc_admin_group">{{.T "admin.auth.oidc.admin-group"}}</label>
+<input type="text" id="oidc_admin_group" name="oidc_admin_group" value="{{.Data.System.OIDC.AdminGroup}}" autocapitalize="off" spellcheck="false" aria-describedby="oidc-group-hint">
+<span class="hint" id="oidc-group-hint">{{.T "admin.auth.oidc.admin-group.hint"}}</span>
+</p>
 </fieldset>
 {{template "check" (dict "Name" "force_email_validation" "Label" (.T "admin.auth.force-email") "On" .Data.System.ForceEmailValidation)}}
 {{if not .Data.CanMail}}<p class="hint">{{.T "admin.auth.no-mail"}}</p>{{end}}

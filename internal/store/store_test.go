@@ -111,7 +111,7 @@ func TestMigrationWebSubHub(t *testing.T) {
 				t.Fatal(err)
 			}
 			// Back to the schema before the migration; those after it run again.
-			for _, q := range []string{"ALTER TABLE feeds DROP COLUMN websub_hub", "ALTER TABLE feeds DROP COLUMN failures", "ALTER TABLE feeds DROP COLUMN not_before", "DROP INDEX entries_state_index", "DELETE FROM schema_migrations WHERE version >= 8"} {
+			for _, q := range []string{"ALTER TABLE feeds DROP COLUMN websub_hub", "ALTER TABLE feeds DROP COLUMN failures", "ALTER TABLE feeds DROP COLUMN not_before", "DROP INDEX entries_state_index", "DROP TABLE oidc_identities", "DELETE FROM schema_migrations WHERE version >= 8"} {
 				if _, err := s.exec(ctx, q); err != nil {
 					t.Fatalf("%s: %v", q, err)
 				}
@@ -1202,6 +1202,45 @@ func TestSystem(t *testing.T) {
 			if got, err := s.System(ctx); err != nil || got.DefaultUser != step.want {
 				t.Errorf("default user stored as ghost = %q, %v; want %q", got.DefaultUser, err, step.want)
 			}
+		}
+	})
+}
+
+// S41: a subject at a provider belongs to one user, a user has one subject
+// there, and the subjects of a user go with the user.
+func TestOIDCIdentities(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		alice, bob := mustUser(t, s, "alice"), mustUser(t, s, "bob")
+		const issuer, other = "https://id.example", "https://other.example"
+		if _, err := s.OIDCUser(ctx, issuer, "a"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("OIDCUser of a subject nobody has: error = %v, want ErrNotFound", err)
+		}
+		for _, b := range []struct {
+			issuer, subject string
+			user            int64
+		}{{issuer, "a", alice.ID}, {other, "a", bob.ID}, {other, "b", alice.ID}} {
+			if err := s.BindOIDC(ctx, b.issuer, b.subject, b.user); err != nil {
+				t.Fatalf("BindOIDC(%s, %s, %d): %v", b.issuer, b.subject, b.user, err)
+			}
+		}
+		if id, err := s.OIDCUser(ctx, issuer, "a"); err != nil || id != alice.ID {
+			t.Errorf("OIDCUser(%s, a) = %d, %v; want alice", issuer, id, err)
+		}
+		if id, err := s.OIDCUser(ctx, other, "a"); err != nil || id != bob.ID {
+			t.Errorf("OIDCUser(%s, a) = %d, %v; want bob", other, id, err)
+		}
+		if err := s.BindOIDC(ctx, issuer, "a", bob.ID); !errors.Is(err, ErrConflict) {
+			t.Errorf("BindOIDC of a subject of another user: error = %v, want ErrConflict", err)
+		}
+		if err := s.BindOIDC(ctx, issuer, "c", alice.ID); !errors.Is(err, ErrConflict) {
+			t.Errorf("BindOIDC of a second subject of a user: error = %v, want ErrConflict", err)
+		}
+		if err := s.DeleteUser(ctx, alice.ID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.OIDCUser(ctx, issuer, "a"); !errors.Is(err, ErrNotFound) {
+			t.Errorf("OIDCUser of a subject of a deleted user: error = %v, want ErrNotFound", err)
 		}
 	})
 }
