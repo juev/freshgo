@@ -177,3 +177,27 @@ func TestDoctorBrokenInstallation(t *testing.T) {
 		t.Errorf("wrong flag: code %d, %q", code, lines)
 	}
 }
+
+// Settings that do not read stop the server and the commands that refresh
+// at start, with what to do about them, instead of failing every request.
+func TestBrokenSettingsStopTheStart(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "freshgo.sqlite")
+	db, err := store.Open(ctx, config.DriverSQLite, path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetSetting(ctx, store.SettingSystem, "{broken"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, command := range []string{"serve", "refresh", "purge"} {
+		code, _, stderr := runCLI(t, command, "-database-url", "sqlite://"+path, "-listen", "127.0.0.1:0")
+		if code != 1 || !strings.Contains(stderr, `store: setting "system"`) || !strings.Contains(stderr, "freshgo doctor") ||
+			strings.Count(stderr, "\n") > 2 {
+			t.Errorf("%s: code %d, stderr %q; want 1 and one error that names freshgo doctor", command, code, stderr)
+		}
+	}
+}
