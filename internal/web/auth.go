@@ -362,8 +362,9 @@ type loginForm struct {
 	Name, Next string
 	// Error is the message of a failed attempt, empty before the first.
 	Error string
-	// CanRegister says a visitor can make an account for themselves.
-	CanRegister bool
+	// CanRegister says a visitor can make an account for themselves,
+	// CanReset that a user can have the password reset by a letter.
+	CanRegister, CanReset bool
 	// Before is what extensions put before the button.
 	Before []template.HTML
 	// Provider is what the provider visitors can sign in through is called
@@ -381,7 +382,7 @@ func (h *Handler) showLogin(w http.ResponseWriter, r *http.Request, status int, 
 		h.broken(w, r, err)
 		return
 	}
-	form.CanRegister, form.Before = open, h.hooks.BeforeLogin.Call(r.Context(), v.asks)
+	form.CanRegister, form.CanReset, form.Before = open, h.resetOn(s.system), h.hooks.BeforeLogin.Call(r.Context(), v.asks)
 	if h.oidcOn(s.system) {
 		form.Provider, form.ProviderURL = oidcName(s.system), h.oidcStart(form.Next)
 	}
