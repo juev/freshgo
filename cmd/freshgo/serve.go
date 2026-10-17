@@ -62,10 +62,12 @@ func extensions(registry *hooks.Registry) http.Handler {
 // the web interface.
 //
 // hubs is nil when WebSub is off.
-func routes(api, icons, misc, hubs, pages http.Handler) http.Handler {
+func routes(health, api, icons, misc, hubs, pages http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		switch {
+		case path == healthPath:
+			health.ServeHTTP(w, r)
 		case strings.HasPrefix(path, favicon.Path):
 			icons.ServeHTTP(w, r)
 		case path == extensionsPath, strings.HasPrefix(path, extensionsPath+"/"):
@@ -180,7 +182,7 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 		}()
 	}
 	server := &http.Server{
-		Handler:           routes(api, s.icons, extensions(s.registry), hubs, pages),
+		Handler:           routes(healthHandler(db.Ping, s.refresher.LastRun, s.log), api, s.icons, extensions(s.registry), hubs, pages),
 		ReadHeaderTimeout: 10 * time.Second,
 		// A request ends with the server, not with the signal: Shutdown
 		// gives it time first.

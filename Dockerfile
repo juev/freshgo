@@ -20,5 +20,8 @@ ENV FRESHGO_DATABASE_URL=sqlite:///data/freshgo.sqlite \
 	FRESHGO_LISTEN=0.0.0.0:8080
 VOLUME /data
 EXPOSE 8080
+# scratch has no program to make a request with: the binary asks itself.
+HEALTHCHECK --interval=10s --timeout=5s --start-period=60s --start-interval=2s --retries=3 \
+	CMD ["/freshgo", "healthcheck"]
 ENTRYPOINT ["/freshgo"]
 CMD ["serve"]

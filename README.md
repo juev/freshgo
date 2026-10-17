@@ -265,6 +265,7 @@ freshrss-password "…"
 | `user create [-admin]\|passwd\|delete <name>`, `user list` | Manages users. Deleting a user deletes their feeds and articles; deleting the default user makes the oldest remaining user the default user and an administrator. |
 | `feed add -user <name> [-category <name>] <address>` | Subscribes a user to a feed and fetches it. |
 | `opml import -user <name> [<file>]`, `opml export -user <name>` | Reads subscriptions from a file or standard input; writes them to standard output. |
+| `healthcheck` | Asks the server at `-listen` whether it works, with `GET /healthz`, and exits with 1 when it does not. An address that listens on every interface is asked over loopback. The image runs it as its `HEALTHCHECK`. |
 | `version` | Prints the version. |
 
 `freshgo <command> -h` lists the flags of a command.
@@ -382,7 +383,7 @@ With `-websub` and a `-base-url` that hubs can reach, a feed that announces a hu
 
 ### Paths the server answers
 
-`/accounts/` and `/reader/` (Google Reader API), `/api/greader.php` (the same API at the FreshRSS path), `/favicon/` (feed icons), `/websub/` (when WebSub is on), `/api/misc.php` (extensions). Every other path belongs to the web interface.
+`/healthz` (whether the server works, without a login: 200 while the database answers, 503 when it does not answer within two seconds, with the error in the log; the JSON says, as `lastRefresh`, when the last refresh of the feeds of every user ended), `/accounts/` and `/reader/` (Google Reader API), `/api/greader.php` (the same API at the FreshRSS path), `/favicon/` (feed icons), `/websub/` (when WebSub is on), `/api/misc.php` (extensions). Every other path belongs to the web interface.
 
 ## Development
 

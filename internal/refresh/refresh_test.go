@@ -1308,3 +1308,30 @@ func TestScrapedFeedKinds(t *testing.T) {
 		}
 	})
 }
+
+// The end of the last run that reached every user is kept for the health
+// check; a run that stops early leaves it as it was.
+func TestLastRun(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		w.user("alice", `{}`)
+		if at, ok := w.r.LastRun(); ok {
+			t.Fatalf("before a run: LastRun = %v, true; want false", at)
+		}
+		if _, err := w.r.Run(context.Background(), Options{}); err != nil {
+			t.Fatal(err)
+		}
+		if at, ok := w.r.LastRun(); !ok || !at.Equal(w.clock) {
+			t.Errorf("after a run: LastRun = %v, %v; want %v", at, ok, w.clock)
+		}
+		ended := w.clock
+		w.later()
+		cancelled, cancel := context.WithCancel(context.Background())
+		cancel()
+		if _, err := w.r.Run(cancelled, Options{}); err == nil {
+			t.Fatal("a cancelled run: no error")
+		}
+		if at, _ := w.r.LastRun(); !at.Equal(ended) {
+			t.Errorf("after a cancelled run: LastRun = %v, want %v", at, ended)
+		}
+	})
+}

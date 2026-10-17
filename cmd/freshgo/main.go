@@ -43,6 +43,7 @@ func commands() []command {
 		{"user", "manage users: create, passwd, list, delete", group("user", userCommands())},
 		{"feed", "manage feeds: add", group("feed", feedCommands())},
 		{"opml", "import or export subscriptions as OPML", group("opml", opmlCommands())},
+		{"healthcheck", "ask the running server whether it works, for the health check of a container", runHealthcheck},
 		{"version", "print the version", runVersion},
 	}
 }
@@ -106,7 +107,7 @@ func usage(w io.Writer) {
 	var b strings.Builder
 	b.WriteString("Usage: freshgo <command> [flags]\n\nCommands:\n")
 	for _, c := range commands() {
-		fmt.Fprintf(&b, "  %-8s %s\n", c.name, c.summary)
+		fmt.Fprintf(&b, "  %-11s %s\n", c.name, c.summary)
 	}
 	b.WriteString("\nRun \"freshgo <command> -h\" for the flags of a command.\n")
 	_, _ = io.WriteString(w, b.String())
