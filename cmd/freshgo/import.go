@@ -18,7 +18,9 @@ import (
 func newFlagSet(e env, name string) (*flag.FlagSet, *config.Config) {
 	fs := flag.NewFlagSet("freshgo "+name, flag.ContinueOnError)
 	fs.SetOutput(e.stderr)
-	return fs, config.Bind(fs, e.getenv)
+	conf := config.Bind(fs, e.getenv)
+	e.settings.Apply(fs)
+	return fs, conf
 }
 
 // openStore parses the flags of a subcommand and opens the database they

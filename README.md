@@ -279,7 +279,7 @@ A running server sees what `user` and `import` change in the installation settin
 
 ## Settings
 
-Every setting is a flag and an environment variable; the flag wins. The help of a command shows a value of the environment as the default of its flag, except for the four that carry passwords: `-database-url`, `-smtp-url`, `-oidc-client-secret` and `-translate-key`.
+Every setting is a flag and an environment variable, and can be written in a configuration file as well. A flag wins over the file, the file over the environment. The help of a command shows a value of the environment as the default of its flag, except for the four that carry passwords: `-database-url`, `-smtp-url`, `-oidc-client-secret` and `-translate-key`.
 
 | Flag | Variable | Default | Meaning |
 |---|---|---|---|
@@ -299,6 +299,16 @@ Every setting is a flag and an environment variable; the flag wins. The help of 
 | `-log-level` | `FRESHGO_LOG_LEVEL` | `info` | Least level of what goes to the log: `debug`, `info`, `warn` or `error`. At `debug` every request is logged with its method, path, status and duration, without the query. The warnings and errors about a user are kept for the journal of the user at every level. |
 | `-log-format` | `FRESHGO_LOG_FORMAT` | `text` | `text` or `json`. |
 | `-smtp-url` | `FRESHGO_SMTP_URL` | | SMTP server for the letters that confirm e-mail addresses and reset forgotten passwords: `smtp[s]://user:password@host:port?from=address`. Without it, confirmation cannot be required and passwords are reset only by an administrator or `freshgo user passwd`. |
+
+The file is YAML, named by `-config` before the command: `freshgo -config /etc/freshgo.yaml serve`. Its keys are the names of the flags without the dash; a key that is no setting, or a value its flag does not take, stops the command before it starts. The file is read once, at start.
+
+```yaml
+database-url: postgres://freshgo:password@db/freshgo
+listen: 0.0.0.0:8080
+base-url: https://rss.example.org
+refresh-interval: 15m
+websub: true
+```
 
 The garbage collector of Go runs with `GOGC=200` unless the variable `GOGC` is set: the heap grows to three times what is in use before a collection, where the runtime of Go lets it grow to twice. An answer of the API takes about a third less time for it, and the process about 8 MB more memory. `GOGC=100` gives the memory back.
 

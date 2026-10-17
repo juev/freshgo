@@ -12,6 +12,8 @@ import (
 	"runtime/debug"
 	"strings"
 	"syscall"
+
+	"github.com/juev/freshgo/internal/config"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -24,6 +26,8 @@ type env struct {
 	stdout io.Writer
 	stderr io.Writer
 	getenv func(string) string
+	// settings are those of the configuration file named by -config.
+	settings config.Settings
 }
 
 type command struct {
@@ -73,12 +77,32 @@ func main() {
 }
 
 func run(ctx context.Context, e env, args []string) int {
+	global := flag.NewFlagSet("freshgo", flag.ContinueOnError)
+	global.SetOutput(io.Discard)
+	file := global.String("config", "", "")
+	switch err := global.Parse(args); {
+	case errors.Is(err, flag.ErrHelp):
+		usage(e.stdout)
+		return 0
+	case err != nil:
+		_, _ = fmt.Fprintf(e.stderr, "freshgo: %v\n\n", err)
+		usage(e.stderr)
+		return 2
+	}
+	args = global.Args()
+	if *file != "" {
+		settings, err := config.ReadFile(*file)
+		if err != nil {
+			_, _ = fmt.Fprintf(e.stderr, "freshgo: %v\n", err)
+			return 1
+		}
+		e.settings = settings
+	}
 	if len(args) == 0 {
 		usage(e.stderr)
 		return 2
 	}
-	switch args[0] {
-	case "help", "-h", "-help", "--help":
+	if args[0] == "help" {
 		usage(e.stdout)
 		return 0
 	}
@@ -106,11 +130,13 @@ func run(ctx context.Context, e env, args []string) int {
 // a failed write has nowhere to be reported.
 func usage(w io.Writer) {
 	var b strings.Builder
-	b.WriteString("Usage: freshgo <command> [flags]\n\nCommands:\n")
+	b.WriteString("Usage: freshgo [-config file] <command> [flags]\n\nCommands:\n")
 	for _, c := range commands() {
 		fmt.Fprintf(&b, "  %-11s %s\n", c.name, c.summary)
 	}
-	b.WriteString("\nRun \"freshgo <command> -h\" for the flags of a command.\n")
+	b.WriteString("\nRun \"freshgo <command> -h\" for the flags of a command. A flag of the settings\n" +
+		"can be set in the YAML file -config names as well, by its name without the dash:\n" +
+		"a flag wins over the file, the file over the environment.\n")
 	_, _ = io.WriteString(w, b.String())
 }
 
