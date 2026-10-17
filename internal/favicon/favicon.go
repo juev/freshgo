@@ -37,6 +37,12 @@ const (
 	retry   = 24 * time.Hour
 	// maxSize is the largest image accepted as an icon.
 	maxSize = 1 << 20
+	// maxLinks is how many distinct icons a page links to are tried, and
+	// searchTimeout how long the whole search at a place may take: a page
+	// must not hold the refresh of its feed with link after link. A search
+	// makes at most 2*(1+maxLinks)+1 requests.
+	maxLinks      = 4
+	searchTimeout = 30 * time.Second
 	// Clients may keep an icon for iconMaxAge and the stand-in for a missing
 	// one for defaultMaxAge, in seconds.
 	iconMaxAge    = 7 * 24 * 3600
@@ -132,11 +138,13 @@ type Service struct {
 	client *fetch.Client
 	log    *slog.Logger
 	now    func() time.Time
+	// timeout bounds one search; it is searchTimeout but in tests.
+	timeout time.Duration
 }
 
 // New returns a Service.
 func New(db *store.Store, client *fetch.Client, log *slog.Logger) *Service {
-	return &Service{db: db, client: client, log: log, now: time.Now}
+	return &Service{db: db, client: client, log: log, now: time.Now, timeout: searchTimeout}
 }
 
 // Refresh makes sure the icon of the feed is there and not older than a
@@ -180,8 +188,12 @@ func (s *Service) refresh(ctx context.Context, src string, route fetch.Params) e
 		return nil
 	}
 	icon.Checked = now.Unix()
-	// A site that has stopped answering keeps the icon it had.
-	if content, contentType := s.find(ctx, src, route); content != nil && !bytes.Equal(content, icon.Content) {
+	// A site that has stopped answering, or answers too slowly, keeps the
+	// icon it had.
+	searchCtx, cancel := context.WithTimeout(ctx, s.timeout)
+	content, contentType := s.find(searchCtx, src, route)
+	cancel()
+	if content != nil && !bytes.Equal(content, icon.Content) {
 		icon.Content, icon.ContentType, icon.Modified = content, contentType, now.Unix()
 	}
 	return s.db.PutIcon(ctx, icon)
@@ -215,7 +227,7 @@ func (s *Service) find(ctx context.Context, src string, route fetch.Params) ([]b
 }
 
 // fromPage fetches the address and returns it when it is an image, else the
-// first image among the icons the page links to.
+// first image among the first maxLinks distinct icons the page links to.
 func (s *Service) fromPage(ctx context.Context, address string, route fetch.Params) ([]byte, string) {
 	resp, err := s.client.Fetch(ctx, fetch.Request{URL: address, Accept: fetch.AcceptHTML, Params: route})
 	if err != nil {
@@ -240,6 +252,7 @@ func (s *Service) fromPage(ctx context.Context, address string, route fetch.Para
 	var (
 		content     []byte
 		contentType string
+		tried       = map[string]bool{}
 	)
 	doc.Find("link[href]").EachWithBreak(func(_ int, link *goquery.Selection) bool {
 		rel := strings.ToLower(link.AttrOr("rel", ""))
@@ -247,11 +260,12 @@ func (s *Service) fromPage(ctx context.Context, address string, route fetch.Para
 			return true
 		}
 		u, err := base.Parse(strings.TrimSpace(link.AttrOr("href", "")))
-		if err != nil {
+		if err != nil || tried[u.String()] {
 			return true
 		}
+		tried[u.String()] = true
 		content, contentType = s.image(ctx, u.String(), route)
-		return content == nil
+		return content == nil && len(tried) < maxLinks && ctx.Err() == nil
 	})
 	return content, contentType
 }
