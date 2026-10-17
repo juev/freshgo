@@ -633,7 +633,12 @@ func TestNoAuthentication(t *testing.T) {
 		if a := s.get("/login"); a.status != http.StatusSeeOther || a.header.Get("Location") != "/" {
 			t.Errorf("GET /login: status %d, Location %q", a.status, a.header.Get("Location"))
 		}
+		// A default user who is gone passes to the first user left.
 		s.system(func(system *store.System) { system.DefaultUser = "_" })
+		if a := s.get("/test/whoami"); a.body != "alice, administrator" {
+			t.Errorf("with a default user who is gone: status %d, body %q", a.status, a.body)
+		}
+		s.system(func(system *store.System) { system.DefaultUser = "" })
 		if a := s.get("/test/whoami"); a.status != http.StatusForbidden {
 			t.Errorf("without a default user: status %d, body %q", a.status, a.body)
 		}

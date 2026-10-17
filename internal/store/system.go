@@ -116,7 +116,9 @@ func DefaultSystem() System {
 }
 
 // System returns the installation-wide settings: what is stored over the
-// defaults.
+// defaults. A default user who is gone is replaced by the user created
+// first among those left, or by none, so that an installation keeps an
+// administrator as long as it has users.
 func (s *Store) System(ctx context.Context) (System, error) {
 	system := DefaultSystem()
 	stored, err := s.Setting(ctx, SettingSystem)
@@ -128,6 +130,16 @@ func (s *Store) System(ctx context.Context) (System, error) {
 	}
 	if err := json.Unmarshal([]byte(stored), &system); err != nil {
 		return System{}, fmt.Errorf("store: setting %q: %w", SettingSystem, err)
+	}
+	if system.DefaultUser != "" {
+		err := s.queryRow(ctx, `
+			SELECT name FROM users ORDER BY name = ? DESC, id LIMIT 1`,
+			system.DefaultUser).Scan(&system.DefaultUser)
+		if errors.Is(err, ErrNotFound) {
+			system.DefaultUser = ""
+		} else if err != nil {
+			return System{}, fmt.Errorf("store: default user: %w", err)
+		}
 	}
 	return system, nil
 }

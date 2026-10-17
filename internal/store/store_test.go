@@ -1160,6 +1160,7 @@ func TestSystem(t *testing.T) {
 		if err != nil || !reflect.DeepEqual(got, DefaultSystem()) {
 			t.Fatalf("System of a new database = %+v, %v; want the defaults", got, err)
 		}
+		alice := mustUser(t, s, "alice")
 		changed := DefaultSystem()
 		changed.Title, changed.DefaultUser, changed.AuthType = "Новости", "alice", AuthNone
 		changed.AllowAnonymous, changed.APIEnabled = true, false
@@ -1179,6 +1180,28 @@ func TestSystem(t *testing.T) {
 		want.Title = "Old"
 		if got, err := s.System(ctx); err != nil || !reflect.DeepEqual(got, want) {
 			t.Errorf("System over a partial value = %+v, %v; want %+v", got, err, want)
+		}
+
+		// A default user who is gone passes to the user created first among
+		// those left, and to none when nobody is left.
+		bob, carol := mustUser(t, s, "bob"), mustUser(t, s, "carol")
+		gone := DefaultSystem()
+		gone.DefaultUser = "ghost"
+		if err := s.SetSystem(ctx, gone); err != nil {
+			t.Fatal(err)
+		}
+		for _, step := range []struct {
+			deleted *User
+			want    string
+		}{{nil, "alice"}, {alice, "bob"}, {bob, "carol"}, {carol, ""}} {
+			if step.deleted != nil {
+				if err := s.DeleteUser(ctx, step.deleted.ID); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if got, err := s.System(ctx); err != nil || got.DefaultUser != step.want {
+				t.Errorf("default user stored as ghost = %q, %v; want %q", got.DefaultUser, err, step.want)
+			}
 		}
 	})
 }
