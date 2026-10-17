@@ -79,6 +79,9 @@ type request struct {
 	user *store.User
 	// system are the settings of the installation.
 	system store.System
+	// wrote says the answer has begun: an error now cannot replace it with
+	// an error page.
+	wrote bool
 }
 
 // get returns a query parameter, post a form field, either the one found
@@ -227,9 +230,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.dispatch(ctx, q); err != nil {
-		if ctx.Err() == nil {
-			h.fail(w, err)
+		if ctx.Err() != nil {
+			return
 		}
+		if q.wrote {
+			h.log.Error("Google Reader API request failed after the answer started", "error", err)
+			return
+		}
+		h.fail(w, err)
 	}
 }
 

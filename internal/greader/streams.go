@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -243,66 +246,168 @@ func (h *Handler) stream(ctx context.Context, q *request) error {
 	return errBadRequest
 }
 
+// streamChunk is how many entries a listing reads at once. The answer is
+// written as the chunks come, so neither the number of entries nor the size
+// of their texts decides the memory a request takes.
+const streamChunk = 100
+
 func (h *Handler) streamContents(ctx context.Context, q *request, s stream) error {
 	p := q.page(s, q.get("it"))
-	var entries []*store.Entry
+	var (
+		list   *itemList
+		source *itemSource
+	)
 	if !s.empty {
+		var (
+			limited = p.query.Limit > 0
+			cursor  = p.query.From
+			left    = p.query.Limit // zero or less: as many as there are
+			drop    = p.continued
+		)
+		for {
+			query := p.query
+			query.From = cursor
+			query.Limit = streamChunk
+			if limited && left < query.Limit {
+				query.Limit = left
+			}
+			entries, err := h.db.ListEntries(ctx, q.user.ID, query)
+			if err != nil {
+				return err
+			}
+			if len(entries) == 0 {
+				break
+			}
+			// What an item needs besides its entry is asked for once, and
+			// the answer begins only when the first chunk is ready.
+			if source == nil {
+				if source, err = h.itemSource(q); err != nil {
+					return err
+				}
+			}
+			items, err := source.items(entries)
+			if err != nil {
+				return err
+			}
+			if list == nil {
+				if list, err = h.newItemList(q); err != nil {
+					return err
+				}
+			}
+			for _, it := range items {
+				if drop {
+					drop = false
+					continue
+				}
+				if err := list.add(it); err != nil {
+					return err
+				}
+			}
+			last := entries[len(entries)-1].ID
+			if p.query.Ascending {
+				cursor = last + 1
+			} else {
+				if last <= 1 {
+					// No entry has a smaller identifier, and zero would
+					// mean "from the beginning" to the query.
+					break
+				}
+				cursor = last - 1
+			}
+			if limited {
+				left -= len(entries)
+				if left <= 0 {
+					break
+				}
+			}
+			if len(entries) < query.Limit {
+				break
+			}
+			// A client that has gone away is seen before more entries are
+			// read for it.
+			if err := flush(q.w); err != nil {
+				return err
+			}
+		}
+	}
+	if list == nil {
 		var err error
-		if entries, err = h.db.ListEntries(ctx, q.user.ID, p.query); err != nil {
+		if list, err = h.newItemList(q); err != nil {
 			return err
 		}
 	}
-	items, err := h.items(q, entries)
-	if err != nil {
-		return err
-	}
-	if p.continued && len(items) > 0 {
-		items = items[1:]
-	}
-	continuation := ""
-	if len(items) >= p.count && len(items) > 0 {
-		continuation = items[len(items)-1].TimestampUsec
-	}
-	return h.writeItems(q, items, continuation)
+	return list.finish(continuationOf(list, p))
 }
 
-// items shows entries, leaving out those an extension holds back.
-func (h *Handler) items(q *request, entries []*store.Entry) ([]item, error) {
-	ctx, u := q.r.Context(), q.user
-	if len(entries) == 0 {
-		return nil, nil
+// continuationOf returns the identifier of the last item of a full page.
+func continuationOf(list *itemList, p page) string {
+	if list.count >= p.count && list.count > 0 {
+		return list.last
 	}
-	throughServer, err := h.throughServer(q)
+	return ""
+}
+
+// itemSource is what every chunk of a listing shares: the library of the
+// user and the rewrite of images through the server.
+type itemSource struct {
+	h       *Handler
+	q       *request
+	lib     *library
+	through func(content string) string
+}
+
+// itemSource asks for what the items need besides the entries themselves.
+func (h *Handler) itemSource(q *request) (*itemSource, error) {
+	through, err := h.throughServer(q)
 	if err != nil {
 		return nil, err
 	}
-	lib, err := h.library(ctx, u)
+	lib, err := h.library(q.r.Context(), q.user)
 	if err != nil {
 		return nil, err
 	}
+	return &itemSource{h: h, q: q, lib: lib, through: through}, nil
+}
+
+// items shows the entries of one chunk, leaving out those an extension holds
+// back.
+func (src *itemSource) items(entries []*store.Entry) ([]item, error) {
+	ctx, u := src.q.r.Context(), src.q.user
 	ids := make([]int64, len(entries))
 	for i, e := range entries {
 		ids[i] = e.ID
 	}
-	labels, err := h.db.EntryLabels(ctx, u.ID, ids)
+	labels, err := src.h.db.EntryLabels(ctx, u.ID, ids)
 	if err != nil {
 		return nil, err
 	}
 	items := make([]item, 0, len(entries))
 	for _, e := range entries {
-		e, ok := h.hooks.EntryBeforeDisplay.Call(ctx, e)
+		e, ok := src.h.hooks.EntryBeforeDisplay.Call(ctx, e)
 		if !ok {
 			continue
 		}
-		f := lib.byID[e.FeedID]
+		f := src.lib.byID[e.FeedID]
 		if f == nil {
 			continue
 		}
-		it := newItem(e, f, lib.category[f.CategoryID].Name, labels[e.ID])
-		it.Summary.Content = throughServer(it.Summary.Content)
+		it := newItem(e, f, src.lib.category[f.CategoryID].Name, labels[e.ID])
+		it.Summary.Content = src.through(it.Summary.Content)
 		items = append(items, it)
 	}
 	return items, nil
+}
+
+// items shows entries, leaving out those an extension holds back.
+func (h *Handler) items(q *request, entries []*store.Entry) ([]item, error) {
+	if len(entries) == 0 {
+		return nil, nil
+	}
+	source, err := h.itemSource(q)
+	if err != nil {
+		return nil, err
+	}
+	return source.items(entries)
 }
 
 // throughServer returns what puts the images of an entry behind the public
@@ -327,38 +432,84 @@ func (h *Handler) throughServer(q *request) (func(content string) string, error)
 	}, nil
 }
 
-// writeItems answers with a list of items in the layout of FreshRSS: one
-// item per line. Every list calls itself the reading list.
+// writeItems answers with a list of items known whole. Every list calls
+// itself the reading list.
 func (h *Handler) writeItems(q *request, items []item, continuation string) error {
-	// Room for the whole answer at once: a buffer that doubles copies the
-	// answer several times over. What JSON adds to an item besides its text
-	// is a guess.
-	size := 256
-	for i := range items {
-		size += len(items[i].Summary.Content)*9/8 + 1024
+	list, err := h.newItemList(q)
+	if err != nil {
+		return err
 	}
-	var b bytes.Buffer
-	b.Grow(size)
-	fmt.Fprintf(&b, "{\n\t\"id\": %q,\n\t\"updated\": %d,\n\t\"items\": [\n", stateReadingList, h.now().Unix())
-	enc := json.NewEncoder(&b)
-	enc.SetEscapeHTML(false)
-	for i, it := range items {
-		if i > 0 {
-			b.WriteString(",\n")
-		}
-		if err := enc.Encode(it); err != nil {
+	for _, it := range items {
+		if err := list.add(it); err != nil {
 			return err
 		}
-		b.Truncate(b.Len() - 1) // the line break of the encoder
 	}
-	b.WriteString("\n\t]")
-	if continuation != "" {
-		fmt.Fprintf(&b, ",\n\t\"continuation\": %q", continuation)
-	}
-	b.WriteString("\n}\n")
+	return list.finish(continuation)
+}
+
+// itemList writes a list of items in the layout of FreshRSS: one item per
+// line. Each item goes out as it is added, so the answer is never held whole.
+type itemList struct {
+	w     io.Writer
+	enc   *json.Encoder
+	buf   bytes.Buffer
+	count int
+	// last is the timestamp of the last item written: the continuation of a
+	// full page.
+	last string
+}
+
+// newItemList starts the answer and returns what writes its items.
+func (h *Handler) newItemList(q *request) (*itemList, error) {
+	list := &itemList{w: q.w}
+	list.enc = json.NewEncoder(&list.buf)
+	list.enc.SetEscapeHTML(false)
+	q.wrote = true
 	q.w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	_, err := q.w.Write(b.Bytes())
+	if _, err := fmt.Fprintf(list.w, "{\n\t\"id\": %q,\n\t\"updated\": %d,\n\t\"items\": [\n", stateReadingList, h.now().Unix()); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+// add writes one item.
+func (l *itemList) add(it item) error {
+	l.buf.Reset()
+	if err := l.enc.Encode(it); err != nil {
+		return err
+	}
+	if l.count > 0 {
+		if _, err := io.WriteString(l.w, ",\n"); err != nil {
+			return err
+		}
+	}
+	line := l.buf.Bytes()
+	if _, err := l.w.Write(line[:len(line)-1]); err != nil { // the line break of the encoder
+		return err
+	}
+	l.count++
+	l.last = it.TimestampUsec
+	return nil
+}
+
+// finish writes the end of the answer.
+func (l *itemList) finish(continuation string) error {
+	end := "\n\t]"
+	if continuation != "" {
+		end += fmt.Sprintf(",\n\t\"continuation\": %q", continuation)
+	}
+	_, err := io.WriteString(l.w, end+"\n}\n")
 	return err
+}
+
+// flush sends what has been written so far, so that a client that has gone
+// away is seen before more work is done for it.
+func flush(w http.ResponseWriter) error {
+	err := http.NewResponseController(w).Flush()
+	if err != nil && !errors.Is(err, http.ErrNotSupported) {
+		return err
+	}
+	return nil
 }
 
 func (h *Handler) streamItemIDs(ctx context.Context, q *request) error {
