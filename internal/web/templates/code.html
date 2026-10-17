@@ -1,0 +1,14 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{if .Data.Error}}<p class="alert" role="alert">{{.Data.Error}}</p>{{end}}
+<form method="post" action="{{.URL "/login/code"}}" class="form">
+<input type="hidden" name="token" value="{{.Data.Token}}">
+<p>
+<label for="code">{{.T "login.code"}}</label>
+<input type="text" id="code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required autofocus aria-describedby="code-hint">
+<span class="hint" id="code-hint">{{.T "login.code.hint"}}</span>
+</p>
+<p><button type="submit">{{.T "login.submit"}}</button></p>
+</form>
+<p><a href="{{.URL "/login"}}">{{.T "login.heading"}}</a></p>
+{{end}}

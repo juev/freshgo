@@ -101,6 +101,13 @@ func TestUsersFromTheCommandLine(t *testing.T) {
 				bad.name, bad.input, code, stdout, stderr, bad.want)
 		}
 	}
+	// A user who lost the app logs in by the password alone again.
+	if code, stdout, stderr := runCLI(t, append([]string{"user", "totp-off"}, append(db, "bob")...)...); code != 0 || stdout != "bob logs in by the password alone\n" {
+		t.Errorf("user totp-off: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+	if code, _, stderr := runCLI(t, append([]string{"user", "totp-off"}, append(db, "nobody")...)...); code != 1 || !strings.Contains(stderr, `no user "nobody"`) {
+		t.Errorf("user totp-off of nobody: code %d, stderr %q", code, stderr)
+	}
 	if code, _, stderr := runCLI(t, append([]string{"user", "create"}, db...)...); code != 1 || !strings.Contains(stderr, "a user name is required") {
 		t.Errorf("user create without a name: code %d, stderr %q", code, stderr)
 	}

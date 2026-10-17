@@ -56,6 +56,9 @@ type preferences struct {
 	Token string `json:"token"`
 	// PasswordHash is the bcrypt hash of the password of the web interface.
 	PasswordHash string `json:"passwordHash"`
+	// TOTPSecret is the secret of the app whose code a login by password
+	// takes as well; empty for none.
+	TOTPSecret string `json:"totp_secret"`
 }
 
 func readPreferences(u *store.User) preferences {
@@ -437,6 +440,12 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		// One message whatever was wrong: which names exist is nobody's
 		// business.
 		refuse(http.StatusUnauthorized, texts.T("login.failed"))
+		return
+	}
+	// With a code of an app to type, the password alone is not a login
+	// that worked yet.
+	if readPreferences(user).TOTPSecret != "" {
+		h.askCode(w, r, user, r.PostFormValue("remember") != "", next)
 		return
 	}
 	h.guard.Succeeded(key)

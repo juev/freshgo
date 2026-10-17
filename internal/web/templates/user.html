@@ -20,6 +20,14 @@
 <p><button type="submit">{{.T "settings.password.submit"}}</button></p>
 </form>
 
+{{if .Data.TOTP}}
+<h2>{{.T "settings.totp"}}</h2>
+<form method="post" action="{{.URL "/admin/users"}}/{{.Data.Row.Name}}" class="form">
+<p>{{.T "admin.user.totp"}}</p>
+<p><button type="submit" name="action" value="totp-off">{{.T "settings.totp.turn-off"}}</button></p>
+</form>
+{{end}}
+
 {{if not .Data.Protected}}
 <h2>{{.T "form.actions"}}</h2>
 <form method="post" action="{{.URL "/admin/users"}}/{{.Data.Row.Name}}" class="feed-actions">

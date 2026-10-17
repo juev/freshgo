@@ -35,6 +35,31 @@
 <p><button type="submit">{{.T "settings.password.submit"}}</button></p>
 </form>
 
+{{if .Data.HasPassword}}
+<h2>{{.T "settings.totp"}}</h2>
+<form method="post" action="{{.URL "/settings/profile/totp"}}" class="form">
+{{if .Data.TOTP}}
+<p>{{.T "settings.totp.on"}}</p>
+<input type="hidden" name="action" value="off">
+{{else}}
+<p>{{.T "settings.totp.intro"}}</p>
+<p><img src="{{.Data.Setup.QR}}" width="200" height="200" alt="{{.T "settings.totp.qr"}}"></p>
+<p>{{.T "settings.totp.secret"}} <code>{{.Data.Setup.Secret}}</code></p>
+<input type="hidden" name="action" value="on">
+<input type="hidden" name="totp_secret" value="{{.Data.Setup.Secret}}">
+{{end}}
+<p>
+<label for="totp-password">{{.T "settings.password.current"}}</label>
+<input type="password" id="totp-password" name="password" autocomplete="current-password" required>
+</p>
+<p>
+<label for="totp-code">{{.T "login.code"}}</label>
+<input type="text" id="totp-code" name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>
+</p>
+<p><button type="submit">{{if .Data.TOTP}}{{.T "settings.totp.turn-off"}}{{else}}{{.T "settings.totp.turn-on"}}{{end}}</button></p>
+</form>
+{{end}}
+
 <h2>{{.T "settings.api-password"}}</h2>
 <form method="post" action="{{.URL "/settings/profile/api-password"}}" class="form">
 <p>
