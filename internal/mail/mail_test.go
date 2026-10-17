@@ -59,3 +59,25 @@ func TestNew(t *testing.T) {
 		t.Errorf("Send to a server that is not there: %v", err)
 	}
 }
+
+// A check logs in and sends nothing; a server that is gone fails it.
+func TestCheck(t *testing.T) {
+	server := mailtest.New(t)
+	sender, err := mail.New(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := sender.Check(context.Background()); err != nil {
+		t.Fatalf("Check: %v", err)
+	}
+	if n := len(server.Letters()); n != 0 {
+		t.Errorf("%d letters arrived, want none", n)
+	}
+	gone, err := mail.New("smtp://127.0.0.1:1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := gone.Check(context.Background()); err == nil {
+		t.Error("Check of a server that is not there: no error")
+	}
+}

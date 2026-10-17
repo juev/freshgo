@@ -132,6 +132,14 @@ func (b *Browser) Page(ctx context.Context, address string) (final, markup strin
 	}
 }
 
+// Check asks the browser for its socket, the first step of reading a page.
+func (b *Browser) Check(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, b.timeout)
+	defer cancel()
+	_, err := b.socket(ctx)
+	return err
+}
+
 // socket returns the address of the websocket to talk to the browser at.
 // An address without a path is that of the browser, which is asked for its
 // socket: Chrome has a new one every time it starts.

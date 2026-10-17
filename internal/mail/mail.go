@@ -87,35 +87,11 @@ func (s *Sender) Send(ctx context.Context, to, subject, body string) error {
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", s.host)
+	client, err := s.open(ctx)
 	if err != nil {
-		return fmt.Errorf("mail: %w", err)
-	}
-	defer func() { _ = conn.Close() }()
-	if deadline, ok := ctx.Deadline(); ok {
-		_ = conn.SetDeadline(deadline)
-	}
-	name, _, _ := net.SplitHostPort(s.host)
-	if s.implicitTLS {
-		conn = tls.Client(conn, &tls.Config{ServerName: name, MinVersion: tls.VersionTLS12})
-	}
-	client, err := smtp.NewClient(conn, name)
-	if err != nil {
-		return fmt.Errorf("mail: %w", err)
+		return err
 	}
 	defer func() { _ = client.Close() }()
-	if ok, _ := client.Extension("STARTTLS"); ok && !s.implicitTLS {
-		if err := client.StartTLS(&tls.Config{ServerName: name, MinVersion: tls.VersionTLS12}); err != nil {
-			return fmt.Errorf("mail: %w", err)
-		}
-	}
-	if s.user != "" {
-		// PlainAuth refuses to send the password over a connection that is
-		// not encrypted, unless the server is this machine.
-		if err := client.Auth(smtp.PlainAuth("", s.user, s.pass, name)); err != nil {
-			return fmt.Errorf("mail: %w", err)
-		}
-	}
 	if err := client.Mail(sender.Address); err != nil {
 		return fmt.Errorf("mail: %w", err)
 	}
@@ -133,6 +109,57 @@ func (s *Sender) Send(ctx context.Context, to, subject, body string) error {
 		return fmt.Errorf("mail: %w", err)
 	}
 	return client.Quit()
+}
+
+// Check logs in to the server and leaves, without a letter.
+func (s *Sender) Check(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	client, err := s.open(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = client.Close() }()
+	if err := client.Quit(); err != nil {
+		return fmt.Errorf("mail: %w", err)
+	}
+	return nil
+}
+
+// open connects to the server, over TLS where it can, and logs in. The
+// connection ends with ctx.
+func (s *Sender) open(ctx context.Context) (*smtp.Client, error) {
+	conn, err := (&net.Dialer{}).DialContext(ctx, "tcp", s.host)
+	if err != nil {
+		return nil, fmt.Errorf("mail: %w", err)
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	}
+	name, _, _ := net.SplitHostPort(s.host)
+	if s.implicitTLS {
+		conn = tls.Client(conn, &tls.Config{ServerName: name, MinVersion: tls.VersionTLS12})
+	}
+	client, err := smtp.NewClient(conn, name)
+	if err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("mail: %w", err)
+	}
+	if ok, _ := client.Extension("STARTTLS"); ok && !s.implicitTLS {
+		if err := client.StartTLS(&tls.Config{ServerName: name, MinVersion: tls.VersionTLS12}); err != nil {
+			_ = client.Close()
+			return nil, fmt.Errorf("mail: %w", err)
+		}
+	}
+	if s.user != "" {
+		// PlainAuth refuses to send the password over a connection that is
+		// not encrypted, unless the server is this machine.
+		if err := client.Auth(smtp.PlainAuth("", s.user, s.pass, name)); err != nil {
+			_ = client.Close()
+			return nil, fmt.Errorf("mail: %w", err)
+		}
+	}
+	return client, nil
 }
 
 // message writes a letter: headers, and the text as quoted-printable UTF-8.

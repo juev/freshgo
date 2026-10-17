@@ -51,6 +51,25 @@ func (s *Stats) why(reason string) {
 	s.Reasons[reason]++
 }
 
+// checkTimeout bounds the question Check asks.
+const checkTimeout = 10 * time.Second
+
+// Check asks the service for its models, which an OpenAI-compatible API
+// answers without a charge: it finds a wrong address or key.
+func (c *Client) Check(ctx context.Context) error {
+	_, err := c.HTTP.Fetch(ctx, fetch.Request{
+		URL: strings.TrimSuffix(c.URL, "/") + "/models", Accept: "application/json",
+		Params: fetch.Params{
+			Timeout: checkTimeout, NoRedirects: true,
+			Header: http.Header{"Authorization": {"Bearer " + c.Key}},
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("translate: %w", err)
+	}
+	return nil
+}
+
 var fence = regexp.MustCompile("(?s)^\\s*```[a-zA-Z]*\\s*\n(.*?)\\s*```\\s*$")
 
 func (c *Client) ask(ctx context.Context, system, user string, st *Stats) (string, error) {

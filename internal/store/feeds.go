@@ -194,3 +194,37 @@ func (s *Store) NewestEntryDates(ctx context.Context, userID int64) (map[int64]i
 	}
 	return dates, nil
 }
+
+// FailingFeed is a feed whose last refresh failed, with its user.
+type FailingFeed struct {
+	User string
+	ID   int64
+	URL  string
+	// Since is when the last refresh failed, in Unix seconds.
+	Since int64
+}
+
+// FailingFeeds returns the feeds of every user whose last refresh failed,
+// by user and feed.
+func (s *Store) FailingFeeds(ctx context.Context) ([]FailingFeed, error) {
+	rows, err := s.query(ctx, `
+		SELECT u.name, f.id, f.url, f.error FROM feeds f JOIN users u ON u.id = f.user_id
+		WHERE f.error <> 0 ORDER BY u.name, f.id`)
+	if err != nil {
+		return nil, fmt.Errorf("store: failing feeds: %w", err)
+	}
+	return collect(rows, func(r scanner) (FailingFeed, error) {
+		var f FailingFeed
+		err := r.Scan(&f.User, &f.ID, &f.URL, &f.Since)
+		return f, err
+	})
+}
+
+// CountFeeds returns how many feeds all users have together.
+func (s *Store) CountFeeds(ctx context.Context) (int, error) {
+	var n int
+	if err := s.queryRow(ctx, `SELECT COUNT(*) FROM feeds`).Scan(&n); err != nil {
+		return 0, fmt.Errorf("store: count feeds: %w", err)
+	}
+	return n, nil
+}

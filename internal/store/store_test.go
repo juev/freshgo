@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/juev/freshgo/internal/config"
 	"github.com/juev/freshgo/internal/storetest"
 )
 
@@ -1390,6 +1392,64 @@ func TestSize(t *testing.T) {
 			size, err := db.Size(ctx)
 			if err != nil || size <= 0 {
 				t.Errorf("Size = %d, %v; want a positive size", size, err)
+			}
+		})
+	}
+}
+
+// A database opened as it is keeps its schema: an empty one stays empty and
+// says so, one brought up to date says its version, and the feeds that fail
+// are listed.
+func TestOpenAsIs(t *testing.T) {
+	ctx := context.Background()
+	for _, e := range storetest.Engines() {
+		t.Run(e.Name, func(t *testing.T) {
+			driver, dsn := e.New(t)
+			if driver == config.DriverSQLite {
+				if _, err := OpenAsIs(ctx, driver, dsn); err == nil {
+					t.Fatal("OpenAsIs of a file that is not there: no error")
+				}
+				if f, err := os.Create(dsn); err != nil {
+					t.Fatal(err)
+				} else {
+					_ = f.Close()
+				}
+			}
+			empty, err := OpenAsIs(ctx, driver, dsn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if current, latest, err := empty.SchemaVersion(ctx); err != nil || current != 0 || latest == 0 {
+				t.Errorf("an empty database: SchemaVersion = %d, %d, %v; want 0 and the latest", current, latest, err)
+			}
+			if current, _, _ := empty.SchemaVersion(ctx); current != 0 {
+				t.Errorf("SchemaVersion made the schema: %d", current)
+			}
+			_ = empty.Close()
+
+			db, err := Open(ctx, driver, dsn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = db.Close() })
+			if current, latest, err := db.SchemaVersion(ctx); err != nil || current != latest {
+				t.Errorf("after Open: SchemaVersion = %d, %d, %v; want the latest", current, latest, err)
+			}
+			u := mustUser(t, db, "alice")
+			ok := &Feed{UserID: u.ID, URL: "https://example.org/a"}
+			failing := &Feed{UserID: u.ID, URL: "https://example.org/b", Error: 1700000000}
+			for _, f := range []*Feed{ok, failing} {
+				if err := db.CreateFeed(ctx, f); err != nil {
+					t.Fatal(err)
+				}
+			}
+			got, err := db.FailingFeeds(ctx)
+			want := []FailingFeed{{User: "alice", ID: failing.ID, URL: failing.URL, Since: 1700000000}}
+			if err != nil || !reflect.DeepEqual(got, want) {
+				t.Errorf("FailingFeeds = %+v, %v; want %+v", got, err, want)
+			}
+			if n, err := db.CountFeeds(ctx); err != nil || n != 2 {
+				t.Errorf("CountFeeds = %d, %v; want 2", n, err)
 			}
 		})
 	}

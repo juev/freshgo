@@ -53,6 +53,29 @@ func loadMigrations(driver config.Driver) ([]migration, error) {
 	return migrations, nil
 }
 
+// SchemaVersion returns the version of the schema of the database, zero
+// for one that has none, and the version this binary brings it to.
+func (s *Store) SchemaVersion(ctx context.Context) (current, latest int, err error) {
+	migrations, err := loadMigrations(s.driver)
+	if err != nil {
+		return 0, 0, err
+	}
+	exists := `SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = 'schema_migrations'`
+	if s.driver == config.DriverPostgres {
+		exists = `SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = 'schema_migrations'`
+	}
+	var tables int
+	if err := s.queryRow(ctx, exists).Scan(&tables); err != nil {
+		return 0, 0, fmt.Errorf("store: schema version: %w", err)
+	}
+	if tables > 0 {
+		if err := s.queryRow(ctx, "SELECT COALESCE(MAX(version), 0) FROM schema_migrations").Scan(&current); err != nil {
+			return 0, 0, fmt.Errorf("store: schema version: %w", err)
+		}
+	}
+	return current, len(migrations), nil
+}
+
 // migrate applies the migrations the database has not seen yet in one
 // transaction: a failed upgrade leaves the schema as it was. A database newer
 // than the binary is refused.
