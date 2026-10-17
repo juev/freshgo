@@ -9,13 +9,12 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/juev/freshgo/internal/authguard"
 	"github.com/juev/freshgo/internal/importer"
 	"github.com/juev/freshgo/internal/store"
 )
@@ -319,7 +318,7 @@ func TestSessionLife(t *testing.T) {
 func TestLoginGuard(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
 		now := s.clock()
-		for i := range freeFailures {
+		for i := range authguard.FreeFailures {
 			if a := s.login("alice", "wrong", nil); a.status != http.StatusUnauthorized {
 				t.Fatalf("failure %d: status %d", i+1, a.status)
 			}
@@ -327,7 +326,7 @@ func TestLoginGuard(t *testing.T) {
 		a := s.login("alice", "alice-web-password", nil)
 		if a.status != http.StatusTooManyRequests || a.header.Get("Retry-After") != "31" ||
 			!strings.Contains(a.body, "Too many failed attempts. Try again in 1 minute.") || a.header.Get("Set-Cookie") != "" {
-			t.Errorf("login after %d failures: status %d, Retry-After %q, body\n%s", freeFailures, a.status, a.header.Get("Retry-After"), a.body)
+			t.Errorf("login after %d failures: status %d, Retry-After %q, body\n%s", authguard.FreeFailures, a.status, a.header.Get("Retry-After"), a.body)
 		}
 		// Another name, or the same from elsewhere, is not held back.
 		if a := s.login("bob", "bob-web-password", nil); a.status != http.StatusSeeOther {
@@ -353,74 +352,13 @@ func TestLoginGuard(t *testing.T) {
 		}
 		s.post("/logout", nil)
 		// A login that worked wipes the slate.
-		for range freeFailures - 1 {
+		for range authguard.FreeFailures - 1 {
 			s.login("alice", "wrong", nil)
 		}
 		if a := s.login("alice", "alice-web-password", nil); a.status != http.StatusSeeOther {
 			t.Errorf("login after fewer failures than the limit: status %d", a.status)
 		}
 	})
-}
-
-func TestGuardPauses(t *testing.T) {
-	var g guard
-	now := time.Unix(1_000_000, 0)
-	for i := 1; i <= 20; i++ {
-		if wait := g.attempt("k", now); wait != 0 {
-			t.Fatalf("attempt %d, made after the pause, has to wait %s", i, wait)
-		}
-		want := time.Duration(0)
-		if i >= freeFailures {
-			want = min(firstPause<<(i-freeFailures), longestPause)
-		}
-		// While the pause lasts, asking again is no attempt.
-		for range 3 {
-			if want == 0 {
-				break
-			}
-			if got := g.attempt("k", now); got != want {
-				t.Errorf("after %d failures the pause is %s, want %s", i, got, want)
-			}
-		}
-		if got := g.failures["k"].count; got != i {
-			t.Errorf("after %d attempts the guard has counted %d", i, got)
-		}
-		now = now.Add(want)
-	}
-	// Left alone for longer than the longest pause, a name starts anew.
-	now = now.Add(longestPause + time.Second)
-	if g.attempt("k", now); g.failures["k"].count != 1 {
-		t.Errorf("the first failure after a long quiet is counted as number %d", g.failures["k"].count)
-	}
-	// What the guard remembers is bounded.
-	for i := range knownFailures + 10 {
-		g.attempt(strconv.Itoa(i), now)
-	}
-	if len(g.failures) > knownFailures {
-		t.Errorf("the guard remembers %d names", len(g.failures))
-	}
-}
-
-// Attempts made at once are counted like attempts made in a row: no more
-// than the free ones get a look at the password.
-func TestGuardCountsParallelAttempts(t *testing.T) {
-	var (
-		g      guard
-		passed atomic.Int32
-		wg     sync.WaitGroup
-	)
-	now := time.Unix(1_000_000, 0)
-	for range 200 {
-		wg.Go(func() {
-			if g.attempt("k", now) == 0 {
-				passed.Add(1)
-			}
-		})
-	}
-	wg.Wait()
-	if n := passed.Load(); n != freeFailures {
-		t.Errorf("%d of 200 attempts made at once were let through, want %d", n, freeFailures)
-	}
 }
 
 // A name without a password to guess is refused as slowly as a wrong
@@ -445,28 +383,17 @@ func TestRefusalsTakeTheSameWork(t *testing.T) {
 				t.Fatalf("checkPassword(%q) = %v, %v", name, u, err)
 			}
 		}
-		if len(s.h.decoys.byCost) != 1 || s.h.decoys.byCost[cost] == nil {
-			t.Errorf("unknown names were checked against decoys of the costs %v, want only %d", keys(s.h.decoys.byCost), cost)
-		}
-		if got, _ := bcrypt.Cost(s.h.decoys.withCost(cost)); got != cost {
-			t.Errorf("the decoy for cost %d has cost %d", cost, got)
+		if costs := s.h.decoys.Costs(); len(costs) != 1 || costs[0] != cost {
+			t.Errorf("unknown names were checked against decoys of the costs %v, want only %d", costs, cost)
 		}
 	})
-}
-
-func keys(m map[int][]byte) []int {
-	var out []int
-	for k := range m {
-		out = append(out, k)
-	}
-	return out
 }
 
 // What a login request may carry is bounded, and so is what is kept of it.
 func TestLoginInputIsBounded(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
 		long := strings.Repeat("a", 1<<20)
-		for range freeFailures + 2 {
+		for range authguard.FreeFailures + 2 {
 			if a := s.login(long, "x", nil); a.status != http.StatusUnauthorized {
 				t.Fatalf("login with a name of 1 MiB: status %d", a.status)
 			}
@@ -474,8 +401,12 @@ func TestLoginInputIsBounded(t *testing.T) {
 				t.Fatalf("login with a name no user can have: status %d", a.status)
 			}
 		}
-		if n := len(s.h.guard.failures); n != 0 {
-			t.Errorf("the guard remembers %d names nobody can have", n)
+		// A name no user can have is refused without being counted: more
+		// attempts than the free ones are still 401, not 429.
+		for range authguard.FreeFailures + 1 {
+			if a := s.login("no such name!", "x", nil); a.status != http.StatusUnauthorized {
+				t.Fatalf("login with a name no user can have: status %d", a.status)
+			}
 		}
 		// A body beyond the limit is not read to its end: the fields
 		// after the limit do not arrive.
@@ -507,7 +438,7 @@ func TestLoginGuardBehindProxy(t *testing.T) {
 		}
 		// Somebody guesses through the proxy; the header starts with what
 		// they sent themselves, the proxy added where they really are.
-		for range freeFailures {
+		for range authguard.FreeFailures {
 			attempt("10.1.0.1:4000", "203.0.113.9, 198.51.100.7", "wrong")
 		}
 		if got := attempt("10.1.0.1:4000", "198.51.100.7", "alice-web-password"); got != http.StatusTooManyRequests {
@@ -518,7 +449,7 @@ func TestLoginGuardBehindProxy(t *testing.T) {
 		}
 		// Directly, the address is that of the connection whatever a
 		// header claims.
-		for i := range freeFailures {
+		for i := range authguard.FreeFailures {
 			attempt("192.0.2.50:4000", "203.0.113."+strconv.Itoa(i), "wrong")
 		}
 		if got := attempt("192.0.2.50:4000", "203.0.113.200", "alice-web-password"); got != http.StatusTooManyRequests {

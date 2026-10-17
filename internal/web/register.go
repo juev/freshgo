@@ -194,7 +194,7 @@ func (h *Handler) sendValidation(r *http.Request, v *view, name, email, token st
 	if h.mailer == nil || email == "" {
 		return false
 	}
-	if h.letters.attempt(name, h.now()) > 0 {
+	if h.letters.Attempt(name, h.now()) > 0 {
 		h.log.Warn("letter was held back", "user", name)
 		return false
 	}

@@ -17,6 +17,7 @@ import (
 	"golang.org/x/text/language"
 	"golang.org/x/text/language/display"
 
+	"github.com/juev/freshgo/internal/authguard"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/store"
 )
@@ -522,9 +523,9 @@ func passwordProblem(password, again string) string {
 // have to wait, or the password is wrong, the answer is given.
 func (h *Handler) confirmed(w http.ResponseWriter, r *http.Request, refuse func(status int, problem string)) bool {
 	who := state(r).who
-	key := h.guardKey(r, who.user.Name)
-	if wait := h.guard.attempt(key, h.now()); wait > 0 {
-		w.Header().Set("Retry-After", strconv.Itoa(int(wait/time.Second)+1))
+	key := authguard.Key(who.user.Name, authguard.ClientAddr(r, h.proxies))
+	if wait := h.guard.Attempt(key, h.now()); wait > 0 {
+		w.Header().Set("Retry-After", authguard.RetryAfter(wait))
 		refuse(http.StatusTooManyRequests, "settings.problem.password-wait")
 		return false
 	}
@@ -532,7 +533,7 @@ func (h *Handler) confirmed(w http.ResponseWriter, r *http.Request, refuse func(
 		refuse(http.StatusForbidden, "settings.problem.password-wrong")
 		return false
 	}
-	h.guard.succeeded(key)
+	h.guard.Succeeded(key)
 	return true
 }
 
