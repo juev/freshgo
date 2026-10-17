@@ -316,7 +316,7 @@ Next to the login by password, users can sign in through an OpenID Connect provi
 2. Start the server with the secret of the client in `FRESHGO_OIDC_CLIENT_SECRET` and with `-base-url`.
 3. On the page "Authentication", enter the address of the provider (the issuer: the address its `/.well-known/openid-configuration` lies under) and the client ID.
 
-The login page then has a link to the provider. The user is the one the provider names in the claim `preferred_username`, which has to be a user name here. A name nobody has gets a user when "Create a user for a name the reverse proxy or the provider vouches for" is on, and is refused otherwise. Administrators are made in freshgo, not at the provider. The API passwords of apps are not touched.
+The login page then has a link to the provider. At the first sign-in of an account of the provider, freshgo binds that account (the issuer and the subject of its ID token) to the user named in the claim `preferred_username`, which has to be a user name here; later sign-ins find the user by the subject, so a changed name keeps the user, and another account that takes the same name is refused. A name nobody has gets a user when "Create a user for a name the reverse proxy or the provider vouches for" is on, and is refused otherwise. Administrators are made in freshgo, unless the field "Group of administrators" names a group: then the provider decides, at every sign-in, through the claim `groups` of the ID token, which the provider has to include. The API passwords of apps are not touched.
 
 ### Images of articles
 

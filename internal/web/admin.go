@@ -477,7 +477,7 @@ func (h *Handler) saveAuthentication(w http.ResponseWriter, r *http.Request) {
 			(issuer != "" && (err != nil || at.Host == "" || (at.Scheme != "https" && at.Scheme != "http"))) {
 			return "admin.problem.oidc"
 		}
-		system.OIDC = store.OIDC{Issuer: issuer, ClientID: client}
+		system.OIDC = store.OIDC{Issuer: issuer, ClientID: client, AdminGroup: strings.TrimSpace(form.Get("oidc_admin_group"))}
 		// A login by password nobody has would lock everybody out, unless
 		// there is a provider to sign in through.
 		if system.AuthType == store.AuthForm && who.prefs.PasswordHash == "" && !h.oidcOn(*system) {

@@ -36,6 +36,7 @@ Out of scope: MySQL/MariaDB, going back to FreshRSS with a freshgo database, the
 - S33. A listing with a search (`Listing.Search`, a query of `internal/search`) has exactly the entries of the listing that `search.Query.Match` accepts, with the category of the feed and the labels of the entry known to it. The database leaves out the entries `Query.Condition` rules out (`search.md`, Q16); the rest is read in the order of the listing and matched until the page is full.
 - S39. `EntryFacts` hands out, for every entry of a user in the order of their identifiers, the feed, the date and whether it is read and starred: what statistics are counted from. `System` has the terms of use (`tos`).
 - S40. `LockUsers`, inside a transaction, makes other transactions that add users wait until it ends, so that a count of users stays true while one is added: a table lock on PostgreSQL, nothing on SQLite, which has one writer. Verified by `TestRegistrationLimitHolds` of `internal/web` under `make test-integration`.
+- S41. Who a user is at an OpenID Connect provider (`oidc_identities`) is kept as the issuer and the subject of its ID tokens. A subject at an issuer belongs to one user, a user has one subject at an issuer, and a second of either is `ErrConflict`; the subjects of a user are deleted with the user.
 - S37. `logs` keeps warnings and errors about users: the time, the level, the name of the user and the text. `Logs` lists them newest first, narrowed to a user, to a text any case of whose ASCII letters matches (other letters match as they are written), and continued below an identifier; `DeleteLogs` removes those of a user or all, `DeleteLogsBefore` those older than a time. `internal/journal` writes them and keeps them for 30 days.
 - S38. `ConfirmSession` records when the user of a login last typed the password; `UserTotals` counts the feeds and the entries of every user.
 - S36. An `EntrySet` also keeps the entries with any label (`Labeled`) and those that are starred or have a label (`FavoriteOrLabeled`).
@@ -123,7 +124,7 @@ In `internal/store`, each run on SQLite and, under `make test-integration`, on P
 - S14, S15: `TestFeedRoundTrip`, `TestUpdateFeed`, `TestUpdateEntry`, `TestLockFeedSerializes`. S16: `TestEntryStatesAndLastSeen`.
 - S17: `TestCleanupTouchesOneFeed`; the rules are compared with FreshRSS by `TestPurgeMatchesFreshRSS` in `internal/refresh`. S18: `TestAutoReadStatements`.
 - S26: `TestWebSubSubscriptions`.
-- S29: `TestSystem`. S30: `TestSessions`. S31: `TestUpdateUserSettings`, `TestFirstUserIsTheDefault`.
+- S29: `TestSystem`. S30: `TestSessions`. S41: `TestOIDCIdentities`. S31: `TestUpdateUserSettings`, `TestFirstUserIsTheDefault`.
 - S27: `TestValidUserName`. S28: `TestSetAPIPasswordHash`, `TestDeleteUser`; from the command line to an API client, `TestUsersFromTheCommandLine` in `cmd/freshgo`.
 - S11: `TestSettings`. S12: `TestCustomIcon`. S24: `TestIcons`. S25: `TestSalt`. S13: counters raised to 5 and 9 → next category 6, next feed 10; lowering has no effect. `TestRaiseCounters`.
 - Field fidelity: every column of a feed, category, entry and label survives a write and a read, including non-ASCII text, markup characters and a NULL hash. `TestFeedRoundTrip`, `TestEntryRoundTrip`, `TestTags`.

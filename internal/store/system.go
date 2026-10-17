@@ -80,6 +80,10 @@ type OIDC struct {
 	// document is found under; empty for no provider.
 	Issuer   string `json:"issuer"`
 	ClientID string `json:"client_id"`
+	// AdminGroup is the group of the provider whose members are
+	// administrators here, and nobody else who signs in through it; empty
+	// leaves administration to this installation.
+	AdminGroup string `json:"admin_group"`
 }
 
 // Limits bound what users may take up.

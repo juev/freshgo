@@ -262,11 +262,75 @@ func TestOIDCRefusals(t *testing.T) {
 		refused("a name nobody has", http.StatusForbidden, p.signIn(s, "/", nil))
 		p.user = "not a name"
 		refused("what cannot be a name", http.StatusForbidden, p.signIn(s, "/", nil))
-		p.spoil = func(claims map[string]any) { delete(claims, "preferred_username") }
-		refused("no name", http.StatusForbidden, p.signIn(s, "/", nil))
+		p.spoil = func(claims map[string]any) {
+			claims["sub"] = "a subject nobody has"
+			delete(claims, "preferred_username")
+		}
+		refused("no name for a subject nobody has", http.StatusForbidden, p.signIn(s, "/", nil))
+		p.spoil = func(claims map[string]any) { delete(claims, "sub") }
+		refused("no subject", http.StatusBadGateway, p.signIn(s, "/", nil))
 		s.setting("bob", "enabled", false)
 		p.user = "bob"
 		refused("a disabled user", http.StatusForbidden, p.signIn(s, "/", nil))
+	})
+}
+
+// A user is who they are at the provider: the subject that first signed in
+// as them. Another subject with the same name does not take the user, and a
+// name changed at the provider does not lose them.
+func TestOIDCIdentity(t *testing.T) {
+	withProvider(t, func(t *testing.T, s *site, p *provider) {
+		if a := p.signIn(s, "/", nil); a.status != http.StatusSeeOther || s.signedInAs() != "alice, administrator" {
+			t.Fatalf("the first sign-in of alice: status %d, signed in as %q", a.status, s.signedInAs())
+		}
+		_ = s.post("/logout", nil)
+
+		p.spoil = func(claims map[string]any) { claims["sub"] = "somebody else" }
+		a := p.signIn(s, "/", nil)
+		if a.status != http.StatusForbidden || s.signedInAs() != "" {
+			t.Errorf("another subject named alice: status %d, signed in as %q", a.status, s.signedInAs())
+		}
+
+		p.user, p.spoil = "bob", func(claims map[string]any) { claims["sub"] = "subject of alice" }
+		if a := p.signIn(s, "/", nil); a.status != http.StatusSeeOther || s.signedInAs() != "alice, administrator" {
+			t.Errorf("alice under another name: status %d, signed in as %q", a.status, s.signedInAs())
+		}
+	})
+}
+
+// With a group of administrators, the provider decides who administers:
+// whoever it puts in the group is an administrator from their next sign-in,
+// and whoever it leaves out is not.
+func TestOIDCAdministratorsGroup(t *testing.T) {
+	withProvider(t, func(t *testing.T, s *site, p *provider) {
+		s.system(func(system *store.System) { system.OIDC.AdminGroup = "readers-admin" })
+		p.user = "bob"
+		for _, c := range []struct {
+			groups any
+			want   string
+		}{
+			{[]string{"staff", "readers-admin"}, "bob, administrator"},
+			{nil, "bob"},
+			{"readers-admin", "bob, administrator"},
+			{[]string{"staff"}, "bob"},
+		} {
+			p.spoil = func(claims map[string]any) {
+				if c.groups != nil {
+					claims["groups"] = c.groups
+				}
+			}
+			if a := p.signIn(s, "/", nil); a.status != http.StatusSeeOther || s.signedInAs() != c.want {
+				t.Errorf("bob in %v: status %d, signed in as %q, want %q", c.groups, a.status, s.signedInAs(), c.want)
+			}
+		}
+
+		// Without the group, administration stays what it is here.
+		s.system(func(system *store.System) { system.OIDC.AdminGroup = "" })
+		s.setting("bob", "is_admin", true)
+		p.spoil = nil
+		if a := p.signIn(s, "/", nil); a.status != http.StatusSeeOther || s.signedInAs() != "bob, administrator" {
+			t.Errorf("bob without a group of administrators: status %d, signed in as %q", a.status, s.signedInAs())
+		}
 	})
 }
 
@@ -415,11 +479,14 @@ func TestOIDCAdministration(t *testing.T) {
 		form.Set("oidc_issuer", " https://id.example.org ")
 		form.Set("oidc_client_id", " reader ")
 		s.follow("/admin/authentication", form)
-		if system, _ := s.db.System(t.Context()); system.OIDC != (store.OIDC{Issuer: "https://id.example.org", ClientID: "reader"}) {
+		form.Set("oidc_admin_group", " readers ")
+		s.follow("/admin/authentication", form)
+		if system, _ := s.db.System(t.Context()); system.OIDC != (store.OIDC{Issuer: "https://id.example.org", ClientID: "reader", AdminGroup: "readers"}) {
 			t.Errorf("the provider after the form = %+v", system.OIDC)
 		}
 		form.Set("oidc_issuer", "")
 		form.Set("oidc_client_id", "")
+		form.Set("oidc_admin_group", "")
 		s.follow("/admin/authentication", form)
 		if system, _ := s.db.System(t.Context()); system.OIDC != (store.OIDC{}) {
 			t.Errorf("the provider after it was taken away = %+v", system.OIDC)
