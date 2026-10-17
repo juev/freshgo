@@ -87,9 +87,13 @@ docker compose up -d
 
 Set `FRESHGO_DATABASE_URL` to `postgres://user:password@host:5432/freshgo`. The server creates its tables at the first start; the volume `/data` is then not used.
 
+The search needs the extension `pg_trgm`, which comes with PostgreSQL. The server creates it at the first start, which takes the right to create in the database; a user without that right fails to start until an administrator runs `CREATE EXTENSION pg_trgm;` in the database.
+
 ### Updates and backups
 
 To update, pull the new image and start the container again: `docker compose pull && docker compose up -d`. The server brings the database to its version when it starts.
+
+The first start of a version that indexes the texts of the articles for the search builds the index for those already stored, which takes under a second per thousand articles, and then indexes each new one as it arrives. On SQLite the file grows by about 40 % of what the texts take; on PostgreSQL the folded copy of the texts with its indexes takes about as much as the articles do.
 
 The first start of a version after 0.2.5 also cleans the texts of the articles that are stored: until then the pages cleaned a text each time they showed it, and now they show what is stored. It takes a few seconds for some thousands of articles, and the log says how many texts changed. What the cleaning takes out of a text is gone from the database, so back it up before this update.
 

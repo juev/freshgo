@@ -77,7 +77,7 @@ func (s *Store) insertEntry(ctx context.Context, e *Entry) error {
 	if err != nil {
 		return fmt.Errorf("store: insert entry %q of feed %d: %w", e.GUID, e.FeedID, err)
 	}
-	return nil
+	return s.indexText(ctx, e.UserID, e.ID, e.Title, e.Content)
 }
 
 // UpdateEntry replaces every field of an entry except its identifier, feed
@@ -112,7 +112,7 @@ func (s *Store) UpdateEntry(ctx context.Context, e *Entry) error {
 	if n == 0 {
 		return fmt.Errorf("store: update entry %d: %w", e.ID, ErrNotFound)
 	}
-	return nil
+	return s.indexText(ctx, e.UserID, e.ID, e.Title, e.Content)
 }
 
 // SetEntryHash stores the change hash of an entry and nothing else.
@@ -419,7 +419,8 @@ func (s *Store) EntryFacts(ctx context.Context, userID int64, each func(EntryFac
 	return nil
 }
 
-// textBatch is how many entries RewriteEntryTexts reads and stores at once.
+// textBatch is how many entries RewriteEntryTexts and indexAllTexts read and
+// store at once.
 const textBatch = 500
 
 // RewriteEntryTexts goes through the entries of every user and stores, for
@@ -431,8 +432,8 @@ func (s *Store) RewriteEntryTexts(ctx context.Context,
 	rewrite func(content string, attributes []byte, link string) (string, []byte, bool),
 ) (int, error) {
 	type text struct {
-		userID, id                int64
-		content, link, attributes string
+		userID, id                       int64
+		title, content, link, attributes string
 	}
 	var (
 		changed      int
@@ -441,12 +442,12 @@ func (s *Store) RewriteEntryTexts(ctx context.Context,
 		wrap         = func(err error) error { return fmt.Errorf("store: rewrite the texts of entries: %w", err) }
 		scanEntryRow = func(sc scanner) (text, error) {
 			var t text
-			return t, sc.Scan(&t.userID, &t.id, &t.content, &t.link, &t.attributes)
+			return t, sc.Scan(&t.userID, &t.id, &t.title, &t.content, &t.link, &t.attributes)
 		}
 	)
 	for {
 		rows, err := s.query(ctx, `
-			SELECT user_id, id, content, link, attributes FROM entries
+			SELECT user_id, id, title, content, link, attributes FROM entries
 			WHERE (user_id, id) > (?, ?) ORDER BY user_id, id LIMIT ?`, afterUser, afterID, textBatch)
 		if err != nil {
 			return changed, wrap(err)
@@ -466,6 +467,9 @@ func (s *Store) RewriteEntryTexts(ctx context.Context,
 				}
 				if _, err := tx.exec(ctx, `UPDATE entries SET content = ?, attributes = ? WHERE user_id = ? AND id = ?`,
 					content, jsonObject(attributes), t.userID, t.id); err != nil {
+					return err
+				}
+				if err := tx.indexText(ctx, t.userID, t.id, t.title, content); err != nil {
 					return err
 				}
 				changed++

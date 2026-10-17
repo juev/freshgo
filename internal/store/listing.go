@@ -143,7 +143,7 @@ func (s *Store) ListPage(ctx context.Context, userID int64, l Listing) (entries 
 	}
 	if l.Search != nil {
 		var b strings.Builder
-		args = writeCondition(&b, args, userID, l.Search.Condition())
+		args = s.writeCondition(&b, args, userID, l.Search.Condition())
 		query += ` AND ` + b.String()
 	}
 	compare, direction := `<`, `DESC`
@@ -276,7 +276,7 @@ const labelOfEntry = `EXISTS (SELECT 1 FROM entry_tags t WHERE t.user_id = entri
 
 // writeCondition writes a condition of a search as SQL on the entries table
 // and returns the arguments with those of the condition added.
-func writeCondition(b *strings.Builder, args []any, userID int64, c *search.Condition) []any {
+func (s *Store) writeCondition(b *strings.Builder, args []any, userID int64, c *search.Condition) []any {
 	in := func(ids []int64) {
 		b.WriteString(` IN (` + placeholders(len(ids)) + `)`)
 		args = idArgs(ids, args...)
@@ -308,12 +308,12 @@ func writeCondition(b *strings.Builder, args []any, userID int64, c *search.Cond
 			if i > 0 {
 				b.WriteString(operator)
 			}
-			args = writeCondition(b, args, userID, sub)
+			args = s.writeCondition(b, args, userID, sub)
 		}
 		b.WriteString(`)`)
 	case search.CondNot:
 		b.WriteString(`NOT (`)
-		args = writeCondition(b, args, userID, c.Of[0])
+		args = s.writeCondition(b, args, userID, c.Of[0])
 		b.WriteString(`)`)
 	case search.CondEntries:
 		b.WriteString(`id`)
@@ -347,6 +347,8 @@ func writeCondition(b *strings.Builder, args []any, userID int64, c *search.Cond
 		between(`last_modified`, 1)
 	case search.CondUserModified:
 		between(`last_user_modified`, 1)
+	case search.CondTitle, search.CondContent:
+		args = s.writeTextCondition(b, args, userID, c)
 	default:
 		panic("store: search condition of kind " + strconv.Itoa(int(c.Kind)))
 	}

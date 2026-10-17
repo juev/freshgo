@@ -40,10 +40,11 @@ type Label struct {
 	Name string
 }
 
-// fold makes text comparable without regard to case. Accents stay: FreshRSS
+// Fold makes text comparable without regard to case. Accents stay: FreshRSS
 // compares the way its database does, and freshgo takes the rule of
-// PostgreSQL, ILIKE, for both of its engines.
-func fold(s string) string {
+// PostgreSQL, ILIKE, for both of its engines. An index that narrows a search
+// down keeps texts folded by it, so that it finds what Match does.
+func Fold(s string) string {
 	return strings.ToLower(s)
 }
 
@@ -59,15 +60,15 @@ func lazy(cache **string, text func() string) string {
 }
 
 func (s *Entry) foldedTitle() string {
-	return lazy(&s.title, func() string { return fold(s.Title) })
+	return lazy(&s.title, func() string { return Fold(s.Title) })
 }
 
 func (s *Entry) foldedContent() string {
-	return lazy(&s.content, func() string { return fold(s.Content) })
+	return lazy(&s.content, func() string { return Fold(s.Content) })
 }
 
 func (s *Entry) foldedAuthors() string {
-	return lazy(&s.authors, func() string { return fold(strings.Join(s.Authors, ";")) })
+	return lazy(&s.authors, func() string { return Fold(strings.Join(s.Authors, ";")) })
 }
 
 func (s *Entry) linedAuthors() string {
@@ -78,7 +79,7 @@ func (s *Entry) foldedTags() []string {
 	if s.tags == nil {
 		s.tags = make([]string, len(s.Tags))
 		for i, tag := range s.Tags {
-			s.tags[i] = fold(strings.TrimLeft(tag, "#"))
+			s.tags[i] = Fold(strings.TrimLeft(tag, "#"))
 		}
 	}
 	return s.tags
@@ -149,17 +150,17 @@ func (t *term) match(s *Entry) bool {
 	// Each demand is a function of one needle; all needles of a list have to
 	// pass for a positive demand, none for a negated one.
 	contains := func(haystack func() string) func(string) bool {
-		return func(needle string) bool { return strings.Contains(haystack(), fold(needle)) }
+		return func(needle string) bool { return strings.Contains(haystack(), Fold(needle)) }
 	}
 	matches := func(text string) func(*pattern) bool {
 		return func(p *pattern) bool { return p.re.MatchString(text) }
 	}
-	inContent := func(needle string) bool { return strings.Contains(s.foldedContent(), fold(inHTML.Replace(needle))) }
+	inContent := func(needle string) bool { return strings.Contains(s.foldedContent(), Fold(inHTML.Replace(needle))) }
 	inLink := func(needle string) bool {
 		return strings.Contains(asciiLower(s.Link), asciiLower(needle))
 	}
 	hasTag := func(needle string) bool {
-		needle = fold(needle)
+		needle = Fold(needle)
 		for _, tag := range s.foldedTags() {
 			if tag == needle {
 				return true

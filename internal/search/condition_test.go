@@ -47,28 +47,39 @@ func (c *Condition) String() string {
 		return "modified" + span
 	case CondUserModified:
 		return "usermodified" + span
+	case CondTitle:
+		return "title[" + c.Text + "]"
+	case CondContent:
+		return "content[" + c.Text + "]"
 	}
 	return "?"
 }
 
-// R6: what a database can check of a query is told apart from its texts,
-// and a part with texts is never denied.
+// R6: what a database can check of a query is told apart from what only
+// Match can: the strings the title and the content contain narrow the
+// entries down, and a part with texts is never denied.
 func TestCondition(t *testing.T) {
 	opts := Options{Now: time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC), Labels: true}
 	for query, want := range map[string]string{
 		"":                              "always",
-		"hello":                         "always",
+		"hello":                         "or(title[hello],content[hello])",
+		"Hello":                         "or(title[hello],content[hello])",
+		`"a & b"`:                       "or(title[a & b],content[a &amp; b])",
+		"intitle:Go intext:<p>":         "and(title[go],content[&lt;p&gt;])",
+		"-hello":                        "always",
+		"-intitle:go /x/ intitle:/y/":   "always",
+		"!(hello)":                      "always",
 		"f:1":                           "feeds[1]",
-		"f:1,2 hello":                   "feeds[1 2]",
+		"f:1,2 hello":                   "and(feeds[1 2],or(title[hello],content[hello]))",
 		"-f:1 c:2":                      "and(not(feeds[1]),categories[2])",
 		"f:":                            "never",
 		"-f:":                           "always",
-		"e:7,007,x":                     "entries[7]",
+		"e:7,007,x":                     "and(entries[7],or(title[x],content[x]))",
 		"e:007":                         "never",
 		"f:1 OR c:2":                    "or(feeds[1],categories[2])",
-		"f:1 OR hello":                  "always",
-		"(f:1 a) OR (f:2 b)":            "or(feeds[1],feeds[2])",
-		"(f:1) (hello)":                 "feeds[1]",
+		"f:1 OR hello":                  "or(feeds[1],or(title[hello],content[hello]))",
+		"(f:1 a) OR (f:2 b)":            "or(and(feeds[1],or(title[a],content[a])),and(feeds[2],or(title[b],content[b])))",
+		"(f:1) (hello)":                 "and(feeds[1],or(title[hello],content[hello]))",
 		"!(f:1)":                        "not(feeds[1])",
 		"!(f:1 hello)":                  "always",
 		"(c:2) !(f:1 hello)":            "categories[2]",
@@ -110,7 +121,7 @@ func TestCondition(t *testing.T) {
 	}
 
 	// A filter does not look at labels.
-	q, err := Parse("L:1 labels:work hello", Options{})
+	q, err := Parse("L:1 labels:work", Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
