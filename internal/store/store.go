@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -50,6 +51,38 @@ type Store struct {
 // Open connects to the database and brings its schema up to date.
 // For SQLite dsn is a file path, for PostgreSQL a connection URL.
 func Open(ctx context.Context, driver config.Driver, dsn string) (*Store, error) {
+	s, err := connect(driver, dsn)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.migrate(ctx); err != nil {
+		_ = s.db.Close()
+		return nil, err
+	}
+	return s, nil
+}
+
+// OpenAsIs connects to a database that exists and leaves its schema as it
+// is, for a look at it: a SQLite file that is not there is an error, not a
+// new database.
+func OpenAsIs(ctx context.Context, driver config.Driver, dsn string) (*Store, error) {
+	if driver == config.DriverSQLite {
+		if _, err := os.Stat(dsn); err != nil {
+			return nil, fmt.Errorf("store: %w", err)
+		}
+	}
+	s, err := connect(driver, dsn)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.Ping(ctx); err != nil {
+		_ = s.db.Close()
+		return nil, err
+	}
+	return s, nil
+}
+
+func connect(driver config.Driver, dsn string) (*Store, error) {
 	var (
 		db  *sql.DB
 		err error
@@ -65,12 +98,7 @@ func Open(ctx context.Context, driver config.Driver, dsn string) (*Store, error)
 	if err != nil {
 		return nil, fmt.Errorf("store: open: %w", err)
 	}
-	s := &Store{db: db, q: db, driver: driver, now: time.Now}
-	if err := s.migrate(ctx); err != nil {
-		_ = db.Close()
-		return nil, err
-	}
-	return s, nil
+	return &Store{db: db, q: db, driver: driver, now: time.Now}, nil
 }
 
 // sqliteDSN turns a file path into a URI with the pragmas freshgo relies on.

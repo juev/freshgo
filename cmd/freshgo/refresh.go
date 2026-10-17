@@ -46,8 +46,9 @@ type services struct {
 	close func()
 }
 
-func newServices(ctx context.Context, e env, conf *config.Config, db *store.Store) (*services, error) {
-	fetching := fetch.Options{
+// fetchOptions are those of every client that fetches for the server.
+func fetchOptions(conf *config.Config, db *store.Store) fetch.Options {
+	return fetch.Options{
 		UserAgent: userAgent(), Allowlist: conf.Allowlist(),
 		// Read for every request: an administrator changes it while the
 		// server runs, and a refresh may run in a process of its own.
@@ -60,6 +61,10 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 			return fetch.InstallationProxy{URL: proxy, ChosenOnly: system.ProxyChosenOnly}, err
 		},
 	}
+}
+
+func newServices(ctx context.Context, e env, conf *config.Config, db *store.Store) (*services, error) {
+	fetching := fetchOptions(conf, db)
 	client, err := fetch.New(fetching)
 	if err != nil {
 		return nil, err

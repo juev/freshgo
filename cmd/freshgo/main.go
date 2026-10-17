@@ -43,6 +43,7 @@ func commands() []command {
 		{"user", "manage users: create, passwd, list, delete", group("user", userCommands())},
 		{"feed", "manage feeds: add", group("feed", feedCommands())},
 		{"opml", "import or export subscriptions as OPML", group("opml", opmlCommands())},
+		{"doctor", "check the configuration, the database and the services it names, changing nothing", runDoctor},
 		{"healthcheck", "ask the running server whether it works, for the health check of a container", runHealthcheck},
 		{"version", "print the version", runVersion},
 	}
