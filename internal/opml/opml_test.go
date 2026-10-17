@@ -320,3 +320,68 @@ func TestImportRefusesWhatIsNotOPML(t *testing.T) {
 		}
 	})
 }
+
+func TestDisplayName(t *testing.T) {
+	const address = "https://reader:secret@blog.example/feed.xml"
+	for _, test := range []struct {
+		name   string
+		feed   store.Feed
+		public bool
+		want   string
+	}{
+		{"a name", store.Feed{Name: "Blog", URL: address}, true, "Blog"},
+		{"the address in a backup", store.Feed{URL: address}, false, "reader:secret@blog.example/feed.xml"},
+		{"the address in a public document", store.Feed{URL: address}, true, "blog.example/feed.xml"},
+	} {
+		if got := displayName(&test.feed, test.public); got != test.want {
+			t.Errorf("%s: displayName = %q, want %q", test.name, got, test.want)
+		}
+	}
+}
+
+// A public document tells nothing about how a feed is requested, its name
+// taken from the address included; the backup of the owner keeps it all.
+func TestExportPublicLeavesCredentialsOut(t *testing.T) {
+	eachEngine(t, func(t *testing.T, db *store.Store, u *store.User) {
+		ctx := context.Background()
+		f := &store.Feed{
+			UserID: u.ID, URL: "https://reader:secret@blog.example/feed.xml",
+			Website: "https://reader:secret@blog.example/", Description: "A blog", TTL: 600,
+		}
+		if err := db.CreateFeed(ctx, f); err != nil {
+			t.Fatal(err)
+		}
+		created := time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC)
+		private, err := Export(ctx, db, u, created)
+		if err != nil {
+			t.Fatalf("Export: %v", err)
+		}
+		for _, want := range []string{
+			`text="reader:secret@blog.example/feed.xml"`,
+			`xmlUrl="https://reader:secret@blog.example/feed.xml"`,
+			`htmlUrl="https://reader:secret@blog.example/"`,
+			`frss:ttl="600"`,
+		} {
+			if !strings.Contains(string(private), want) {
+				t.Errorf("the backup has no %s:\n%s", want, private)
+			}
+		}
+
+		public, err := ExportPart(ctx, db, u, created, Part{Public: true})
+		if err != nil {
+			t.Fatalf("ExportPart: %v", err)
+		}
+		if strings.Contains(string(public), "secret") || strings.Contains(string(public), "frss:ttl") {
+			t.Errorf("the public document tells what the feed is requested with:\n%s", public)
+		}
+		for _, want := range []string{
+			`text="blog.example/feed.xml"`,
+			`xmlUrl="https://blog.example/feed.xml"`,
+			`htmlUrl="https://blog.example/"`,
+		} {
+			if !strings.Contains(string(public), want) {
+				t.Errorf("the public document has no %s:\n%s", want, public)
+			}
+		}
+	})
+}
