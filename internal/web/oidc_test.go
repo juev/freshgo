@@ -340,18 +340,23 @@ func TestOIDCSlowProvider(t *testing.T) {
 	withProvider(t, func(t *testing.T, s *site, p *provider) {
 		p.hold = make(chan struct{})
 		const visitors = 5
-		answers := make(chan int, visitors)
+		// The sign-ins ask at once, without the database between them and
+		// the provider, so that all of them find the reading under way.
+		answers := make(chan error, visitors)
 		for range visitors {
-			go func() { answers <- (&site{t: t, db: s.db, h: s.h}).get("/oidc/login").status }()
+			go func() {
+				_, err := s.h.oidc.get(t.Context(), p.server.URL)
+				answers <- err
+			}()
 		}
 		for p.held.Load() == 0 {
 			time.Sleep(time.Millisecond)
 		}
-		time.Sleep(200 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 		close(p.hold)
 		for range visitors {
-			if status := <-answers; status != http.StatusBadGateway {
-				t.Errorf("GET /oidc/login while the provider fails: status %d", status)
+			if err := <-answers; err == nil {
+				t.Error("a sign-in found the provider while it fails")
 			}
 		}
 		if held := p.held.Load(); held != 1 {
