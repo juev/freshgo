@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -91,7 +92,13 @@ func connect(driver config.Driver, dsn string) (*Store, error) {
 	case config.DriverSQLite:
 		db, err = sql.Open("sqlite", sqliteDSN(dsn))
 	case config.DriverPostgres:
-		db, err = sql.Open("pgx", dsn)
+		if db, err = sql.Open("pgx", dsn); err == nil {
+			// A busy server would otherwise open a connection per request
+			// until PostgreSQL refuses them.
+			db.SetMaxOpenConns(postgresConns())
+			db.SetMaxIdleConns(postgresConns())
+			db.SetConnMaxLifetime(postgresConnLifetime)
+		}
 	default:
 		return nil, fmt.Errorf("store: unknown driver %q", driver)
 	}
@@ -100,6 +107,16 @@ func connect(driver config.Driver, dsn string) (*Store, error) {
 	}
 	return &Store{db: db, q: db, driver: driver, now: time.Now}, nil
 }
+
+// postgresConns is how many connections to PostgreSQL a Store keeps open at
+// most, and idle: four per processor, and no fewer than ten.
+func postgresConns() int {
+	return max(4*runtime.GOMAXPROCS(0), 10)
+}
+
+// postgresConnLifetime retires a connection after a while, so that a
+// failover or a restarted pooler in front of the server is picked up.
+const postgresConnLifetime = 30 * time.Minute
 
 // sqliteDSN turns a file path into a URI with the pragmas freshgo relies on.
 // Foreign keys are off by default in SQLite; immediate transactions make a
