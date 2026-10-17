@@ -38,6 +38,8 @@ func commands() []command {
 		{"refresh", "refresh feeds once and exit", runRefresh},
 		{"purge", "delete old entries according to the archiving settings", runPurge},
 		{"import", "import a FreshRSS installation into an empty database", runImport},
+		{"backup", "copy the database to a file while the server runs", runBackup},
+		{"restore", "check a copy made by backup before it is put in place", runRestore},
 		{"user", "manage users: create, passwd, list, delete", group("user", userCommands())},
 		{"feed", "manage feeds: add", group("feed", feedCommands())},
 		{"opml", "import or export subscriptions as OPML", group("opml", opmlCommands())},
