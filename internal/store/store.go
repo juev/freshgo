@@ -47,6 +47,10 @@ type Store struct {
 	q      querier
 	driver config.Driver
 	now    func() time.Time
+	system *systemCache
+	// systemChanged is set inside a transaction that changed what System
+	// reads; the cache lets go of it once the transaction is committed.
+	systemChanged *bool
 }
 
 // Open connects to the database and brings its schema up to date.
@@ -105,7 +109,7 @@ func connect(driver config.Driver, dsn string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("store: open: %w", err)
 	}
-	return &Store{db: db, q: db, driver: driver, now: time.Now}, nil
+	return &Store{db: db, q: db, driver: driver, now: time.Now, system: &systemCache{}}, nil
 }
 
 // postgresConns is how many connections to PostgreSQL a Store keeps open at
@@ -167,14 +171,18 @@ func (s *Store) InTx(ctx context.Context, fn func(tx *Store) error) error {
 	if err != nil {
 		return fmt.Errorf("store: begin: %w", err)
 	}
+	var systemChanged bool
 	inner := *s
-	inner.q = tx
+	inner.q, inner.systemChanged = tx, &systemChanged
 	if err := fn(&inner); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("store: commit: %w", err)
+	}
+	if systemChanged {
+		s.system.forget()
 	}
 	return nil
 }

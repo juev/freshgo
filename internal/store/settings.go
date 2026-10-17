@@ -38,6 +38,9 @@ func (s *Store) SetSetting(ctx context.Context, name, value string) error {
 	if err != nil {
 		return fmt.Errorf("store: set setting %q: %w", name, err)
 	}
+	if name == SettingSystem {
+		s.changedSystem()
+	}
 	return nil
 }
 

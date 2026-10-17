@@ -1264,6 +1264,97 @@ func TestSystem(t *testing.T) {
 	})
 }
 
+// System answers from what it read last. What this Store changes is seen by
+// the next call, and from a transaction once it is committed; what another
+// process changes, within systemTTL.
+func TestSystemCache(t *testing.T) {
+	ctx := context.Background()
+	for _, e := range storetest.Engines() {
+		t.Run(e.Name, func(t *testing.T) {
+			driver, dsn := e.New(t)
+			s, err := Open(ctx, driver, dsn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = s.Close() })
+			other, err := Open(ctx, driver, dsn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = other.Close() })
+			clock := time.Unix(1_700_000_000, 0)
+			s.now = func() time.Time { return clock }
+			title := func() string {
+				t.Helper()
+				system, err := s.System(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return system.Title
+			}
+			setTitle := func(db *Store, title string) {
+				t.Helper()
+				system := DefaultSystem()
+				system.Title = title
+				if err := db.SetSystem(ctx, system); err != nil {
+					t.Fatal(err)
+				}
+			}
+
+			setTitle(s, "own")
+			if got := title(); got != "own" {
+				t.Errorf("after SetSystem: title = %q; want own", got)
+			}
+
+			errRollback := errors.New("rollback")
+			err = s.InTx(ctx, func(tx *Store) error {
+				setTitle(tx, "rolled back")
+				return errRollback
+			})
+			if !errors.Is(err, errRollback) {
+				t.Fatal(err)
+			}
+			if got := title(); got != "own" {
+				t.Errorf("after a rolled back change: title = %q; want own", got)
+			}
+			err = s.InTx(ctx, func(tx *Store) error {
+				setTitle(tx, "committed")
+				if got, err := tx.System(ctx); err != nil || got.Title != "committed" {
+					t.Errorf("inside the transaction: System = %q, %v; want committed", got.Title, err)
+				}
+				return nil
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := title(); got != "committed" {
+				t.Errorf("after a committed change: title = %q; want committed", got)
+			}
+
+			// The default user leaves with their account.
+			alice := mustUser(t, s, "alice")
+			if got, err := s.System(ctx); err != nil || got.DefaultUser != "alice" {
+				t.Fatalf("after the first user: default user = %q, %v; want alice", got.DefaultUser, err)
+			}
+			if err := s.DeleteUser(ctx, alice.ID); err != nil {
+				t.Fatal(err)
+			}
+			if got, err := s.System(ctx); err != nil || got.DefaultUser != "" {
+				t.Errorf("after the default user left: default user = %q, %v; want none", got.DefaultUser, err)
+			}
+
+			setTitle(other, "elsewhere")
+			if got := title(); got != "committed" {
+				t.Errorf("before systemTTL: title = %q; want what was read, committed", got)
+			}
+			clock = clock.Add(systemTTL)
+			if got := title(); got != "elsewhere" {
+				t.Errorf("after systemTTL: title = %q; want elsewhere", got)
+			}
+		})
+	}
+}
+
 // S41: a subject at a provider belongs to one user, a user has one subject
 // there, and the subjects of a user go with the user.
 func TestOIDCIdentities(t *testing.T) {

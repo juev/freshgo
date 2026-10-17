@@ -271,6 +271,8 @@ freshrss-password "…"
 
 `freshgo <command> -h` lists the flags of a command.
 
+A running server sees what `user` and `import` change in the installation settings, such as who the default user is, within five seconds.
+
 ## Settings
 
 Every setting is a flag and an environment variable; the flag wins. The help of a command shows a value of the environment as the default of its flag, except for the four that carry passwords: `-database-url`, `-smtp-url`, `-oidc-client-secret` and `-translate-key`.
