@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -39,6 +40,10 @@ type provider struct {
 	signWith *rsa.PrivateKey
 	// codes are the sign-ins the provider has sent the browser back with.
 	codes map[string]providerCode
+	// hold, when set, keeps every request for what the provider says about
+	// itself waiting until it is closed, and then fails it; held counts them.
+	hold chan struct{}
+	held atomic.Int32
 }
 
 type providerCode struct {
@@ -58,6 +63,15 @@ func newProvider(t *testing.T) *provider {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /token", p.token)
 	mux.Handle("/", discovery)
+	mux.HandleFunc("GET /.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
+		if p.hold != nil {
+			p.held.Add(1)
+			<-p.hold
+			http.Error(w, "busy", http.StatusServiceUnavailable)
+			return
+		}
+		discovery.ServeHTTP(w, r)
+	})
 	p.server = httptest.NewServer(mux)
 	t.Cleanup(p.server.Close)
 	discovery.SetIssuer(p.server.URL)
@@ -316,6 +330,38 @@ func TestOIDCProviderDown(t *testing.T) {
 			t.Errorf("GET /oidc/login with the provider down: status %d\n%s", a.status, a.body)
 		}
 		s.asAlice()
+	})
+}
+
+// Sign-ins that find the provider unread wait for one reading of it rather
+// than each for its own, one after the other: a provider that is slow to fail
+// holds them up once.
+func TestOIDCSlowProvider(t *testing.T) {
+	withProvider(t, func(t *testing.T, s *site, p *provider) {
+		p.hold = make(chan struct{})
+		const visitors = 5
+		answers := make(chan int, visitors)
+		for range visitors {
+			go func() { answers <- (&site{t: t, db: s.db, h: s.h}).get("/oidc/login").status }()
+		}
+		for p.held.Load() == 0 {
+			time.Sleep(time.Millisecond)
+		}
+		time.Sleep(200 * time.Millisecond)
+		close(p.hold)
+		for range visitors {
+			if status := <-answers; status != http.StatusBadGateway {
+				t.Errorf("GET /oidc/login while the provider fails: status %d", status)
+			}
+		}
+		if held := p.held.Load(); held != 1 {
+			t.Errorf("the provider was asked about itself %d times, want once", held)
+		}
+		p.hold = nil
+		p.signIn(s, "/", nil)
+		if who := s.signedInAs(); !strings.HasPrefix(who, "alice") {
+			t.Errorf("signed in as %q once the provider answers", who)
+		}
 	})
 }
 

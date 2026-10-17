@@ -14,6 +14,7 @@ import (
 
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/juev/freshgo/internal/store"
 )
@@ -43,12 +44,44 @@ type oidcAttempt struct {
 }
 
 // oidcProviders keeps what the provider says about itself, read once for an
-// issuer.
+// issuer. Sign-ins that find it unread wait for one reading, not for each
+// other.
 type oidcProviders struct {
-	mu       sync.Mutex
+	mu       sync.RWMutex
 	issuer   string
 	provider *oidc.Provider
 	client   *http.Client
+	reading  singleflight.Group
+}
+
+// get returns what the issuer says about itself, asking it when it is not
+// known yet; sign-ins that ask at once share one request.
+func (p *oidcProviders) get(ctx context.Context, issuer string) (*oidc.Provider, error) {
+	p.mu.RLock()
+	provider := p.provider
+	if p.issuer != issuer {
+		provider = nil
+	}
+	p.mu.RUnlock()
+	if provider != nil {
+		return provider, nil
+	}
+	read, err, _ := p.reading.Do(issuer, func() (any, error) {
+		// The request is shared: one sign-in that gives up does not end
+		// it for the others. The client bounds it.
+		provider, err := oidc.NewProvider(oidc.ClientContext(context.WithoutCancel(ctx), p.client), issuer)
+		if err != nil {
+			return nil, err
+		}
+		p.mu.Lock()
+		p.issuer, p.provider = issuer, provider
+		p.mu.Unlock()
+		return provider, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return read.(*oidc.Provider), nil
 }
 
 // errOIDC is a sign-in the provider or its answer did not carry through.
@@ -77,23 +110,16 @@ func (h *Handler) oidcStart(next string) string {
 // oidcClient returns the client of the provider of the settings and what
 // checks its tokens. ctx carries the HTTP client the provider is asked with.
 func (h *Handler) oidcClient(r *http.Request, system store.System) (context.Context, *oauth2.Config, *oidc.IDTokenVerifier, error) {
-	p := &h.oidc
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	ctx := oidc.ClientContext(r.Context(), p.client)
-	if p.provider == nil || p.issuer != system.OIDC.Issuer {
-		provider, err := oidc.NewProvider(ctx, system.OIDC.Issuer)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		p.issuer, p.provider = system.OIDC.Issuer, provider
+	provider, err := h.oidc.get(r.Context(), system.OIDC.Issuer)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 	config := &oauth2.Config{
 		ClientID: system.OIDC.ClientID, ClientSecret: h.oidcSecret,
-		Endpoint: p.provider.Endpoint(), RedirectURL: h.absolute(r, oidcCallbackPath),
+		Endpoint: provider.Endpoint(), RedirectURL: h.absolute(r, oidcCallbackPath),
 		Scopes: []string{oidc.ScopeOpenID, "profile"},
 	}
-	return ctx, config, p.provider.Verifier(&oidc.Config{ClientID: system.OIDC.ClientID}), nil
+	return oidc.ClientContext(r.Context(), h.oidc.client), config, provider.Verifier(&oidc.Config{ClientID: system.OIDC.ClientID}), nil
 }
 
 // setOIDCAttempt hands the browser a sign-in to bring back from the
