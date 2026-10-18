@@ -145,7 +145,9 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 			s.refresher.WebSub = s.webSub
 		}
 	}
-	// The summaries under way are written before the database is closed.
+	// The summaries under way are written before the database is closed,
+	// unless the process was told to stop.
+	s.refresher.Lifetime = ctx
 	closed := s.close
 	s.close = func() {
 		s.refresher.Wait()

@@ -1,12 +1,14 @@
 package refresh
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"golang.org/x/text/language"
 
@@ -101,6 +103,52 @@ func TestRefreshSummarisesLongEntries(t *testing.T) {
 		w.r.Wait()
 		if asked() != 1 {
 			t.Errorf("the model was asked %d times after the second run, want once", asked())
+		}
+	})
+}
+
+// A process told to stop does not wait for a model that does not answer:
+// the summary under way stops and the batches waiting for it are dropped.
+func TestSummariesEndWithTheProcess(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		asked, released := make(chan struct{}, 10), make(chan struct{})
+		server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			asked <- struct{}{}
+			select {
+			case <-r.Context().Done():
+			case <-released:
+			}
+		}))
+		t.Cleanup(server.Close)
+		t.Cleanup(func() { close(released) })
+		client, err := fetch.New(fetch.Options{UserAgent: "freshgo/test", Allowlist: []string{strings.TrimPrefix(server.URL, "http://")}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.r.Summarise = translate.New(w.db, &translate.Client{URL: server.URL, Key: "k", Model: "m", HTTP: client}).SummariseLong
+		lifetime, stop := context.WithCancel(context.Background())
+		w.r.Lifetime = lifetime
+		u := w.user("alice", "")
+		for _, path := range []string{"/a.xml", "/b.xml", "/c.xml"} {
+			w.feed(u, path, func(f *store.Feed) { f.Attributes = json.RawMessage(`{"summarise_long":true}`) })
+			articles(w, path)
+		}
+
+		w.run(Options{})
+		<-asked
+		stop()
+		waited := make(chan struct{})
+		go func() { w.r.Wait(); close(waited) }()
+		select {
+		case <-waited:
+		case <-time.After(10 * time.Second):
+			t.Fatal("the summaries did not end with the process")
+		}
+		if len(asked) > summaryConcurrency-1 {
+			t.Errorf("the model was asked %d more times after the stop", len(asked))
+		}
+		if logs := w.logs.String(); strings.Contains(logs, "entries were not summarised") {
+			t.Errorf("a stop was logged as a failure:\n%s", logs)
 		}
 	})
 }

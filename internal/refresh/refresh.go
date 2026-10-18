@@ -63,6 +63,11 @@ type Refresher struct {
 	// refresh, which neither waits for it nor fails with it; Wait lets a
 	// process that ends wait for the summaries under way.
 	Summarise func(ctx context.Context, u *store.User, entries []*store.Entry) error
+	// Lifetime bounds the summaries, which outlive the run or the push that
+	// brought their entries: when it is done, those under way stop and those
+	// waiting are dropped, so that a process told to stop is not held up.
+	// New sets it to a context that never ends.
+	Lifetime context.Context
 
 	// running keeps one run at a time: a second one would find the same
 	// feeds due and fetch them again.
@@ -85,7 +90,7 @@ type Refresher struct {
 // New returns a Refresher. Handlers of the registry are called from several
 // goroutines at once.
 func New(db *store.Store, client *fetch.Client, registry *hooks.Registry, log *slog.Logger) *Refresher {
-	r := &Refresher{db: db, client: client, hooks: registry, log: log, now: time.Now, summarySlots: make(chan struct{}, summaryConcurrency)}
+	r := &Refresher{db: db, client: client, hooks: registry, log: log, now: time.Now, Lifetime: context.Background(), summarySlots: make(chan struct{}, summaryConcurrency)}
 	r.feeds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name: "freshgo_refresh_feed_duration_seconds",
 		Help: "How long the refresh of a feed in a run took, by result: refreshed, unchanged or failed.",

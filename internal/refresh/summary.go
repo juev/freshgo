@@ -19,20 +19,24 @@ const (
 // summarise has the new entries of a feed summarised when the feed asks
 // for it. The batch runs on its own, past the end of the run that brought
 // the entries: a failure is logged and the entries stay as they are.
-func (r *Refresher) summarise(ctx context.Context, j *job, attrs attributes, entries []*store.Entry) {
+func (r *Refresher) summarise(j *job, attrs attributes, entries []*store.Entry) {
 	if r.Summarise == nil || len(entries) == 0 {
 		return
 	}
 	if on, _ := get[bool](attrs, "summarise_long"); !on {
 		return
 	}
-	ctx, user := context.WithoutCancel(ctx), j.user
+	user := j.user
 	r.summaries.Go(func() {
-		r.summarySlots <- struct{}{}
+		select {
+		case r.summarySlots <- struct{}{}:
+		case <-r.Lifetime.Done():
+			return
+		}
 		defer func() { <-r.summarySlots }()
-		ctx, cancel := context.WithTimeout(ctx, summaryBudget)
+		ctx, cancel := context.WithTimeout(r.Lifetime, summaryBudget)
 		defer cancel()
-		if err := r.Summarise(ctx, user, entries); err != nil {
+		if err := r.Summarise(ctx, user, entries); err != nil && r.Lifetime.Err() == nil {
 			r.log.Warn("entries were not summarised", "user", user.Name, "error", err)
 		}
 	})
