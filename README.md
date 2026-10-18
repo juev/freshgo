@@ -5,7 +5,7 @@ A feed aggregator server in one binary that takes over an existing [FreshRSS](ht
 ## Features
 
 - stores data in SQLite or PostgreSQL;
-- imports a FreshRSS installation that ran on SQLite or PostgreSQL (not MySQL/MariaDB);
+- imports a FreshRSS installation that ran on SQLite or PostgreSQL (not MySQL/MariaDB), and one account from a Miniflux server;
 - refreshes every feed kind of FreshRSS: RSS, Atom, JSON Feed, HTML and XML with XPath, JSON with dot notation, JSON embedded in HTML;
 - applies the retention settings, the auto-read rules and the filter actions of FreshRSS, with its search language;
 - fetches the full text of articles, by CSS selector or found on the page automatically, for a whole feed or for one article on request;
@@ -169,6 +169,28 @@ What it does not: the theme and the other settings of the FreshRSS pages that th
 
 The full lists are in the Decisions sections of `docs/specs/`.
 
+## Moving from Miniflux
+
+One account of a Miniflux server moves into an existing freshgo user, through the REST API of the server. Make an API key in Miniflux (Settings, API Keys), then either run the command:
+
+```sh
+freshgo import -from miniflux -source-url https://miniflux.example.org -source-token <token> -user alice
+```
+
+or, as the user, use "Import from another server" on the page of import and export (Subscriptions, Import and export), which asks for the same address and token. The token is used for the one import and is not kept. Instead of `-source-token` the command reads `FRESHGO_SOURCE_TOKEN`, which keeps the token out of the list of processes.
+
+What it carries over: categories, feeds with their name, site and category, the credentials, user agent and cookie of the feed, full text by CSS selector (the scraper rules) or found on the page (the crawler without scraper rules), a disabled feed as a muted one, a feed hidden from the global lists as one shown in its category only; entries with title, author, link, text and date, their read and starred states, and their tags as labels. The command prints the numbers of feeds and entries added and updated, and the page shows them too.
+
+What it does not, and says so in a list of warnings with the feeds concerned: rewrite and URL rewrite rules, block and keep rules, fetching through the proxy of Miniflux, self-signed certificates. Not looked at: feed icons (fetched at the first refresh), the integrations of the account, and entries deleted in Miniflux. Entries over the limits of the installation (feeds, categories) are left out and named in the warnings.
+
+Things to know:
+
+- The whole account is read before anything is written, and written in one transaction: if the server fails, or the write does, the account of the user is as it was.
+- Run it again to catch up: nothing is added twice, and the read states follow Miniflux, stars and labels are added. A star set in freshgo is never taken off.
+- Imported feeds tell their entries by their links, because Miniflux does not give the identifiers the feeds themselves use; the next refresh finds the imported entries instead of adding them again. A feed the user already had keeps its settings and takes the entries, and when it tells entries by something other than links, a warning says a refresh may add some of them once more.
+- On the page, freshgo reads the server like it reads a feed: **addresses of the internal network are refused unless `-fetch-allowlist` names them**. A Miniflux on a private address (`miniflux.lan:8080`, `10.0.0.5:8080`) needs an entry there. The command is the operator's own and does not apply that protection.
+- The texts of the warnings are in English in both languages of the interface.
+
 ## Starting without FreshRSS
 
 ```sh
@@ -271,6 +293,7 @@ The API gives groups (the categories), feeds, items (fifty at a time), unread an
 | `refresh [-force]` | Refreshes the feeds that are due once, for cron; `-force` takes all of them. |
 | `purge` | Deletes old articles by the retention settings without waiting for a refresh. |
 | `import -data <dir>` | Imports a FreshRSS installation into an empty database. |
+| `import -from miniflux -source-url <url> -source-token <token> -user <name>` | Imports one account of a Miniflux server into an existing user; see "Moving from Miniflux". |
 | `backup -to <file>` | Copies the database while the server runs: SQLite by itself, PostgreSQL with `pg_dump`. |
 | `restore -check <file>` | Checks a SQLite copy before it is put in place, without touching the database of the server. |
 | `user create [-admin]\|passwd\|delete <name>`, `user list` | Manages users. Deleting a user deletes their feeds and articles; deleting the default user makes the oldest remaining user the default user and an administrator. |

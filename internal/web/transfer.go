@@ -8,7 +8,10 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
+	"github.com/juev/freshgo/internal/fetch"
+	"github.com/juev/freshgo/internal/miniflux"
 	"github.com/juev/freshgo/internal/opml"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/transfer"
@@ -21,16 +24,35 @@ const maxImport = 64 << 20
 type transferPage struct {
 	Feeds   []option
 	Problem string
+	// Server says the page offers the import from another server.
+	Server bool
+	Source []option
+	// Imported is what the last import from a server did.
+	Imported *serverImport
 }
 
+// serverImport is the outcome of an import from another server.
+type serverImport struct {
+	Summary  string
+	Warnings []string
+}
+
+// sources are the servers an account can be imported from: the values of
+// the field source of the form.
+var sources = []option{{Value: "miniflux", Name: "Miniflux"}}
+
 func (h *Handler) showTransfer(w http.ResponseWriter, r *http.Request, status int, problem string) {
+	h.showImported(w, r, status, problem, nil)
+}
+
+func (h *Handler) showImported(w http.ResponseWriter, r *http.Request, status int, problem string, imported *serverImport) {
 	v := h.view(r, "subscriptions", "transfer.heading")
 	feeds, err := h.db.Feeds(r.Context(), state(r).who.user.ID)
 	if err != nil {
 		h.broken(w, r, err)
 		return
 	}
-	page := transferPage{}
+	page := transferPage{Server: h.sources != nil, Source: sources, Imported: imported}
 	for _, f := range feeds {
 		page.Feeds = append(page.Feeds, option{Value: strconv.FormatInt(f.ID, 10), Name: f.Name})
 	}
@@ -96,6 +118,60 @@ func (h *Handler) importFile(w http.ResponseWriter, r *http.Request) {
 	}
 	h.notify(w, r, notice, report.Feeds+report.Entries+report.Updated)
 	http.Redirect(w, r, h.url("/subscriptions/transfer"), http.StatusSeeOther)
+}
+
+// importServer takes in the account the user has on another server, named by
+// the address and the token the form brings.
+func (h *Handler) importServer(w http.ResponseWriter, r *http.Request) {
+	if h.sources == nil {
+		h.fail(w, r, http.StatusNotFound)
+		return
+	}
+	ctx, s := r.Context(), state(r)
+	if !h.form(w, r) {
+		return
+	}
+	address, token := strings.TrimSpace(r.PostForm.Get("address")), strings.TrimSpace(r.PostForm.Get("token"))
+	if r.PostForm.Get("source") != "miniflux" {
+		h.showTransfer(w, r, http.StatusBadRequest, "transfer.problem.source")
+		return
+	}
+	if address == "" || token == "" {
+		h.showTransfer(w, r, http.StatusBadRequest, "transfer.problem.server-missing")
+		return
+	}
+	remote, err := miniflux.Read(ctx, h.sources, address, token)
+	switch {
+	case errors.Is(err, miniflux.ErrAddress):
+		h.showTransfer(w, r, http.StatusBadRequest, "transfer.problem.server-address")
+		return
+	case errors.Is(err, miniflux.ErrToken):
+		h.showTransfer(w, r, http.StatusBadRequest, "transfer.problem.server-token")
+		return
+	case errors.Is(err, fetch.ErrForbiddenAddress):
+		h.showTransfer(w, r, http.StatusBadRequest, "transfer.problem.server-forbidden")
+		return
+	case ctx.Err() != nil:
+		return
+	case err != nil:
+		// What the server answered is for the log: the page would tell the
+		// user what is reachable from this server.
+		h.log.Warn("import from a server failed", "user", s.who.user.Name, "error", err)
+		h.showTransfer(w, r, http.StatusBadGateway, "transfer.problem.server-failed")
+		return
+	}
+	report, err := transfer.ImportRemote(ctx, h.db, h.hooks, s.who.user, remote, transfer.Options{
+		MaxFeeds: s.system.Limits.MaxFeeds, MaxCategories: s.system.Limits.MaxCategories, Now: h.now(),
+	})
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	v := h.view(r, "subscriptions", "transfer.heading")
+	h.showImported(w, r, http.StatusOK, "", &serverImport{
+		Summary:  v.T("transfer.server-done", report.Feeds, report.Entries, report.Updated),
+		Warnings: report.Warnings,
+	})
 }
 
 // exported is a file of an export: its name and what writes it.

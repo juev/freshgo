@@ -63,6 +63,10 @@ type Options struct {
 	// Services sends entries to the services that take them from the server
 	// (share.go); nil, and entries are sent by the browser alone.
 	Services Fetcher
+	// Sources reads the accounts users import from other servers
+	// (transfer.go); nil, and the page offers no such import. The addresses
+	// it may reach are those of the guard of its client.
+	Sources Fetcher
 	// OIDCClientSecret is the secret of the client the settings name at an
 	// OpenID Connect provider; empty when the server was given none, and
 	// then nobody signs in through a provider.
@@ -121,6 +125,8 @@ type Handler struct {
 	images  Fetcher
 	// services is Options.Services.
 	services Fetcher
+	// sources is Options.Sources.
+	sources Fetcher
 	// oidcSecret and oidc are what signing in through a provider takes.
 	oidcSecret string
 	oidc       oidcProviders
@@ -145,6 +151,7 @@ func New(o Options) (*Handler, error) {
 	}
 	h.images = o.Images
 	h.services = o.Services
+	h.sources = o.Sources
 	h.oidcSecret, h.oidc.client = o.OIDCClientSecret, &http.Client{Timeout: oidcTimeout}
 	if o.BaseURL != "" {
 		public, err := url.Parse(o.BaseURL)
@@ -236,6 +243,7 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("GET /subscriptions/problems", h.protect(members, h.problems))
 	h.mux.HandleFunc("GET /subscriptions/transfer", h.protect(members, h.transferPage))
 	h.mux.HandleFunc("POST /subscriptions/import", h.protect(members, h.importFile))
+	h.mux.HandleFunc("POST /subscriptions/import-server", h.protect(members, h.importServer))
 	h.mux.HandleFunc("POST /subscriptions/export", h.protect(members, h.exportFiles))
 	h.mux.HandleFunc("POST /subscriptions/feeds", h.protect(members, h.addFeed))
 	h.mux.HandleFunc("GET /subscriptions/feeds/{id}", h.protect(members, h.feedPage))

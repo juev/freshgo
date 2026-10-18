@@ -13,6 +13,35 @@
 <p><button type="submit">{{.T "transfer.import.submit"}}</button></p>
 </form>
 
+{{with .Data.Server}}
+<h2>{{$.T "transfer.server"}}</h2>
+{{with $.Data.Imported}}<div role="status" id="server-done">
+<p>{{.Summary}}</p>
+{{if .Warnings}}<p>{{$.T "transfer.server-warnings"}}</p>
+<ul>
+{{range .Warnings}}<li>{{.}}</li>
+{{end}}</ul>{{end}}
+</div>{{end}}
+<form method="post" action="{{$.URL "/subscriptions/import-server"}}" class="form">
+<p>{{$.T "transfer.server.hint"}}</p>
+<p>
+<label for="source">{{$.T "transfer.source"}}</label>
+<select id="source" name="source">
+{{template "options" $.Data.Source}}</select>
+</p>
+<p>
+<label for="address">{{$.T "transfer.address"}}</label>
+<input type="url" id="address" name="address" required autocomplete="off" placeholder="https://miniflux.example.org">
+</p>
+<p>
+<label for="token">{{$.T "transfer.token"}}</label>
+<input type="password" id="token" name="token" required autocomplete="off" aria-describedby="token-hint">
+<span class="hint" id="token-hint">{{$.T "transfer.token.hint"}}</span>
+</p>
+<p><button type="submit">{{$.T "transfer.server.submit"}}</button></p>
+</form>
+{{end}}
+
 <h2>{{.T "transfer.export"}}</h2>
 <form method="post" action="{{.URL "/subscriptions/export"}}" class="form">
 <p class="check">
