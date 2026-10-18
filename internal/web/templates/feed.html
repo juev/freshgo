@@ -141,6 +141,15 @@
 </p>
 </fieldset>
 
+{{if .Data.CanSummarise}}<fieldset>
+<legend>{{.T "feed.summaries"}}</legend>
+<p class="check">
+<input type="checkbox" id="summarise_long" name="summarise_long" value="1"{{if .Data.Summarise}} checked{{end}} aria-describedby="summarise-hint">
+<label for="summarise_long">{{.T "feed.summarise"}}</label>
+<span class="hint" id="summarise-hint">{{.T "feed.summarise.hint"}}</span>
+</p>
+</fieldset>
+{{end}}
 {{template "retention" (dict "Retention" .Data.Retention "Units" .Data.Units "Inherit" true "Page" .)}}
 {{template "sorting" (dict "Sorts" .Data.Sorts "Orders" .Data.Orders "Page" .)}}
 

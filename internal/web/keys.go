@@ -37,6 +37,7 @@ var actions = []action{
 	{"original", "v", "go_website", "space"},
 	{"fulltext", "f", "", ""},
 	{"translate", "T", "", ""},
+	{"summarise", "Y", "", ""},
 	{"read", "m", "mark_read", "r"},
 	{"star", "s", "mark_favorite", "f"},
 	{"labels", "l", "mylabels", "l"},

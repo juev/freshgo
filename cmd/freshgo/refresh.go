@@ -99,6 +99,7 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 			return nil, err
 		}
 		s.translator = translate.New(db, &translate.Client{URL: conf.TranslateURL, Key: conf.TranslateKey, Model: conf.TranslateModel, HTTP: asking})
+		s.refresher.Summarise = s.translator.SummariseLong
 	}
 	if conf.VAPIDPublicKey != "" {
 		// A client of its own: the push services must not wait for the
@@ -143,6 +144,12 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 			s.webSub.Pusher = s.refresher
 			s.refresher.WebSub = s.webSub
 		}
+	}
+	// The summaries under way are written before the database is closed.
+	closed := s.close
+	s.close = func() {
+		s.refresher.Wait()
+		closed()
 	}
 	return s, nil
 }

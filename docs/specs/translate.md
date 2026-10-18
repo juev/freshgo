@@ -5,7 +5,7 @@ Sources: user requests of 2026-10-08 and 2026-10-09 (issue #31) and the measurem
 
 ## Purpose and scope
 
-A reader has the text of an entry translated into their language by a language model behind an API that speaks the chat completions of OpenAI. `internal/translate` cuts the text, asks the model and keeps the translation with the entry; `internal/web` offers it (`web.md`, U98). No service is built in.
+A reader has the text of an entry translated into their language by a language model behind an API that speaks the chat completions of OpenAI. `internal/translate` cuts the text, asks the model and keeps the translation with the entry; `internal/web` offers it (`web.md`, U98). The same service writes summaries of entries (T11–T16, `web.md`, U111). No service is built in.
 
 ## Requirements
 
@@ -19,6 +19,12 @@ A reader has the text of an entry translated into their language by a language m
 - T8. A translation whose hash is not that of the entry as it is does not exist: the entry is shown as it is and offers to be translated. So a change of the entry by its feed and a change of its text (`fulltext.md`, T12, T13) drop it. Translations of a text the entry no longer has are removed when one is stored.
 - T9. `Translator.Show` switches between the translation and the original without a request; a step shows the translation again.
 - T10. The language is told to the model by its English name.
+- T11. `Translator.Summarise` asks the service for the summary of one entry in a language, stores it and returns it. The model is sent a system instruction (a summary of at most five sentences of plain text, with no markup, lists or headings, in the English name of the language, whatever language the article is in) and one message, "Title: " and the title, a blank line and the text of the entry as plain text: no markup, white space as single spaces, the first 12000 characters of it. An entry without text is `ErrNoText` and no request is made.
+- T12. A summary is kept in the attributes of the entry under `summary`: the text, the hash of the title and the text it was made from (as in T8), the language tag and the time in Unix seconds. An entry keeps one summary: the next one, in any language, replaces it. `SummaryOf` returns it only for the language asked for and the text the entry has now, so a changed text or another language means no summary. The title and the text of the entry are not touched, nor are its other attributes.
+- T13. A service that fails, or answers with nothing, or whose answer did not end by `stop` (it was cut off), is an error and stores nothing; the entry stays as it was, a summary it had before included. A text that changed while the model answered gets nothing stored.
+- T14. The language of a summary the reader asks for is that of translation (U98): `translate_to` or else the language of the interface.
+- T15. A text is long above `LongText`, 3000 characters of plain text (markup does not count). There is no setting for it.
+- T16. `Translator.SummariseLong` summarises, one after another, the long entries among those given for a user, in the language the settings of the user give (`UserLanguage`: `translate_to`, else `language` of the interface, else English), and goes on past an entry that fails; the errors are returned joined. The refresh calls it for the new entries of the feeds with `summarise_long` (`refresh.md`, F41).
 
 ## Decisions
 
@@ -29,6 +35,11 @@ A reader has the text of an entry translated into their language by a language m
 - **Pieces of the text are sent to the service the administrator named** each time a reader asks for a translation; the README says so.
 - **A text in the target language is told by asking the model**, one small request, beside which the title is asked for at once and in vain when the answer is yes: a model asked to translate such a text rewrites it (one of the two measured changed 72% of a text that was in the language already).
 
+- **Summaries live next to the translations in `internal/translate`, not in a package of their own**: they share the client, the settings, the hash that decides when stored text is stale and the way it is written to the attributes.
+- **One summary per entry, in the language of the reader at the time.** A reader who changes the language gets the button again; there is no collection of summaries in several languages to keep.
+- **The text sent is plain and cut at 12000 characters**, so that the cost of a request does not grow with the length of the article and markup is not paid for; a model summarises the beginning of a longer one.
+- **Automatic summaries are for new entries of a feed that asks for them, above a threshold**, and run apart from the refresh; a reader who wants one for any other entry presses the button.
+
 ## Verification scenarios
 
 - T1: `TestTranslateSettings`, `TestHelpKeepsSecrets` in `internal/config`.
@@ -36,3 +47,5 @@ A reader has the text of an entry translated into their language by a language m
 - T2, T4, T5: `TestBlocks`, against an endpoint of the test that refuses a request with anything but the model and the messages: what is sent, an answer without one paragraph and with a mark dropped in another, a paragraph given up, a text given back as it was, a service that refuses (an error), a text of several requests.
 - T6–T10: `TestSteps`, on both engines: the first step with its questions and its one small request of paragraphs, the entry itself unchanged and its other attributes kept, the original and back, the rest without asking twice, nothing asked when complete, the text changed, a text in the language already, a paragraph translated to one letter, a service that refuses in the middle and answers again, an entry there is not, the entry of another user.
 - Not automated: the quality of the translations. It was judged by the owner on twelve entries translated by `deepseek-v4-flash` and `openai/gpt-6-luna`; the numbers are in issue #31.
+- T11–T14: `TestSummarise`, on both engines: what is sent (plain text, the title), the stored summary with the title, the text and the other attributes unchanged, another language, a service that refuses and an answer cut off (the entry as it was), a changed text, a text changed while the model answers, an entry without text (no request), an entry there is not, the entry of another user.
+- T15, T16: `TestLong` (the border at 3000 characters, markup not counted), `TestSummariseLong` (only the long entries, in the language of the user, one that fails does not stop the next), `TestUserLanguage`.

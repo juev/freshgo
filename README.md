@@ -9,7 +9,7 @@ A feed aggregator server in one binary that takes over an existing [FreshRSS](ht
 - refreshes every feed kind of FreshRSS: RSS, Atom, JSON Feed, HTML and XML with XPath, JSON with dot notation, JSON embedded in HTML;
 - applies the retention settings, the auto-read rules and the filter actions of FreshRSS, with its search language;
 - fetches the full text of articles, by CSS selector or found on the page automatically, for a whole feed or for one article on request;
-- translates an article on request with a language model of your choice, part by part as you read;
+- translates an article on request with a language model of your choice, part by part as you read, and writes a short summary of it;
 - sends a daily e-mail digest of the unread entries to users who ask for it, where the server has an SMTP server;
 - sends Web Push notifications of new entries to the browsers of users who ask for them, where the server has VAPID keys;
 - serves the Google Reader API and, when an administrator switches it on, the Fever API; OPML import and export, and feed icons;
@@ -184,7 +184,7 @@ freshgo serve
 
 ## Web interface
 
-Open the address of the server in a browser and sign in. Pages are rendered by the server: every action is a link or a form and works without JavaScript; the script adds keys and actions that do not reload the page. The actions of an open entry (read or unread, the original, full text, translation, sharing, folding) stand between its title and its text and stay at the top of the screen while the text is read. On a phone the menu and the controls of a stream (search, state, order) fold behind buttons, a tap on a row opens its entry and closes the one that was open, and a bar at the foot of the screen opens the next and the previous entry, marks read and stars. The browser of a phone or a desktop can install freshgo as an application ("Add to Home Screen", "Install"); that takes HTTPS, and nothing is read offline.
+Open the address of the server in a browser and sign in. Pages are rendered by the server: every action is a link or a form and works without JavaScript; the script adds keys and actions that do not reload the page. The actions of an open entry (read or unread, the original, full text, translation, summary, sharing, folding) stand between its title and its text and stay at the top of the screen while the text is read. On a phone the menu and the controls of a stream (search, state, order) fold behind buttons, a tap on a row opens its entry and closes the one that was open, and a bar at the foot of the screen opens the next and the previous entry, marks read and stars. The browser of a phone or a desktop can install freshgo as an application ("Add to Home Screen", "Install"); that takes HTTPS, and nothing is read offline.
 
 The reading screen has the tree of categories, feeds, saved queries and labels on the left and the entries on the right, laid out after Google Reader: an entry is one row with its star, feed, title and the beginning of its text, and opens in place as a card. "List" and "Expanded" above the entries switch between rows and open entries. The pages come in two looks, "Reader classic" and "Reader 2011", each with light and dark colours; the choice is on the page "Display" of the settings. The search field takes the search language of FreshRSS. The other sections are subscriptions (feeds with all their settings, categories, labels, import and export), statistics, settings, and administration for administrators (users, the installation, how users log in, the log). Marking a page read and deleting a feed, a category or a label can be undone from the notice that follows, for 10 minutes and until the next such action; a restart of the server forgets it. The page of feeds that need a look says of each one when it was last refreshed, what its last refresh failed with, and when and why it is refreshed next.
 
@@ -200,6 +200,7 @@ The reading screen has the tree of categories, feeds, saved queries and labels o
 | `v` | open the original in a new tab |
 | `f` | take the text of the entry from its page, or put the text of the feed back |
 | `T` | translate the entry, or show its original |
+| `Y` | summarise the entry |
 | `m` | mark read or unread |
 | `s` | star |
 | `l` | labels |
@@ -364,6 +365,12 @@ FRESHGO_TRANSLATE_MODEL=openai/gpt-6-luna
 `openai/gpt-6-luna` is the model recommended: of the two measured on twelve articles of 1425 paragraphs in all (prose, code, tables, lists, German, Chinese and Japanese sources) it needed a second request for the fewest paragraphs and the fewest tokens. `deepseek-v4-flash` at `https://api.deepseek.com` translated all of them too, but it reasons before every answer, and freshgo sends nothing that switches the reasoning of a model off: expect several times the waiting and the tokens. The numbers are in issue #31.
 
 The model is sent the text of the article, paragraph by paragraph, and never its markup: links, images and code stand as numbered marks and are put back as they were. What an article says therefore leaves your server for the service you named, each time you ask for a translation.
+
+### Summaries
+
+With the same service as for translation, an open article has the action "Summarise" (key `Y`). The model writes a summary of at most five sentences in the language of translation (the one set on the page "Reading", or else that of the interface); it is shown above the text, which a click on its title folds, and kept with the article until its text changes. The article itself is not changed, and clients of the Google Reader API and exports do not see the summary. If the model fails, the article stays as it was and says that it could not be summarised.
+
+The form of a feed has the box "Summarise long entries" (it shows only where the service is set). For such a feed, a new entry with more than 3000 characters of text gets its summary right after it is stored; the refresh does not wait for the model and does not fail with it, and an entry that could not be summarised is only logged. The model is sent the text of the article without markup, the first 12000 characters of it, so what an article says leaves your server for the service you named, each time a summary is made.
 
 ### Signing in through a provider
 

@@ -31,6 +31,8 @@ const forceFeedSuffix = "#force_feed"
 // result is what the refresh of one feed stored.
 type result struct {
 	added, updated int
+	// inserted are the new entries, as stored.
+	inserted []*store.Entry
 	// unchanged says the server answered that the feed is as it was.
 	unchanged bool
 }
@@ -256,7 +258,7 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 		if err := tx.InsertEntries(ctx, f.UserID, insert); err != nil {
 			return err
 		}
-		res.added = len(insert)
+		res.added, res.inserted = len(insert), insert
 		for _, e := range insert {
 			for _, tagID := range labels[e] {
 				if err := tx.TagEntry(ctx, f.UserID, tagID, e.ID); err != nil {
@@ -323,6 +325,9 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 		}
 		return tx.UpdateFeed(ctx, fresh)
 	})
+	if err == nil {
+		r.summarise(ctx, j, attrs, res.inserted)
+	}
 	if err == nil && r.WebSub != nil && topic != "" {
 		// A hub that is trusted pushes every entry before a poll finds it.
 		if res.added > 0 && j.pushing[f.ID] {

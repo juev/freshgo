@@ -912,6 +912,25 @@ button.star[aria-pressed="true"] {
 	font-size: 0.9em;
 }
 
+.entry-summary {
+	max-width: var(--reading-width);
+	margin: calc(var(--space) * 1) 0;
+	padding: calc(var(--space) * 0.5) calc(var(--space) * 1.5);
+	border-left: 3px solid var(--text-muted);
+}
+
+.entry-summary summary {
+	color: var(--text-muted);
+	font-size: 0.9em;
+	cursor: pointer;
+}
+
+.entry-summary p {
+	margin: calc(var(--space) * 0.5) 0;
+	white-space: pre-line;
+	overflow-wrap: anywhere;
+}
+
 .entry-content {
 	max-width: var(--reading-width);
 	font-size: 1.0625em;
