@@ -5,7 +5,7 @@ A feed aggregator server in one binary that takes over an existing [FreshRSS](ht
 ## Features
 
 - stores data in SQLite or PostgreSQL;
-- imports a FreshRSS installation that ran on SQLite or PostgreSQL (not MySQL/MariaDB), and one account from a Miniflux server;
+- imports a FreshRSS installation that ran on SQLite or PostgreSQL (not MySQL/MariaDB), and one account from a Miniflux or Tiny Tiny RSS server;
 - refreshes every feed kind of FreshRSS: RSS, Atom, JSON Feed, HTML and XML with XPath, JSON with dot notation, JSON embedded in HTML;
 - applies the retention settings, the auto-read rules and the filter actions of FreshRSS, with its search language;
 - fetches the full text of articles, by CSS selector or found on the page automatically, for a whole feed or for one article on request;
@@ -191,6 +191,28 @@ Things to know:
 - On the page, freshgo reads the server like it reads a feed: **addresses of the internal network are refused unless `-fetch-allowlist` names them**. A Miniflux on a private address (`miniflux.lan:8080`, `10.0.0.5:8080`) needs an entry there. The command is the operator's own and does not apply that protection.
 - The texts of the warnings are in English in both languages of the interface.
 
+## Moving from Tiny Tiny RSS
+
+One account of a Tiny Tiny RSS server moves into an existing freshgo user, through the JSON API of the server. The API has to be on for the user (Preferences, Enable API). Then either run the command, with the address of the installation (the one that serves the web interface, not `/api/`):
+
+```sh
+freshgo import -from ttrss -source-url https://rss.example.org/tt-rss -source-user alice -source-password <password> -user alice
+```
+
+or, as the user, use "Import from another server" on the page of import and export, choose Tiny Tiny RSS and fill the address, the login and the password. The password is used for the one import and is not kept; the session on the server is closed at the end. Instead of `-source-password` the command reads `FRESHGO_SOURCE_PASSWORD`, which keeps the password out of the list of processes.
+
+What it carries over: categories, feeds with their name, site, category and address, a feed with updates disabled as a muted one; articles with title, author, link, text and date, their read and starred states, and their labels as labels. Categories inside other categories become top-level ones, and a warning names them. The command prints the numbers of feeds and entries added and updated, then the warnings on the error output.
+
+What it does not, and says so in warnings: the refresh period of a feed (freshgo asks a feed as often as it publishes), published articles, notes, and the tags of articles. The filters and the logins of feeds are not given by the API of Tiny Tiny RSS, so they cannot be carried over, and the report says so every time. Not looked at: feed icons (fetched at the first refresh), attachments, labels that are on no article. Articles over the limits of the installation (feeds, categories) are left out and named in the warnings.
+
+Things to know:
+
+- It works like the import from Miniflux: the whole account is read before anything is written, and written in one transaction; run it again to catch up, nothing is added twice, the read states follow Tiny Tiny RSS, stars and labels are added.
+- Imported feeds tell their entries by their links: the identifier Tiny Tiny RSS gives is a hash with the id of the user inside, not the one a refresh of freshgo computes, so the next refresh would not recognise it. A feed the user already had keeps its settings and takes the articles, with a warning when it tells entries by something other than links.
+- A Tiny Tiny RSS behind HTTP authentication of its web server is not supported: the API takes only its own login.
+- On the page, **addresses of the internal network are refused unless `-fetch-allowlist` names them**; the command does not apply that protection.
+- The texts of the warnings are in English in both languages of the interface.
+
 ## Starting without FreshRSS
 
 ```sh
@@ -294,6 +316,7 @@ The API gives groups (the categories), feeds, items (fifty at a time), unread an
 | `purge` | Deletes old articles by the retention settings without waiting for a refresh. |
 | `import -data <dir>` | Imports a FreshRSS installation into an empty database. |
 | `import -from miniflux -source-url <url> -source-token <token> -user <name>` | Imports one account of a Miniflux server into an existing user; see "Moving from Miniflux". |
+| `import -from ttrss -source-url <url> -source-user <login> -source-password <password> -user <name>` | Imports one account of a Tiny Tiny RSS server into an existing user; see "Moving from Tiny Tiny RSS". |
 | `backup -to <file>` | Copies the database while the server runs: SQLite by itself, PostgreSQL with `pg_dump`. |
 | `restore -check <file>` | Checks a SQLite copy before it is put in place, without touching the database of the server. |
 | `user create [-admin]\|passwd\|delete <name>`, `user list` | Manages users. Deleting a user deletes their feeds and articles; deleting the default user makes the oldest remaining user the default user and an administrator. |

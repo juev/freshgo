@@ -30,7 +30,7 @@ func TestCompletionBash(t *testing.T) {
 		"freshgo user create -ad":         "-admin",
 		"freshgo opml import -us":         "-user",
 		"freshgo import -da":              "-data -database-url",
-		"freshgo import -so":              "-source-database-url -source-token -source-url",
+		"freshgo import -so":              "-source-database-url -source-password -source-token -source-url -source-user",
 		"freshgo import -fr":              "-from",
 		"freshgo serve -listen :80 -data": "-database-url",
 		"freshgo comp":                    "completion",

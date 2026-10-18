@@ -8,6 +8,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/juev/freshgo/internal/config"
@@ -16,6 +18,7 @@ import (
 	"github.com/juev/freshgo/internal/miniflux"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/transfer"
+	"github.com/juev/freshgo/internal/ttrss"
 )
 
 // newFlagSet returns the flag set of a subcommand with the shared settings bound.
@@ -56,21 +59,58 @@ func parseDatabase(fs *flag.FlagSet, conf *config.Config, args []string, operand
 const (
 	fromFreshRSS = "freshrss"
 	fromMiniflux = "miniflux"
+	fromTTRSS    = "ttrss"
 )
+
+// importFlags are the flags that name what is imported, by the source they
+// go with; the rest of the flags go with every source.
+var importFlags = []struct {
+	from  string
+	flags []string
+}{
+	{fromFreshRSS, []string{"data", "source-database-url"}},
+	{fromMiniflux, []string{"source-url", "source-token", "user"}},
+	{fromTTRSS, []string{"source-url", "source-user", "source-password", "user"}},
+}
+
+// checkImportFlags refuses a flag that goes with another source than the one
+// chosen, naming the sources it goes with.
+func checkImportFlags(from string, given map[string]bool) error {
+	goesWith := map[string][]string{}
+	var own []string
+	for _, s := range importFlags {
+		for _, name := range s.flags {
+			goesWith[name] = append(goesWith[name], s.from)
+			if s.from == from {
+				own = append(own, name)
+			}
+		}
+	}
+	for name, sources := range goesWith {
+		if given[name] && !slices.Contains(own, name) {
+			return fmt.Errorf("-%s goes with -from %s", name, strings.Join(sources, " or "))
+		}
+	}
+	return nil
+}
 
 func runImport(ctx context.Context, e env, args []string) (err error) {
 	fs, conf := newFlagSet(e, "import")
 	synopsis(fs, e, "import [flags]")
 	var opts importer.Options
 	from := fs.String("from", fromFreshRSS, "what to import: freshrss, a whole installation into an empty database, "+
-		"or miniflux, one account into an existing user")
+		"or miniflux or ttrss, one account into an existing user")
 	fs.StringVar(&opts.DataDir, "data", "", "FreshRSS data directory, the one with config.php and users/ (required for -from freshrss)")
 	fs.StringVar(&opts.SourceDatabaseURL, "source-database-url", "",
 		"PostgreSQL URL of the FreshRSS database, when it differs from what its config.php says")
-	sourceURL := fs.String("source-url", "", "address of the Miniflux server (required for -from miniflux)")
+	sourceURL := fs.String("source-url", "", "address of the Miniflux server, or of the Tiny Tiny RSS installation "+
+		"(required for -from miniflux and ttrss)")
 	sourceToken := fs.String("source-token", "", "API token of the Miniflux account; FRESHGO_SOURCE_TOKEN is read when the flag is not given, "+
 		"which keeps the token out of the list of processes (required for -from miniflux)")
-	user := fs.String("user", "", "the existing user who gets the account (required for -from miniflux)")
+	sourceUser := fs.String("source-user", "", "login of the Tiny Tiny RSS account, which needs the API enabled in its preferences (required for -from ttrss)")
+	sourcePassword := fs.String("source-password", "", "password of the Tiny Tiny RSS account; FRESHGO_SOURCE_PASSWORD is read when the flag is not given, "+
+		"which keeps the password out of the list of processes (required for -from ttrss)")
+	user := fs.String("user", "", "the existing user who gets the account (required for -from miniflux and ttrss)")
 	driver, dsn, err := parseDatabase(fs, conf, args, 0)
 	if err != nil {
 		return err
@@ -80,24 +120,25 @@ func runImport(ctx context.Context, e env, args []string) (err error) {
 	if *sourceToken == "" {
 		*sourceToken = e.getenv("FRESHGO_SOURCE_TOKEN")
 	}
+	if *sourcePassword == "" {
+		*sourcePassword = e.getenv("FRESHGO_SOURCE_PASSWORD")
+	}
+	switch *from {
+	case fromFreshRSS, fromMiniflux, fromTTRSS:
+	default:
+		return fmt.Errorf("unknown -from %q: %s, %s or %s", *from, fromFreshRSS, fromMiniflux, fromTTRSS)
+	}
+	if err := checkImportFlags(*from, given); err != nil {
+		return err
+	}
 	switch *from {
 	case fromFreshRSS:
-		for _, name := range []string{"source-url", "source-token", "user"} {
-			if given[name] {
-				return fmt.Errorf("-%s goes with -from %s", name, fromMiniflux)
-			}
-		}
 		// Opening makes and migrates the database: a mistyped -data would leave
 		// an empty one behind, which the next import refuses as not empty.
 		if err := checkDataDir(opts.DataDir); err != nil {
 			return err
 		}
 	case fromMiniflux:
-		for _, name := range []string{"data", "source-database-url"} {
-			if given[name] {
-				return fmt.Errorf("-%s goes with -from %s", name, fromFreshRSS)
-			}
-		}
 		switch {
 		case *sourceURL == "":
 			return errors.New("-source-url is required")
@@ -106,8 +147,17 @@ func runImport(ctx context.Context, e env, args []string) (err error) {
 		case *user == "":
 			return errors.New("-user is required")
 		}
-	default:
-		return fmt.Errorf("unknown -from %q: %s or %s", *from, fromFreshRSS, fromMiniflux)
+	case fromTTRSS:
+		switch {
+		case *sourceURL == "":
+			return errors.New("-source-url is required")
+		case *sourceUser == "":
+			return errors.New("-source-user is required")
+		case *sourcePassword == "":
+			return errors.New("-source-password is required")
+		case *user == "":
+			return errors.New("-user is required")
+		}
 	}
 	db, err := store.Open(ctx, driver, dsn)
 	if err != nil {
@@ -115,8 +165,15 @@ func runImport(ctx context.Context, e env, args []string) (err error) {
 	}
 	defer func() { err = errors.Join(err, db.Close()) }()
 
-	if *from == fromMiniflux {
-		return importMiniflux(ctx, e, conf, db, *user, *sourceURL, *sourceToken)
+	switch *from {
+	case fromMiniflux:
+		return importRemote(ctx, e, conf, db, *user, func(ctx context.Context, f *fetch.Client) (*transfer.Remote, error) {
+			return miniflux.Read(ctx, f, *sourceURL, *sourceToken)
+		})
+	case fromTTRSS:
+		return importRemote(ctx, e, conf, db, *user, func(ctx context.Context, f *fetch.Client) (*transfer.Remote, error) {
+			return ttrss.Read(ctx, f, *sourceURL, *sourceUser, *sourcePassword)
+		})
 	}
 	report, err := importer.Run(ctx, db, opts)
 	if err != nil {
@@ -131,12 +188,13 @@ func runImport(ctx context.Context, e env, args []string) (err error) {
 	return printWarnings(e, report.Warnings)
 }
 
-// importMiniflux reads the account at the server and writes it into the
-// account of the user. The command is the operator's, who names the server:
-// it may be at an address of the internal network, so the protection against
-// requests there is off, as it is for the feeds of the OPML an operator
-// imports by hand.
-func importMiniflux(ctx context.Context, e env, conf *config.Config, db *store.Store, name, address, token string) error {
+// importRemote reads an account of another server with read and writes it
+// into the account of the user. The command is the operator's, who names the
+// server: it may be at an address of the internal network, so the protection
+// against requests there is off, as it is for the feeds of the OPML an
+// operator imports by hand.
+func importRemote(ctx context.Context, e env, conf *config.Config, db *store.Store, name string,
+	read func(context.Context, *fetch.Client) (*transfer.Remote, error)) error {
 	u, err := findUser(ctx, db, name)
 	if err != nil {
 		return err
@@ -147,7 +205,7 @@ func importMiniflux(ctx context.Context, e env, conf *config.Config, db *store.S
 	if err != nil {
 		return err
 	}
-	remote, err := miniflux.Read(ctx, client, address, token)
+	remote, err := read(ctx, client)
 	if err != nil {
 		return err
 	}

@@ -44,7 +44,7 @@ func commands() []command {
 		{"serve", "run the HTTP server and the refresh scheduler", runServe, nil},
 		{"refresh", "refresh feeds once and exit", runRefresh, nil},
 		{"purge", "delete old entries according to the archiving settings", runPurge, nil},
-		{"import", "import a FreshRSS installation into an empty database, or a Miniflux account into a user", runImport, nil},
+		{"import", "import a FreshRSS installation into an empty database, or a Miniflux or Tiny Tiny RSS account into a user", runImport, nil},
 		{"backup", "copy the database to a file while the server runs", runBackup, nil},
 		{"restore", "check a copy made by backup before it is put in place", runRestore, nil},
 		{"user", "manage users: create, passwd, list, delete", nil, userCommands()},
