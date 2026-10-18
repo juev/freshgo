@@ -1,6 +1,7 @@
 package translate
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -22,9 +23,11 @@ import (
 // of the message of the user, and keeps what it was asked.
 type service struct {
 	*Client
-	mu    sync.Mutex
-	asked []string
-	reply func(system, user string) string
+	mu                sync.Mutex
+	asked, instructed []string
+	reply             func(system, user string) string
+	// finish is how the answers end; "stop" when empty.
+	finish string
 }
 
 func newService(t *testing.T, reply func(system, user string) string) *service {
@@ -40,11 +43,11 @@ func newService(t *testing.T, reply func(system, user string) string) *service {
 			return
 		}
 		s.mu.Lock()
-		s.asked = append(s.asked, messages[1].Content)
-		answer := s.reply(messages[0].Content, messages[1].Content)
+		s.asked, s.instructed = append(s.asked, messages[1].Content), append(s.instructed, messages[0].Content)
+		answer, finish := s.reply(messages[0].Content, messages[1].Content), cmp.Or(s.finish, "stop")
 		s.mu.Unlock()
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"choices": []map[string]any{{"finish_reason": "stop", "message": map[string]string{"content": answer}}},
+			"choices": []map[string]any{{"finish_reason": finish, "message": map[string]string{"content": answer}}},
 			"usage":   map[string]any{"prompt_tokens": 10, "completion_tokens": 20, "cost": 0.5},
 		})
 	}))
@@ -55,6 +58,13 @@ func newService(t *testing.T, reply func(system, user string) string) *service {
 	}
 	s.Client = &Client{URL: server.URL + "/v1/", Key: "secret", Model: "m", HTTP: client}
 	return s
+}
+
+// systems are the instructions the model was given.
+func (s *service) systems() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.instructed
 }
 
 func (s *service) requests() int {

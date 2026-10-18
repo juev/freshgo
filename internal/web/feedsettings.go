@@ -128,8 +128,12 @@ type feedPage struct {
 	Automatic  bool
 	// Browser is whether the pages are read by the browser of the
 	// installation; CanBrowse whether there is one.
-	Browser       bool
-	CanBrowse     bool
+	Browser   bool
+	CanBrowse bool
+	// Summarise is whether the long new entries are summarised;
+	// CanSummarise whether there is a service to do it.
+	Summarise     bool
+	CanSummarise  bool
 	ContentAction []option
 	Preview       template.HTML
 	PreviewNote   string
@@ -276,6 +280,8 @@ func (h *Handler) showFeed(w http.ResponseWriter, r *http.Request, status int, f
 	_ = json.Unmarshal(a["path_entries_auto"], &page.Automatic)
 	_ = json.Unmarshal(a["page_by_browser"], &page.Browser)
 	page.CanBrowse = h.refresher.Browser != nil
+	_ = json.Unmarshal(a["summarise_long"], &page.Summarise)
+	page.CanSummarise = h.translator != nil
 	action := a.text("content_action")
 	if action != "prepend" && action != "append" {
 		action = "replace"
@@ -386,7 +392,7 @@ type icon struct {
 // applyFeed writes what the form of the settings of a feed says into f. It
 // returns the key of the text that says what is wrong, empty when nothing is.
 // canBrowse is whether the form asks about reading pages with a browser.
-func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, canBrowse bool) string {
+func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, canBrowse, canSummarise bool) string {
 	form := r.PostForm
 	get := func(name string) string { return strings.TrimSpace(form.Get(name)) }
 	number := func(name string) (int, bool) {
@@ -469,6 +475,14 @@ func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, can
 			a.set("page_by_browser", true)
 		} else {
 			delete(a, "page_by_browser")
+		}
+	}
+	// Likewise without a service to summarise with.
+	if canSummarise {
+		if get("summarise_long") != "" {
+			a.set("summarise_long", true)
+		} else {
+			delete(a, "summarise_long")
 		}
 	}
 	if conditions := lines(form.Get("path_entries_conditions")); len(conditions) > 0 {
@@ -696,7 +710,7 @@ func (h *Handler) editFeed(ctx context.Context, r *http.Request, db *store.Store
 		return "", err
 	}
 	before := *f
-	problem = applyFeed(r, f, categories, h.refresher.Browser != nil)
+	problem = applyFeed(r, f, categories, h.refresher.Browser != nil, h.translator != nil)
 	// Such a proxy is not to be chosen; one the feed came with stays, so
 	// that the rest of its settings can be changed.
 	if problem == "" && errors.Is(fetch.FeedProxy(f.Attributes), fetch.ErrUnsupportedProxy) &&

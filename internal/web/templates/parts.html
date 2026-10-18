@@ -4,7 +4,11 @@
 {{if .Authors}}<span class="entry-authors">{{.Authors}}</span>{{end}}
 <time datetime="{{.DateTime}}">{{.Date}}</time>
 </p>
-<div class="entry-content">{{.Content}}</div>
+{{with .Summary}}<details class="entry-summary" open>
+<summary>{{.Heading}}</summary>
+<p>{{.Text}}</p>
+</details>
+{{end}}<div class="entry-content">{{.Content}}</div>
 {{if .Attachments}}
 <ul class="attachments">
 {{range .Attachments}}
@@ -39,6 +43,10 @@
 <input type="hidden" name="next" value="{{$.Here}}">
 <input type="hidden" name="do" value="{{.Do}}">
 <button type="submit" class="link"{{if .Percent}} data-percent="{{.Percent}}"{{end}}>{{.Label}}</button>
+</form>{{end}}
+{{with .Entry.Summarise}}<form method="post" action="{{$.Entry.URL}}/summary" class="entry-action">
+<input type="hidden" name="next" value="{{$.Here}}">
+<button type="submit" class="link">{{.}}</button>
 </form>{{end}}
 {{end}}
 

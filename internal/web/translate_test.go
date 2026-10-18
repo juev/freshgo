@@ -1,6 +1,7 @@
 package web
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -25,6 +26,8 @@ type interpreter struct {
 	// opening, when set, is waited for before the first two answers, the
 	// language and the title; hold before each answer after the third.
 	opening, hold chan struct{}
+	// finish is how the answers end, "stop" when empty.
+	finish string
 	// entry is long enough to take three requests.
 	entry *store.Entry
 }
@@ -46,7 +49,7 @@ func interpret(t *testing.T, s *site) *interpreter {
 		system, user := request.Messages[0].Content, request.Messages[1].Content
 		in.mu.Lock()
 		in.asked, in.systems = append(in.asked, user), append(in.systems, system)
-		n, wait := len(in.asked), in.hold
+		n, wait, finish := len(in.asked), in.hold, cmp.Or(in.finish, "stop")
 		if n <= 2 {
 			wait = in.opening
 		} else if n == 3 {
@@ -67,7 +70,7 @@ func interpret(t *testing.T, s *site) *interpreter {
 				answer = "yes"
 			}
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []map[string]any{{"finish_reason": "stop", "message": map[string]string{"content": answer}}}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []map[string]any{{"finish_reason": finish, "message": map[string]string{"content": answer}}}})
 	}))
 	t.Cleanup(server.Close)
 	client, err := fetch.New(fetch.Options{Allowlist: []string{"*"}})

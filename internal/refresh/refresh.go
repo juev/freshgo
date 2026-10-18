@@ -58,10 +58,19 @@ type Refresher struct {
 	// stored entries, with the time the refresh began. It decides what is
 	// news for the user and must return without waiting for the network.
 	Notify func(ctx context.Context, u *store.User, since time.Time)
+	// Summarise, when set, writes the summaries of the new entries of the
+	// feeds that ask for them (summarise_long). It runs apart from the
+	// refresh, which neither waits for it nor fails with it; Wait lets a
+	// process that ends wait for the summaries under way.
+	Summarise func(ctx context.Context, u *store.User, entries []*store.Entry) error
 
 	// running keeps one run at a time: a second one would find the same
 	// feeds due and fetch them again.
 	running sync.Mutex
+	// summaries are the batches of entries being summarised, of which
+	// summarySlots lets a few at a time ask the model.
+	summaries    sync.WaitGroup
+	summarySlots chan struct{}
 	// lastRun is when the last run that reached every user ended, in Unix
 	// seconds; zero before the first.
 	lastRun atomic.Int64
@@ -76,7 +85,7 @@ type Refresher struct {
 // New returns a Refresher. Handlers of the registry are called from several
 // goroutines at once.
 func New(db *store.Store, client *fetch.Client, registry *hooks.Registry, log *slog.Logger) *Refresher {
-	r := &Refresher{db: db, client: client, hooks: registry, log: log, now: time.Now}
+	r := &Refresher{db: db, client: client, hooks: registry, log: log, now: time.Now, summarySlots: make(chan struct{}, summaryConcurrency)}
 	r.feeds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name: "freshgo_refresh_feed_duration_seconds",
 		Help: "How long the refresh of a feed in a run took, by result: refreshed, unchanged or failed.",

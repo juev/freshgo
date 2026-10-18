@@ -199,7 +199,7 @@
 		const ways = 'a, button:not([hidden])';
 		const way = menu && menu.contains(focused) ? Array.from(menu.querySelectorAll(ways)).indexOf(focused) : -1;
 		const parts = ['.entry-state', '.entry-star', '.entry-labels', '.entry-actions'];
-		for (const part of text ? [...parts, '.entry-title', '.entry-excerpt', '.entry-content'] : parts) {
+		for (const part of text ? [...parts, '.entry-title', '.entry-excerpt', '.entry-summary', '.entry-content'] : parts) {
 			const old = article.querySelector(part);
 			const now = fresh.querySelector(part);
 			if (old && now) {
@@ -209,6 +209,9 @@
 			} else if (now && part === '.entry-excerpt') {
 				// The row has it after the title.
 				article.querySelector('.entry-title').after(now);
+			} else if (now && part === '.entry-summary') {
+				// It stands between the line of the entry and its text.
+				article.querySelector('.entry-meta').after(now);
 			} else if (now) {
 				(article.querySelector('.entry-body') || article).append(now);
 			}
@@ -283,7 +286,7 @@
 		if (!fresh) {
 			return failed();
 		}
-		sync(article, fresh, /\/(fulltext|translate)$/.test(form.getAttribute('action')));
+		sync(article, fresh, /\/(fulltext|translate|summary)$/.test(form.getAttribute('action')));
 		const notice = response.headers.get('X-Notice');
 		if (notice) {
 			tell(article, decodeURIComponent(notice));
@@ -1009,6 +1012,7 @@
 			const form = current && current.querySelector('form.entry-action[action$="/translate"]');
 			return form && submit(form, current);
 		}
+		case 'summarise': return current && act(current, 'summary');
 		case 'read': return current && act(current, 'read');
 		case 'star': return current && act(current, 'star');
 		case 'labels': return current && current.querySelector('form.entry-action') && showLabels(current);

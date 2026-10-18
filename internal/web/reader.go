@@ -599,6 +599,10 @@ type article struct {
 	// Translation is what the entry offers about its translation; nil
 	// when entries are not translated.
 	Translation *translation
+	// Summary is the summary the entry has, and Summarise the label of the
+	// button that asks for one; both empty when entries are not summarised.
+	Summary   *summary
+	Summarise string
 	// ShowFeed and ShowDate say what the row of the entry in a list names.
 	ShowFeed, ShowDate bool
 	// Share are the ways the entry can be sent on.
@@ -614,6 +618,11 @@ type translation struct {
 	// begun has come, 0 when none was.
 	Label   string
 	Percent int
+}
+
+// summary is the summary of an entry as a page shows it.
+type summary struct {
+	Heading, Text string
 }
 
 // translateTo is the language the entries of a reader are translated into.
@@ -672,13 +681,22 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 			date = time.Unix(e.Published, 0).In(loc)
 		}
 		title, content := e.Title, e.Content
-		var offered *translation
+		var (
+			offered   *translation
+			summed    *summary
+			summarise string
+		)
 		if translated && h.translator != nil {
-			state := translate.Of(e, translateTo(v, prefs).String())
+			tag := translateTo(v, prefs)
+			state := translate.Of(e, tag.String())
 			title, content, offered = state.Title, state.Content, offer(v, state)
+			summarise = v.T("entry.summarise")
+			if text, ok := translate.SummaryOf(e, tag); ok {
+				summed, summarise = &summary{Heading: v.T("entry.summary"), Text: text}, v.T("entry.summarise-again")
+			}
 		}
 		a := article{
-			ID: e.ID, Title: title, Translation: offered, URL: h.url("/entries/" + strconv.FormatInt(e.ID, 10)),
+			ID: e.ID, Title: title, Translation: offered, Summary: summed, Summarise: summarise, URL: h.url("/entries/" + strconv.FormatInt(e.ID, 10)),
 			Authors: strings.Join(e.Authors, ", "), Date: date.Format("2006-01-02 15:04"), DateTime: date.Format(time.RFC3339),
 			// What is stored is clean: every writer cleans what it stores, and
 			// serve cleaned once what was stored before they did.
@@ -1152,6 +1170,35 @@ func (h *Handler) translateEntry(w http.ResponseWriter, r *http.Request) {
 		notice = "notice.translate-partly"
 	}
 	w.Header().Set(progressHeader, strconv.Itoa(progress.Done)+"/"+strconv.Itoa(progress.Total))
+	h.back(w, r, e.ID, notice)
+}
+
+// summariseEntry has the model summarise the text of an entry in the
+// language of the reader, and stores the summary with the entry. A model
+// that fails leaves the entry as it was and the reader is told so.
+func (h *Handler) summariseEntry(w http.ResponseWriter, r *http.Request) {
+	ctx, user := r.Context(), state(r).who.user
+	if h.translator == nil {
+		h.fail(w, r, http.StatusNotFound)
+		return
+	}
+	e, ok := h.ownEntry(w, r)
+	if !ok || !h.form(w, r) {
+		return
+	}
+	tag := translateTo(h.view(r, "reader", "entry.untitled"), readReading(user))
+	notice := ""
+	_, err := h.translator.Summarise(ctx, user.ID, e.ID, tag)
+	switch {
+	case ctx.Err() != nil:
+		return
+	case errors.Is(err, store.ErrNotFound):
+		h.fail(w, r, http.StatusNotFound)
+		return
+	case err != nil:
+		h.log.Warn("entry was not summarised", "user", user.Name, "entry", e.ID, "error", err)
+		notice = "notice.summary-failed"
+	}
 	h.back(w, r, e.ID, notice)
 }
 
