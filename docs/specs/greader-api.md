@@ -7,7 +7,7 @@ Sources: user request of 2026-10-06 and the decisions recorded in `plan.md`; `p/
 
 `internal/greader` serves the Google Reader API the way FreshRSS does, so that a client set up for a FreshRSS server keeps working after the installation has been imported. `internal/opml` reads and writes subscriptions, `internal/favicon` finds and serves the icons of feeds. Covers plan requirements R2, R7 and R13.
 
-Out of scope: the Fever API, the web interface, uploading a custom icon (imported ones are served), dynamic OPML categories (their address is kept and exported, nothing fetches it).
+Out of scope: the Fever API (`fever-api.md`), the web interface, uploading a custom icon (imported ones are served), dynamic OPML categories (their address is kept and exported, nothing fetches it).
 
 ## Requirements
 

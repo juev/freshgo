@@ -11,6 +11,7 @@
   "admin.auth.anonymous-refresh": "and may have the feeds refreshed",
   "admin.auth.api": "Apps may connect (Google Reader API)",
   "admin.auth.auto-register": "Create a user for a name the reverse proxy or the provider vouches for and nobody has",
+  "admin.auth.fever": "Apps may connect through the Fever API (needs the setting above; the password for apps has to be set again once for it)",
   "admin.auth.force-email": "A user has to confirm their e-mail address before using the account",
   "admin.auth.form": "a login with name and password",
   "admin.auth.hint": "Without a login everybody who reaches the server is let in: leave that to a server only you can reach.",

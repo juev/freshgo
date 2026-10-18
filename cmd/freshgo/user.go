@@ -60,9 +60,8 @@ func findUser(ctx context.Context, db *store.Store, name string) (*store.User, e
 	return u, err
 }
 
-// readPassword takes a new password from standard input and returns its
-// hash. At a terminal it is asked for twice, without echo; otherwise it is
-// the first line of the input.
+// readPassword takes a new password from standard input. At a terminal it is
+// asked for twice, without echo; otherwise it is the first line of the input.
 func readPassword(e env) (string, error) {
 	var password string
 	if f, ok := e.stdin.(*os.File); ok && term.IsTerminal(int(f.Fd())) {
@@ -94,11 +93,13 @@ func readPassword(e env) (string, error) {
 	if len(password) < minPasswordLength {
 		return "", fmt.Errorf("the password must be at least %d characters long", minPasswordLength)
 	}
+	return password, nil
+}
+
+// hashPassword returns the bcrypt hash of a password.
+func hashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return "", err
-	}
-	return string(hash), nil
+	return string(hash), err
 }
 
 func runUserCreate(ctx context.Context, e env, args []string) (err error) {
@@ -124,7 +125,11 @@ func runUserCreate(ctx context.Context, e env, args []string) (err error) {
 	} else if !errors.Is(err, store.ErrNotFound) {
 		return err
 	}
-	hash, err := readPassword(e)
+	password, err := readPassword(e)
+	if err != nil {
+		return err
+	}
+	hash, err := hashPassword(password)
 	if err != nil {
 		return err
 	}
@@ -138,7 +143,7 @@ func runUserCreate(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	if err := db.CreateUser(ctx, &store.User{Name: name, APIPasswordHash: hash, Settings: raw}); err != nil {
+	if err := db.CreateUser(ctx, &store.User{Name: name, APIPasswordHash: hash, FeverKey: store.FeverKey(name, password), Settings: raw}); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintf(e.stdout, "user %s created\n", name)
@@ -189,7 +194,11 @@ func runUserPasswd(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
-	hash, err := readPassword(e)
+	password, err := readPassword(e)
+	if err != nil {
+		return err
+	}
+	hash, err := hashPassword(password)
 	if err != nil {
 		return err
 	}
@@ -202,7 +211,7 @@ func runUserPasswd(ctx context.Context, e env, args []string) (err error) {
 		if err != nil {
 			return err
 		}
-		if err := tx.SetAPIPasswordHash(ctx, u.ID, hash); err != nil {
+		if err := tx.SetAPIPasswordHash(ctx, u.ID, hash, store.FeverKey(u.Name, password)); err != nil {
 			return err
 		}
 		// Whoever is logged in with the old password is logged out.

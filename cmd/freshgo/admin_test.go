@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
@@ -223,6 +224,28 @@ func TestUsersFromTheCommandLine(t *testing.T) {
 	}
 	if login(t, address, "alice", "correct horse") != "" || login(t, address, "alice", "tr0ub4dor&3") == "" {
 		t.Error("after user passwd the old password works or the new one does not")
+	}
+	// The key of the Fever API follows the password, at the creation of a
+	// user and at a change.
+	feverKeys := func() map[string]string {
+		t.Helper()
+		keys := map[string]string{}
+		fever, err := store.Open(context.Background(), config.DriverSQLite, strings.TrimPrefix(database, "sqlite://"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = fever.Close() }()
+		for _, name := range []string{"alice", "bob"} {
+			u, err := fever.UserByName(context.Background(), name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			keys[name] = u.FeverKey
+		}
+		return keys
+	}
+	if got, want := feverKeys(), map[string]string{"alice": store.FeverKey("alice", "tr0ub4dor&3"), "bob": store.FeverKey("bob", "battery staple")}; !reflect.DeepEqual(got, want) {
+		t.Errorf("Fever keys after user create and user passwd = %v, want %v", got, want)
 	}
 	if welcomed(session) {
 		t.Error("a browser logged in with the old password is still logged in after user passwd")

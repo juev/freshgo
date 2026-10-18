@@ -532,7 +532,7 @@ func TestMigrationIndexesTexts(t *testing.T) {
 			if err := s.InsertEntries(ctx, u.ID, entries); err != nil {
 				t.Fatal(err)
 			}
-			for _, q := range []string{"DROP TABLE entry_texts", "DROP TABLE IF EXISTS entry_search", "DELETE FROM schema_migrations WHERE version >= 16"} {
+			for _, q := range []string{"DROP INDEX users_fever_key", "ALTER TABLE users DROP COLUMN fever_key", "DROP TABLE entry_texts", "DROP TABLE IF EXISTS entry_search", "DELETE FROM schema_migrations WHERE version >= 16"} {
 				if _, err := s.exec(ctx, q); err != nil {
 					t.Fatalf("%s: %v", q, err)
 				}

@@ -181,7 +181,7 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 	if language := r.PostForm.Get("language"); slices.Contains(h.texts.Languages(), language) {
 		settings.set("language", language)
 	}
-	err = h.db.CreateUser(r.Context(), &store.User{Name: name, APIPasswordHash: hash, Settings: settings.raw()})
+	err = h.db.CreateUser(r.Context(), &store.User{Name: name, APIPasswordHash: hash, FeverKey: store.FeverKey(name, password), Settings: settings.raw()})
 	switch {
 	case errors.Is(err, store.ErrConflict):
 		h.showUsers(w, r, http.StatusBadRequest, name, "admin.problem.name-taken")
@@ -300,7 +300,7 @@ func (h *Handler) updateUser(w http.ResponseWriter, r *http.Request) {
 			keep = s.who.session.TokenHash
 		}
 		if err = h.setWebPassword(ctx, u.ID, hash, keep); err == nil {
-			err = h.db.SetAPIPasswordHash(ctx, u.ID, hash)
+			err = h.db.SetAPIPasswordHash(ctx, u.ID, hash, store.FeverKey(u.Name, password))
 		}
 		notice = "notice.password"
 	case "enable":
@@ -470,6 +470,7 @@ func (h *Handler) saveAuthentication(w http.ResponseWriter, r *http.Request) {
 		system.AllowAnonymous = form.Get("allow_anonymous") != ""
 		system.AllowAnonymousRefresh = form.Get("allow_anonymous_refresh") != ""
 		system.APIEnabled = form.Get("api_enabled") != ""
+		system.FeverEnabled = form.Get("fever_enabled") != ""
 		system.HTTPAuthAutoRegister = form.Get("http_auth_auto_register") != ""
 		system.ForceEmailValidation = form.Get("force_email_validation") != ""
 		// Without a server to send letters through nobody could ever

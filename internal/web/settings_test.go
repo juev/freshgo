@@ -231,11 +231,14 @@ func TestProfile(t *testing.T) {
 		if hash := s.user("alice").APIPasswordHash; bcrypt.CompareHashAndPassword([]byte(hash), []byte("app-password")) != nil {
 			t.Error("the password of apps was not stored")
 		}
+		if key := s.user("alice").FeverKey; key != store.FeverKey("alice", "app-password") {
+			t.Errorf("the Fever key after the password of apps was set = %q, want md5 of alice:app-password", key)
+		}
 		if a := s.post("/settings/profile/api-password", url.Values{"new": {"short"}}); a.status != http.StatusBadRequest {
 			t.Errorf("a short password of apps: status %d", a.status)
 		}
 		_, body = s.follow("/settings/profile/api-password", url.Values{"new": {""}})
-		if s.user("alice").APIPasswordHash != "" || notice(body) != "Apps can no longer connect." {
+		if s.user("alice").APIPasswordHash != "" || s.user("alice").FeverKey != "" || notice(body) != "Apps can no longer connect." {
 			t.Errorf("after removing the password of apps: notice %q", notice(body))
 		}
 
@@ -308,7 +311,7 @@ func TestAdministration(t *testing.T) {
 		carol := s.user("carol")
 		if location != "/admin/users" || notice(body) != "User added." || !readPreferences(carol).IsAdmin ||
 			bcrypt.CompareHashAndPassword([]byte(readPreferences(carol).PasswordHash), []byte("carol-password")) != nil ||
-			bcrypt.CompareHashAndPassword([]byte(carol.APIPasswordHash), []byte("carol-password")) != nil {
+			bcrypt.CompareHashAndPassword([]byte(carol.APIPasswordHash), []byte("carol-password")) != nil || carol.FeverKey != store.FeverKey("carol", "carol-password") {
 			t.Fatalf("after adding a user: at %q, notice %q, %s", location, notice(body), carol.Settings)
 		}
 		for name, form := range map[string]url.Values{
@@ -345,6 +348,9 @@ func TestAdministration(t *testing.T) {
 		act("bob", "enable", nil)
 		if a := act("bob", "password", url.Values{"new": {"bobs-new-password"}, "again": {"bobs-new-password"}}); a.status != http.StatusSeeOther {
 			t.Errorf("setting a password: status %d", a.status)
+		}
+		if key := s.user("bob").FeverKey; key != store.FeverKey("bob", "bobs-new-password") {
+			t.Errorf("the Fever key of bob after the administrator set a password = %q", key)
 		}
 		if a := bobBrowser.login("bob", "bobs-new-password", nil); a.status != http.StatusSeeOther {
 			t.Errorf("login with the password the administrator set: status %d", a.status)
@@ -427,6 +433,21 @@ func TestAdministration(t *testing.T) {
 		if !system.AllowAnonymous || !system.AllowAnonymousRefresh || system.APIEnabled || system.HTTPAuthAutoRegister || system.AuthType != store.AuthForm {
 			t.Errorf("system after the form of signing in = %+v", system)
 		}
+
+		// Fever is switched on apart from the API, and off by default.
+		for _, c := range []struct {
+			form url.Values
+			want bool
+		}{
+			{url.Values{"auth_type": {"form"}, "api_enabled": {"1"}, "fever_enabled": {"1"}}, true},
+			{url.Values{"auth_type": {"form"}, "api_enabled": {"1"}}, false},
+		} {
+			s.follow("/admin/authentication", c.form)
+			if system, _ := s.db.System(ctx); system.FeverEnabled != c.want || !system.APIEnabled {
+				t.Errorf("system after the form %v: Fever %v, API %v; want Fever %v", c.form, system.FeverEnabled, system.APIEnabled, c.want)
+			}
+		}
+		s.follow("/admin/authentication", url.Values{"auth_type": {"form"}, "allow_anonymous": {"1"}, "allow_anonymous_refresh": {"1"}})
 
 		// A way of telling users apart that would not know the administrator
 		// who asks for it is not switched on.

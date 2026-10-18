@@ -25,7 +25,10 @@ type User struct {
 	// APIPasswordHash is the bcrypt hash of the Google Reader API password,
 	// empty while API access is not set up.
 	APIPasswordHash string
-	Settings        json.RawMessage
+	// FeverKey is what a Fever client logs in with (see FeverKey), empty
+	// until the API password is set.
+	FeverKey string
+	Settings json.RawMessage
 }
 
 // Category groups feeds.

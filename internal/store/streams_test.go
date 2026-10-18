@@ -687,16 +687,28 @@ func TestSetAPIPasswordHash(t *testing.T) {
 	eachEngine(t, func(t *testing.T, s *Store) {
 		ctx := context.Background()
 		alice, bob := mustUser(t, s, "alice"), mustUser(t, s, "bob")
-		if err := s.SetAPIPasswordHash(ctx, alice.ID, "$2a$10$hash"); err != nil {
+		if err := s.SetAPIPasswordHash(ctx, alice.ID, "$2a$10$hash", FeverKey("alice", "secret")); err != nil {
 			t.Fatalf("SetAPIPasswordHash: %v", err)
 		}
-		if got, err := s.UserByName(ctx, "alice"); err != nil || got.APIPasswordHash != "$2a$10$hash" {
+		if got, err := s.UserByName(ctx, "alice"); err != nil || got.APIPasswordHash != "$2a$10$hash" || got.FeverKey != FeverKey("alice", "secret") {
 			t.Errorf("alice = %+v, %v; want the new hash", got, err)
 		}
 		if got, err := s.UserByName(ctx, "bob"); err != nil || got.APIPasswordHash != "" {
 			t.Errorf("bob = %+v, %v; want no hash", got, err)
 		}
-		if err := s.SetAPIPasswordHash(ctx, bob.ID+100, "x"); !errors.Is(err, ErrNotFound) {
+		if got, err := s.UserByFeverKey(ctx, FeverKey("alice", "secret")); err != nil || got.Name != "alice" {
+			t.Errorf("UserByFeverKey = %+v, %v; want alice", got, err)
+		}
+		if err := s.SetAPIPasswordHash(ctx, alice.ID, "$2a$10$other", FeverKey("alice", "other")); err != nil {
+			t.Fatal(err)
+		}
+		// Bob has no key, and an empty key is nobody's.
+		for _, key := range []string{FeverKey("alice", "secret"), "", FeverKey("bob", "")} {
+			if got, err := s.UserByFeverKey(ctx, key); !errors.Is(err, ErrNotFound) {
+				t.Errorf("UserByFeverKey(%q) = %+v, %v; want ErrNotFound", key, got, err)
+			}
+		}
+		if err := s.SetAPIPasswordHash(ctx, bob.ID+100, "x", ""); !errors.Is(err, ErrNotFound) {
 			t.Errorf("SetAPIPasswordHash(unknown user) error = %v, want ErrNotFound", err)
 		}
 	})

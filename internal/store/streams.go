@@ -175,6 +175,16 @@ func (s *Store) ListEntries(ctx context.Context, userID int64, q EntryQuery) ([]
 	return entries, nil
 }
 
+// CountSet returns how many entries of a user the set selects.
+func (s *Store) CountSet(ctx context.Context, userID int64, set EntrySet) (int, error) {
+	where, args := set.where(userID)
+	var n int
+	if err := s.queryRow(ctx, `SELECT COUNT(*) FROM entries WHERE user_id = ?`+where, append([]any{userID}, args...)...).Scan(&n); err != nil {
+		return 0, fmt.Errorf("store: count entries of a set: %w", err)
+	}
+	return n, nil
+}
+
 // ListEntryIDs returns the identifiers of the entries a query selects.
 func (s *Store) ListEntryIDs(ctx context.Context, userID int64, q EntryQuery) ([]int64, error) {
 	query, args := q.sql(userID, `id`)

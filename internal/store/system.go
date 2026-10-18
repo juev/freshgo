@@ -45,6 +45,9 @@ type System struct {
 	// APIEnabled switches the Google Reader API and the public feeds of
 	// saved queries on.
 	APIEnabled bool `json:"api_enabled"`
+	// FeverEnabled switches the Fever API on; it answers only while
+	// APIEnabled is on too.
+	FeverEnabled bool `json:"fever_enabled"`
 	// ForceEmailValidation keeps a user out until they have followed the
 	// link sent to their address.
 	ForceEmailValidation bool `json:"force_email_validation"`

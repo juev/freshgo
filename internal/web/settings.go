@@ -644,7 +644,7 @@ func (h *Handler) changeAPIPassword(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if err := h.db.SetAPIPasswordHash(ctx, who.user.ID, hash); err != nil {
+	if err := h.db.SetAPIPasswordHash(ctx, who.user.ID, hash, store.FeverKey(who.user.Name, password)); err != nil {
 		h.broken(w, r, err)
 		return
 	}

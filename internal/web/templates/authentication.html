@@ -32,6 +32,7 @@
 {{template "check" (dict "Name" "allow_anonymous" "Label" (.T "admin.auth.anonymous" .Data.System.DefaultUser) "On" .Data.System.AllowAnonymous)}}
 {{template "check" (dict "Name" "allow_anonymous_refresh" "Label" (.T "admin.auth.anonymous-refresh") "On" .Data.System.AllowAnonymousRefresh)}}
 {{template "check" (dict "Name" "api_enabled" "Label" (.T "admin.auth.api") "On" .Data.System.APIEnabled)}}
+{{template "check" (dict "Name" "fever_enabled" "Label" (.T "admin.auth.fever") "On" .Data.System.FeverEnabled)}}
 <p><button type="submit">{{.T "keys.save"}}</button></p>
 </form>
 {{end}}
