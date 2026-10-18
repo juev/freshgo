@@ -52,9 +52,18 @@ func TestObserve(t *testing.T) {
 		if len(lines) != len(want) {
 			t.Fatalf("log:\n%s\nwant %d lines", text, len(want))
 		}
-		for i, line := range lines {
-			if !strings.Contains(line, "msg=request "+want[i]+" duration=") {
-				t.Errorf("line %d: %q, want %q and a duration", i, line, want[i])
+		// A request is logged after its handler returns, and the client of a
+		// flushed answer can send the next one before that, so the lines
+		// come in any order.
+		for _, w := range want {
+			matched := 0
+			for _, line := range lines {
+				if strings.Contains(line, "msg=request "+w+" duration=") {
+					matched++
+				}
+			}
+			if matched != 1 {
+				t.Errorf("log:\n%s\nhas %d lines with %q and a duration, want 1", text, matched, w)
 			}
 		}
 		if strings.Contains(text, "secret") {
