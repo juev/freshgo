@@ -489,6 +489,81 @@
 		}
 	};
 
+	// ---- Notifications ----
+
+	// The button of the profile asks the browser for permission and
+	// subscribes it to the push service; the service worker is registered
+	// only then, when the reader asks for notifications.
+	const pushToggle = document.getElementById('push-toggle');
+	if (pushToggle && urls.push && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window) {
+		document.getElementById('push').hidden = false;
+
+		// The key of the server is base64url; the browser wants its bytes.
+		const keyBytes = (text) => {
+			const padded = text.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(text.length / 4) * 4, '=');
+			return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+		};
+		const post = (url, body) => ask(url, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify(body),
+		}).then((response) => {
+			if (!response.ok) {
+				throw new Error(`HTTP ${response.status}`);
+			}
+		});
+		const show = (on) => {
+			pushToggle.setAttribute('aria-pressed', String(on));
+			pushToggle.textContent = on ? t('js.push.disable') : t('js.push.enable');
+		};
+		// The subscription of this browser, if it has one; it does not
+		// register the worker.
+		const current = async () => {
+			const registration = await navigator.serviceWorker.getRegistration(urls.worker);
+			return registration ? registration.pushManager.getSubscription() : null;
+		};
+		current().then((subscription) => show(Boolean(subscription)), () => {});
+
+		const enable = async () => {
+			if ((await Notification.requestPermission()) !== 'granted') {
+				say(t('js.push.denied'));
+				return;
+			}
+			await navigator.serviceWorker.register(urls.worker);
+			const registration = await navigator.serviceWorker.ready;
+			const subscription = await registration.pushManager.subscribe({
+				userVisibleOnly: true,
+				applicationServerKey: keyBytes(pushToggle.dataset.key),
+			});
+			try {
+				await post(urls.push, subscription.toJSON());
+			} catch (error) {
+				// A browser the server does not know would be told of nothing.
+				await subscription.unsubscribe();
+				throw error;
+			}
+			show(true);
+		};
+		const disable = async () => {
+			const subscription = await current();
+			if (subscription) {
+				await post(urls.pushDelete, { endpoint: subscription.endpoint });
+				await subscription.unsubscribe();
+			}
+			show(false);
+		};
+		pushToggle.addEventListener('click', async () => {
+			pushToggle.disabled = true;
+			try {
+				await (pushToggle.getAttribute('aria-pressed') === 'true' ? disable() : enable());
+			} catch {
+				say(t('js.failed'));
+			} finally {
+				pushToggle.disabled = false;
+			}
+		});
+	}
+
 	// ---- The next page ----
 
 	let loading = null;

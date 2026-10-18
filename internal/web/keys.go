@@ -220,6 +220,7 @@ var scriptTexts = []string{
 	"js.close", "js.confirm", "js.cancel", "js.failed", "js.help", "js.help.key", "js.help.action", "js.help.fixed-enter",
 	"js.help.fixed-escape", "js.help.fixed-palette", "js.help.none", "js.mark-all", "js.palette",
 	"js.palette.empty", "js.palette.hint", "js.palette.action", "js.labels", "js.no-entry", "js.copied", "js.no-share", "js.no-linkding", "js.translating", "js.translate-begun", "js.translate-stopping",
+	"js.push.enable", "js.push.disable", "js.push.denied",
 }
 
 // scriptConfig is what a page hands to the script.
@@ -252,6 +253,9 @@ func (h *Handler) config(v *view, who *identity) string {
 			"palette": h.url("/palette"), "unread": h.url("/"), "all": h.url("/?state=all"), "starred": h.url("/?state=starred"),
 			"keys": h.url("/settings/keys"), "subscriptions": h.url("/subscriptions"), "add": h.url("/subscriptions/add"),
 		},
+	}
+	if h.pushing() {
+		c.URLs["push"], c.URLs["pushDelete"], c.URLs["worker"] = h.url(pushPath), h.url(pushDeletePath), h.url(workerPath)
 	}
 	var k keyboard
 	if who != nil {

@@ -48,8 +48,13 @@ func (r *Refresher) Push(ctx context.Context, sub *store.WebSub, document []byte
 		Header: http.Header{"Content-Type": {contentType}},
 		Body:   document,
 	}
-	if _, err := r.storeFetched(ctx, j, f, params, resp, r.now().Unix(), true); err != nil {
+	began := r.now()
+	res, err := r.storeFetched(ctx, j, f, params, resp, began.Unix(), true)
+	if err != nil {
 		return 0, err
+	}
+	if r.Notify != nil && res.added > 0 {
+		r.Notify(ctx, u, began)
 	}
 	return 1, nil
 }

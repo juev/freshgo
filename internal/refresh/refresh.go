@@ -53,6 +53,11 @@ type Refresher struct {
 	// (page_by_browser) in place of a request: it returns the address a
 	// page ends at and its markup.
 	Browser func(ctx context.Context, address string) (final, markup string, err error)
+	// Notify, when set, is told that entries came to a user: it is called
+	// after the feeds of the user were refreshed, or a hub pushed to one, and
+	// stored entries, with the time the refresh began. It decides what is
+	// news for the user and must return without waiting for the network.
+	Notify func(ctx context.Context, u *store.User, since time.Time)
 
 	// running keeps one run at a time: a second one would find the same
 	// feeds due and fetch them again.
@@ -153,10 +158,14 @@ func (r *Refresher) Run(ctx context.Context, o Options) ([]Stats, error) {
 			return all, fmt.Errorf("refresh: user %s: %w", u.Name, err)
 		}
 		r.refreshOPMLs(ctx, j)
+		began := r.now()
 		st, err := r.refreshUser(ctx, j, o, hubs)
 		all = append(all, st)
 		if err != nil {
 			return all, fmt.Errorf("refresh: user %s: %w", u.Name, err)
+		}
+		if r.Notify != nil && st.NewEntries > 0 {
+			r.Notify(ctx, u, began)
 		}
 		r.log.Info("feeds refreshed", "user", u.Name, "feeds", st.Refreshed, "unchanged", st.Unchanged, "failed", st.Failed,
 			"new", st.NewEntries, "updated", st.UpdatedEntries)

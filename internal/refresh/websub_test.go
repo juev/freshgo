@@ -733,3 +733,59 @@ func TestWebSubOff(t *testing.T) {
 		}
 	}
 }
+
+// Notify hears of a user whose refresh stored entries, once for the run, and
+// of a hub that pushed an entry; not of a refresh or a push that stored none.
+func TestNotifyHearsOfNewEntries(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		h := newHubWorld(t, w)
+		var mu sync.Mutex
+		var told []string
+		var since []time.Time
+		w.r.Notify = func(_ context.Context, u *store.User, at time.Time) {
+			mu.Lock()
+			defer mu.Unlock()
+			told = append(told, u.Name)
+			since = append(since, at)
+		}
+		heard := func() []string {
+			mu.Lock()
+			defer mu.Unlock()
+			return append([]string(nil), told...)
+		}
+		alice, bob := w.user("alice", ""), w.user("bob", "")
+		mine := w.feed(alice, "/feed.xml", nil)
+		w.feed(bob, "/quiet.xml", nil)
+		w.serveBody("/quiet.xml", "application/atom+xml", `<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom"><title>Quiet</title></feed>`)
+
+		h.publish("a", "b")
+		w.run(Options{})
+		if got := heard(); len(got) != 1 || got[0] != "alice" {
+			t.Fatalf("told after the first run: %v, want alice alone", got)
+		}
+		if !since[0].Equal(w.clock) {
+			t.Errorf("told the refresh began at %v, want %v", since[0], w.clock)
+		}
+
+		w.later()
+		w.run(Options{})
+		if got := heard(); len(got) != 1 {
+			t.Errorf("a run that stored nothing told %v", got[1:])
+		}
+
+		h.confirm(mine, 864000)
+		secret := h.subscription(mine).Secret
+		if status, _ := h.push(mine, h.document(h.topic, "c"), secret); status != http.StatusOK {
+			t.Fatalf("push: status %d", status)
+		}
+		if got := heard(); len(got) != 2 || got[1] != "alice" {
+			t.Errorf("told after a push with a new entry: %v", got)
+		}
+		if status, _ := h.push(mine, h.document(h.topic, "c"), secret); status != http.StatusOK {
+			t.Fatalf("push again: status %d", status)
+		}
+		if got := heard(); len(got) != 2 {
+			t.Errorf("a push of an entry that was stored already told %v", got[2:])
+		}
+	})
+}

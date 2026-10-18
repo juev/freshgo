@@ -70,6 +70,9 @@ type Options struct {
 	// Translator translates entries; nil when the server was given no
 	// service for it, and then no entry offers to be translated.
 	Translator *translate.Translator
+	// PushKey is the public VAPID key of the installation; empty when it has
+	// none, and then no browser is offered notifications.
+	PushKey string
 	// Guard counts the failures of a login; the server shares it with the
 	// API, so that moving from one to the other does not start the count
 	// anew. Nil, and the interface has one of its own.
@@ -83,7 +86,9 @@ type Handler struct {
 	refresher *refresh.Refresher
 	// translator is nil when entries are not translated.
 	translator *translate.Translator
-	hooks      *hooks.Registry
+	// pushKey is empty when notifications are not offered.
+	pushKey string
+	hooks   *hooks.Registry
 	baseURL    string
 	// prefix is the path of the public address, without a trailing slash.
 	prefix  string
@@ -131,7 +136,7 @@ func New(o Options) (*Handler, error) {
 		guard = &authguard.Guard{}
 	}
 	h := &Handler{
-		db: o.DB, log: o.Log, refresher: o.Refresher, translator: o.Translator, baseURL: o.BaseURL, version: o.Version, assets: map[string]string{},
+		db: o.DB, log: o.Log, refresher: o.Refresher, translator: o.Translator, pushKey: o.PushKey, baseURL: o.BaseURL, version: o.Version, assets: map[string]string{},
 		proxies: o.TrustedProxies, allowlist: o.FetchAllowlist, mailer: o.Mailer, crossOrigin: http.NewCrossOriginProtection(), now: time.Now, hooks: o.Hooks,
 		guard: guard,
 	}
@@ -261,6 +266,9 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /settings/integrations", h.protect(members, h.saveIntegrations))
 	h.mux.HandleFunc("GET /settings/privacy", h.protect(members, h.privacyPage))
 	h.mux.HandleFunc("POST /settings/privacy", h.protect(members, h.savePrivacy))
+	h.mux.HandleFunc("POST "+pushPath, h.protect(members, h.subscribePush))
+	h.mux.HandleFunc("POST "+pushDeletePath, h.protect(members, h.unsubscribePush))
+	h.mux.HandleFunc("GET "+workerPath, h.worker)
 	h.mux.HandleFunc("GET /settings/profile", h.protect(members, h.profilePage))
 	h.mux.HandleFunc("POST /settings/profile", h.protect(members, h.saveProfile))
 	h.mux.HandleFunc("POST /settings/profile/token", h.protect(members, h.regenerateToken))

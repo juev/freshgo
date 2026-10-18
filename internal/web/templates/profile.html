@@ -26,6 +26,14 @@
 <span class="hint" id="regenerate-hint">{{.T "settings.token.regenerate.hint"}}</span></p>
 </form>
 
+{{if .Data.PushKey}}
+<h2>{{.T "settings.push"}}</h2>
+<div id="push" hidden>
+<p><button type="button" id="push-toggle" data-key="{{.Data.PushKey}}" aria-pressed="false" aria-describedby="push-hint">{{.T "js.push.enable"}}</button>
+<span class="hint" id="push-hint">{{.T "settings.push.hint"}}</span></p>
+</div>
+{{end}}
+
 <h2>{{.T "settings.password"}}</h2>
 <form method="post" action="{{.URL "/settings/profile/password"}}" class="form">
 {{if .Data.HasPassword}}

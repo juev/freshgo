@@ -11,6 +11,7 @@ A feed aggregator server in one binary that takes over an existing [FreshRSS](ht
 - fetches the full text of articles, by CSS selector or found on the page automatically, for a whole feed or for one article on request;
 - translates an article on request with a language model of your choice, part by part as you read;
 - sends a daily e-mail digest of the unread entries to users who ask for it, where the server has an SMTP server;
+- sends Web Push notifications of new entries to the browsers of users who ask for them, where the server has VAPID keys;
 - serves the Google Reader API and, when an administrator switches it on, the Fever API; OPML import and export, and feed icons;
 - has a web interface of its own, in English and Russian, in which everything can be done from the keyboard and without JavaScript;
 - subscribes to WebSub hubs;
@@ -276,6 +277,7 @@ The API gives groups (the categories), feeds, items (fifty at a time), unread an
 | `opml import -user <name> [<file>]`, `opml export -user <name>` | Reads subscriptions from a file or standard input; writes them to standard output. |
 | `doctor` | Checks the settings and what they name, and changes nothing: the flags, the database and the version of its schema, the settings of the installation, the SMTP server (it logs in and sends no letter), the browser, the translation service (it asks for the list of models), the OpenID Connect provider (its discovery document), the feeds set to a proxy freshgo does not go through (SOCKS4 and SOCKS4A, which FreshRSS allows), and the feeds whose last refresh failed, listed. Each check gets a line: `ok`, `FAIL`, `warn` or `skip`; the command exits with 1 when one failed. `serve`, `refresh` and `purge` do not start with settings of the installation that do not read, and say how to repair them. |
 | `healthcheck` | Asks the server at `-listen` whether it works, with `GET /healthz`, and exits with 1 when it does not. An address that listens on every interface is asked over loopback. The image runs it as its `HEALTHCHECK`. |
+| `vapid-keys` | Prints a new pair of keys for Web Push, as lines of the configuration file; see "Web Push". |
 | `completion bash\|zsh\|fish` | Prints a script that completes the commands, their actions and flags in that shell: `source <(freshgo completion bash)`, the same for zsh, `freshgo completion fish \| source`. |
 | `version` | Prints the version. |
 
@@ -285,7 +287,7 @@ A running server sees what `user` and `import` change in the installation settin
 
 ## Settings
 
-Every setting is a flag and an environment variable, and can be written in a configuration file as well. A flag wins over the file, the file over the environment. The help of a command shows a value of the environment as the default of its flag, except for the four that carry passwords: `-database-url`, `-smtp-url`, `-oidc-client-secret` and `-translate-key`.
+Every setting is a flag and an environment variable, and can be written in a configuration file as well. A flag wins over the file, the file over the environment. The help of a command shows a value of the environment as the default of its flag, except for the five that carry secrets: `-database-url`, `-smtp-url`, `-oidc-client-secret`, `-translate-key` and `-vapid-private-key`.
 
 | Flag | Variable | Default | Meaning |
 |---|---|---|---|
@@ -305,6 +307,7 @@ Every setting is a flag and an environment variable, and can be written in a con
 | `-log-level` | `FRESHGO_LOG_LEVEL` | `info` | Least level of what goes to the log: `debug`, `info`, `warn` or `error`. At `debug` every request is logged with its method, path, status and duration, without the query. The warnings and errors about a user are kept for the journal of the user at every level. |
 | `-log-format` | `FRESHGO_LOG_FORMAT` | `text` | `text` or `json`. |
 | `-smtp-url` | `FRESHGO_SMTP_URL` | | SMTP server for the letters that confirm e-mail addresses, reset forgotten passwords and carry the daily digest: `smtp[s]://user:password@host:port?from=address`. Without it, confirmation cannot be required and passwords are reset only by an administrator or `freshgo user passwd`. |
+| `-vapid-public-key`, `-vapid-private-key`, `-vapid-subject` | `FRESHGO_VAPID_PUBLIC_KEY`, `FRESHGO_VAPID_PRIVATE_KEY`, `FRESHGO_VAPID_SUBJECT` | | The keys that sign Web Push messages, as `freshgo vapid-keys` prints them, and a `mailto:` or `https:` address push services may contact you at. All three or none; see "Web Push". |
 
 The file is YAML, named by `-config` before the command: `freshgo -config /etc/freshgo.yaml serve`. Its keys are the names of the flags without the dash; a key that is no setting, or a value its flag does not take, stops the command before it starts. The file is read once, at start.
 
@@ -323,6 +326,28 @@ The garbage collector of Go runs with `GOGC=200` unless the variable `GOGC` is s
 With an SMTP server (`-smtp-url`), a user who has an e-mail address in the profile can tick "Send a digest of unread entries once a day" there. Nothing is offered while the server has no SMTP server or the profile has no address, and a form that asks for it anyway leaves it off.
 
 The server looks at the users every hour. For a user whose last digest is a day old, it sends one plain-text letter, in the language of the user, with the unread entries of the reading list (feeds of priority 0 and above, as in the apps) that arrived since: the feed, the title and the link, the newest first. The letter names a hundred entries and says how many more there are. When nothing new arrived, no letter goes out and the period still moves on. The first period begins when the switch is turned on. A letter that fails is logged, and the next look tries again for the same period. Users who are kept out, or whose address is not yet confirmed, get nothing.
+
+### Web Push
+
+With VAPID keys, a user can switch on notifications in a browser: when a refresh brings unread entries to the reading list, the browser shows one notification with their number and the title of the newest, even while freshgo is not open. Nothing is offered while the keys are not set.
+
+Make a pair of keys once, put them and a contact address in the settings, and restart the server:
+
+```sh
+freshgo vapid-keys
+# vapid-public-key: BEl6…
+# vapid-private-key: 4kW1…
+```
+
+```yaml
+vapid-public-key: BEl6…
+vapid-private-key: 4kW1…
+vapid-subject: mailto:you@example.org
+```
+
+Then each user opens the profile, presses "Notify me in this browser" in the part "Notifications in this browser" and allows notifications; every browser is switched on on its own, and the same button switches it off. Browsers allow push on pages served over HTTPS (and on `localhost`), so freshgo has to sit behind a reverse proxy with a certificate. A new pair of keys makes the browsers subscribed with the old pair stop getting messages; they switch notifications on again.
+
+The user gets one message per browser for a refresh, in the language of the interface; it counts the entries of the reading list that are unread (feeds of priority 0 and above, as in the apps), so entries a filter marked read are not news. A push service that no longer knows a browser (404 or 410) loses its subscription; any other failure is logged and the subscription stays. The message goes to the address the browser gave, through the same rules as feeds: an address that is internal is refused unless `-fetch-allowlist` names it. Sending is done in the background and holds the refresh back for nothing.
 
 ### Translating articles
 
