@@ -179,3 +179,34 @@ func TestRefreshWithFailingModel(t *testing.T) {
 		}
 	})
 }
+
+// Batches past summaryBacklog are dropped while the model is held up, so
+// that what waits for it cannot grow with every refresh.
+func TestBacklogIsBounded(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		u := w.user("alice", "")
+		held := make(chan struct{})
+		var mu sync.Mutex
+		ran := 0
+		for range summaryBacklog + 10 {
+			w.r.background(u, "entries were not summarised", func(context.Context) error {
+				<-held
+				mu.Lock()
+				ran++
+				mu.Unlock()
+				return nil
+			})
+		}
+		if got := len(w.r.summaryBacklog); got != summaryBacklog {
+			t.Errorf("%d batches hold a place, want %d", got, summaryBacklog)
+		}
+		if got := strings.Count(w.logs.String(), "too many batches wait for the model"); got != 10 {
+			t.Errorf("%d batches were logged as dropped, want 10", got)
+		}
+		close(held)
+		w.r.Wait()
+		if ran != summaryBacklog || len(w.r.summaryBacklog) != 0 {
+			t.Errorf("%d batches ran and %d still hold a place; want %d and none", ran, len(w.r.summaryBacklog), summaryBacklog)
+		}
+	})
+}
