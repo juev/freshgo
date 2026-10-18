@@ -10,6 +10,9 @@ const (
 	ActionRead  = "read"
 	ActionStar  = "star"
 	ActionLabel = "label"
+	// ActionSuggest has the language model suggest labels for the entry;
+	// FreshRSS has no such action.
+	ActionSuggest = "suggest"
 )
 
 // Rule is a filter action: what happens to the entries a query matches. A

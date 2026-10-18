@@ -70,7 +70,7 @@ var (
 const maxActionForm = 64 << 10
 
 // maxLabelName bounds the name of a label, in characters.
-const maxLabelName = 191
+const maxLabelName = translate.MaxLabelName
 
 // reading are the settings of a user the reading screen goes by, under the
 // names FreshRSS gives them.
@@ -603,6 +603,11 @@ type article struct {
 	// button that asks for one; both empty when entries are not summarised.
 	Summary   *summary
 	Summarise string
+	// SuggestLabels is the label of the button that asks the model for
+	// labels, empty when entries are not given any; Suggested are the names
+	// it suggested that wait for the reader.
+	SuggestLabels string
+	Suggested     []string
 	// ShowFeed and ShowDate say what the row of the entry in a list names.
 	ShowFeed, ShowDate bool
 	// Share are the ways the entry can be sent on.
@@ -685,18 +690,19 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 			offered   *translation
 			summed    *summary
 			summarise string
+			suggest   string
 		)
 		if translated && h.translator != nil {
 			tag := translateTo(v, prefs)
 			state := translate.Of(e, tag.String())
 			title, content, offered = state.Title, state.Content, offer(v, state)
-			summarise = v.T("entry.summarise")
+			summarise, suggest = v.T("entry.summarise"), v.T("entry.suggest-labels")
 			if text, ok := translate.SummaryOf(e, tag); ok {
 				summed, summarise = &summary{Heading: v.T("entry.summary"), Text: text}, v.T("entry.summarise-again")
 			}
 		}
 		a := article{
-			ID: e.ID, Title: title, Translation: offered, Summary: summed, Summarise: summarise, URL: h.url("/entries/" + strconv.FormatInt(e.ID, 10)),
+			ID: e.ID, Title: title, Translation: offered, Summary: summed, Summarise: summarise, SuggestLabels: suggest, Suggested: translate.LabelSuggestions(e), URL: h.url("/entries/" + strconv.FormatInt(e.ID, 10)),
 			Authors: strings.Join(e.Authors, ", "), Date: date.Format("2006-01-02 15:04"), DateTime: date.Format(time.RFC3339),
 			// What is stored is clean: every writer cleans what it stores, and
 			// serve cleaned once what was stored before they did.
@@ -1200,6 +1206,83 @@ func (h *Handler) summariseEntry(w http.ResponseWriter, r *http.Request) {
 		notice = "notice.summary-failed"
 	}
 	h.back(w, r, e.ID, notice)
+}
+
+// suggestLabels has the model suggest labels for an entry and stores the
+// names with the entry; none is attached. A model that fails leaves the
+// entry as it was and the reader is told so.
+func (h *Handler) suggestLabels(w http.ResponseWriter, r *http.Request) {
+	ctx, user := r.Context(), state(r).who.user
+	if h.translator == nil {
+		h.fail(w, r, http.StatusNotFound)
+		return
+	}
+	e, ok := h.ownEntry(w, r)
+	if !ok || !h.form(w, r) {
+		return
+	}
+	notice := ""
+	_, err := h.translator.SuggestLabels(ctx, user.ID, e.ID)
+	switch {
+	case ctx.Err() != nil:
+		return
+	case errors.Is(err, store.ErrNotFound):
+		h.fail(w, r, http.StatusNotFound)
+		return
+	case err != nil:
+		h.log.Warn("labels were not suggested", "user", user.Name, "entry", e.ID, "error", err)
+		notice = "notice.suggest-failed"
+	}
+	h.back(w, r, e.ID, notice)
+}
+
+// addSuggestedLabel attaches to an entry a label the model suggested for it,
+// and makes the label when the user has none of the name. A name that is not
+// among the suggestions of the entry is not attached.
+func (h *Handler) addSuggestedLabel(w http.ResponseWriter, r *http.Request) {
+	ctx, user := r.Context(), state(r).who.user
+	e, ok := h.ownEntry(w, r)
+	if !ok || !h.form(w, r) {
+		return
+	}
+	name := r.PostForm.Get("name")
+	if !slices.Contains(translate.LabelSuggestions(e), name) {
+		h.back(w, r, e.ID, "")
+		return
+	}
+	notice := "notice.label-added"
+	id, err := h.labelNamed(ctx, user.ID, name)
+	switch {
+	case errors.Is(err, errLabelLong):
+		notice = "notice.label-long"
+	case errors.Is(err, store.ErrConflict):
+		notice = "notice.label-taken"
+	case err != nil:
+		h.broken(w, r, err)
+		return
+	default:
+		if err = h.db.TagEntries(ctx, user.ID, id, []int64{e.ID}); err == nil {
+			err = translate.DropSuggestion(ctx, h.db, user.ID, e.ID, name)
+		}
+		if err != nil {
+			h.broken(w, r, err)
+			return
+		}
+	}
+	h.back(w, r, e.ID, notice)
+}
+
+// dismissSuggestedLabels drops the labels the model suggested for an entry.
+func (h *Handler) dismissSuggestedLabels(w http.ResponseWriter, r *http.Request) {
+	e, ok := h.ownEntry(w, r)
+	if !ok || !h.form(w, r) {
+		return
+	}
+	if err := translate.DropSuggestion(r.Context(), h.db, state(r).who.user.ID, e.ID, ""); err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	h.back(w, r, e.ID, "")
 }
 
 var errLabelLong = errors.New("web: the name of the label is too long")

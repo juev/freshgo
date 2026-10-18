@@ -63,6 +63,9 @@ type Refresher struct {
 	// refresh, which neither waits for it nor fails with it; Wait lets a
 	// process that ends wait for the summaries under way.
 	Summarise func(ctx context.Context, u *store.User, entries []*store.Entry) error
+	// Suggest, when set, writes label suggestions for the new entries that
+	// a filter with the action "suggest" matches. It runs as Summarise does.
+	Suggest func(ctx context.Context, u *store.User, entries []*store.Entry) error
 	// Lifetime bounds the summaries, which outlive the run or the push that
 	// brought their entries: when it is done, those under way stop and those
 	// waiting are dropped, so that a process told to stop is not held up.
@@ -72,8 +75,9 @@ type Refresher struct {
 	// running keeps one run at a time: a second one would find the same
 	// feeds due and fetch them again.
 	running sync.Mutex
-	// summaries are the batches of entries being summarised, of which
-	// summarySlots lets a few at a time ask the model.
+	// summaries are the batches of entries being summarised or given
+	// label suggestions, of which summarySlots lets a few at a time ask
+	// the model.
 	summaries    sync.WaitGroup
 	summarySlots chan struct{}
 	// lastRun is when the last run that reached every user ended, in Unix

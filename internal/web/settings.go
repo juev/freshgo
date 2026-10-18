@@ -19,6 +19,7 @@ import (
 
 	"github.com/juev/freshgo/internal/authguard"
 	"github.com/juev/freshgo/internal/refresh"
+	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -226,6 +227,7 @@ func (h *Handler) showReading(w http.ResponseWriter, r *http.Request, status int
 		page.On["same_title_in_feed"], page.Text["same_title_in_feed"] = true, "1"
 	}
 	page.Text["filters_read"], page.Text["filters_star"] = s.filtersFor("read"), s.filtersFor("star")
+	page.Text["filters_suggest"] = s.filtersFor(search.ActionSuggest)
 	page.On["translating"] = h.translator != nil
 	page.Options["translate_to"] = translateOptions(v, prefs.TranslateTo)
 	if problem != "" {
@@ -284,6 +286,7 @@ func (h *Handler) saveReading(w http.ResponseWriter, r *http.Request) {
 		s.setFilters("read", lines(form.Get("filters_read")))
 		s.setFilters("star", lines(form.Get("filters_star")))
 		if h.translator != nil {
+			s.setFilters(search.ActionSuggest, lines(form.Get("filters_suggest")))
 			to := strings.TrimSpace(form.Get("translate_to"))
 			s.set("translate_to", to)
 			if _, err := language.Parse(to); err != nil && to != "" {

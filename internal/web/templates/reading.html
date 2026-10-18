@@ -59,6 +59,14 @@
 </fieldset>
 {{if index .Data.On "translating"}}
 <fieldset>
+<legend>{{.T "settings.suggesting"}}</legend>
+<p>
+<label for="filters_suggest">{{.T "form.filters-suggest"}}</label>
+<textarea id="filters_suggest" name="filters_suggest" rows="4" spellcheck="false" aria-describedby="suggest-hint">{{index .Data.Text "filters_suggest"}}</textarea>
+<span class="hint" id="suggest-hint">{{.T "form.filters-suggest.hint"}}</span>
+</p>
+</fieldset>
+<fieldset>
 <legend>{{.T "settings.translating"}}</legend>
 <p>
 <label for="translate_to">{{.T "settings.translate-to"}}</label>

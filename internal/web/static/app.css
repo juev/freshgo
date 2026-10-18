@@ -955,8 +955,22 @@ button.star[aria-pressed="true"] {
 	padding-left: calc(var(--space) * 2.5);
 }
 
+.entry-suggestions ul {
+	margin: calc(var(--space) * 0.5) 0;
+	padding: 0;
+	list-style: none;
+}
+
+.entry-suggestions li,
+.entry-suggestions form {
+	display: inline-flex;
+	gap: calc(var(--space) * 0.5);
+	margin-right: calc(var(--space) * 1.5);
+}
+
 .entry-tags,
-.entry-labels {
+.entry-labels,
+.entry-suggestions {
 	color: var(--text-muted);
 	font-size: 0.9em;
 }

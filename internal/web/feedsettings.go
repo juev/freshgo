@@ -19,6 +19,7 @@ import (
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/scrape"
+	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -132,11 +133,12 @@ type feedPage struct {
 	CanBrowse bool
 	// Summarise is whether the long new entries are summarised;
 	// CanSummarise whether there is a service to do it.
-	Summarise     bool
-	CanSummarise  bool
-	ContentAction []option
-	Preview       template.HTML
-	PreviewNote   string
+	Summarise      bool
+	CanSummarise   bool
+	FiltersSuggest string
+	ContentAction  []option
+	Preview        template.HTML
+	PreviewNote    string
 	// Checks are what requesting the feed by each way came to; CheckHint
 	// what to do about it, if anything.
 	Checks    []feedCheck
@@ -282,6 +284,7 @@ func (h *Handler) showFeed(w http.ResponseWriter, r *http.Request, status int, f
 	page.CanBrowse = h.refresher.Browser != nil
 	_ = json.Unmarshal(a["summarise_long"], &page.Summarise)
 	page.CanSummarise = h.translator != nil
+	page.FiltersSuggest = a.filtersFor(search.ActionSuggest)
 	action := a.text("content_action")
 	if action != "prepend" && action != "append" {
 		action = "replace"
@@ -477,8 +480,9 @@ func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, can
 			delete(a, "page_by_browser")
 		}
 	}
-	// Likewise without a service to summarise with.
+	// Likewise without a service to summarise with, which also suggests labels.
 	if canSummarise {
+		a.setFilters(search.ActionSuggest, lines(form.Get("filters_suggest")))
 		if get("summarise_long") != "" {
 			a.set("summarise_long", true)
 		} else {

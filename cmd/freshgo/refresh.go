@@ -100,6 +100,7 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 		}
 		s.translator = translate.New(db, &translate.Client{URL: conf.TranslateURL, Key: conf.TranslateKey, Model: conf.TranslateModel, HTTP: asking})
 		s.refresher.Summarise = s.translator.SummariseLong
+		s.refresher.Suggest = s.translator.SuggestLabelsFor
 	}
 	if conf.VAPIDPublicKey != "" {
 		// A client of its own: the push services must not wait for the
