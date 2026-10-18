@@ -162,7 +162,10 @@ func (h *Handler) authenticate(ctx context.Context, r *http.Request, system stor
 	if subtle.ConstantTimeCompare([]byte(user.FeverKey), []byte(key)) != 1 || !greader.Admits(system, user) {
 		return nil, 0, nil
 	}
-	h.guard.Succeeded(guard)
+	// The count is of the address, which every account behind it shares:
+	// a key that works takes back its own attempt and no more, or a user
+	// could clear the guesses at another with a key of their own.
+	h.guard.Refund(guard)
 	return user, 0, nil
 }
 

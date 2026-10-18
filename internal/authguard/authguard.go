@@ -90,6 +90,27 @@ func (g *Guard) Succeeded(key string) {
 	delete(g.failures, key)
 }
 
+// Refund takes back the count of one attempt that worked and leaves the
+// failures before it. It is for a key that many accounts share, such as an
+// address alone, where a success of one account must not clear the guesses
+// at another.
+func (g *Guard) Refund(key string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	f := g.failures[key]
+	if f == nil {
+		return
+	}
+	f.count--
+	if f.count <= 0 {
+		delete(g.failures, key)
+		return
+	}
+	if f.count < FreeFailures {
+		f.until = time.Time{}
+	}
+}
+
 // Key tells attempts apart by name and by where they come from. The name is
 // one a user can have, so the key is short.
 func Key(name, addr string) string {
