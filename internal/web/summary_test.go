@@ -84,10 +84,11 @@ func TestSummariseEntry(t *testing.T) {
 			t.Errorf("a plain form: at %q", location)
 		}
 
-		// A summary is in the language of the reader: in another there is none.
+		// A summary in another language than the reader's is shown, and can
+		// be made again in theirs.
 		s.setting("alice", "translate_to", "de")
-		if page := s.page(path); strings.Contains(page, "entry-summary") || !strings.Contains(page, ">Summarise</button>") {
-			t.Error("a summary in English is shown to a reader of German")
+		if page := s.page(path); !strings.Contains(page, "entry-summary") || !strings.Contains(page, ">Summarise again</button>") {
+			t.Error("a summary in English is not shown to a reader of German")
 		}
 		a = s.part(http.MethodPost, path+"/summary", "entry", form)
 		if system := in.systems[len(in.systems)-1]; !strings.Contains(system, "in German") || !strings.Contains(a.body, "entry-summary") {

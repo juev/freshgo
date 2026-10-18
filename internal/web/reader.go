@@ -697,7 +697,7 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 			state := translate.Of(e, tag.String())
 			title, content, offered = state.Title, state.Content, offer(v, state)
 			summarise, suggest = v.T("entry.summarise"), v.T("entry.suggest-labels")
-			if text, ok := translate.SummaryOf(e, tag); ok {
+			if text, ok := translate.SummaryOf(e); ok {
 				summed, summarise = &summary{Heading: v.T("entry.summary"), Text: text}, v.T("entry.summarise-again")
 			}
 		}

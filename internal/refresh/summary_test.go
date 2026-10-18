@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/text/language"
-
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/translate"
@@ -79,7 +77,7 @@ func TestRefreshSummarisesLongEntries(t *testing.T) {
 		summary := func(entries []*store.Entry) map[string]bool {
 			got := map[string]bool{}
 			for _, e := range entries {
-				_, ok := translate.SummaryOf(e, language.Russian)
+				_, ok := translate.SummaryOf(e)
 				got[e.Title] = ok
 			}
 			return got
@@ -172,7 +170,7 @@ func TestRefreshWithFailingModel(t *testing.T) {
 			t.Errorf("the model was asked %d times, want once", asked())
 		}
 		for _, e := range w.entries(f) {
-			if _, ok := translate.SummaryOf(e, language.English); ok {
+			if _, ok := translate.SummaryOf(e); ok {
 				t.Errorf("entry %q has a summary", e.Title)
 			}
 		}

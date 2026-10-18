@@ -68,15 +68,11 @@ func TestSummarise(t *testing.T) {
 			// S2: the summary is stored; the title, the text and the other
 			// attributes are not touched.
 			e := stored()
-			if text, ok := SummaryOf(e, language.Russian); !ok || text != got {
+			if text, ok := SummaryOf(e); !ok || text != got {
 				t.Errorf("SummaryOf = %q, %v", text, ok)
 			}
 			if e.Title != "Hello, reader" || e.Content != longArticle || !strings.Contains(string(e.Attributes), `"original_content":"kept"`) {
 				t.Errorf("the entry itself changed: %q, attributes %s", e.Title, e.Attributes)
-			}
-			// S3: a summary is in one language.
-			if _, ok := SummaryOf(e, language.German); ok {
-				t.Error("a summary in Russian is offered in German")
 			}
 
 			// S4: a model that fails leaves the stored summary and the entry
@@ -103,7 +99,7 @@ func TestSummarise(t *testing.T) {
 			if err := db.UpdateEntry(ctx, e); err != nil {
 				t.Fatal(err)
 			}
-			if _, ok := SummaryOf(stored(), language.Russian); ok {
+			if _, ok := SummaryOf(stored()); ok {
 				t.Error("the summary of the old text is offered for the new one")
 			}
 
@@ -125,7 +121,7 @@ func TestSummarise(t *testing.T) {
 			if got, err := tr.Summarise(ctx, u.ID, entry.ID, language.Russian); err != nil || got != "" {
 				t.Errorf("Summarise of a text that changed meanwhile = %q, %v", got, err)
 			}
-			if _, ok := SummaryOf(stored(), language.Russian); ok {
+			if _, ok := SummaryOf(stored()); ok {
 				t.Error("the summary of the text before the change is stored")
 			}
 
@@ -200,7 +196,7 @@ func TestSummariseLong(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, ok := SummaryOf(e, language.Russian); ok != want {
+		if _, ok := SummaryOf(e); ok != want {
 			t.Errorf("entry %q has a summary: %v, want %v", e.Title, ok, want)
 		}
 	}
