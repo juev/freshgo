@@ -11,6 +11,13 @@
 <input type="text" id="token" name="token" value="{{.Data.Token}}" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="token-hint">
 <span class="hint" id="token-hint">{{.T "settings.token.hint"}}</span>
 </p>
+{{if .Data.CanDigest}}
+<p class="check">
+<input type="checkbox" id="digest" name="digest" value="1"{{if .Data.Digest}} checked{{end}} aria-describedby="digest-hint">
+<label for="digest">{{.T "settings.digest"}}</label>
+<span class="hint" id="digest-hint">{{.T "settings.digest.hint"}}</span>
+</p>
+{{end}}
 <p><button type="submit">{{.T "keys.save"}}</button></p>
 </form>
 {{if .Data.Feed}}<p>{{.T "settings.token.links"}} <a href="{{.Data.Feed}}">RSS</a>, <a href="{{.Data.OPML}}">OPML</a>.</p>{{end}}

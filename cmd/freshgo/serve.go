@@ -17,6 +17,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/juev/freshgo/internal/authguard"
+	"github.com/juev/freshgo/internal/digest"
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/fever"
 	"github.com/juev/freshgo/internal/greader"
@@ -26,12 +27,17 @@ import (
 	"github.com/juev/freshgo/internal/sanitize"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/web"
+	"github.com/juev/freshgo/internal/web/i18n"
 	"github.com/juev/freshgo/internal/websub"
 )
 
 // shutdownTimeout is how long requests in flight get to finish when the
 // server is told to stop.
 const shutdownTimeout = 10 * time.Second
+
+// digestInterval is how often the users whose digest is due are looked for;
+// a digest itself goes out once a day.
+const digestInterval = time.Hour
 
 // extensionsPath is where extensions answer requests of their own, as in
 // FreshRSS: the name of the extension follows, or comes in the "ext"
@@ -243,6 +249,14 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	defer cancel()
 	var background sync.WaitGroup
 	background.Go(func() { s.refresher.Schedule(ctx, conf.RefreshInterval) })
+	if mailer != nil {
+		texts, err := i18n.Load()
+		if err != nil {
+			return err
+		}
+		digests := digest.New(digest.Options{DB: db, Mailer: mailer, Texts: texts, Log: s.log})
+		background.Go(func() { digests.Schedule(ctx, digestInterval) })
+	}
 	background.Go(func() {
 		<-ctx.Done()
 		stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)

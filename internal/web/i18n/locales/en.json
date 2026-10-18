@@ -114,6 +114,20 @@
   "category.repeats": "Repeated entries",
   "category.same-guid": "Mark an entry as read when another one of the category has its identifier",
   "category.same-title": "Mark an entry as read when another one of the category has its title",
+  "digest.mail.footer": "You get this letter because the daily digest is switched on in the profile settings.",
+  "digest.mail.intro": {
+    "one": "%d unread entry came to %s since the last digest:",
+    "other": "%d unread entries came to %s since the last digest:"
+  },
+  "digest.mail.more": {
+    "one": "… and %d more.",
+    "other": "… and %d more."
+  },
+  "digest.mail.subject": {
+    "one": "%d new unread entry — %s",
+    "other": "%d new unread entries — %s"
+  },
+  "digest.untitled": "(no title)",
   "entry.feed-text": "Text of the feed",
   "entry.fold": "Collapse",
   "entry.full-text": "Full text",
@@ -625,6 +639,8 @@
   "settings.delete": "Deleting the account",
   "settings.delete.confirm": "Your account is deleted with every feed, entry and setting of it. This cannot be undone.",
   "settings.delete.open": "Delete my account…",
+  "settings.digest": "Send a digest of unread entries once a day",
+  "settings.digest.hint": "One letter a day with the unread entries that came since the last one, to the address above. Nothing is sent when there are none.",
   "settings.display-posts": "List entries open",
   "settings.display.heading": "Display",
   "settings.email": "E-mail address",
