@@ -881,6 +881,7 @@
   "transfer.problem.server-missing-login": "Give the address of the server, the login and the password.",
   "transfer.problem.server-failed": "The server could not be read. The log of freshgo says why.",
   "transfer.problem.server-forbidden": "This freshgo is not allowed to reach that address. An administrator can allow it with the fetch allowlist.",
+  "transfer.problem.server-too-large": "The account on the server is too large to import (more than 256 MiB). Remove old entries on the server first.",
   "transfer.problem.server-address": "The address of the server is not an http or https address.",
   "transfer.problem.server-missing": "Give the address of the server and the API token.",
   "transfer.problem.server-token": "The server does not accept the API token.",

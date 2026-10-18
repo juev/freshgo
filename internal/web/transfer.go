@@ -172,6 +172,9 @@ func (h *Handler) importServer(w http.ResponseWriter, r *http.Request) {
 	case errors.Is(err, fetch.ErrForbiddenAddress):
 		h.showTransfer(w, r, http.StatusBadRequest, "transfer.problem.server-forbidden")
 		return
+	case errors.Is(err, transfer.ErrRemoteTooLarge):
+		h.showTransfer(w, r, http.StatusBadRequest, "transfer.problem.server-too-large")
+		return
 	case ctx.Err() != nil:
 		return
 	case err != nil:

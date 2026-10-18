@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"slices"
 	"strings"
 	"testing"
@@ -340,4 +342,45 @@ func TestImport(t *testing.T) {
 			t.Errorf("labels %v, %v: no again", after, err)
 		}
 	})
+}
+
+// A server that pages without end is read up to a bound: the account is held
+// in memory before it is written.
+func TestReadIsBounded(t *testing.T) {
+	defer func(was int) { *ttrss.MaxBytes = was }(*ttrss.MaxBytes)
+	*ttrss.MaxBytes = 1 << 20
+	pages := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var in map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&in)
+		var content any
+		switch in["op"] {
+		case "login":
+			content = map[string]any{"session_id": "s"}
+		case "getCategories", "getFeeds":
+			content = []any{}
+		case "getHeadlines":
+			pages++
+			skip, _ := in["skip"].(float64)
+			var page []map[string]any
+			for i := range 200 {
+				page = append(page, map[string]any{"id": int(skip) + i + 1, "feed_id": 1, "content": strings.Repeat("x", 1000)})
+			}
+			content = page
+		default:
+			content = map[string]any{"status": "OK"}
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"seq": 0, "status": 0, "content": content})
+	}))
+	defer server.Close()
+	c, err := fetch.New(fetch.Options{UserAgent: "freshgo/test", Allowlist: []string{strings.TrimPrefix(server.URL, "http://")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ttrss.Read(context.Background(), c, server.URL, "u", "p"); !errors.Is(err, transfer.ErrRemoteTooLarge) {
+		t.Errorf("an account without end: %v, want ErrRemoteTooLarge", err)
+	}
+	if pages > 7 {
+		t.Errorf("%d pages read past the bound", pages)
+	}
 }

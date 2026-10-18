@@ -100,7 +100,12 @@ type client struct {
 	fetcher Fetcher
 	base    string
 	token   string
+	// read is how many bytes the answers so far came to.
+	read int
 }
+
+// maxBytes is transfer.MaxRemoteBytes, smaller in tests.
+var maxBytes = transfer.MaxRemoteBytes
 
 func (c *client) get(ctx context.Context, path string, query url.Values, into any) error {
 	address := c.base + path
@@ -117,6 +122,9 @@ func (c *client) get(ctx context.Context, path string, query url.Values, into an
 		return ErrToken
 	case err != nil:
 		return fmt.Errorf("miniflux: %s: %w", path, err)
+	}
+	if c.read += len(resp.Body); c.read > maxBytes {
+		return fmt.Errorf("miniflux: %w", transfer.ErrRemoteTooLarge)
 	}
 	if err := json.Unmarshal(resp.Body, into); err != nil {
 		return fmt.Errorf("miniflux: %s: the answer is not what the API gives: %w", path, err)
