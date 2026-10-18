@@ -113,7 +113,9 @@ func (d *Digester) one(ctx context.Context, u *store.User, system store.System) 
 	if !s.Digest || s.Enabled != nil && !*s.Enabled || s.Mail == "" || s.Pending != "" {
 		return nil
 	}
-	now := d.now()
+	// The end of a period is the start of the next, kept in whole seconds:
+	// cut there, an entry in the second of a pass is in one letter only.
+	now := d.now().Truncate(time.Second)
 	// The switch records when it was turned on; a user who has none starts
 	// now, so that the first digest does not carry the whole backlog.
 	if s.Sent == 0 {

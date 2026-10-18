@@ -22,7 +22,7 @@ Out of scope: another period than a day, a choice of feeds or categories, HTML l
 - D4. A user gets a digest when `digest` is on, the user is not kept out (`enabled`), has an address, and that address is not waiting for confirmation (`email_validation_token` empty), and at least 24 hours have passed since `digest_sent`. A user with the digest on and no `digest_sent` gets it set to now and no letter, so that the first letter does not carry a backlog.
 - D5. The letter is one plain-text message to `mail_login`. Its entries are the unread ones of the reading list of the user (`greader-api.md`, A13: feeds of priority 0 and above) whose identifier, the time the entry was added, lies from `digest_sent` up to the time of the pass; entries read, of other users, of hidden feeds, and from before the period are not in it.
 - D6. Each entry takes a line `feed: title` and, when it has one, a line with its link; the title of an entry without one is a placeholder. The newest come first. At most 100 are named; a line says how many more there are. The subject and the other lines are in the language of the user (`language`, then that of the installation), in the forms of the language for the number of entries.
-- D7. With no entries in the period no letter goes out. After a letter that went out, or none that was due, `digest_sent` becomes the time of the pass: the next period starts there.
+- D7. With no entries in the period no letter goes out. After a letter that went out, or none that was due, `digest_sent` becomes the time of the pass: the next period starts there. The time of the pass is cut to the whole second, as `digest_sent` keeps it, so that an entry that came in the second of the pass is in the next letter and not in two.
 - D8. A letter that cannot be sent is logged and leaves `digest_sent` as it is; the next pass tries again for the same period, and the entries that came meanwhile join. One user's failure does not hold up the others.
 
 ## Decisions
@@ -39,6 +39,7 @@ Out of scope: another period than a day, a choice of feeds or categories, HTML l
 
 - D4–D7: `TestOneLetterForThePeriod` (read, hidden, another user's and earlier entries absent; none before 24 hours; none on a second look within the day; only the newer after it), `TestNoLetterWithoutNewEntries`, `TestWhoGetsNothing` (switch off, no address, unconfirmed address, kept out, no start yet).
 - D6: `TestLongList` (a hundred named, the rest counted), `TestLetterInTheLanguageOfTheUser`.
+- D7, the second of a pass: `TestEntryInTheSecondOfAPass`.
 - D8: `TestFailedLetterIsRetried`.
 - D1, D2: `TestDigestSwitch`, `TestDigestNeedsLetters` in `internal/web`.
 - D3: not run in a test: the loop is `Schedule`, which calls `Run` on a ticker.

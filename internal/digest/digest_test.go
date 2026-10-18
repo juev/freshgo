@@ -225,6 +225,21 @@ func TestOneLetterForThePeriod(t *testing.T) {
 	})
 }
 
+// A pass in the middle of a second ends its period at the start of that
+// second: an entry that came within it is in the next letter, not in two.
+func TestEntryInTheSecondOfAPass(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		news := w.feeds["news"]
+		due := start.Add(24 * time.Hour)
+		w.entry(w.alice, news, due.Add(-time.Hour), "early", false)
+		w.entry(w.alice, news, due.Add(200*time.Millisecond), "edge", false)
+		w.run(due.Add(500 * time.Millisecond))
+		mentions(t, w.letters(1)[0].Body, []string{"early"}, []string{"edge"})
+		w.run(due.Add(24*time.Hour + 500*time.Millisecond))
+		mentions(t, w.letters(2)[1].Body, []string{"edge"}, []string{"early"})
+	})
+}
+
 // With nothing new no letter goes out, and the period still moves on, so
 // that an entry of an earlier day does not turn up later.
 func TestNoLetterWithoutNewEntries(t *testing.T) {
