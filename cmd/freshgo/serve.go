@@ -18,6 +18,7 @@ import (
 
 	"github.com/juev/freshgo/internal/authguard"
 	"github.com/juev/freshgo/internal/favicon"
+	"github.com/juev/freshgo/internal/fever"
 	"github.com/juev/freshgo/internal/greader"
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/mail"
@@ -64,11 +65,12 @@ func extensions(registry *hooks.Registry) http.Handler {
 
 // routes sends a request to the part of the server its path belongs to. The
 // Google Reader API lives at the root, as in the original service, and under
-// the path FreshRSS serves it at. What belongs to no other part is a page of
+// the path FreshRSS serves it at; the Fever API has the path FreshRSS gives
+// it. What belongs to no other part is a page of
 // the web interface.
 //
 // hubs is nil when WebSub is off.
-func routes(health, api, icons, misc, hubs, pages http.Handler) http.Handler {
+func routes(health, api, feverAPI, icons, misc, hubs, pages http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := r.URL.Path
 		switch {
@@ -80,6 +82,8 @@ func routes(health, api, icons, misc, hubs, pages http.Handler) http.Handler {
 			misc.ServeHTTP(w, r)
 		case hubs != nil && strings.HasPrefix(path, websub.Path):
 			hubs.ServeHTTP(w, r)
+		case path == fever.Path:
+			feverAPI.ServeHTTP(w, r)
 		case path == greader.Alias, strings.HasPrefix(path, greader.Alias+"/"),
 			strings.HasPrefix(path, "/accounts/"), strings.HasPrefix(path, "/reader/"):
 			api.ServeHTTP(w, r)
@@ -179,6 +183,9 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL, MediaProxy: true,
 		Guard: guard, TrustedProxies: proxies,
 	})
+	feverAPI := fever.New(fever.Options{
+		DB: db, Hooks: s.registry, Log: s.log, Guard: guard, TrustedProxies: proxies,
+	})
 	// A nil service must not become a handler that is not nil.
 	var hubs http.Handler
 	if s.webSub != nil {
@@ -222,7 +229,7 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 		}()
 	}
 	server := &http.Server{
-		Handler: observe(routes(healthHandler(db.Ping, s.refresher.LastRun, s.log), api, s.icons, extensions(s.registry), hubs, pages),
+		Handler: observe(routes(healthHandler(db.Ping, s.refresher.LastRun, s.log), api, feverAPI, s.icons, extensions(s.registry), hubs, pages),
 			s.log, requests),
 		ReadHeaderTimeout: 10 * time.Second,
 		// A request ends with the server, not with the signal: Shutdown

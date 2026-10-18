@@ -573,6 +573,13 @@ func heldUp(system store.System, user *store.User) bool {
 	return system.ForceEmailValidation && s.unconfirmed && !s.admin && user.Name != system.DefaultUser
 }
 
+// Admits reports whether a user may use API clients at all: they are not
+// disabled, and not held up for an address they have yet to confirm. Other
+// APIs of the installation apply the same rule.
+func Admits(system store.System, user *store.User) bool {
+	return readSettings(user.Settings).enabled && !heldUp(system, user)
+}
+
 // settings are the keys of a user's settings the API depends on, under the
 // names FreshRSS gives them in the user's config.php.
 type settings struct {

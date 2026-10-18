@@ -27,10 +27,10 @@ func TestRoutes(t *testing.T) {
 	}
 	registry := &hooks.Registry{}
 	registry.HandleAPI("Share By Mail", part("extension"))
-	server := httptest.NewServer(routes(part("health"), part("api"), part("icons"), extensions(registry), part("hubs"), part("pages")))
+	server := httptest.NewServer(routes(part("health"), part("api"), part("fever"), part("icons"), extensions(registry), part("hubs"), part("pages")))
 	defer server.Close()
 	// Without WebSub its addresses do not exist.
-	off := httptest.NewServer(routes(part("health"), part("api"), part("icons"), extensions(registry), nil, part("pages")))
+	off := httptest.NewServer(routes(part("health"), part("api"), part("fever"), part("icons"), extensions(registry), nil, part("pages")))
 	defer off.Close()
 	if resp, err := http.Get(off.URL + "/websub/abc"); err != nil {
 		t.Errorf("GET /websub/abc with WebSub off: %v", err)
@@ -62,7 +62,9 @@ func TestRoutes(t *testing.T) {
 		"/healthz/x":                                                            {200, "pages /healthz/x"},
 		"/":                                                                     {200, "pages /"},
 		"/api/greader.phpx":                                                     {200, "pages /api/greader.phpx"},
-		"/api/fever.php":                                                        {200, "pages /api/fever.php"},
+		"/api/fever.php":                                                        {200, "fever /api/fever.php"},
+		"/api/fever.php?api&unread_item_ids":                                    {200, "fever /api/fever.php?api&unread_item_ids"},
+		"/api/fever.phpx":                                                       {200, "pages /api/fever.phpx"},
 		"/readers":                                                              {200, "pages /readers"},
 		"/static/app.css":                                                       {200, "pages /static/app.css"},
 	} {

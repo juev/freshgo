@@ -10,13 +10,11 @@ A feed aggregator server in one binary that takes over an existing [FreshRSS](ht
 - applies the retention settings, the auto-read rules and the filter actions of FreshRSS, with its search language;
 - fetches the full text of articles, by CSS selector or found on the page automatically, for a whole feed or for one article on request;
 - translates an article on request with a language model of your choice, part by part as you read;
-- serves the Google Reader API, OPML import and export, and feed icons;
+- serves the Google Reader API and, when an administrator switches it on, the Fever API; OPML import and export, and feed icons;
 - has a web interface of its own, in English and Russian, in which everything can be done from the keyboard and without JavaScript;
 - subscribes to WebSub hubs;
 - has extension points modelled on the FreshRSS hooks, for handlers compiled into the binary, which can also add links to the menu and a block to the login page. PHP extensions of FreshRSS do not run;
 - runs as one static binary or from a container image of about 25 MB, for amd64 and arm64.
-
-The Fever API is not implemented.
 
 ## Running on your own server
 
@@ -256,6 +254,12 @@ freshrss-login "alice"
 freshrss-password "…"
 ```
 
+### Fever
+
+Readers that speak the Fever API, such as Reeder and Fiery Feeds, use the address `https://rss.example.org/api/fever.php`. An administrator switches it on with "Apps may connect through the Fever API" on the administration page "Signing in", beside the general switch for apps; it is off by default, and it answers only while both are on. The client asks for an e-mail and a password: give it the user name and the API password. The Fever key is the md5 hash of `name:password` and cannot be worked out from the bcrypt hash of the API password, so freshgo stores it whenever the API password is set (in the profile, on the page of a user in the administration, with `user create` and `user passwd`). A user whose API password was set earlier, or came with an import, sets it again once to use Fever. The key is md5 of the name and the password, so it is no stronger than the password: use a password of its own for apps, and an HTTPS address.
+
+The API gives groups (the categories), feeds, items (fifty at a time), unread and saved identifiers, and marks items, feeds and groups; saved is starred. Favicons and links are empty lists, and the answer is JSON only.
+
 ## Commands
 
 | Command | What it does |
@@ -415,7 +419,7 @@ With `-debug-listen`, `/metrics` at that address has, besides the metrics of the
 
 ### Paths the server answers
 
-`/healthz` (whether the server works, without a login: 200 while the database answers, 503 when it does not answer within two seconds, with the error in the log; the JSON says, as `lastRefresh`, when the last refresh of the feeds of every user ended), `/accounts/` and `/reader/` (Google Reader API), `/api/greader.php` (the same API at the FreshRSS path), `/favicon/` (feed icons), `/websub/` (when WebSub is on), `/api/misc.php` (extensions). Every other path belongs to the web interface.
+`/healthz` (whether the server works, without a login: 200 while the database answers, 503 when it does not answer within two seconds, with the error in the log; the JSON says, as `lastRefresh`, when the last refresh of the feeds of every user ended), `/accounts/` and `/reader/` (Google Reader API), `/api/greader.php` (the same API at the FreshRSS path), `/api/fever.php` (Fever API, when switched on), `/favicon/` (feed icons), `/websub/` (when WebSub is on), `/api/misc.php` (extensions). Every other path belongs to the web interface.
 
 ## Development
 

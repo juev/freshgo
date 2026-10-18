@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"crypto/md5" // the key of the Fever protocol, which defines it
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -36,8 +37,8 @@ func (s *Store) CreateUser(ctx context.Context, u *User) error {
 	u.Settings = settings
 	return s.InTx(ctx, func(tx *Store) error {
 		err := tx.queryRow(ctx, `
-			INSERT INTO users (name, api_password_hash, settings) VALUES (?, ?, ?)
-			RETURNING id`, u.Name, u.APIPasswordHash, jsonObject(u.Settings)).Scan(&u.ID)
+			INSERT INTO users (name, api_password_hash, fever_key, settings) VALUES (?, ?, ?, ?)
+			RETURNING id`, u.Name, u.APIPasswordHash, u.FeverKey, jsonObject(u.Settings)).Scan(&u.ID)
 		if err != nil {
 			return fmt.Errorf("store: create user %q: %w", u.Name, err)
 		}
@@ -89,7 +90,7 @@ func NewFeedToken() (string, error) {
 // UserByName returns the user with the given name or ErrNotFound.
 func (s *Store) UserByName(ctx context.Context, name string) (*User, error) {
 	u, err := scanUser(s.queryRow(ctx, `
-		SELECT id, name, api_password_hash, settings FROM users WHERE name = ?`, name))
+		SELECT id, name, api_password_hash, fever_key, settings FROM users WHERE name = ?`, name))
 	if err != nil {
 		return nil, fmt.Errorf("store: user %q: %w", name, err)
 	}
@@ -98,7 +99,7 @@ func (s *Store) UserByName(ctx context.Context, name string) (*User, error) {
 
 // Users returns all users ordered by name.
 func (s *Store) Users(ctx context.Context) ([]*User, error) {
-	rows, err := s.query(ctx, `SELECT id, name, api_password_hash, settings FROM users ORDER BY name`)
+	rows, err := s.query(ctx, `SELECT id, name, api_password_hash, fever_key, settings FROM users ORDER BY name`)
 	if err != nil {
 		return nil, fmt.Errorf("store: users: %w", err)
 	}
@@ -112,7 +113,7 @@ func (s *Store) Users(ctx context.Context) ([]*User, error) {
 func scanUser(sc scanner) (*User, error) {
 	u := &User{}
 	var settings string
-	if err := sc.Scan(&u.ID, &u.Name, &u.APIPasswordHash, &settings); err != nil {
+	if err := sc.Scan(&u.ID, &u.Name, &u.APIPasswordHash, &u.FeverKey, &settings); err != nil {
 		return nil, err
 	}
 	u.Settings = []byte(settings)
@@ -129,10 +130,36 @@ func ValidUserName(name string) bool {
 	return userNamePattern.MatchString(name)
 }
 
-// SetAPIPasswordHash replaces the hash of the API password of a user. The
-// tokens issued for the old password stop working.
-func (s *Store) SetAPIPasswordHash(ctx context.Context, userID int64, hash string) error {
-	n, err := s.affected(ctx, `UPDATE users SET api_password_hash = ? WHERE id = ?`, hash, userID)
+// FeverKey returns the key a Fever client logs in with: the md5 hash of
+// "name:password" in lower-case hexadecimal, as the Fever protocol defines it.
+// A user who has no API password has no key.
+func FeverKey(name, password string) string {
+	if password == "" {
+		return ""
+	}
+	sum := md5.Sum([]byte(name + ":" + password))
+	return hex.EncodeToString(sum[:])
+}
+
+// UserByFeverKey returns the user whose Fever key is key, or ErrNotFound. An
+// empty key belongs to nobody.
+func (s *Store) UserByFeverKey(ctx context.Context, key string) (*User, error) {
+	if key == "" {
+		return nil, fmt.Errorf("store: user by Fever key: %w", ErrNotFound)
+	}
+	u, err := scanUser(s.queryRow(ctx, `
+		SELECT id, name, api_password_hash, fever_key, settings FROM users WHERE fever_key = ?`, key))
+	if err != nil {
+		return nil, fmt.Errorf("store: user by Fever key: %w", err)
+	}
+	return u, nil
+}
+
+// SetAPIPasswordHash replaces the hash of the API password of a user, and
+// with it the Fever key made of the same password (see FeverKey). The tokens
+// issued for the old password stop working.
+func (s *Store) SetAPIPasswordHash(ctx context.Context, userID int64, hash, feverKey string) error {
+	n, err := s.affected(ctx, `UPDATE users SET api_password_hash = ?, fever_key = ? WHERE id = ?`, hash, feverKey, userID)
 	if err != nil {
 		return fmt.Errorf("store: set API password of user %d: %w", userID, err)
 	}
@@ -159,7 +186,7 @@ func (s *Store) DeleteUser(ctx context.Context, userID int64) error {
 // UserByID returns the user with the identifier or ErrNotFound.
 func (s *Store) UserByID(ctx context.Context, id int64) (*User, error) {
 	u, err := scanUser(s.queryRow(ctx, `
-		SELECT id, name, api_password_hash, settings FROM users WHERE id = ?`, id))
+		SELECT id, name, api_password_hash, fever_key, settings FROM users WHERE id = ?`, id))
 	if err != nil {
 		return nil, fmt.Errorf("store: user %d: %w", id, err)
 	}
