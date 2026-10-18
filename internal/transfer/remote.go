@@ -13,6 +13,15 @@ import (
 	"github.com/juev/freshgo/internal/store"
 )
 
+// MaxRemoteBytes bounds the answers a source reads for one account. The
+// account is held in memory until it is written, and the server is one the
+// user names, which could page without end.
+const MaxRemoteBytes = 256 << 20
+
+// ErrRemoteTooLarge is returned by a source whose answers for one account
+// come to more than MaxRemoteBytes.
+var ErrRemoteTooLarge = fmt.Errorf("the account on the server takes more than %d MiB to read", MaxRemoteBytes>>20)
+
 // Remote is the account of a user on another reader's server, as the
 // sources that read one (Miniflux, Tiny Tiny RSS) hand it over. Reading it
 // takes the network and writing it takes the database: the two never overlap,

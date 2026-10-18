@@ -4,7 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -440,4 +444,39 @@ func TestImportIntoSubscribedFeed(t *testing.T) {
 			t.Errorf("no warning about the identifiers in %q", report.Warnings)
 		}
 	})
+}
+
+// A server that pages without end is read up to a bound: the account is held
+// in memory before it is written.
+func TestReadIsBounded(t *testing.T) {
+	defer func(was int) { *miniflux.MaxBytes = was }(*miniflux.MaxBytes)
+	*miniflux.MaxBytes = 1 << 20
+	pages := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/me":
+			_, _ = io.WriteString(w, `{}`)
+		case "/v1/categories", "/v1/feeds":
+			_, _ = io.WriteString(w, `[]`)
+		case "/v1/entries":
+			pages++
+			after, _ := strconv.ParseInt(r.URL.Query().Get("after_entry_id"), 10, 64)
+			var entries []map[string]any
+			for i := range int64(100) {
+				entries = append(entries, map[string]any{"id": after + i + 1, "content": strings.Repeat("x", 1000)})
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"total": 1 << 30, "entries": entries})
+		}
+	}))
+	defer server.Close()
+	c, err := fetch.New(fetch.Options{UserAgent: "freshgo/test", Allowlist: []string{strings.TrimPrefix(server.URL, "http://")}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := miniflux.Read(context.Background(), c, server.URL, "token"); !errors.Is(err, transfer.ErrRemoteTooLarge) {
+		t.Errorf("an account without end: %v, want ErrRemoteTooLarge", err)
+	}
+	if pages > 12 {
+		t.Errorf("%d pages read past the bound", pages)
+	}
 }

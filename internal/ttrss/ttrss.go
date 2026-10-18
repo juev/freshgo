@@ -147,7 +147,7 @@ func Read(ctx context.Context, f Fetcher, address, user, password string) (*tran
 			if len(h.Tags) > 0 {
 				tagged++
 			}
-			if at, ok := index[strconv.FormatInt(h.FeedID, 10)]; ok && remote.Feeds[at].Site == "" {
+			if at, ok := index[strconv.FormatInt(int64(h.FeedID), 10)]; ok && remote.Feeds[at].Site == "" {
 				remote.Feeds[at].Site = h.SiteURL
 			}
 			remote.Entries = append(remote.Entries, h.convert())
@@ -187,7 +187,12 @@ type client struct {
 	fetcher  Fetcher
 	endpoint string
 	sid      string
+	// read is how many bytes the answers so far came to.
+	read int
 }
+
+// maxBytes is transfer.MaxRemoteBytes, smaller in tests.
+var maxBytes = transfer.MaxRemoteBytes
 
 // call makes the call op with the arguments and reads its content into into.
 // The API answers 200 also to a refusal: the status of the answer is in the
@@ -213,6 +218,9 @@ func (c *client) call(ctx context.Context, op string, args map[string]any, into 
 	})
 	if err != nil {
 		return fmt.Errorf("ttrss: %s: %w", op, err)
+	}
+	if c.read += len(resp.Body); c.read > maxBytes {
+		return fmt.Errorf("ttrss: %w", transfer.ErrRemoteTooLarge)
 	}
 	var answer struct {
 		Status  int             `json:"status"`
@@ -304,7 +312,7 @@ type headline struct {
 	Updated   int64    `json:"updated"`
 	Title     string   `json:"title"`
 	Link      string   `json:"link"`
-	FeedID    int64    `json:"feed_id"`
+	FeedID    id       `json:"feed_id"`
 	Author    string   `json:"author"`
 	Note      string   `json:"note"`
 	SiteURL   string   `json:"site_url"`
@@ -314,12 +322,25 @@ type headline struct {
 	Labels [][]any `json:"labels"`
 }
 
+// id is a number the API passes on from the database as it comes: a JSON
+// number, or a string with some database drivers.
+type id int64
+
+func (n *id) UnmarshalJSON(data []byte) error {
+	v, err := strconv.ParseInt(strings.Trim(string(data), `"`), 10, 64)
+	if err != nil {
+		return fmt.Errorf("ttrss: %s is not an id", data)
+	}
+	*n = id(v)
+	return nil
+}
+
 // convert makes an entry of the headline. The identifier TT-RSS keeps is a
 // hash of the one the feed gave, with the id of the user inside, so it only
 // stands for a link the article has none of.
 func (h *headline) convert() transfer.RemoteEntry {
 	re := transfer.RemoteEntry{
-		Feed: strconv.FormatInt(h.FeedID, 10), ID: h.GUID, Title: h.Title, Author: h.Author, URL: h.Link,
+		Feed: strconv.FormatInt(int64(h.FeedID), 10), ID: h.GUID, Title: h.Title, Author: h.Author, URL: h.Link,
 		Content: h.Content, Read: !h.Unread, Starred: h.Marked, Published: h.Updated,
 	}
 	for _, l := range h.Labels {

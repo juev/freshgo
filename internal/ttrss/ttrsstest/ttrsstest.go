@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -77,6 +78,11 @@ func New(t *testing.T) *Server {
 			"comments_count": 0, "comments_link": "", "always_display_attachments": false,
 			"author": "Ann", "score": 0, "note": nil, "lang": "en", "site_url": fmt.Sprintf("https://site%d.example/", feed),
 			"content": fmt.Sprintf("<p>Body %d</p>", i),
+		}
+		// The API passes feed_id on from the database as it comes, which is
+		// a string with some drivers.
+		if i%3 == 0 {
+			h["feed_id"] = strconv.Itoa(feed)
 		}
 		label := func(name string) []any { return []any{-11, name, "", ""} }
 		if i%25 == 0 {
