@@ -40,13 +40,16 @@ type summaryRecord struct {
 	At int64 `json:"at"`
 }
 
-// SummaryOf returns the summary of an entry in the language of the tag;
-// ok is false when the entry has none for the text it has now.
-func SummaryOf(e *store.Entry, tag language.Tag) (text string, ok bool) {
+// SummaryOf returns the summary of an entry, in whatever language it was
+// made; ok is false when the entry has none for the text it has now. A
+// summary the refresh made in the language of the settings is shown also
+// to a reader whose browser asks for another: it was paid for, and the
+// reader can have it made again in theirs.
+func SummaryOf(e *store.Entry) (text string, ok bool) {
 	attrs := map[string]json.RawMessage{}
 	_ = json.Unmarshal(e.Attributes, &attrs)
 	var rec summaryRecord
-	if json.Unmarshal(attrs[summaryAttribute], &rec) != nil || rec.Text == "" || rec.Of != hashOf(e) || rec.Language != tag.String() {
+	if json.Unmarshal(attrs[summaryAttribute], &rec) != nil || rec.Text == "" || rec.Of != hashOf(e) {
 		return "", false
 	}
 	return rec.Text, true
