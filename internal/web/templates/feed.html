@@ -149,6 +149,14 @@
 <span class="hint" id="summarise-hint">{{.T "feed.summarise.hint"}}</span>
 </p>
 </fieldset>
+<fieldset>
+<legend>{{.T "feed.suggestions"}}</legend>
+<p>
+<label for="filters_suggest">{{.T "form.filters-suggest"}}</label>
+<textarea id="filters_suggest" name="filters_suggest" rows="3" spellcheck="false" aria-describedby="suggest-hint">{{.Data.FiltersSuggest}}</textarea>
+<span class="hint" id="suggest-hint">{{.T "form.filters-suggest.hint"}}</span>
+</p>
+</fieldset>
 {{end}}
 {{template "retention" (dict "Retention" .Data.Retention "Units" .Data.Units "Inherit" true "Page" .)}}
 {{template "sorting" (dict "Sorts" .Data.Sorts "Orders" .Data.Orders "Page" .)}}

@@ -48,7 +48,30 @@
 <input type="hidden" name="next" value="{{$.Here}}">
 <button type="submit" class="link">{{.}}</button>
 </form>{{end}}
+{{with .Entry.SuggestLabels}}<form method="post" action="{{$.Entry.URL}}/label-suggestions" class="entry-action">
+<input type="hidden" name="next" value="{{$.Here}}">
+<button type="submit" class="link">{{.}}</button>
+</form>{{end}}
 {{end}}
+
+{{define "entry-suggestions"}}{{with .Entry.Suggested}}<div class="entry-suggestions">
+<p>{{$.Page.T "entry.suggested"}}</p>
+<ul>
+{{range .}}<li>
+<span>{{.}}</span>
+<form method="post" action="{{$.Entry.URL}}/label-suggestions/add" class="entry-action">
+<input type="hidden" name="next" value="{{$.Here}}">
+<input type="hidden" name="name" value="{{.}}">
+<button type="submit" class="link">{{$.Page.T "entry.suggestion-add"}}</button>
+</form>
+</li>
+{{end}}</ul>
+<form method="post" action="{{$.Entry.URL}}/label-suggestions/dismiss" class="entry-action">
+<input type="hidden" name="next" value="{{$.Here}}">
+<button type="submit" class="link">{{$.Page.T "entry.suggestion-dismiss"}}</button>
+</form>
+</div>
+{{end}}{{end}}
 
 {{define "entry-star"}}
 <div class="entry-star">
@@ -135,6 +158,7 @@
 {{template "entry-body" .Entry}}
 {{if .Entry.Tags}}<p class="entry-tags">{{.Page.T "entry.tags"}} {{range $i, $tag := .Entry.Tags}}{{if $i}}, {{end}}{{$tag}}{{end}}</p>{{end}}
 {{if .Entry.Labels}}<p class="entry-labels">{{.Page.T "entry.labels"}} {{range $i, $label := .Entry.Labels}}{{if $i}}, {{end}}{{$label}}{{end}}</p>{{end}}
+{{if .CanChange}}{{template "entry-suggestions" (dict "Entry" .Entry "Here" .Here "Page" .Page)}}{{end}}
 </div>
 </details>
 </article>

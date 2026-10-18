@@ -26,7 +26,15 @@ func (r *Refresher) summarise(j *job, attrs attributes, entries []*store.Entry) 
 	if on, _ := get[bool](attrs, "summarise_long"); !on {
 		return
 	}
-	user := j.user
+	r.background(j.user, "entries were not summarised", func(ctx context.Context) error {
+		return r.Summarise(ctx, j.user, entries)
+	})
+}
+
+// background runs a batch of work for the model on its own, one of a few at
+// a time and for no longer than summaryBudget, and ends it with Lifetime.
+// A failure is logged under the message.
+func (r *Refresher) background(user *store.User, failure string, run func(ctx context.Context) error) {
 	r.summaries.Go(func() {
 		select {
 		case r.summarySlots <- struct{}{}:
@@ -36,11 +44,11 @@ func (r *Refresher) summarise(j *job, attrs attributes, entries []*store.Entry) 
 		defer func() { <-r.summarySlots }()
 		ctx, cancel := context.WithTimeout(r.Lifetime, summaryBudget)
 		defer cancel()
-		if err := r.Summarise(ctx, user, entries); err != nil && r.Lifetime.Err() == nil {
-			r.log.Warn("entries were not summarised", "user", user.Name, "error", err)
+		if err := run(ctx); err != nil && r.Lifetime.Err() == nil {
+			r.log.Warn(failure, "user", user.Name, "error", err)
 		}
 	})
 }
 
-// Wait returns when the summaries under way are done.
+// Wait returns when the summaries and the suggestions under way are done.
 func (r *Refresher) Wait() { r.summaries.Wait() }

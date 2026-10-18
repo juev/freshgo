@@ -198,7 +198,7 @@
 		const shared = Boolean(menu && menu.open);
 		const ways = 'a, button:not([hidden])';
 		const way = menu && menu.contains(focused) ? Array.from(menu.querySelectorAll(ways)).indexOf(focused) : -1;
-		const parts = ['.entry-state', '.entry-star', '.entry-labels', '.entry-actions'];
+		const parts = ['.entry-state', '.entry-star', '.entry-labels', '.entry-suggestions', '.entry-actions'];
 		for (const part of text ? [...parts, '.entry-title', '.entry-excerpt', '.entry-summary', '.entry-content'] : parts) {
 			const old = article.querySelector(part);
 			const now = fresh.querySelector(part);

@@ -10,6 +10,7 @@
 {{template "entry-body" .Data.Entry}}
 {{if .Data.Entry.Tags}}<p class="entry-tags">{{.T "entry.tags"}} {{range $i, $tag := .Data.Entry.Tags}}{{if $i}}, {{end}}{{$tag}}{{end}}</p>{{end}}
 {{if .Data.CanChange}}
+{{template "entry-suggestions" (dict "Entry" .Data.Entry "Here" .Data.Here "Page" .)}}
 <form method="post" action="{{.Data.Entry.URL}}/labels" class="form labels" id="labels">
 <input type="hidden" name="next" value="{{.Data.Here}}">
 <fieldset>

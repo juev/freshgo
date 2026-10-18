@@ -5,7 +5,7 @@ Sources: user request of 2026-10-06 and the decisions recorded in `plan.md`; `Fr
 
 ## Purpose and scope
 
-`internal/search` reads the search language of FreshRSS and tells whether an entry matches a query. Filter actions, the rules that mark arriving entries read, star them or label them, are written in it; `internal/refresh` applies them. The search of the web interface is the same matching run over the stored entries. Covers requirement R11 of the plan of the core and, with `storage.md`, R6 of the plan of the web interface.
+`internal/search` reads the search language of FreshRSS and tells whether an entry matches a query. Filter actions, the rules that mark arriving entries read, star them or label them, or have the language model suggest labels for them, are written in it; `internal/refresh` applies them. The search of the web interface is the same matching run over the stored entries. Covers requirement R11 of the plan of the core and, with `storage.md`, R6 of the plan of the web interface.
 
 ## Requirements
 
@@ -28,6 +28,7 @@ Filter actions in the refresh (`internal/refresh`, see `refresh.md`):
 - Q12. A changed entry goes through the same rules, but is never starred by them.
 - Q13. After `EntryBeforeAdd`, a new entry gets every label one of whose rules with the action `label` matches it. A changed entry gets none.
 - Q14. An entry that is not stored yet is matched under the identifier it would get at the time of the refresh.
+- Q17. `suggest` is a fourth action, which FreshRSS does not have: a matching rule of the user or of the feed with it asks the language model for label suggestions for a new entry, after the entry is stored (`refresh.md`, F42). It changes nothing of the entry: it is not read, starred or labelled by it, and the actions of the same rule are done as they are. The forms offer it for the user and for a feed; the refresh looks at the rules of the user, of the category and of the feed, in the order of Q11.
 
 ## Decisions
 
@@ -53,4 +54,5 @@ Filter actions in the refresh (`internal/refresh`, see `refresh.md`):
 - Q3: `TestLimits`. Q9, Q10: `TestParseRules`.
 - Q8, Q15: `TestMatchLabels`. Q16: `TestCondition` for the shape of the test; that it never rules out an entry the query matches is checked against the database by `TestSearchListsWhatMatches` and `TestSearchNarrowsByIndex` in `internal/store`.
 - R11, Q11–Q13: `TestFilterActions` in `internal/refresh`: rules of the user, the category, the feed and a label, a saved search, an unusable rule reported and skipped, changed entries. Q14 and the user's time zone: `TestFilterByDate`.
+- Q17: `TestParseRulesSuggest` (the action is read, alone and with another); `TestRefreshSuggestsLabels` in `internal/refresh` for the effect.
 - Q10 in the import: `TestImportWarnings` in `internal/importer`.

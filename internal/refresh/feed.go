@@ -327,6 +327,7 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 	})
 	if err == nil {
 		r.summarise(j, attrs, res.inserted)
+		r.suggest(j, f, feedRules, res.inserted, now)
 	}
 	if err == nil && r.WebSub != nil && topic != "" {
 		// A hub that is trusted pushes every entry before a poll finds it.

@@ -47,3 +47,20 @@ func TestParseRules(t *testing.T) {
 		}
 	}
 }
+
+// A rule asks the language model for labels with the action "suggest",
+// beside the actions FreshRSS has.
+func TestParseRulesSuggest(t *testing.T) {
+	rules, problems := ParseRules(json.RawMessage(`[
+		{"search": "intitle:go", "actions": ["suggest"]},
+		{"search": "intitle:rust", "actions": ["read", "suggest"]}]`), Options{})
+	if len(rules) != 2 || len(problems) != 0 {
+		t.Fatalf("%d rules, problems %v; want 2 rules", len(rules), problems)
+	}
+	if !rules[0].Has(ActionSuggest) || rules[0].Has(ActionRead) || !rules[1].Has(ActionSuggest) || !rules[1].Has(ActionRead) {
+		t.Errorf("actions: %v, %v", rules[0].Actions, rules[1].Actions)
+	}
+	if !rules[0].Query.Match(&Entry{Title: "Go 1.30"}) || rules[0].Query.Match(&Entry{Title: "Rust 2"}) {
+		t.Error("the query of the rule does not match what it says")
+	}
+}
