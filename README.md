@@ -10,6 +10,7 @@ A feed aggregator server in one binary that takes over an existing [FreshRSS](ht
 - applies the retention settings, the auto-read rules and the filter actions of FreshRSS, with its search language;
 - fetches the full text of articles, by CSS selector or found on the page automatically, for a whole feed or for one article on request;
 - translates an article on request with a language model of your choice, part by part as you read;
+- sends a daily e-mail digest of the unread entries to users who ask for it, where the server has an SMTP server;
 - serves the Google Reader API and, when an administrator switches it on, the Fever API; OPML import and export, and feed icons;
 - has a web interface of its own, in English and Russian, in which everything can be done from the keyboard and without JavaScript;
 - subscribes to WebSub hubs;
@@ -303,7 +304,7 @@ Every setting is a flag and an environment variable, and can be written in a con
 | `-browser-url` | `FRESHGO_BROWSER_URL` | | Websocket of the DevTools protocol of a browser that reads the pages of the feeds set to it: `ws://host:port`; see "Pages only a browser gets". |
 | `-log-level` | `FRESHGO_LOG_LEVEL` | `info` | Least level of what goes to the log: `debug`, `info`, `warn` or `error`. At `debug` every request is logged with its method, path, status and duration, without the query. The warnings and errors about a user are kept for the journal of the user at every level. |
 | `-log-format` | `FRESHGO_LOG_FORMAT` | `text` | `text` or `json`. |
-| `-smtp-url` | `FRESHGO_SMTP_URL` | | SMTP server for the letters that confirm e-mail addresses and reset forgotten passwords: `smtp[s]://user:password@host:port?from=address`. Without it, confirmation cannot be required and passwords are reset only by an administrator or `freshgo user passwd`. |
+| `-smtp-url` | `FRESHGO_SMTP_URL` | | SMTP server for the letters that confirm e-mail addresses, reset forgotten passwords and carry the daily digest: `smtp[s]://user:password@host:port?from=address`. Without it, confirmation cannot be required and passwords are reset only by an administrator or `freshgo user passwd`. |
 
 The file is YAML, named by `-config` before the command: `freshgo -config /etc/freshgo.yaml serve`. Its keys are the names of the flags without the dash; a key that is no setting, or a value its flag does not take, stops the command before it starts. The file is read once, at start.
 
@@ -316,6 +317,12 @@ websub: true
 ```
 
 The garbage collector of Go runs with `GOGC=200` unless the variable `GOGC` is set: the heap grows to three times what is in use before a collection, where the runtime of Go lets it grow to twice. An answer of the API takes about a third less time for it, and the process about 8 MB more memory. `GOGC=100` gives the memory back.
+
+### Daily digest
+
+With an SMTP server (`-smtp-url`), a user who has an e-mail address in the profile can tick "Send a digest of unread entries once a day" there. Nothing is offered while the server has no SMTP server or the profile has no address, and a form that asks for it anyway leaves it off.
+
+The server looks at the users every hour. For a user whose last digest is a day old, it sends one plain-text letter, in the language of the user, with the unread entries of the reading list (feeds of priority 0 and above, as in the apps) that arrived since: the feed, the title and the link, the newest first. The letter names a hundred entries and says how many more there are. When nothing new arrived, no letter goes out and the period still moves on. The first period begins when the switch is turned on. A letter that fails is logged, and the next look tries again for the same period. Users who are kept out, or whose address is not yet confirmed, get nothing.
 
 ### Translating articles
 

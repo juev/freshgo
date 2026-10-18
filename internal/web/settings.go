@@ -425,6 +425,9 @@ type profilePage struct {
 	TOTP    bool
 	Setup   *totpSetup
 	Problem string
+	// CanDigest says the digest can be offered: letters can go out and the
+	// user has an address to send them to; Digest says it is on.
+	CanDigest, Digest bool
 }
 
 var (
@@ -432,12 +435,13 @@ var (
 	tokenText    = regexp.MustCompile(`^[\x21-\x7e]{0,191}$`)
 )
 
-func (h *Handler) showProfile(w http.ResponseWriter, r *http.Request, status int, email, token, problem string) {
+func (h *Handler) showProfile(w http.ResponseWriter, r *http.Request, status int, email, token string, digest bool, problem string) {
 	s := state(r)
 	v := h.settingsView(r, "profile")
 	page := profilePage{
 		Email: email, Token: token, HasPassword: s.who.prefs.PasswordHash != "", HasAPI: s.who.user.APIPasswordHash != "",
 		CanDelete: s.who.user.Name != s.system.DefaultUser, TOTP: s.who.prefs.TOTPSecret != "",
+		CanDigest: h.mailer != nil && email != "", Digest: digest,
 	}
 	if page.HasPassword && !page.TOTP {
 		setup, err := newTOTPSetup(s.system.Title, s.who.user.Name, r.PostFormValue("totp_secret"))
@@ -460,7 +464,7 @@ func (h *Handler) showProfile(w http.ResponseWriter, r *http.Request, status int
 
 func (h *Handler) profilePage(w http.ResponseWriter, r *http.Request) {
 	s := userSettings(r)
-	h.showProfile(w, r, http.StatusOK, s.text("mail_login"), s.text("token"), "")
+	h.showProfile(w, r, http.StatusOK, s.text("mail_login"), s.text("token"), s.flag("digest", false), "")
 }
 
 func (h *Handler) saveProfile(w http.ResponseWriter, r *http.Request) {
@@ -482,6 +486,13 @@ func (h *Handler) saveProfile(w http.ResponseWriter, r *http.Request) {
 		another := email != s.text("mail_login")
 		s.set("mail_login", email)
 		s.set("token", token)
+		// The digest needs a server to send through and an address to
+		// send to; the period of a digest that is switched on starts now.
+		digest := h.mailer != nil && email != "" && form.Get("digest") != ""
+		if digest && !s.flag("digest", false) {
+			s.set("digest_sent", h.now().Unix())
+		}
+		s.set("digest", digest)
 		switch {
 		case email != "" && (!emailAddress.MatchString(email) || len(email) > 191):
 			return "settings.problem.email"
@@ -500,7 +511,7 @@ func (h *Handler) saveProfile(w http.ResponseWriter, r *http.Request) {
 		}
 		return ""
 	}, func(status int, s attrs, problem string) {
-		h.showProfile(w, r, status, s.text("mail_login"), s.text("token"), problem)
+		h.showProfile(w, r, status, s.text("mail_login"), s.text("token"), s.flag("digest", false), problem)
 	})
 }
 
@@ -528,7 +539,7 @@ func (h *Handler) regenerateToken(w http.ResponseWriter, r *http.Request) {
 // profileProblem answers with the page of the profile and what is wrong.
 func (h *Handler) profileProblem(w http.ResponseWriter, r *http.Request, status int, problem string) {
 	s := userSettings(r)
-	h.showProfile(w, r, status, s.text("mail_login"), s.text("token"), problem)
+	h.showProfile(w, r, status, s.text("mail_login"), s.text("token"), s.flag("digest", false), problem)
 }
 
 // hashPassword hashes a password for storing.
