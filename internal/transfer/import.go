@@ -100,6 +100,9 @@ type Report struct {
 	// the limit, an entry without a usable feed, a part of an archive that
 	// could not be read.
 	Incomplete bool
+	// Warnings say what an import from a server could not carry over; a
+	// file import leaves them empty.
+	Warnings []string
 }
 
 func (r *Report) add(other Report) {
@@ -107,6 +110,7 @@ func (r *Report) add(other Report) {
 	r.Entries += other.Entries
 	r.Updated += other.Updated
 	r.Incomplete = r.Incomplete || other.Incomplete
+	r.Warnings = append(r.Warnings, other.Warnings...)
 }
 
 // Kinds of files, told by their names the way FreshRSS tells them.
@@ -477,95 +481,103 @@ func Entries(ctx context.Context, db *store.Store, registry *hooks.Registry, u *
 			report.Feeds++
 		}
 
-		// Entries by feed: what is there already is looked up once a feed.
-		byFeed := map[int64][]*candidate{}
-		var feedOrder []int64
-		seen := map[string]bool{}
-		for _, c := range candidates {
-			f := byAddress[c.feed]
-			if f == nil {
-				report.Incomplete = true
-				continue
-			}
-			// The first item with an identifier stands for the others.
-			key := strconv.FormatInt(f.ID, 10) + "\x00" + c.entry.GUID
-			if seen[key] {
-				continue
-			}
-			seen[key] = true
-			c.entry.UserID, c.entry.FeedID = u.ID, f.ID
-			if _, known := byFeed[f.ID]; !known {
-				feedOrder = append(feedOrder, f.ID)
-			}
-			byFeed[f.ID] = append(byFeed[f.ID], c)
+		return writeEntries(ctx, tx, registry, u, byAddress, candidates, &report)
+	})
+	return report, err
+}
+
+// writeEntries stores the candidates in the feeds they name, by the key of
+// the feed. An entry the feed has already, by its identifier, is rewritten;
+// the states a candidate does not name stay as they are. Labels are made as
+// they are needed.
+func writeEntries(ctx context.Context, tx *store.Store, registry *hooks.Registry, u *store.User, feeds map[string]*store.Feed, candidates []*candidate, report *Report) error {
+	// Entries by feed: what is there already is looked up once a feed.
+	byFeed := map[int64][]*candidate{}
+	var feedOrder []int64
+	seen := map[string]bool{}
+	for _, c := range candidates {
+		f := feeds[c.feed]
+		if f == nil {
+			report.Incomplete = true
+			continue
 		}
-		labelled := map[string][]int64{}
-		for _, feedID := range feedOrder {
-			list := byFeed[feedID]
-			guids := make([]string, len(list))
-			for i, c := range list {
-				guids[i] = c.entry.GUID
+		// The first item with an identifier stands for the others.
+		key := strconv.FormatInt(f.ID, 10) + "\x00" + c.entry.GUID
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		c.entry.UserID, c.entry.FeedID = u.ID, f.ID
+		if _, known := byFeed[f.ID]; !known {
+			feedOrder = append(feedOrder, f.ID)
+		}
+		byFeed[f.ID] = append(byFeed[f.ID], c)
+	}
+	labelled := map[string][]int64{}
+	for _, feedID := range feedOrder {
+		list := byFeed[feedID]
+		guids := make([]string, len(list))
+		for i, c := range list {
+			guids[i] = c.entry.GUID
+		}
+		states, err := tx.EntryStates(ctx, u.ID, feedID, guids)
+		if err != nil {
+			return err
+		}
+		var added []*candidate
+		for _, c := range list {
+			e, ok := registry.EntryBeforeInsert.Call(ctx, c.entry)
+			if !ok {
+				continue
 			}
-			states, err := tx.EntryStates(ctx, u.ID, feedID, guids)
+			c.entry = e
+			st, exists := states[e.GUID]
+			if !exists {
+				if c.entry, ok = registry.EntryBeforeAdd.Call(ctx, c.entry); ok {
+					added = append(added, c)
+				}
+				continue
+			}
+			stored, err := tx.EntryByID(ctx, u.ID, st.ID)
 			if err != nil {
 				return err
 			}
-			var added []*candidate
-			for _, c := range list {
-				e, ok := registry.EntryBeforeInsert.Call(ctx, c.entry)
-				if !ok {
-					continue
-				}
-				c.entry = e
-				st, exists := states[e.GUID]
-				if !exists {
-					if c.entry, ok = registry.EntryBeforeAdd.Call(ctx, c.entry); ok {
-						added = append(added, c)
-					}
-					continue
-				}
-				stored, err := tx.EntryByID(ctx, u.ID, st.ID)
-				if err != nil {
-					return err
-				}
-				// The states the document does not name stay as they are.
-				stored.Title, stored.Authors, stored.Content, stored.Link = e.Title, e.Authors, e.Content, e.Link
-				stored.Published, stored.Tags = e.Published, e.Tags
-				if c.read != nil {
-					stored.IsRead = *c.read
-				}
-				stored.IsFavorite = stored.IsFavorite || c.starred
-				if stored, ok = registry.EntryBeforeUpdate.Call(ctx, stored); !ok {
-					continue
-				}
-				if err := tx.UpdateEntry(ctx, stored); err != nil {
-					return err
-				}
-				c.entry = stored
-				report.Updated++
-				for _, label := range c.labels {
-					labelled[label] = append(labelled[label], stored.ID)
-				}
+			// The states the document does not name stay as they are.
+			stored.Title, stored.Authors, stored.Content, stored.Link = e.Title, e.Authors, e.Content, e.Link
+			stored.Published, stored.Tags = e.Published, e.Tags
+			if c.read != nil {
+				stored.IsRead = *c.read
 			}
-			// New entries get identifiers in the order of their dates.
-			sort.SliceStable(added, func(a, b int) bool { return added[a].entry.Published < added[b].entry.Published })
-			entries := make([]*store.Entry, len(added))
-			for i, c := range added {
-				entries[i] = c.entry
+			stored.IsFavorite = stored.IsFavorite || c.starred
+			if stored, ok = registry.EntryBeforeUpdate.Call(ctx, stored); !ok {
+				continue
 			}
-			if err := tx.InsertEntries(ctx, u.ID, entries); err != nil {
+			if err := tx.UpdateEntry(ctx, stored); err != nil {
 				return err
 			}
-			report.Entries += len(entries)
-			for _, c := range added {
-				for _, label := range c.labels {
-					labelled[label] = append(labelled[label], c.entry.ID)
-				}
+			c.entry = stored
+			report.Updated++
+			for _, label := range c.labels {
+				labelled[label] = append(labelled[label], stored.ID)
 			}
 		}
-		return attachLabels(ctx, tx, u, labelled, &report)
-	})
-	return report, err
+		// New entries get identifiers in the order of their dates.
+		sort.SliceStable(added, func(a, b int) bool { return added[a].entry.Published < added[b].entry.Published })
+		entries := make([]*store.Entry, len(added))
+		for i, c := range added {
+			entries[i] = c.entry
+		}
+		if err := tx.InsertEntries(ctx, u.ID, entries); err != nil {
+			return err
+		}
+		report.Entries += len(entries)
+		for _, c := range added {
+			for _, label := range c.labels {
+				labelled[label] = append(labelled[label], c.entry.ID)
+			}
+		}
+	}
+	return attachLabels(ctx, tx, u, labelled, report)
 }
 
 // attachLabels gives entries the labels of the given names, making those
@@ -594,6 +606,7 @@ func attachLabels(ctx context.Context, tx *store.Store, u *store.User, labelled 
 			switch err := tx.CreateTag(ctx, created); {
 			case errors.Is(err, store.ErrConflict):
 				report.Incomplete = true
+				report.Warnings = append(report.Warnings, fmt.Sprintf("label %q: a category has the name, so the label was not made", name))
 				continue
 			case err != nil:
 				return err
@@ -746,26 +759,11 @@ func addFeed(ctx context.Context, tx *store.Store, registry *hooks.Registry, u *
 		f.TTL = store.MutedTTL
 	}
 	if src.category != "" {
-		categories, err := tx.Categories(ctx, u.ID)
+		id, _, err := categoryNamed(ctx, tx, u, src.category, o.MaxCategories)
 		if err != nil {
 			return nil, err
 		}
-		for _, c := range categories {
-			if c.Name == src.category {
-				f.CategoryID = c.ID
-			}
-		}
-		if f.CategoryID == 0 && (o.MaxCategories <= 0 || len(categories) < o.MaxCategories) {
-			c := &store.Category{UserID: u.ID, Name: src.category}
-			switch err := tx.CreateCategory(ctx, c); {
-			case errors.Is(err, store.ErrConflict):
-				// A label has the name: the feed goes to the default category.
-			case err != nil:
-				return nil, err
-			default:
-				f.CategoryID = c.ID
-			}
-		}
+		f.CategoryID = id
 	}
 	f, ok := registry.FeedBeforeInsert.Call(ctx, f)
 	if !ok {
@@ -775,4 +773,32 @@ func addFeed(ctx context.Context, tx *store.Store, registry *hooks.Registry, u *
 		return nil, err
 	}
 	return f, nil
+}
+
+// categoryNamed returns the identifier of the category of the user with the
+// name, making it unless the user has as many as limit already (zero is no
+// bound). Zero comes back when there is none and none could be made: the
+// limit, or a label with the name; the feed then goes to the default
+// category. limited tells the first of the two.
+func categoryNamed(ctx context.Context, tx *store.Store, u *store.User, name string, limit int) (id int64, limited bool, err error) {
+	categories, err := tx.Categories(ctx, u.ID)
+	if err != nil {
+		return 0, false, err
+	}
+	for _, c := range categories {
+		if c.Name == name {
+			return c.ID, false, nil
+		}
+	}
+	if limit > 0 && len(categories) >= limit {
+		return 0, true, nil
+	}
+	c := &store.Category{UserID: u.ID, Name: name}
+	switch err := tx.CreateCategory(ctx, c); {
+	case errors.Is(err, store.ErrConflict):
+		return 0, false, nil
+	case err != nil:
+		return 0, false, err
+	}
+	return c.ID, false, nil
 }
