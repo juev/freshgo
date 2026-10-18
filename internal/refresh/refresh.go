@@ -80,6 +80,8 @@ type Refresher struct {
 	// the model.
 	summaries    sync.WaitGroup
 	summarySlots chan struct{}
+	// summaryBacklog holds a place for every batch that waits or runs.
+	summaryBacklog chan struct{}
 	// lastRun is when the last run that reached every user ended, in Unix
 	// seconds; zero before the first.
 	lastRun atomic.Int64
@@ -94,7 +96,7 @@ type Refresher struct {
 // New returns a Refresher. Handlers of the registry are called from several
 // goroutines at once.
 func New(db *store.Store, client *fetch.Client, registry *hooks.Registry, log *slog.Logger) *Refresher {
-	r := &Refresher{db: db, client: client, hooks: registry, log: log, now: time.Now, Lifetime: context.Background(), summarySlots: make(chan struct{}, summaryConcurrency)}
+	r := &Refresher{db: db, client: client, hooks: registry, log: log, now: time.Now, Lifetime: context.Background(), summarySlots: make(chan struct{}, summaryConcurrency), summaryBacklog: make(chan struct{}, summaryBacklog)}
 	r.feeds = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name: "freshgo_refresh_feed_duration_seconds",
 		Help: "How long the refresh of a feed in a run took, by result: refreshed, unchanged or failed.",

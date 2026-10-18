@@ -14,6 +14,10 @@ const (
 	// summaryBudget bounds the time of one batch, so that a model that does
 	// not answer cannot keep a process from ending.
 	summaryBudget = 10 * time.Minute
+	// summaryBacklog bounds the batches that wait or run: each holds the
+	// entries it came with, and a model that does not answer would have
+	// every refresh add to them.
+	summaryBacklog = 64
 )
 
 // summarise has the new entries of a feed summarised when the feed asks
@@ -33,9 +37,17 @@ func (r *Refresher) summarise(j *job, attrs attributes, entries []*store.Entry) 
 
 // background runs a batch of work for the model on its own, one of a few at
 // a time and for no longer than summaryBudget, and ends it with Lifetime.
-// A failure is logged under the message.
+// A failure is logged under the message, and so is a batch dropped because
+// summaryBacklog others wait already.
 func (r *Refresher) background(user *store.User, failure string, run func(ctx context.Context) error) {
+	select {
+	case r.summaryBacklog <- struct{}{}:
+	default:
+		r.log.Warn(failure, "user", user.Name, "error", "too many batches wait for the model")
+		return
+	}
 	r.summaries.Go(func() {
+		defer func() { <-r.summaryBacklog }()
 		select {
 		case r.summarySlots <- struct{}{}:
 		case <-r.Lifetime.Done():
