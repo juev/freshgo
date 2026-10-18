@@ -52,6 +52,7 @@ func commands() []command {
 		{"opml", "import or export subscriptions as OPML", nil, opmlCommands()},
 		{"doctor", "check the configuration, the database and the services it names, changing nothing", runDoctor, nil},
 		{"healthcheck", "ask the running server whether it works, for the health check of a container", runHealthcheck, nil},
+		{"vapid-keys", "print a new pair of keys for Web Push", runVapidKeys, nil},
 		{"completion", "print a script that completes the commands and their flags in bash, zsh or fish", runCompletion, nil},
 		{"version", "print the version", runVersion, nil},
 	}

@@ -12,9 +12,11 @@ import (
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/journal"
+	"github.com/juev/freshgo/internal/push"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/translate"
+	"github.com/juev/freshgo/internal/web/i18n"
 	"github.com/juev/freshgo/internal/websub"
 )
 
@@ -97,6 +99,29 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 			return nil, err
 		}
 		s.translator = translate.New(db, &translate.Client{URL: conf.TranslateURL, Key: conf.TranslateKey, Model: conf.TranslateModel, HTTP: asking})
+	}
+	if conf.VAPIDPublicKey != "" {
+		// A client of its own: the push services must not wait for the
+		// feeds, nor the feeds for them.
+		pushing, err := fetch.New(fetching)
+		if err != nil {
+			return nil, err
+		}
+		texts, err := i18n.Load()
+		if err != nil {
+			return nil, err
+		}
+		notifier := push.New(push.Options{
+			DB: db, Fetcher: pushing, Texts: texts, Log: s.log,
+			PublicKey: conf.VAPIDPublicKey, PrivateKey: conf.VAPIDPrivateKey, Subject: conf.VAPIDSubject,
+		})
+		s.refresher.Notify = notifier.Notify
+		// The messages of a run that ends the process are sent before the
+		// database is closed.
+		s.close = func() {
+			notifier.Wait()
+			kept.Close()
+		}
 	}
 	if conf.BrowserURL != "" {
 		pages, err := browser.New(conf.BrowserURL)

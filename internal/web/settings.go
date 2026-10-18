@@ -428,6 +428,9 @@ type profilePage struct {
 	// CanDigest says the digest can be offered: letters can go out and the
 	// user has an address to send them to; Digest says it is on.
 	CanDigest, Digest bool
+	// PushKey is the public key the browser subscribes with, empty where
+	// notifications are not offered.
+	PushKey string
 }
 
 var (
@@ -441,7 +444,7 @@ func (h *Handler) showProfile(w http.ResponseWriter, r *http.Request, status int
 	page := profilePage{
 		Email: email, Token: token, HasPassword: s.who.prefs.PasswordHash != "", HasAPI: s.who.user.APIPasswordHash != "",
 		CanDelete: s.who.user.Name != s.system.DefaultUser, TOTP: s.who.prefs.TOTPSecret != "",
-		CanDigest: h.mailer != nil && email != "", Digest: digest,
+		CanDigest: h.mailer != nil && email != "", Digest: digest, PushKey: h.pushKey,
 	}
 	if page.HasPassword && !page.TOTP {
 		setup, err := newTOTPSetup(s.system.Title, s.who.user.Name, r.PostFormValue("totp_secret"))

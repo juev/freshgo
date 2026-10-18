@@ -2,6 +2,9 @@
 package config
 
 import (
+	"bytes"
+	"crypto/ecdh"
+	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -40,6 +43,12 @@ const (
 	EnvTranslateURL   = "FRESHGO_TRANSLATE_URL"
 	EnvTranslateKey   = "FRESHGO_TRANSLATE_KEY"
 	EnvTranslateModel = "FRESHGO_TRANSLATE_MODEL"
+	// EnvVAPIDPublicKey, EnvVAPIDPrivateKey and EnvVAPIDSubject name the
+	// keys the server signs Web Push messages with and who to contact about
+	// them.
+	EnvVAPIDPublicKey  = "FRESHGO_VAPID_PUBLIC_KEY"
+	EnvVAPIDPrivateKey = "FRESHGO_VAPID_PRIVATE_KEY"
+	EnvVAPIDSubject    = "FRESHGO_VAPID_SUBJECT"
 	// EnvBrowserURL names the browser that reads the pages a request does
 	// not get: the websocket of its DevTools protocol.
 	EnvBrowserURL = "FRESHGO_BROWSER_URL"
@@ -109,6 +118,11 @@ type Config struct {
 	// "/chat/completions", its key and a model. All empty, and nothing is
 	// translated.
 	TranslateURL, TranslateKey, TranslateModel string
+	// VAPIDPublicKey and VAPIDPrivateKey are the pair of keys, base64url as
+	// "freshgo vapid-keys" prints them, that Web Push messages are signed
+	// with; VAPIDSubject is the mailto: or https: address the push services
+	// may contact the operator at. All empty, and no push is offered.
+	VAPIDPublicKey, VAPIDPrivateKey, VAPIDSubject string
 	// BrowserURL is the websocket of the DevTools protocol of a browser
 	// that runs already, for the feeds whose pages only a browser gets.
 	// Empty: no page is read by a browser.
@@ -172,6 +186,12 @@ func Bind(fs *flag.FlagSet, getenv func(string) string) *Config {
 		"key of the API that translates entries ($"+EnvTranslateKey+")")
 	fs.StringVar(&c.TranslateModel, "translate-model", getenv(EnvTranslateModel),
 		"model that translates entries ($"+EnvTranslateModel+")")
+	fs.StringVar(&c.VAPIDPublicKey, "vapid-public-key", getenv(EnvVAPIDPublicKey),
+		"public VAPID key that signs Web Push messages, as \"freshgo vapid-keys\" prints it ($"+EnvVAPIDPublicKey+")")
+	fs.StringVar(&c.VAPIDPrivateKey, "vapid-private-key", getenv(EnvVAPIDPrivateKey),
+		"private VAPID key that signs Web Push messages ($"+EnvVAPIDPrivateKey+")")
+	fs.StringVar(&c.VAPIDSubject, "vapid-subject", getenv(EnvVAPIDSubject),
+		"mailto: or https: address push services may contact the operator at ($"+EnvVAPIDSubject+")")
 	fs.StringVar(&c.LogLevel, "log-level", envOr(getenv, EnvLogLevel, "info"),
 		"least level of what is logged: debug, info, warn or error; debug logs every request ($"+EnvLogLevel+")")
 	fs.StringVar(&c.LogFormat, "log-format", envOr(getenv, EnvLogFormat, "text"),
@@ -182,6 +202,7 @@ func Bind(fs *flag.FlagSet, getenv func(string) string) *Config {
 	fs.Lookup("smtp-url").DefValue = ""
 	fs.Lookup("oidc-client-secret").DefValue = ""
 	fs.Lookup("translate-key").DefValue = ""
+	fs.Lookup("vapid-private-key").DefValue = ""
 	return c
 }
 
@@ -233,6 +254,9 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("translate URL %q: want an http or https address", c.TranslateURL)
 		}
 	}
+	if err := c.validateVAPID(); err != nil {
+		return err
+	}
 	if c.BrowserURL != "" {
 		if u, err := url.Parse(c.BrowserURL); err != nil || (u.Scheme != "ws" && u.Scheme != "wss") || u.Host == "" {
 			return fmt.Errorf("browser URL %q: want a ws or wss address", c.BrowserURL)
@@ -258,6 +282,47 @@ func (c *Config) Validate() error {
 		c.BaseURL = strings.TrimRight(c.BaseURL, "/")
 	}
 	return nil
+}
+
+// validateVAPID checks that the keys of Web Push come whole, that they are a
+// pair, and that the subject is an address a push service can contact.
+func (c *Config) validateVAPID() error {
+	set := c.VAPIDPublicKey != ""
+	if set != (c.VAPIDPrivateKey != "") || set != (c.VAPIDSubject != "") {
+		return errors.New("push messages need -vapid-public-key, -vapid-private-key and -vapid-subject together")
+	}
+	if !set {
+		return nil
+	}
+	private, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(c.VAPIDPrivateKey, "="))
+	if err != nil {
+		return fmt.Errorf("VAPID private key: want base64url as \"freshgo vapid-keys\" prints it: %w", err)
+	}
+	key, err := ecdh.P256().NewPrivateKey(private)
+	if err != nil {
+		return fmt.Errorf("VAPID private key: %w", err)
+	}
+	public, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(c.VAPIDPublicKey, "="))
+	if err != nil {
+		return fmt.Errorf("VAPID public key: want base64url as \"freshgo vapid-keys\" prints it: %w", err)
+	}
+	if !bytes.Equal(public, key.PublicKey().Bytes()) {
+		return errors.New("VAPID public key is not the public half of the private key")
+	}
+	if !contactAddress(c.VAPIDSubject) {
+		return fmt.Errorf("VAPID subject %q: want mailto:address or an https address", c.VAPIDSubject)
+	}
+	return nil
+}
+
+// contactAddress reports whether subject is a mailto: address or an https
+// address, the two forms RFC 8292 allows.
+func contactAddress(subject string) bool {
+	if rest, ok := strings.CutPrefix(subject, "mailto:"); ok {
+		return strings.Contains(rest, "@")
+	}
+	u, err := url.Parse(subject)
+	return err == nil && u.Scheme == "https" && u.Host != ""
 }
 
 func (c *Config) logLevel() (slog.Level, error) {

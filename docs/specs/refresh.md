@@ -51,6 +51,7 @@ Auto-read and cleanup. Settings are read under the names FreshRSS gives them: `m
 - F35. `Refresher.PreviewArticle` returns what a selector, or the automatic way without one, and a filter take from the page of the newest entry of a feed, requested with the settings of the feed; nothing is stored. A feed without an entry that has a link gives `ErrNoEntries`.
 - F39. `Refresher.CheckFeed` requests a feed once by every way there is: without a proxy, through the proxy of the installation when it has one (whether or not the proxy is for chosen feeds only, and whatever the feed has chosen), and through the proxy of the feed when it has one. The feed is given as its form has it and need not be stored. Each way gives nil or the error of the request; what the document holds is not read, and nothing is stored: no validators, no failure. `FetchBefore` is not called. Settings no request can be made by are the error of the call.
 - F25. `freshgo purge` applies F22 to every feed of every user without fetching anything and prints the number of deleted entries per user.
+- F40. `Refresher.Notify`, when set, is called with the user and the time the refresh of the user began, after a run has refreshed the feeds of a user and stored at least one new entry, and after a push of a WebSub hub (F31) stored one. It is called after the entries are stored, outside any transaction; what is news for the user, and the sending, are its own business (`push.md`), and it must not wait for the network. A run that stores nothing, or only changes entries, does not call it. The server sets it where the keys of Web Push are set, and so does `freshgo refresh`.
 
 ## Decisions
 
@@ -83,6 +84,7 @@ Auto-read and cleanup. Settings are read under the names FreshRSS gives them: `m
 `internal/refresh`, each on SQLite and, under `make test-integration`, on PostgreSQL.
 
 - F31: the tests of `websub_test.go`, listed in `websub.md`.
+- F40: `TestNotifyHearsOfNewEntries` (a run with new entries calls it once for the user who had them, with the start of the refresh; a run with none and a push of an entry already stored do not; a push of a new one does).
 - F28: `TestAddFeed` (one request for the document; what the caller chose stands; a second subscription is refused, another user's is not), `TestAddFeedFollowsThePage`, `TestAddFeedOfAnotherKind`, `TestAddFeedRefusals`. F29: `TestRefreshFeed`. F30: `TestRefreshKeepsIcons`.
 
 - F32: `TestFeedLimit`. F33: `TestRefreshUser`, `TestReloadFeed` (replace, append and prepend), `TestReloadFeedKeepsWhatItCannotReplace`. F34: `TestDynamicOPML`, `TestDynamicOPMLFollowsRedirects`; `Feeds` of `internal/opml` through it. F36: `TestValidatorsOfAnOvertakenFetch`. F35: `TestPreviewArticle`. F39: `TestCheckFeed` (no proxy, that of the installation under every choice of the feed, a proxy of the feed's own with and without it, a kind of proxy there is not).

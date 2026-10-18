@@ -1,6 +1,9 @@
 package config
 
 import (
+	"crypto/ecdh"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"flag"
 	"io"
@@ -271,5 +274,81 @@ func TestLog(t *testing.T) {
 		if err := parse(t, nil, args...).Validate(); err == nil {
 			t.Errorf("%v: no error", args)
 		}
+	}
+}
+
+// vapidPair returns a pair of VAPID keys in the form "freshgo vapid-keys"
+// prints them.
+func vapidPair(t *testing.T) (public, private string) {
+	t.Helper()
+	key, err := ecdh.P256().GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return base64.RawURLEncoding.EncodeToString(key.PublicKey().Bytes()), base64.RawURLEncoding.EncodeToString(key.Bytes())
+}
+
+// Web Push is set up whole or not at all: both keys, which have to be a
+// pair, and an address to contact.
+func TestVAPIDSettings(t *testing.T) {
+	public, private := vapidPair(t)
+	otherPublic, _ := vapidPair(t)
+	whole := map[string]string{EnvVAPIDPublicKey: public, EnvVAPIDPrivateKey: private, EnvVAPIDSubject: "mailto:admin@example.org"}
+	c := parse(t, whole)
+	if err := c.Validate(); err != nil || c.VAPIDPublicKey != public || c.VAPIDPrivateKey != private || c.VAPIDSubject != "mailto:admin@example.org" {
+		t.Errorf("the three settings: %+v, %v", c, err)
+	}
+	if err := parse(t, nil).Validate(); err != nil {
+		t.Errorf("none of the settings: %v", err)
+	}
+	// The flags take what the variables do.
+	flags := parse(t, nil, "-vapid-public-key", public, "-vapid-private-key", private, "-vapid-subject", "https://example.org/contact")
+	if err := flags.Validate(); err != nil || flags.VAPIDSubject != "https://example.org/contact" {
+		t.Errorf("the three flags: %+v, %v", flags, err)
+	}
+	for _, missing := range []string{EnvVAPIDPublicKey, EnvVAPIDPrivateKey, EnvVAPIDSubject} {
+		part := map[string]string{}
+		for name, value := range whole {
+			if name != missing {
+				part[name] = value
+			}
+		}
+		if err := parse(t, part).Validate(); err == nil || !strings.Contains(err.Error(), "together") {
+			t.Errorf("without %s: error = %v", missing, err)
+		}
+	}
+	for name, change := range map[string]map[string]string{
+		"keys that are not a pair":    {EnvVAPIDPublicKey: otherPublic},
+		"a public key that is text":   {EnvVAPIDPublicKey: "not a key"},
+		"a private key that is text":  {EnvVAPIDPrivateKey: "not a key"},
+		"a private key that is short": {EnvVAPIDPrivateKey: private[:20]},
+		"a subject without a scheme":  {EnvVAPIDSubject: "admin@example.org"},
+		"a subject over http":         {EnvVAPIDSubject: "http://example.org/"},
+		"a mailto: without address":   {EnvVAPIDSubject: "mailto:admin"},
+	} {
+		env := map[string]string{}
+		for k, v := range whole {
+			env[k] = v
+		}
+		for k, v := range change {
+			env[k] = v
+		}
+		if err := parse(t, env).Validate(); err == nil || !strings.Contains(err.Error(), "VAPID") {
+			t.Errorf("%s: error = %v", name, err)
+		}
+	}
+}
+
+// The help of a command shows the defaults of the flags; the private key is
+// not among what it shows.
+func TestHelpKeepsVAPIDPrivateKey(t *testing.T) {
+	_, private := vapidPair(t)
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	var help strings.Builder
+	fs.SetOutput(&help)
+	Bind(fs, func(k string) string { return map[string]string{EnvVAPIDPrivateKey: private}[k] })
+	_ = fs.Parse([]string{"-h"})
+	if strings.Contains(help.String(), private) {
+		t.Errorf("the help shows the private key:\n%s", help.String())
 	}
 }
