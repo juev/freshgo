@@ -9,6 +9,7 @@ import (
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/miniflux/minifluxtest"
 	"github.com/juev/freshgo/internal/store"
+	"github.com/juev/freshgo/internal/ttrss/ttrsstest"
 )
 
 // withMiniflux is the options of a site that may import from the server.
@@ -167,6 +168,135 @@ func TestImportFromServerLimits(t *testing.T) {
 		}
 		if got := len(s.feeds("alice")); got != had+1 {
 			t.Errorf("%d feeds, want %d", got, had+1)
+		}
+	})
+}
+
+// withTTRSS is the options of a site that may import from the server.
+func withTTRSS(t *testing.T, servers ...*ttrsstest.Server) Options {
+	t.Helper()
+	allowed := []string{"127.0.0.1:1"}
+	for _, s := range servers {
+		allowed = append(allowed, s.Host)
+	}
+	client, err := fetch.New(fetch.Options{Allowlist: allowed})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return Options{Sources: client}
+}
+
+func ttrssForm(s *ttrsstest.Server, more url.Values) url.Values {
+	form := url.Values{"source": {"ttrss"}, "address": {s.URL}, "login": {ttrsstest.User}, "password": {ttrsstest.Password}}
+	for k, v := range more {
+		form[k] = v
+	}
+	return form
+}
+
+// R18: the page of import and export brings an account in from a Tiny Tiny
+// RSS server with a login and password: it offers the software and the
+// fields, says what it did and what it could not carry over, never shows the
+// password, and a second run adds nothing twice.
+func TestImportFromTTRSS(t *testing.T) {
+	tt := ttrsstest.New(t)
+	imported(t, withTTRSS(t, tt), func(t *testing.T, s *site) {
+		s.asAlice()
+		page := s.shown("/subscriptions/transfer")
+		for _, want := range []string{`<option value="ttrss">Tiny Tiny RSS</option>`, `type="password" id="password"`, `name="login"`, `type="password" id="token"`} {
+			if !strings.Contains(page, want) {
+				t.Errorf("GET /subscriptions/transfer: no %q", want)
+			}
+		}
+		// Only the fields of the chosen software are required, so the form
+		// can be sent without JavaScript for either.
+		for _, field := range []string{`id="token"`, `id="login"`, `id="password"`} {
+			i := strings.Index(page, field)
+			if end := strings.Index(page[i:], ">"); strings.Contains(page[i:i+end], "required") {
+				t.Errorf("the field %s is required for every software", field)
+			}
+		}
+		had := len(s.feeds("alice"))
+		hadEntries := len(s.stored("alice", store.Listing{}))
+
+		a := s.post("/subscriptions/import-server", ttrssForm(tt, nil))
+		if a.status != http.StatusOK {
+			t.Fatalf("import: status %d\n%s", a.status, a.body)
+		}
+		for _, want := range []string{
+			"Imported from the server: 4 feeds and 230 entries added, 0 entries updated.", "Not carried over:",
+			"<li>refresh period not carried over, set on 1 feeds: Sub</li>", "<li>the filters and the logins of feeds",
+		} {
+			if !strings.Contains(a.body, want) {
+				t.Errorf("import: no %q in\n%s", want, a.body)
+			}
+		}
+		if strings.Contains(a.body, ttrsstest.Password) {
+			t.Error("the page shows the password")
+		}
+		if got := len(s.feeds("alice")); got != had+4 {
+			t.Errorf("%d feeds, want %d", got, had+4)
+		}
+		if got := len(s.stored("alice", store.Listing{})); got != hadEntries+230 {
+			t.Errorf("%d entries, want %d", got, hadEntries+230)
+		}
+
+		tt.Change(5, false, true, "go")
+		a = s.post("/subscriptions/import-server", ttrssForm(tt, nil))
+		if a.status != http.StatusOK || !strings.Contains(a.body, "Imported from the server: 0 feeds and 0 entries added, 230 entries updated.") {
+			t.Errorf("second import: status %d\n%s", a.status, a.body)
+		}
+		if got := len(s.stored("alice", store.Listing{})); got != hadEntries+230 {
+			t.Errorf("%d entries after the second import, want %d", got, hadEntries+230)
+		}
+		found := false
+		for _, id := range s.stored("alice", store.Listing{Set: store.EntrySet{OnlyFavorite: true}}) {
+			if e := s.entry("alice", id); e.Title == "Entry 5" && e.IsRead {
+				found = true
+			}
+		}
+		if !found {
+			t.Error("Entry 5 is not read and starred after the second import")
+		}
+	})
+}
+
+// R19: what cannot be imported from Tiny Tiny RSS is said, and changes
+// nothing; the fields of the other software do not stand in for its own.
+func TestImportFromTTRSSRefusals(t *testing.T) {
+	tt := ttrsstest.New(t)
+	off := ttrsstest.New(t)
+	off.DisableAPI()
+	imported(t, withTTRSS(t, tt, off), func(t *testing.T, s *site) {
+		s.asAlice()
+		had := len(s.feeds("alice"))
+		for name, c := range map[string]struct {
+			form   url.Values
+			status int
+			want   string
+		}{
+			"no login":    {ttrssForm(tt, url.Values{"login": {" "}}), http.StatusBadRequest, "Give the address of the server, the login and the password."},
+			"no password": {ttrssForm(tt, url.Values{"password": {""}}), http.StatusBadRequest, "Give the address of the server, the login and the password."},
+			"no address":  {ttrssForm(tt, url.Values{"address": {""}}), http.StatusBadRequest, "Give the address of the server, the login and the password."},
+			"token only":  {ttrssForm(tt, url.Values{"login": {""}, "password": {""}, "token": {"x"}}), http.StatusBadRequest, "Give the address of the server, the login and the password."},
+			"not a web address": {ttrssForm(tt, url.Values{"address": {"ftp://x.example"}}), http.StatusBadRequest,
+				"not an http or https address"},
+			"wrong password": {ttrssForm(tt, url.Values{"password": {"wrong"}}), http.StatusBadRequest, "The server does not accept the login and password."},
+			"API off":        {ttrssForm(off, nil), http.StatusBadRequest, "The API is not enabled for this user on the server."},
+			"server down":    {ttrssForm(tt, url.Values{"address": {"http://127.0.0.1:1"}}), http.StatusBadGateway, "The server could not be read."},
+			"login only for Miniflux": {url.Values{"source": {"miniflux"}, "address": {tt.URL}, "login": {ttrsstest.User}, "password": {ttrsstest.Password}},
+				http.StatusBadRequest, "Give the address of the server and the API token."},
+		} {
+			a := s.post("/subscriptions/import-server", c.form)
+			if a.status != c.status || !strings.Contains(a.body, c.want) {
+				t.Errorf("%s: status %d, want %d with %q", name, a.status, c.status, c.want)
+			}
+			if strings.Contains(a.body, ttrsstest.Password) {
+				t.Errorf("%s: the page shows the password", name)
+			}
+		}
+		if got := len(s.feeds("alice")); got != had {
+			t.Errorf("refused imports left %d feeds, was %d", got, had)
 		}
 	})
 }

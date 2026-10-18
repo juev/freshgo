@@ -31,12 +31,23 @@
 </p>
 <p>
 <label for="address">{{$.T "transfer.address"}}</label>
-<input type="url" id="address" name="address" required autocomplete="off" placeholder="https://miniflux.example.org">
+<input type="url" id="address" name="address" required autocomplete="off" placeholder="https://rss.example.org" aria-describedby="address-hint">
+<span class="hint" id="address-hint">{{$.T "transfer.address.hint"}}</span>
 </p>
 <p>
 <label for="token">{{$.T "transfer.token"}}</label>
-<input type="password" id="token" name="token" required autocomplete="off" aria-describedby="token-hint">
+<input type="password" id="token" name="token" autocomplete="off" aria-describedby="token-hint">
 <span class="hint" id="token-hint">{{$.T "transfer.token.hint"}}</span>
+</p>
+<p>
+<label for="login">{{$.T "transfer.login"}}</label>
+<input type="text" id="login" name="login" autocomplete="off" aria-describedby="login-hint">
+<span class="hint" id="login-hint">{{$.T "transfer.login.hint"}}</span>
+</p>
+<p>
+<label for="password">{{$.T "transfer.password"}}</label>
+<input type="password" id="password" name="password" autocomplete="off" aria-describedby="password-hint">
+<span class="hint" id="password-hint">{{$.T "transfer.password.hint"}}</span>
 </p>
 <p><button type="submit">{{$.T "transfer.server.submit"}}</button></p>
 </form>
