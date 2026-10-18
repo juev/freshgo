@@ -250,7 +250,9 @@ func TestAccess(t *testing.T) {
 		}
 
 		// A user who is disabled, or has yet to confirm an address where
-		// that is required, gets in nowhere; an administrator does.
+		// that is required, gets in nowhere; an administrator does. The
+		// failures above are let pass first: they pause the address.
+		w.now.Add(int64(time.Hour))
 		w.user("carol", `{"enabled":false}`)
 		w.user("dave", `{"email_validation_token":"secret"}`)
 		w.user("erin", `{"email_validation_token":"secret","is_admin":true}`)
@@ -281,7 +283,7 @@ func TestAccess(t *testing.T) {
 }
 
 // Guesses at a key are counted by address, as the failed logins are, and a
-// key that works clears the count.
+// key that works is not counted.
 func TestGuessesAreSlowedDown(t *testing.T) {
 	eachEngine(t, func(t *testing.T, w *world) {
 		wrong := strings.Repeat("0", 32)
@@ -305,6 +307,28 @@ func TestGuessesAreSlowedDown(t *testing.T) {
 		w.now.Add(int64(time.Hour))
 		if status, _ := w.call("api", nil); status != http.StatusOK {
 			t.Errorf("after the pause: status %d", status)
+		}
+	})
+}
+
+// A key that works does not clear the guesses made from its address before
+// it: a user cannot hide guesses at the key of another among requests with
+// their own.
+func TestOwnKeyDoesNotHideGuesses(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		w.now.Add(int64(time.Hour))
+		wrong := strings.Repeat("0", 32)
+		for i := range authguard.FreeFailures - 1 {
+			if status, _ := w.callWith(wrong, "api", nil); status == http.StatusTooManyRequests {
+				t.Fatalf("guess %d was paused", i+1)
+			}
+			if status, _ := w.call("api", nil); status != http.StatusOK {
+				t.Fatalf("the own key after guess %d: status %d", i+1, status)
+			}
+		}
+		w.callWith(wrong, "api", nil)
+		if status, _ := w.call("api", nil); status != http.StatusTooManyRequests {
+			t.Errorf("after %d guesses between own keys: status %d, want 429", authguard.FreeFailures, status)
 		}
 	})
 }

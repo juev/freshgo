@@ -93,6 +93,35 @@ func TestGuardSucceeded(t *testing.T) {
 	}
 }
 
+// A refund takes back the attempt that worked alone: any number of them
+// lets a key through, and the failures between them still add up to a
+// pause.
+func TestGuardRefund(t *testing.T) {
+	var g Guard
+	now := time.Unix(1_000_000, 0)
+	for range 3 * FreeFailures {
+		if wait := g.Attempt("k", now); wait != 0 {
+			t.Fatalf("an attempt that works has to wait %s", wait)
+		}
+		g.Refund("k")
+	}
+	if got := len(g.failures); got != 0 {
+		t.Errorf("the guard remembers %d keys after attempts that all worked", got)
+	}
+	for range FreeFailures - 1 {
+		g.Attempt("k", now)
+		g.Attempt("k", now)
+		g.Refund("k")
+	}
+	if wait := g.Attempt("k", now); wait != 0 {
+		t.Fatalf("the failure number %d has to wait %s", FreeFailures, wait)
+	}
+	if wait := g.Attempt("k", now); wait == 0 {
+		t.Errorf("after %d failures and refunds of the attempts between them, no pause", FreeFailures)
+	}
+	g.Refund("unknown")
+}
+
 func TestKey(t *testing.T) {
 	for _, k := range []struct{ name, addr, want string }{
 		{"Alice", "192.0.2.1", "alice\x00192.0.2.1"},
