@@ -78,6 +78,8 @@ networks:
 
 `FRESHGO_TRUSTED_PROXIES` names the network of the two containers. The proxy connects from an address of that network, not from the loopback address the default expects, and without the setting the server would count the failed logins of all visitors against the proxy.
 
+An open page hears from the server at `/events` when entries change (server-sent events), and the proxy must let that answer through as it comes. Caddy does: it sends an answer of type `text/event-stream` on at once. nginx needs, for that location, `proxy_buffering off` (the server also says `X-Accel-Buffering: no`) and a `proxy_read_timeout` longer than the 30 seconds between the comments the server sends when there is nothing to tell; the default 60 seconds will do. A proxy that holds the answer back holds back what the page shows; one that closes the stream makes the page look for changes every two minutes until the browser has opened it again.
+
 ```sh
 docker compose run --rm freshgo user create alice
 docker compose up -d

@@ -664,6 +664,9 @@
 	// ---- The tree ----
 
 	let treeTimer = 0;
+	// newEntries is set when the server told of entries that came: the
+	// fresh tree then says how many the stream being read got.
+	let newEntries = false;
 
 	// refreshTree brings the counts of the tree up to date.
 	function refreshTree() {
@@ -672,6 +675,8 @@
 		}
 		clearTimeout(treeTimer);
 		treeTimer = setTimeout(async () => {
+			const announce = newEntries;
+			newEntries = false;
 			const here = location.href;
 			let response;
 			try {
@@ -689,7 +694,11 @@
 			const count = document.getElementById('stream-unread');
 			const counted = answer.getElementById('stream-unread');
 			if (count && counted) {
+				const more = Number(counted.textContent) - Number(count.textContent);
 				count.replaceWith(document.adoptNode(counted));
+				if (announce && more > 0) {
+					say(t('js.new-entries').replace('%d', more));
+				}
 			}
 			const focused = tree.contains(document.activeElement) ? document.activeElement.getAttribute('href') : null;
 			fresh.open = old.open;
@@ -759,8 +768,56 @@
 			fold.open = false;
 		}
 	});
+
+	// ---- What the server tells ----
+
+	// The page of a user who logged in hears from the server when the
+	// counts change or entries come. The stream outlives the pages opened
+	// in place; the browser opens it again when it breaks.
+	let source = null;
+	let sourceURL = '';
+	// replaced is set when the server gave the place of the stream to newer
+	// pages: one opened again would take the place of another.
+	let replaced = false;
+	const listening = () => source !== null && source.readyState === EventSource.OPEN;
+	onContent(() => {
+		const url = urls.events || '';
+		// A stream the server turned down, as when the login it was
+		// opened under ended, is not opened again by the browser.
+		if (source && (url !== sourceURL || source.readyState === EventSource.CLOSED)) {
+			source.close();
+			source = null;
+		}
+		if (source || !url || replaced || !('EventSource' in window)) {
+			return;
+		}
+		sourceURL = url;
+		source = new EventSource(url);
+		let lost = false;
+		source.addEventListener('error', () => {
+			lost = true;
+		});
+		// What changed while the stream was down was not told.
+		source.addEventListener('open', () => {
+			if (lost) {
+				lost = false;
+				refreshTree();
+			}
+		});
+		source.addEventListener('tree', refreshTree);
+		source.addEventListener('entries', () => {
+			newEntries = true;
+			refreshTree();
+		});
+		source.addEventListener('replaced', () => {
+			replaced = true;
+			source.close();
+			source = null;
+		});
+	});
+	// Without the stream the page looks for changes now and then.
 	setInterval(() => {
-		if (!document.hidden) {
+		if (!document.hidden && !listening()) {
 			refreshTree();
 		}
 	}, 120000);

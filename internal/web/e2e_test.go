@@ -22,6 +22,7 @@ import (
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
 
+	"github.com/juev/freshgo/internal/events"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/translate"
 )
@@ -1600,4 +1601,83 @@ func TestE2EToolbar(t *testing.T) {
 		b.open("/?state=all")
 		b.until("the category folded as the reader left it", `!document.querySelector('#tree details.branch').open && JSON.parse(localStorage.getItem('freshgo.folded')).length === 1`)
 	})
+}
+
+// An open page hears from the server: an entry read elsewhere and an entry
+// that came change the tree long before the page would look for itself,
+// the page says how many entries came, and the stream outlives a stream
+// opened in place.
+func TestE2EEvents(t *testing.T) {
+	broker := &events.Broker{}
+	imported(t, Options{Events: broker}, func(t *testing.T, s *site) {
+		s.db.EntriesChanged = func(userID int64, added bool) {
+			kind := events.Tree
+			if added {
+				kind = events.Entries
+			}
+			broker.Publish(userID, kind)
+		}
+		alice := s.user("alice")
+		ids := s.stored("alice", store.Listing{Set: mainStream(), Read: ptr(false)})
+		b := browse(t, s)
+		// The streams the page opens are kept where the test sees them.
+		b.run(command(page.AddScriptToEvaluateOnNewDocument, page.AddScriptToEvaluateOnNewDocumentParams{
+			Source: `window.sources = [];
+				window.EventSource = class extends EventSource {
+					constructor(...args) { super(...args); window.sources.push(this); }
+				}`,
+		}))
+		b.login("alice")
+		b.until("the stream open", `window.sources.length === 1 && window.sources[0].readyState === EventSource.OPEN`)
+		count := `document.getElementById('stream-unread').textContent`
+		unread := b.text(count)
+
+		// Read by another client: the count goes down.
+		if _, err := s.db.SetEntriesRead(context.Background(), alice.ID, ids[:1], true, 1); err != nil {
+			t.Fatal(err)
+		}
+		fewer := strconv.Itoa(mustAtoi(t, unread) - 1)
+		b.until("the read entry counted off", count+` === '`+fewer+`'`)
+
+		// An entry comes to a feed of the stream: counted, and said.
+		var feed *store.Feed
+		for _, f := range s.feeds("alice") {
+			if f.Priority >= priorityMain {
+				feed = f
+				break
+			}
+		}
+		if feed == nil {
+			t.Fatal("alice has no feed in the main stream")
+		}
+		if err := s.db.InsertEntries(context.Background(), alice.ID, []*store.Entry{{FeedID: feed.ID, GUID: "came-now", Title: "Came now"}}); err != nil {
+			t.Fatal(err)
+		}
+		b.until("the new entry counted", count+` === '`+unread+`'`)
+		b.until("the new entry said", `document.getElementById('messages').textContent.includes('New entries here: 1.')`)
+
+		// Another stream opened in place keeps the stream of events.
+		b.press("t")
+		b.tabTo(`#tree a[href="/categories/2"]`)
+		b.press(kb.Enter)
+		b.until("the category in place", `location.pathname === '/categories/2'`)
+		everything := `document.querySelector('#tree details li > .count').textContent`
+		before := mustAtoi(t, b.text(everything))
+		if _, err := s.db.SetEntriesRead(context.Background(), alice.ID, ids[1:2], true, 2); err != nil {
+			t.Fatal(err)
+		}
+		b.until("the tree of the category told", everything+` === '`+strconv.Itoa(before-1)+`'`)
+		if n := read[int](b, `window.sources.length`); n != 1 {
+			t.Errorf("the page opened %d streams, want 1", n)
+		}
+	})
+}
+
+func mustAtoi(t *testing.T, s string) int {
+	t.Helper()
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return n
 }
