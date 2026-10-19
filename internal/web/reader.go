@@ -303,8 +303,11 @@ type showing struct {
 	// viewExpanded, empty when the setting of the user decides.
 	view  string
 	state string
-	sort  string
-	asc   bool
+	// adaptive is set when the state follows whether the stream has unread
+	// entries, which may change while the page is open.
+	adaptive bool
+	sort     string
+	asc      bool
 	// seed picks the shuffle when the sort is random.
 	seed  int64
 	query string
@@ -338,9 +341,9 @@ func show(params url.Values, prefs reading, s stream) showing {
 		case prefs.DefaultView == "unread":
 			v.state = stateUnread
 		case s.unread > 0: // adaptive, the default: unread entries while there are some
-			v.state = stateUnread
+			v.state, v.adaptive = stateUnread, true
 		default:
-			v.state = stateAll
+			v.state, v.adaptive = stateAll, true
 		}
 	}
 
@@ -774,6 +777,9 @@ type readerPage struct {
 	Query    string
 	Problem  string
 	State    string
+	// Adaptive says that State follows whether the stream has unread
+	// entries.
+	Adaptive bool
 	Asked    url.Values
 	Path     string
 	Here     string
@@ -851,7 +857,7 @@ func (h *Handler) reader(kind string) http.HandlerFunc {
 		}
 		page := readerPage{
 			Unread: s.unread, Sort: showing.sort, Asc: showing.asc, Query: showing.query, State: showing.state,
-			Asked: showing.asked, Path: s.path(), Here: showing.here(r.URL), Expanded: expanded,
+			Adaptive: showing.adaptive, Asked: showing.asked, Path: s.path(), Here: showing.here(r.URL), Expanded: expanded,
 			Before: h.now().UnixMicro(), CanChange: !who.anonymous,
 			CanRefresh: !who.anonymous || state(r).system.AllowAnonymousRefresh,
 		}
@@ -879,8 +885,17 @@ func (h *Handler) reader(kind string) http.HandlerFunc {
 		hideRead := showing.state == stateUnread && (prefs.HideReadFeeds == nil || *prefs.HideReadFeeds)
 		page.Tree = h.tree(v, lib, s, showing, hideRead)
 		if r.Header.Get(fragmentHeader) == "tree" {
-			// The script asks for the tree alone, and the count of the
-			// stream, to bring the counts up to date.
+			// The script asks for the tree alone, the count and the state
+			// of the stream, and the entries it lists, to bring them up to
+			// date.
+			listed, err := h.db.EntriesByIDs(ctx, who.user.ID, shownEntries(r), true)
+			if err == nil {
+				page.Entries, err = h.articles(ctx, v, lib, who.user.ID, prefs, listed, true)
+			}
+			if err != nil {
+				h.broken(w, r, err)
+				return
+			}
 			v.Data = page
 			h.fragment(w, r, "tree-fresh", v)
 			return
@@ -1017,6 +1032,29 @@ func isText(values url.Values) bool {
 // of the page: "tree" for the tree of a stream, "entry" for the entry an
 // action was about.
 const fragmentHeader = "X-Fragment"
+
+// shownHeader names, with the tree asked for, the entries the page lists,
+// separated by commas.
+const shownHeader = "X-Entries"
+
+// maxShown is how many entries the tree is answered with at most: the
+// identifiers have to fit in a header a proxy lets through.
+const maxShown = 300
+
+// shownEntries returns the identifiers of shownHeader, leaving out what is
+// no identifier and what is beyond maxShown.
+func shownEntries(r *http.Request) []int64 {
+	var ids []int64
+	for field := range strings.SplitSeq(r.Header.Get(shownHeader), ",") {
+		if len(ids) == maxShown {
+			break
+		}
+		if id, err := strconv.ParseInt(strings.TrimSpace(field), 10, 64); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
 
 // noticeHeader carries what an action has to say with a part of a page,
 // encoded as a path segment.

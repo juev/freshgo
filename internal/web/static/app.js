@@ -667,30 +667,123 @@
 	// newEntries is set when the server told of entries that came: the
 	// fresh tree then says how many the stream being read got.
 	let newEntries = false;
+	// told is set when the change came from elsewhere, not from an action
+	// of the reader on this page.
+	let told = false;
+	// treeAsked counts the times the tree was asked for: an answer that a
+	// later question overtook may be older than what an action showed.
+	let treeAsked = 0;
+	// offer is the message that offers to list the unread entries.
+	let offer = null;
 
-	// refreshTree brings the counts of the tree up to date.
-	function refreshTree() {
+	// maxShown is how many listed entries the tree is asked for with, as
+	// the server answers at most.
+	const maxShown = 300;
+
+	// shownIDs names the entries the page lists, those around the current
+	// one when there are too many.
+	const shownIDs = () => {
+		const rows = entries ? Array.from(entries.querySelectorAll(':scope > article.entry')) : [];
+		const at = Math.max(0, rows.indexOf(current));
+		const from = Math.max(0, Math.min(at - maxShown / 2, rows.length - maxShown));
+		return rows.slice(from, from + maxShown).map((article) => article.id.slice(1)).join(',');
+	};
+
+	// The parts of an entry that tell what state it is in.
+	const stateParts = ['.entry-state', '.entry-star', '.entry-labels'];
+	const changed = (article, fresh) => article.classList.contains('read') !== fresh.classList.contains('read')
+		|| stateParts.some((part) => {
+			const old = article.querySelector(part);
+			const now = fresh.querySelector(part);
+			return (old && old.outerHTML) !== (now && now.outerHTML);
+		});
+
+	// reload lists the stream again in place.
+	const reload = () => {
+		if (window.htmx) {
+			htmx.ajax('GET', location.href, { target: document.body, swap: 'outerSync' });
+		} else {
+			location.reload();
+		}
+	};
+
+	// offerUnread says that unread entries came and offers to list them;
+	// the offer stays until it is taken or the page is left.
+	const offerUnread = () => {
+		if (!messages || (offer && offer.isConnected)) {
+			return;
+		}
+		const button = el('button', { type: 'button' }, t('js.show-unread'));
+		button.addEventListener('click', reload);
+		offer = el('p', { class: 'said offer' }, t('js.unread-came'), ' ', button);
+		messages.append(offer);
+	};
+
+	// listChanged brings the entries the page lists up to the state the
+	// server says they are in. An adaptive stream that listed all entries
+	// for want of unread ones lists the unread ones when some came from
+	// elsewhere: at once while no entry is open, by the offer otherwise.
+	const listChanged = (answer, elsewhere) => {
+		const fresh = answer.querySelector('.entries');
+		if (!entries || !fresh) {
+			return;
+		}
+		for (const article of fresh.querySelectorAll(':scope > article.entry')) {
+			const shown = document.getElementById(article.id);
+			if (shown && entries.contains(shown) && changed(shown, article)) {
+				sync(shown, document.adoptNode(article), false);
+			}
+		}
+		if (elsewhere && 'adaptive' in entries.dataset && entries.dataset.state === 'all' && fresh.dataset.state === 'unread') {
+			if (entries.querySelector(':scope > article.entry > details[open]')) {
+				offerUnread();
+			} else {
+				reload();
+			}
+		}
+	};
+
+	// refreshTree brings the counts of the tree and the state of the listed
+	// entries up to date; elsewhere says that the change came from elsewhere.
+	function refreshTree(elsewhere = false) {
 		if (!tree) {
 			return;
 		}
+		told ||= elsewhere;
+		const asked = ++treeAsked;
 		clearTimeout(treeTimer);
 		treeTimer = setTimeout(async () => {
 			const announce = newEntries;
-			newEntries = false;
+			const fromElsewhere = told;
+			newEntries = told = false;
+			// A later question takes over what this one was to tell.
+			const overtaken = () => {
+				newEntries ||= announce;
+				told ||= fromElsewhere;
+			};
 			const here = location.href;
 			let response;
 			try {
-				response = await ask(here, { headers: { 'X-Fragment': 'tree' } });
+				response = await ask(here, { headers: { 'X-Fragment': 'tree', 'X-Entries': shownIDs() } });
 			} catch {
+				return;
+			}
+			if (asked !== treeAsked) {
+				overtaken();
 				return;
 			}
 			// The tree of a stream the reader has left is not the one shown.
 			const answer = response.ok && location.href === here ? parse(await response.text()) : null;
+			if (asked !== treeAsked) {
+				overtaken();
+				return;
+			}
 			const fresh = answer && answer.querySelector('details');
 			const old = tree.querySelector('details');
 			if (!fresh || !old) {
 				return;
 			}
+			listChanged(answer, fromElsewhere);
 			const count = document.getElementById('stream-unread');
 			const counted = answer.getElementById('stream-unread');
 			if (count && counted) {
@@ -801,13 +894,13 @@
 		source.addEventListener('open', () => {
 			if (lost) {
 				lost = false;
-				refreshTree();
+				refreshTree(true);
 			}
 		});
-		source.addEventListener('tree', refreshTree);
+		source.addEventListener('tree', () => refreshTree(true));
 		source.addEventListener('entries', () => {
 			newEntries = true;
-			refreshTree();
+			refreshTree(true);
 		});
 		source.addEventListener('replaced', () => {
 			replaced = true;
@@ -818,7 +911,7 @@
 	// Without the stream the page looks for changes now and then.
 	setInterval(() => {
 		if (!document.hidden && !listening()) {
-			refreshTree();
+			refreshTree(true);
 		}
 	}, 120000);
 

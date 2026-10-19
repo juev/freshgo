@@ -94,7 +94,7 @@
 <button type="button" data-run="star" aria-label="{{.T "key.star"}}" title="{{.T "key.star"}}">★</button>
 {{end}}<button type="button" data-run="next" aria-label="{{.T "key.next"}}" title="{{.T "key.next"}}">↓</button>
 </div>
-<div class="entries" data-view="{{if .Data.Expanded}}expanded{{else}}list{{end}}"{{if .Data.Entries}} role="feed" aria-labelledby="stream-heading"{{end}}>
+<div class="entries" data-view="{{if .Data.Expanded}}expanded{{else}}list{{end}}" data-state="{{.Data.State}}"{{if .Data.Adaptive}} data-adaptive{{end}}{{if .Data.Entries}} role="feed" aria-labelledby="stream-heading"{{end}}>
 {{range .Data.Entries}}{{template "article" (dict "Entry" . "Here" $.Data.Here "Page" $ "Expanded" $.Data.Expanded "CanChange" $.Data.CanChange)}}{{end}}
 </div>
 {{if .Data.Next}}<p class="more"><a href="{{.Data.Next}}" rel="next">{{.T "stream.next"}}</a></p>{{end}}

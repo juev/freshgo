@@ -134,7 +134,10 @@
 
 {{define "stream-unread"}}<span class="count" id="stream-unread" title="{{.N "tree.unread" .Data.Unread}}"{{if not .Data.Unread}} hidden{{end}}>{{.Data.Unread}}</span>{{end}}
 
-{{define "tree-fresh"}}{{template "tree" .}}{{template "stream-unread" .}}{{end}}
+{{define "tree-fresh"}}{{template "tree" .}}{{template "stream-unread" .}}
+<div class="entries" data-state="{{.Data.State}}"{{if .Data.Adaptive}} data-adaptive{{end}}>
+{{range .Data.Entries}}{{template "article" (dict "Entry" . "Here" $.Data.Here "Page" $ "Expanded" $.Data.Expanded "CanChange" $.Data.CanChange)}}{{end}}
+</div>{{end}}
 
 {{define "article"}}
 <article class="entry{{if .Entry.Read}} read{{end}}" id="e{{.Entry.ID}}" aria-labelledby="t{{.Entry.ID}}" tabindex="-1">
