@@ -10,6 +10,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/juev/freshgo/internal/push"
 )
 
 const pushKey = "BPublicKeyOfTheInstallation"
@@ -200,7 +202,7 @@ func TestPushRefusesWhatIsNotASubscription(t *testing.T) {
 		}
 
 		// A message goes to every browser, so their number is bounded.
-		for i := range maxBrowsers {
+		for i := range push.MaxSubscriptions {
 			if a := s.postJSON("/settings/push", subscriptionJSON(t, "https://push.example/"+string(rune('a'+i)))); a.status != http.StatusNoContent {
 				t.Fatalf("browser %d: status %d", i+1, a.status)
 			}
