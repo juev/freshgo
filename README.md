@@ -11,7 +11,7 @@ A feed aggregator server in one binary that takes over an existing [FreshRSS](ht
 - fetches the full text of articles, by CSS selector or found on the page automatically, for a whole feed or for one article on request;
 - translates an article on request with a language model of your choice, part by part as you read, writes a short summary of it and suggests labels for it;
 - sends a daily e-mail digest of the unread entries to users who ask for it, where the server has an SMTP server;
-- sends Web Push notifications of new entries to the browsers of users who ask for them, where the server has VAPID keys;
+- sends Web Push notifications of new entries to the browsers and apps of users who ask for them, and tells apps to sync when entries are read or starred, where the server has VAPID keys;
 - serves the Google Reader API and, when an administrator switches it on, the Fever API; OPML import and export, and feed icons;
 - has a web interface of its own, in English and Russian, in which everything can be done from the keyboard and without JavaScript;
 - subscribes to WebSub hubs;
@@ -397,6 +397,16 @@ vapid-subject: mailto:you@example.org
 Then each user opens the profile, presses "Notify me in this browser" in the part "Notifications in this browser" and allows notifications; every browser is switched on on its own, and the same button switches it off. Browsers allow push on pages served over HTTPS (and on `localhost`), so freshgo has to sit behind a reverse proxy with a certificate. A new pair of keys makes the browsers subscribed with the old pair stop getting messages; they switch notifications on again.
 
 The user gets one message per browser for a refresh, in the language of the interface; it counts the entries of the reading list that are unread (feeds of priority 0 and above, as in the apps), so entries a filter marked read are not news. A push service that no longer knows a browser (404 or 410) loses its subscription; any other failure is logged and the subscription stays. The message goes to the address the browser gave, through the same rules as feeds: an address that is internal is refused unless `-fetch-allowlist` names it. Sending is done in the background and holds the refresh back for nothing.
+
+An app that talks to freshgo over the Google Reader API subscribes with the token of the API, through a UnifiedPush distributor such as ntfy on Android (FCM is not supported):
+
+| Request | Answer |
+|---|---|
+| `GET /api/freshgo/push` | `{"vapidPublicKey": "…"}`, or 404 while the server has no VAPID keys |
+| `POST /api/freshgo/push/subscribe` with `{"endpoint": "https://…", "keys": {"p256dh": "…", "auth": "…"}}` | 204; 400 for what is not a subscription, 409 beyond ten browsers and apps of a user |
+| `POST /api/freshgo/push/unsubscribe` with `{"endpoint": "https://…"}` | 204 |
+
+Each request carries `Authorization: GoogleLogin auth=<user>/<token>`, as every call of the API does. An app gets the message of new entries a browser gets, `{"kind": "entries", "title": …, "body": …, "count": 3, "newest": "1700000000000000"}`, where `newest` is the identifier of the newest entry as `stream/items/ids` gives it. Entries read, starred or otherwise changed are told to apps alone, at most once per 30 seconds, as `{"kind": "changes"}`; the app that made the change is told as well. A distributor on a home network or a tailnet has an internal address, so `-fetch-allowlist` has to name it.
 
 ### Translating articles
 

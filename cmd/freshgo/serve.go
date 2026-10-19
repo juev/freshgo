@@ -166,13 +166,17 @@ func newMetrics(db *store.Store, refresher *refresh.Refresher, requests *prometh
 // newEvents returns what tells the open pages of a user that entries of
 // theirs changed, and whether entries came: the store tells it, whichever
 // part of the server changed them, a refresh, an import, a page or an API
-// client.
-func newEvents(db *store.Store) *events.Broker {
+// client. A change that brought no entries goes to changed as well, unless it
+// is nil: the apps of the user are pushed to sync. Entries that came are
+// pushed by the refresh.
+func newEvents(db *store.Store, changed func(userID int64)) *events.Broker {
 	broker := &events.Broker{}
 	db.EntriesChanged = func(userID int64, added bool) {
 		kind := events.Tree
 		if added {
 			kind = events.Entries
+		} else if changed != nil {
+			changed(userID)
 		}
 		broker.Publish(userID, kind)
 	}
@@ -239,7 +243,11 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 		}
 		mailer = sender
 	}
-	broker := newEvents(db)
+	var changed func(int64)
+	if s.notifier != nil {
+		changed = s.notifier.Changed
+	}
+	broker := newEvents(db, changed)
 	pages, err := web.New(web.Options{
 		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL, Version: buildVersion(),
 		TrustedProxies: proxies, FetchAllowlist: conf.Allowlist(), Mailer: mailer, OIDCClientSecret: conf.OIDCClientSecret, Images: s.images, Services: s.images, Sources: s.images,

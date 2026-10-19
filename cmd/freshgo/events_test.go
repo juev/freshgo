@@ -64,7 +64,7 @@ func TestEventsReachOpenPages(t *testing.T) {
 	log := slog.New(slog.DiscardHandler)
 	registry := &hooks.Registry{}
 	refresher := refresh.New(db, client, registry, log)
-	broker := newEvents(db)
+	broker := newEvents(db, nil)
 	api := greader.New(greader.Options{DB: db, Refresher: refresher, Hooks: registry, Log: log})
 	pages, err := web.New(web.Options{DB: db, Refresher: refresher, Hooks: registry, Log: log, Version: "test", Events: broker})
 	if err != nil {
@@ -162,5 +162,46 @@ func TestEventsReachOpenPages(t *testing.T) {
 		t.Errorf("Serve: %v", err)
 	}
 	for range lines {
+	}
+}
+
+// Entries read or starred are told to the apps of the user; entries that came
+// are not, the refresh pushes them.
+func TestChangesReachApps(t *testing.T) {
+	ctx := context.Background()
+	db, err := store.Open(ctx, config.DriverSQLite, filepath.Join(t.TempDir(), "freshgo.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Close() })
+	alice := &store.User{Name: "alice"}
+	if err := db.CreateUser(ctx, alice); err != nil {
+		t.Fatal(err)
+	}
+	f := &store.Feed{UserID: alice.ID, URL: "https://example.org/feed", Name: "Feed"}
+	if err := db.CreateFeed(ctx, f); err != nil {
+		t.Fatal(err)
+	}
+	var told []int64
+	newEvents(db, func(userID int64) { told = append(told, userID) })
+
+	if err := db.InsertEntries(ctx, alice.ID, []*store.Entry{{FeedID: f.ID, GUID: "1"}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(told) != 0 {
+		t.Errorf("entries that came were told as changes: %v", told)
+	}
+	entries, err := db.EntriesByFeed(ctx, alice.ID, f.ID)
+	if err != nil || len(entries) != 1 {
+		t.Fatalf("entries = %v, %v", entries, err)
+	}
+	if _, err := db.SetEntriesRead(ctx, alice.ID, []int64{entries[0].ID}, true, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetEntriesFavorite(ctx, alice.ID, []int64{entries[0].ID}, true, 2); err != nil {
+		t.Fatal(err)
+	}
+	if len(told) != 2 || told[0] != alice.ID || told[1] != alice.ID {
+		t.Errorf("told = %v, want alice twice", told)
 	}
 }
