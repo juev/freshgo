@@ -1,7 +1,7 @@
 {{define "content"}}
 <section class="stream" aria-labelledby="stream-heading">
 <div class="stream-head">
-<nav class="tree" id="tree" aria-label="{{.T "tree.label"}}">
+<nav class="tree" id="tree" aria-label="{{.T "tree.label"}}" hx-boost:inherited="true" hx-target:inherited="#content" hx-select:inherited="#content" hx-swap:inherited="outerSync">
 {{template "tree" .}}
 </nav>
 <h1 id="stream-heading">{{.Heading}}</h1>
