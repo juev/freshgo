@@ -208,6 +208,10 @@ func TestStaticFiles(t *testing.T) {
 		if len(scripts) != 2 || scripts[0][2] != "htmx.min" || scripts[1][2] != "app" {
 			t.Fatalf("want htmx and then the script, deferred and versioned, in\n%s", page)
 		}
+		// htmx reads hx-* alone: the text of a feed may carry data-hx-*.
+		if !strings.Contains(page, `<meta name="htmx-config" content='{"prefix": ""}'>`) {
+			t.Errorf("htmx is not told to leave data-hx-* alone in\n%s", page)
+		}
 		for _, script := range scripts {
 			if a := s.get(script[1]); a.status != http.StatusOK || !strings.HasPrefix(a.header.Get("Content-Type"), "text/javascript") {
 				t.Errorf("GET %s: status %d, headers %v", script[1], a.status, a.header)

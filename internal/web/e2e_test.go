@@ -443,6 +443,29 @@ func TestE2EStreamsInPlace(t *testing.T) {
 		b.press("J")
 		b.until("the category again, by J", in("/categories/2", "Blogs"))
 
+		// The text of an entry keeps the data-* attributes of its feed:
+		// htmx reads hx-* alone, which the sanitizer drops, so a feed asks
+		// for nothing. The same request under hx-* is made, which shows that
+		// a request would be seen.
+		asked := func(attribute, mark string) string {
+			return `(() => {
+				const p = document.createElement('p');
+				p.setAttribute('` + attribute + `-get', '/about?` + mark + `');
+				p.setAttribute('` + attribute + `-trigger', 'load');
+				p.setAttribute('` + attribute + `-swap', 'none');
+				document.querySelector('.entries article.entry').append(p);
+				htmx.process(p);
+			})()`
+		}
+		seen := func(mark string) string {
+			return `performance.getEntriesByType('resource').some((r) => r.name.endsWith('/about?` + mark + `'))`
+		}
+		b.run(chromedp.Evaluate[chromedp.Void](asked("data-hx", "feed")), chromedp.Evaluate[chromedp.Void](asked("hx", "page")))
+		b.until("the request under hx-*", seen("page"))
+		if read[bool](b, seen("feed")) {
+			t.Errorf("htmx made the request of a data-hx-* attribute, which the text of a feed may carry")
+		}
+
 		if refused := b.text(`window.refused.join('; ')`); refused != "" {
 			t.Errorf("the policy of the page refuses: %s", refused)
 		}
