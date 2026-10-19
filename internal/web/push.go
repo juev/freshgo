@@ -2,13 +2,11 @@ package web
 
 import (
 	_ "embed"
-	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
-	"net/url"
-	"slices"
-	"strings"
 
+	"github.com/juev/freshgo/internal/push"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -31,11 +29,6 @@ const (
 	// maxPushForm bounds the JSON of a subscription; the endpoints of push
 	// services are a few hundred bytes long.
 	maxPushForm = 4 << 10
-	// maxEndpoint bounds the address of a push service.
-	maxEndpoint = 1024
-	// maxBrowsers is how many browsers a user may have subscribed: a message
-	// is sent to each of them.
-	maxBrowsers = 10
 )
 
 // pushing says whether the installation offers Web Push: it has the keys.
@@ -73,57 +66,32 @@ func (h *Handler) pushForm(w http.ResponseWriter, r *http.Request) (subscription
 		return sub, false
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxPushForm)
-	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil || !validEndpoint(sub.Endpoint) {
+	if err := json.NewDecoder(r.Body).Decode(&sub); err != nil || !push.ValidEndpoint(sub.Endpoint) {
 		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
 		return sub, false
 	}
 	return sub, true
 }
 
-// validEndpoint reports whether the address is one a push service takes
-// messages at. Browsers hand out https addresses only.
-func validEndpoint(endpoint string) bool {
-	u, err := url.Parse(endpoint)
-	return err == nil && len(endpoint) <= maxEndpoint && u.Scheme == "https" && u.Host != "" && u.User == nil
-}
-
-// validKey reports whether the text is base64url of n bytes.
-func validKey(text string, n int) bool {
-	raw, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(text, "="))
-	return err == nil && len(raw) == n
-}
-
 // subscribePush stores the browser of the user that asked for notifications.
-// The public key of a browser is a point of the curve P-256, 65 bytes, and
-// its secret is 16.
 func (h *Handler) subscribePush(w http.ResponseWriter, r *http.Request) {
-	ctx, user := r.Context(), state(r).who.user
 	sub, ok := h.pushForm(w, r)
 	if !ok {
 		return
 	}
-	if !validKey(sub.Keys.P256DH, 65) || !validKey(sub.Keys.Auth, 16) {
-		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
-		return
-	}
-	own, err := h.db.PushSubscriptions(ctx, user.ID)
-	if err != nil {
-		h.broken(w, r, err)
-		return
-	}
-	if len(own) >= maxBrowsers && !slices.ContainsFunc(own, func(p *store.PushSubscription) bool { return p.Endpoint == sub.Endpoint }) {
-		http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict)
-		return
-	}
-	err = h.db.PutPush(ctx, &store.PushSubscription{
-		UserID: user.ID, Endpoint: sub.Endpoint, P256DH: strings.TrimRight(sub.Keys.P256DH, "="),
-		Auth: strings.TrimRight(sub.Keys.Auth, "="), Created: h.now().Unix(),
+	err := push.Subscribe(r.Context(), h.db, &store.PushSubscription{
+		UserID: state(r).who.user.ID, Endpoint: sub.Endpoint, P256DH: sub.Keys.P256DH, Auth: sub.Keys.Auth, Created: h.now().Unix(),
 	})
-	if err != nil {
+	switch {
+	case errors.Is(err, push.ErrInvalid):
+		http.Error(w, http.StatusText(http.StatusBadRequest), http.StatusBadRequest)
+	case errors.Is(err, push.ErrTooMany):
+		http.Error(w, http.StatusText(http.StatusConflict), http.StatusConflict)
+	case err != nil:
 		h.broken(w, r, err)
-		return
+	default:
+		w.WriteHeader(http.StatusNoContent)
 	}
-	w.WriteHeader(http.StatusNoContent)
 }
 
 // unsubscribePush takes back the browser of the user. A browser that is not

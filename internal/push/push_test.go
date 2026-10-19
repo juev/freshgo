@@ -242,11 +242,22 @@ func (w *world) feed(u *store.User, change func(*store.Feed)) *store.Feed {
 // subscribe gives the user a browser at the path of the push service.
 func (w *world) subscribe(u *store.User, path string) *browser {
 	w.t.Helper()
+	return w.put(u, path, false)
+}
+
+// subscribeApp gives the user an app at the path of the push service.
+func (w *world) subscribeApp(u *store.User, path string) *browser {
+	w.t.Helper()
+	return w.put(u, path, true)
+}
+
+func (w *world) put(u *store.User, path string, app bool) *browser {
+	w.t.Helper()
 	b := newBrowser(w.t)
 	err := w.db.PutPush(context.Background(), &store.PushSubscription{
 		UserID: u.ID, Endpoint: w.service.URL + path,
 		P256DH: base64.RawURLEncoding.EncodeToString(b.key.PublicKey().Bytes()), Auth: base64.RawURLEncoding.EncodeToString(b.auth),
-		Created: time.Now().Unix(),
+		Created: time.Now().Unix(), App: app,
 	})
 	if err != nil {
 		w.t.Fatal(err)
@@ -298,6 +309,12 @@ func (w *world) subscriptions(u *store.User) int {
 // newest is the title of the entry stored last for the feed.
 func (w *world) newest(f *store.Feed) string {
 	w.t.Helper()
+	return w.last(f).Title
+}
+
+// last is the entry stored last for the feed.
+func (w *world) last(f *store.Feed) *store.Entry {
+	w.t.Helper()
 	entries, err := w.db.EntriesByFeed(context.Background(), f.UserID, f.ID)
 	if err != nil || len(entries) == 0 {
 		w.t.Fatalf("entries of the feed: %v, %v", entries, err)
@@ -308,7 +325,7 @@ func (w *world) newest(f *store.Feed) string {
 			last = e
 		}
 	}
-	return last.Title
+	return last
 }
 
 // opened opens a request to the push service and reads the message in it.
@@ -347,6 +364,10 @@ func TestRefreshNotifiesEachBrowserOnce(t *testing.T) {
 			want := "3 new entries, the latest: " + w.newest(feed)
 			if m.Title != "freshgo" || m.Body != want {
 				t.Errorf("%s: message %+v, want the title of the site and %q", path, m, want)
+			}
+			// What an app reads, the same for a browser.
+			if newest := strconv.FormatInt(w.last(feed).ID, 10); m.Kind != "entries" || m.Count != 3 || m.Newest != newest {
+				t.Errorf("%s: message %+v, want kind entries, count 3 and newest %s", path, m, newest)
 			}
 		}
 		// The message is in the language of the user.
@@ -414,6 +435,66 @@ func TestRefreshNotifiesEachBrowserOnce(t *testing.T) {
 		}
 		if m := opened(t, phone, w.at("/alice-phone")[1]); m.Body != "1 new entry: fourth" {
 			t.Errorf("message = %+v, want one new entry: fourth", m)
+		}
+	})
+}
+
+// An app is told of entries that came as a browser is, and of changes of
+// entries a while after, in one message for those that come meanwhile; a
+// browser is not told of changes, as it would have to show the message.
+func TestChangesAreToldToApps(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		alice, bob := w.user("alice", ``), w.user("bob", ``)
+		feed := w.feed(alice, nil)
+		app := w.subscribeApp(alice, "/app")
+		w.subscribe(alice, "/browser")
+		w.subscribe(bob, "/bob")
+
+		w.publish("one", "two")
+		w.refresh()
+		got := w.at("/app")
+		if len(got) != 1 {
+			t.Fatalf("the app got %d messages for a refresh, want 1", len(got))
+		}
+		if m := opened(t, app, got[0]); m.Kind != "entries" || m.Count != 2 || m.Newest != strconv.FormatInt(w.last(feed).ID, 10) {
+			t.Errorf("message of entries to the app = %+v", m)
+		}
+
+		w.notifier.delay = time.Hour
+		for range 3 {
+			w.notifier.Changed(alice.ID)
+		}
+		w.notifier.Changed(bob.ID)
+		// The refresh told the app and the browser of alice; bob has no feed.
+		if n := len(w.requests()); n != 2 {
+			t.Errorf("changes were told before their time: %d requests, want 2", n)
+		}
+		// Wait tells what waits, once.
+		w.notifier.Wait()
+		got = w.at("/app")
+		if len(got) != 2 {
+			t.Fatalf("the app got %d messages after three changes, want 2 in all", len(got))
+		}
+		if m := opened(t, app, got[1]); m != (message{Kind: "changes"}) {
+			t.Errorf("message of changes = %+v, want the kind alone", m)
+		}
+		if topic := got[1].header.Get("Topic"); topic == "" || topic == got[0].header.Get("Topic") {
+			t.Errorf("Topic of changes = %q, want one of its own, so that it does not replace a message of entries", topic)
+		}
+		if n, m := len(w.at("/browser")), len(w.at("/bob")); n != 1 || m != 0 {
+			t.Errorf("browsers got %d and %d messages, want 1 of entries and none", n, m)
+		}
+
+		// A change after the time is told again, when its time comes.
+		w.notifier.delay = time.Millisecond
+		w.notifier.Changed(alice.ID)
+		deadline := time.Now().Add(5 * time.Second)
+		for len(w.at("/app")) < 3 && time.Now().Before(deadline) {
+			time.Sleep(10 * time.Millisecond)
+		}
+		w.notifier.Wait()
+		if n := len(w.at("/app")); n != 3 {
+			t.Errorf("the app got %d messages, want 3 in all", n)
 		}
 	})
 }
