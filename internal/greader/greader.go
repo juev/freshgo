@@ -54,6 +54,9 @@ type Options struct {
 	// TrustedProxies are the reverse proxies whose word is taken for the
 	// address a request comes from.
 	TrustedProxies []netip.Prefix
+	// PushKey is the public VAPID key; empty when the installation does
+	// not push.
+	PushKey string
 }
 
 // Handler answers the requests of the Google Reader API.
@@ -67,6 +70,7 @@ type Handler struct {
 	guard     *authguard.Guard
 	decoys    authguard.Decoys
 	proxies   []netip.Prefix
+	pushKey   string
 	now       func() time.Time
 }
 
@@ -78,7 +82,7 @@ func New(o Options) *Handler {
 	}
 	return &Handler{
 		db: o.DB, refresher: o.Refresher, hooks: o.Hooks, log: o.Log, baseURL: o.BaseURL, media: o.MediaProxy,
-		guard: guard, proxies: o.TrustedProxies, now: time.Now,
+		guard: guard, proxies: o.TrustedProxies, pushKey: o.PushKey, now: time.Now,
 	}
 }
 
@@ -238,7 +242,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		badRequest(w)
 		return
 	}
-	if len(q.parts) < 5 || q.parts[1] != "reader" || q.parts[2] != "api" || q.parts[3] != "0" {
+	endpoint := h.dispatch
+	if pushRequest(q) {
+		endpoint = h.push
+	} else if len(q.parts) < 5 || q.parts[1] != "reader" || q.parts[2] != "api" || q.parts[3] != "0" {
 		badRequest(w)
 		return
 	}
@@ -246,7 +253,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		unauthorized(w)
 		return
 	}
-	if err := h.dispatch(ctx, q); err != nil {
+	if err := endpoint(ctx, q); err != nil {
 		if ctx.Err() != nil {
 			return
 		}

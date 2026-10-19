@@ -72,8 +72,8 @@ func extensions(registry *hooks.Registry) http.Handler {
 
 // routes sends a request to the part of the server its path belongs to. The
 // Google Reader API lives at the root, as in the original service, and under
-// the path FreshRSS serves it at; the Fever API has the path FreshRSS gives
-// it. What belongs to no other part is a page of
+// the path FreshRSS serves it at, with the subscription of apps to push next
+// to it; the Fever API has the path FreshRSS gives it. What belongs to no other part is a page of
 // the web interface.
 //
 // hubs is nil when WebSub is off.
@@ -92,7 +92,8 @@ func routes(health, api, feverAPI, icons, misc, hubs, pages http.Handler) http.H
 		case path == fever.Path:
 			feverAPI.ServeHTTP(w, r)
 		case path == greader.Alias, strings.HasPrefix(path, greader.Alias+"/"),
-			strings.HasPrefix(path, "/accounts/"), strings.HasPrefix(path, "/reader/"):
+			strings.HasPrefix(path, "/accounts/"), strings.HasPrefix(path, "/reader/"),
+			path == greader.PushPath, strings.HasPrefix(path, greader.PushPath+"/"):
 			api.ServeHTTP(w, r)
 		default:
 			pages.ServeHTTP(w, r)
@@ -219,7 +220,7 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	guard := &authguard.Guard{}
 	api := greader.New(greader.Options{
 		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL, MediaProxy: true,
-		Guard: guard, TrustedProxies: proxies,
+		Guard: guard, TrustedProxies: proxies, PushKey: conf.VAPIDPublicKey,
 	})
 	feverAPI := fever.New(fever.Options{
 		DB: db, Hooks: s.registry, Log: s.log, Guard: guard, TrustedProxies: proxies,
