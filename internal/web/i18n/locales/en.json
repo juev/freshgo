@@ -331,6 +331,7 @@
   "js.help.none": "no key",
   "js.labels": "Labels",
   "js.mark-all": "Mark every unread entry listed here as read?",
+  "js.new-entries": "New entries here: %d.",
   "js.no-entry": "No more entries.",
   "js.no-linkding": "No Linkding with an API token is set up: see Settings, Integrations.",
   "js.no-share": "No way to share is set up: see Settings, Integrations.",
