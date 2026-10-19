@@ -175,7 +175,7 @@ func TestOIDCSignIn(t *testing.T) {
 	withProvider(t, func(t *testing.T, s *site, p *provider) {
 		host := strings.TrimPrefix(p.server.URL, "http://")
 		page := s.shown("/login?next=%2Fsubscriptions")
-		if !strings.Contains(page, `<a href="/oidc/login?next=%2Fsubscriptions">Sign in with `+host+`</a>`) || !strings.Contains(page, `name="password"`) {
+		if !strings.Contains(page, `<a href="/oidc/login?next=%2Fsubscriptions" hx-boost="false">Sign in with `+host+`</a>`) || !strings.Contains(page, `name="password"`) {
 			t.Errorf("the login page does not offer the provider next to the password:\n%s", page)
 		}
 

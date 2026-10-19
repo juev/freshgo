@@ -13,7 +13,7 @@
 <script src="{{.Asset "htmx.min.js"}}" defer></script>
 <script src="{{.Asset "app.js"}}" defer></script>
 </head>
-<body data-config="{{.Config}}">
+<body data-config="{{.Config}}" hx-boost:inherited="true" hx-swap:inherited="outerSync">
 <a class="skip" href="#content">{{.T "nav.skip"}}</a>
 <header class="site-header">
 <a class="site-title" href="{{.URL "/"}}">{{.Site}}</a>
@@ -38,7 +38,7 @@
 </div>
 </header>
 <div class="messages" id="messages" role="status" aria-live="polite">{{if .Undo}}<form method="post" action="{{.URL "/undo"}}" class="undo"><p>{{.Notice}} <input type="hidden" name="next" value="{{.Undo}}"><button type="submit">{{.T "notice.undo"}}</button></p></form>{{else if .Notice}}<p>{{.Notice}}</p>{{end}}</div>
-<main class="page{{if .Wide}} wide{{end}}" id="content" tabindex="-1" hx-history-elt>
+<main class="page{{if .Wide}} wide{{end}}" id="content" tabindex="-1">
 {{if .Tabs}}<nav class="tabs" aria-label="{{.T "nav.section"}}">
 <ul>
 {{range .Tabs}}<li><a href="{{.URL}}"{{if .Current}} aria-current="page"{{end}}>{{.Name}}</a></li>

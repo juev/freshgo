@@ -125,7 +125,7 @@ func TestRegistration(t *testing.T) {
 	})
 }
 
-var publicFeedLink = regexp.MustCompile(`<a href="[^"]*(/rss\?[^"]+)">RSS</a>`)
+var publicFeedLink = regexp.MustCompile(`<a href="[^"]*(/rss\?[^"]+)" hx-boost="false">RSS</a>`)
 
 // publicFeed is the address of the public feed the page of the profile
 // links to, relative to the site.

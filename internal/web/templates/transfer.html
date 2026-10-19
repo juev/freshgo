@@ -54,7 +54,7 @@
 {{end}}
 
 <h2>{{.T "transfer.export"}}</h2>
-<form method="post" action="{{.URL "/subscriptions/export"}}" class="form">
+<form method="post" action="{{.URL "/subscriptions/export"}}" class="form" hx-boost="false">
 <p class="check">
 <input type="checkbox" id="opml" name="opml" value="1" checked>
 <label for="opml">{{.T "transfer.opml"}}</label>

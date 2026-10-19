@@ -348,8 +348,20 @@ func TestE2EDialogs(t *testing.T) {
 		b.press(":")
 		b.until("the palette open", `document.querySelector('dialog[open]') && document.activeElement.id === 'palette-input'`)
 		b.accessible("the palette")
-		b.press(kb.Tab, kb.Tab, kb.Tab)
-		b.until("the focus kept in the palette", `document.activeElement.closest('dialog[open]')`)
+		// Tab goes round the palette and, past its end, to the browser itself
+		// (the body for the page), never to the page behind it.
+		inPalette := false
+		for range 4 {
+			b.press(kb.Tab)
+			if read[bool](b, `document.activeElement !== document.body && !document.activeElement.closest('dialog[open]')`) {
+				t.Fatalf("Tab leaves the palette for %s", b.focus())
+			}
+			inPalette = inPalette || read[bool](b, `Boolean(document.activeElement.closest('dialog[open]'))`)
+		}
+		b.tabTo("#palette-input")
+		if !inPalette {
+			t.Errorf("Tab never stays in the palette")
+		}
 		b.press(kb.Escape)
 		b.until("the palette closed, the focus back on the entry", `!document.querySelector('dialog') && `+current(ids[0], false))
 		b.chord("k", kb.ModifierCtrl)
@@ -469,6 +481,86 @@ func TestE2EStreamsInPlace(t *testing.T) {
 		if refused := b.text(`window.refused.join('; ')`); refused != "" {
 			t.Errorf("the policy of the page refuses: %s", refused)
 		}
+	})
+}
+
+// U114: every page of the interface comes in place of the one shown, with
+// its header, its notice, the language and colours of the reader and the
+// keys of the script; the way back comes back to where the page was
+// scrolled; what is not a page is opened as without the script.
+func TestE2EPagesInPlace(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		b := browse(t, s)
+		// The way back goes by popstate, as in a browser without the
+		// navigation API (Firefox); TestE2EStreamsInPlace goes by the API.
+		b.run(command(page.AddScriptToEvaluateOnNewDocument, page.AddScriptToEvaluateOnNewDocumentParams{
+			Source: `Object.defineProperty(window, 'navigation', { value: undefined })`,
+		}))
+		b.login("alice")
+		b.run(chromedp.Evaluate[chromedp.Void](`window.stayed = true; window.refused = [];
+			document.addEventListener('securitypolicyviolation', (event) => window.refused.push(event.violatedDirective + ' ' + event.blockedURI))`))
+		stayed := func(path string) string {
+			return `window.stayed && location.pathname === '` + path + `' && document.activeElement.id === 'content'`
+		}
+
+		// The way back comes back to where the stream was scrolled.
+		b.tabTo(`form.views button[value="expanded"]`)
+		b.press(kb.Enter)
+		b.until("every entry open", stayed("/")+` && document.querySelectorAll('.entries details:not([open])').length === 0`)
+		if room := read[int](b, `document.documentElement.scrollHeight - window.innerHeight`); room < 600 {
+			t.Fatalf("the stream scrolls %d px only", room)
+		}
+		b.run(chromedp.Evaluate[chromedp.Void](`window.scrollTo({ top: 500, behavior: 'instant' })`))
+		b.press("J")
+		b.until("the next stream at its top", stayed("/categories/2")+` && window.scrollY === 0`)
+		b.run(chromedp.Evaluate[chromedp.Void](`history.back()`))
+		b.until("the stream again where it was scrolled", `window.stayed && location.pathname === '/' && Math.abs(window.scrollY - 500) < 2`)
+
+		// A link of the menu: the header marks the section that came.
+		b.tabTo(`#site-menu a[href="/subscriptions"]`)
+		b.press(kb.Enter)
+		b.until("the subscriptions in place", stayed("/subscriptions")+` && document.querySelector('#site-menu a[aria-current="page"]').getAttribute('href') === '/subscriptions' && document.title.startsWith('Subscriptions · ')`)
+		b.press("g", "k")
+		b.until("the keys by g k, in place", stayed("/settings/keys"))
+
+		// A form of the settings: the notice, the language and the colours
+		// come with the page, and the script speaks the language.
+		b.tabTo(`#site-menu a[href="/settings/display"]`)
+		b.press(kb.Enter)
+		b.until("the display settings in place", stayed("/settings/display"))
+		// The script speaks the language of the reader, not the one of the
+		// page it was loaded with: that of the login, in the language of the
+		// browser.
+		b.press("?")
+		b.until("the help in the language of the reader", `document.querySelector('dialog[open]') && document.querySelector('dialog[open]').textContent.includes('Open the next entry')`)
+		b.press(kb.Escape)
+		b.until("the help closed", `!document.querySelector('dialog')`)
+		b.run(chromedp.Evaluate[chromedp.Void](`document.getElementById('language').value = 'ru'; document.getElementById('darkMode').value = 'dark'`))
+		b.tabTo(`form[action="/settings/display"] button[type="submit"]`)
+		b.press(kb.Enter)
+		b.until("the settings saved in place", `window.stayed && document.documentElement.lang === 'ru' && document.documentElement.dataset.theme === 'dark'`+
+			` && document.getElementById('messages').textContent.includes('Сохранено.') && document.querySelector('#site-menu a[href="/subscriptions"]').textContent === 'Подписки'`)
+		b.accessible("a page of settings in place")
+		b.press("?")
+		b.until("the help in the language that came", `document.querySelector('dialog[open]') && document.querySelector('dialog[open]').textContent.includes('Клавиши') && document.querySelector('dialog[open]').textContent.includes('Открыть следующую статью')`)
+		b.press(kb.Escape)
+
+		if refused := b.text(`window.refused.join('; ')`); refused != "" {
+			t.Errorf("the policy of the page refuses: %s", refused)
+		}
+
+		// What is not a page is opened as it is.
+		b.run(chromedp.Evaluate[chromedp.Void](`(() => {
+			const a = document.createElement('a');
+			a.id = 'manifest';
+			a.href = '/manifest.webmanifest';
+			a.textContent = 'manifest';
+			document.getElementById('content').append(a);
+			htmx.process(a);
+		})()`))
+		b.tabTo("#manifest")
+		b.press(kb.Enter)
+		b.until("the manifest opened as without the script", `!window.stayed && location.pathname === '/manifest.webmanifest'`)
 	})
 }
 

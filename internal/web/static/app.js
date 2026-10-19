@@ -3,21 +3,27 @@
 (() => {
 	'use strict';
 
+	// A page opened in place (htmx) comes with its own body: what the script
+	// read off the page and did to it is read and done again.
 	let config = {};
-	try {
-		config = JSON.parse(document.body.dataset.config || '{}');
-	} catch {
-		// A page without settings has no keys of its own.
-	}
-	const keys = config.keys || {};
-	const urls = config.urls || {};
+	let keys = {};
+	let urls = {};
+	const readConfig = () => {
+		try {
+			config = JSON.parse(document.body.dataset.config || '{}');
+		} catch {
+			// A page without settings has no keys of its own.
+			config = {};
+		}
+		keys = config.keys || {};
+		urls = config.urls || {};
+	};
+	readConfig();
 	const t = (key) => (config.texts && config.texts[key]) || key;
 
-	// The stream and its tree are in the content, which a stream opened from
-	// the tree replaces; what the script does to the content is done again.
 	let entries = document.querySelector('.entries');
 	let tree = document.getElementById('tree');
-	const messages = document.getElementById('messages');
+	let messages = document.getElementById('messages');
 
 	const mounts = [];
 	const onContent = (mount) => {
@@ -61,14 +67,16 @@
 	// A phone and the window of the installed application take the colour
 	// of the header for their own bars. It is read off the page, where the
 	// look and the theme have set it, also when the system goes dark.
-	const header = document.querySelector('.site-header');
-	if (header) {
-		const tint = el('meta', { name: 'theme-color' });
-		const paint = () => tint.setAttribute('content', getComputedStyle(header).backgroundColor);
-		paint();
-		document.head.append(tint);
-		window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paint);
-	}
+	const tint = el('meta', { name: 'theme-color' });
+	const paint = () => {
+		const header = document.querySelector('.site-header');
+		if (header) {
+			tint.setAttribute('content', getComputedStyle(header).backgroundColor);
+		}
+	};
+	document.head.append(tint);
+	window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', paint);
+	onContent(paint);
 
 	// ---- The menu ----
 
@@ -83,8 +91,7 @@
 			});
 		}
 	};
-	foldable('.menu-toggle');
-	onContent(() => foldable('.filters-toggle'));
+	onContent(() => foldable('.menu-toggle, .filters-toggle'));
 
 	// ---- Entries ----
 
@@ -516,8 +523,11 @@
 	// The button of the profile asks the browser for permission and
 	// subscribes it to the push service; the service worker is registered
 	// only then, when the reader asks for notifications.
-	const pushToggle = document.getElementById('push-toggle');
-	if (pushToggle && urls.push && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window) {
+	onContent(() => {
+		const pushToggle = document.getElementById('push-toggle');
+		if (!pushToggle || !urls.push || !('serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window)) {
+			return;
+		}
 		document.getElementById('push').hidden = false;
 
 		// The key of the server is base64url; the browser wants its bytes.
@@ -584,7 +594,7 @@
 				pushToggle.disabled = false;
 			}
 		});
-	}
+	});
 
 	// ---- The next page ----
 
@@ -724,38 +734,36 @@
 			if (!marker) {
 				return;
 			}
-			// The category folds after this event.
-			setTimeout(() => {
-				const one = marker.parentElement;
-				const folded = foldedBranches();
-				if (one.open) {
-					folded.delete(one.dataset.branch);
-				} else {
-					folded.add(one.dataset.branch);
-				}
-				try {
-					localStorage.setItem(foldedKey, JSON.stringify(Array.from(folded)));
-				} catch {
-					// Without storage a fold lasts as long as the page.
-				}
-			});
+			// The category folds after this event, which is when the reader
+			// may already be on the way to another page: what it will be is
+			// kept now.
+			const one = marker.parentElement;
+			const folded = foldedBranches();
+			if (one.open) {
+				folded.add(one.dataset.branch);
+			} else {
+				folded.delete(one.dataset.branch);
+			}
+			try {
+				localStorage.setItem(foldedKey, JSON.stringify(Array.from(folded)));
+			} catch {
+				// Without storage a fold lasts as long as the page.
+			}
 		});
 	});
 
-	if (tree) {
-		// The tree unfolds over the stream: a click beside it folds it back.
-		document.addEventListener('click', (event) => {
-			const fold = tree.querySelector('details');
-			if (fold.open && !tree.contains(event.target)) {
-				fold.open = false;
-			}
-		});
-		setInterval(() => {
-			if (!document.hidden) {
-				refreshTree();
-			}
-		}, 120000);
-	}
+	// The tree unfolds over the stream: a click beside it folds it back.
+	document.addEventListener('click', (event) => {
+		const fold = tree && tree.querySelector('details');
+		if (fold && fold.open && !tree.contains(event.target)) {
+			fold.open = false;
+		}
+	});
+	setInterval(() => {
+		if (!document.hidden) {
+			refreshTree();
+		}
+	}, 120000);
 
 	// goNode opens the next or the previous stream of the tree.
 	const goNode = (step, unreadOnly) => {
@@ -775,35 +783,105 @@
 		}
 	};
 
-	// ---- Streams in place ----
+	// ---- Pages in place ----
 
-	// A link of the tree, and the way back and forward among the streams
-	// so opened, bring the content of the next page in place of this one
-	// (htmx, by the attributes of the tree). The content is busy while it
-	// comes, and what the script did to the old one it does to the new.
-	const content = document.getElementById('content');
-	const inContent = (event) => event.detail.ctx && event.detail.ctx.target === content;
+	// Links and forms of the interface bring the next page in place of this
+	// one (htmx, by the attributes of the body): its body, and the language
+	// and colours of its root. The content is busy while it comes. Back and
+	// forward ask for the page again and come back to where it was scrolled.
+	const inPlace = (event) => event.detail.ctx && event.detail.ctx.target === document.body;
+	const restored = (ctx) => Boolean(ctx.request.headers['HX-History-Restore-Request']);
+	const busy = (on) => {
+		const content = document.getElementById('content');
+		if (content) {
+			content.toggleAttribute('aria-busy', on);
+		}
+	};
+
+	// go opens a page of the interface the way a link of it does.
+	const go = (url) => {
+		if (window.htmx) {
+			htmx.ajax('GET', url, { target: document.body, swap: 'outerSync', push: 'true' });
+		} else {
+			location.href = url;
+		}
+	};
+
+	// The forms of an entry in a stream are the script's own (U37).
+	document.addEventListener('htmx:config:request', (event) => {
+		const form = event.detail.ctx.request.form;
+		if (form && form.matches('.entries form.entry-action')) {
+			event.preventDefault();
+		}
+	});
 	document.addEventListener('htmx:before:request', (event) => {
-		if (inContent(event)) {
-			content.setAttribute('aria-busy', 'true');
+		if (inPlace(event)) {
+			busy(true);
+		}
+	});
+	// A page that cannot be had in place, as one that sends the browser to
+	// another site, is opened as without the script.
+	document.addEventListener('htmx:error', (event) => {
+		const { ctx, error } = event.detail;
+		if (ctx && ctx.target === document.body && ctx.request.method === 'GET' && !(error && error.name === 'AbortError')) {
+			location.href = ctx.request.action;
+		}
+	});
+	// What is not a page of the interface (a file, a feed) is not put in
+	// place of one: a link to it is followed as without the script.
+	document.addEventListener('htmx:before:response', (event) => {
+		const { ctx } = event.detail;
+		const kind = ctx.response.headers.get('Content-Type') || '';
+		if (inPlace(event) && (!kind.startsWith('text/html') || ctx.response.headers.has('Content-Disposition'))) {
+			event.preventDefault();
+			busy(false);
+			if (ctx.request.method === 'GET') {
+				location.href = ctx.response.raw.url;
+			}
+		}
+	});
+	// The place in the page being left is kept with it in the history.
+	document.addEventListener('htmx:before:history:update', () => {
+		history.replaceState({ ...history.state, scrolled: window.scrollY }, '');
+	});
+	document.addEventListener('htmx:before:swap', (event) => {
+		if (!inPlace(event)) {
+			return;
+		}
+		const root = parse(event.detail.ctx.text.slice(0, event.detail.ctx.text.indexOf('<head'))).documentElement;
+		for (const name of ['lang', 'data-theme', 'data-look', 'data-width']) {
+			if (root.hasAttribute(name)) {
+				document.documentElement.setAttribute(name, root.getAttribute(name));
+			} else {
+				document.documentElement.removeAttribute(name);
+			}
 		}
 	});
 	document.addEventListener('htmx:after:swap', (event) => {
-		if (!inContent(event)) {
+		if (!inPlace(event)) {
 			return;
 		}
+		readConfig();
 		entries = document.querySelector('.entries');
 		tree = document.getElementById('tree');
+		messages = document.getElementById('messages');
+		lastSaid = null;
 		current = null;
+		places = null;
 		for (const mount of mounts) {
 			mount();
 		}
-		window.scrollTo(0, 0);
-		content.focus({ preventScroll: true });
+		const content = document.getElementById('content');
+		// A page that comes is where a loaded one would be, at once.
+		const top = restored(event.detail.ctx) && history.state ? history.state.scrolled || 0 : 0;
+		window.scrollTo({ top, behavior: 'instant' });
+		if (content && !document.querySelector('[autofocus]')) {
+			content.focus({ preventScroll: true });
+		}
 	});
 	document.addEventListener('htmx:finally:request', (event) => {
-		if (inContent(event)) {
-			content.removeAttribute('aria-busy');
+		if (inPlace(event)) {
+			busy(false);
 		}
 	});
 
@@ -955,7 +1033,7 @@
 		const offer = () => {
 			const typed = input.value.trim().toLocaleLowerCase();
 			const all = commands.concat((places || []).map((place) => ({
-				name: place.name, kind: place.kind, run: () => { location.href = place.url; },
+				name: place.name, kind: place.kind, run: () => go(place.url),
 			})));
 			offered = all
 				.map((item, order) => ({ item, order, score: typed ? rank(typed, item.name) : 0 }))
@@ -1048,7 +1126,7 @@
 		return config.singleKeys || !binding.split(' ').every(isSingle);
 	}
 
-	const prefixes = new Set(Object.keys(keys).filter((binding) => binding.includes(' ')).map((binding) => binding.split(' ')[0]));
+	const prefixes = () => new Set(Object.keys(keys).filter((binding) => binding.includes(' ')).map((binding) => binding.split(' ')[0]));
 	let pending = '';
 	let pendingTimer = 0;
 
@@ -1114,12 +1192,12 @@
 			}
 			return undefined;
 		}
-		case 'go-unread': location.href = urls.unread; return undefined;
-		case 'go-all': location.href = urls.all; return undefined;
-		case 'go-starred': location.href = urls.starred; return undefined;
-		case 'go-keys': location.href = urls.keys; return undefined;
-		case 'go-subscriptions': location.href = urls.subscriptions; return undefined;
-		case 'add-feed': location.href = urls.add; return undefined;
+		case 'go-unread': return go(urls.unread);
+		case 'go-all': return go(urls.all);
+		case 'go-starred': return go(urls.starred);
+		case 'go-keys': return go(urls.keys);
+		case 'go-subscriptions': return go(urls.subscriptions);
+		case 'add-feed': return go(urls.add);
 		case 'palette': return showPalette();
 		case 'help': return showHelp();
 		default: return undefined;
@@ -1177,7 +1255,7 @@
 		if (id && allowed(binding)) {
 			event.preventDefault();
 			run(id);
-		} else if (!binding.includes(' ') && prefixes.has(one) && allowed(`${one} x`)) {
+		} else if (!binding.includes(' ') && prefixes().has(one) && allowed(`${one} x`)) {
 			event.preventDefault();
 			pending = one;
 			pendingTimer = setTimeout(() => { pending = ''; }, 1500);

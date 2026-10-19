@@ -1,6 +1,6 @@
 {{define "content"}}
 <h1>{{.Heading}}</h1>
-<p>{{.Data.Description}} <a href="{{.Data.Feed}}">RSS</a></p>
+<p>{{.Data.Description}} <a href="{{.Data.Feed}}" hx-boost="false">RSS</a></p>
 {{if .Data.Form}}<form method="get" action="{{.URL .Data.Form}}" class="search" role="search">
 {{range .Data.Hidden}}<input type="hidden" name="{{index . 0}}" value="{{index . 1}}">
 {{end}}<label for="q">{{.T "search.label"}}</label>
