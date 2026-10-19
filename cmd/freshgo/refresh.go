@@ -43,6 +43,8 @@ type services struct {
 	translator *translate.Translator
 	// webSub is nil when WebSub is off.
 	webSub *websub.Service
+	// notifier is nil when the server has no VAPID keys.
+	notifier *push.Notifier
 	// close lets go of what the services hold; it comes before the
 	// database is closed.
 	close func()
@@ -118,6 +120,7 @@ func newServices(ctx context.Context, e env, conf *config.Config, db *store.Stor
 			PublicKey: conf.VAPIDPublicKey, PrivateKey: conf.VAPIDPrivateKey, Subject: conf.VAPIDSubject,
 		})
 		s.refresher.Notify = notifier.Notify
+		s.notifier = notifier
 		// The messages of a run that ends the process are sent before the
 		// database is closed.
 		s.close = func() {
