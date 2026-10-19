@@ -229,7 +229,7 @@ func TestImportedQueries(t *testing.T) {
 	})
 }
 
-var sharedLink = regexp.MustCompile(`<a href="(/shared/[0-9a-f]+)\.rss">`)
+var sharedLink = regexp.MustCompile(`<a href="(/shared/[0-9a-f]+)\.rss" hx-boost="false">`)
 
 // R12: a query that is handed out answers without a login at its secret
 // address, in every format, and stops when the secret changes.

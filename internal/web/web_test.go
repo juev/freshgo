@@ -121,7 +121,7 @@ func TestAboutPage(t *testing.T) {
 		}
 		for _, want := range []string{
 			"<title>About · freshgo</title>", "Version 1.2.3", "<code>http://example.com</code>",
-			`<a class="skip" href="#content">Skip to content</a>`, `<main class="page" id="content" tabindex="-1" hx-history-elt>`,
+			`<a class="skip" href="#content">Skip to content</a>`, `<main class="page" id="content" tabindex="-1">`,
 			`<a href="/about" aria-current="page">About</a>`, `id="messages" role="status" aria-live="polite"`,
 		} {
 			if !strings.Contains(a.body, want) {

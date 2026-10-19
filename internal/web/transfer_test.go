@@ -42,7 +42,7 @@ func TestExportAndImport(t *testing.T) {
 		day := now.Format("2006-01-02")
 		s.asAlice()
 		page := s.shown("/subscriptions/transfer")
-		for _, want := range []string{`action="/subscriptions/import" enctype="multipart/form-data"`, `action="/subscriptions/export"`, `<option value="1">Atom corpus</option>`} {
+		for _, want := range []string{`action="/subscriptions/import" enctype="multipart/form-data"`, `action="/subscriptions/export" class="form" hx-boost="false"`, `<option value="1">Atom corpus</option>`} {
 			if !strings.Contains(page, want) {
 				t.Errorf("GET /subscriptions/transfer: no %q", want)
 			}

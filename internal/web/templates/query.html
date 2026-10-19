@@ -48,7 +48,7 @@
 <h2>{{.T "query.links"}}</h2>
 <p>{{.T "query.links.hint"}}</p>
 <ul class="feed-list">
-{{range .Data.Links}}<li>{{.Name}}: <a href="{{.URL}}">{{.URL}}</a></li>
+{{range .Data.Links}}<li>{{.Name}}: <a href="{{.URL}}" hx-boost="false">{{.URL}}</a></li>
 {{end}}</ul>
 {{end}}
 
