@@ -13,7 +13,7 @@ func TestPushSubscriptions(t *testing.T) {
 		ctx := context.Background()
 		alice, bob := mustUser(t, s, "alice"), mustUser(t, s, "bob")
 		first := &PushSubscription{UserID: alice.ID, Endpoint: "https://push.example/a", P256DH: "k1", Auth: "s1", Created: 10}
-		second := &PushSubscription{UserID: alice.ID, Endpoint: "https://push.example/b", P256DH: "k2", Auth: "s2", Created: 20}
+		second := &PushSubscription{UserID: alice.ID, Endpoint: "https://push.example/b", P256DH: "k2", Auth: "s2", Created: 20, App: true}
 		for _, p := range []*PushSubscription{first, second} {
 			if err := s.PutPush(ctx, p); err != nil {
 				t.Fatalf("PutPush: %v", err)
@@ -32,8 +32,8 @@ func TestPushSubscriptions(t *testing.T) {
 		if err := s.PutPush(ctx, again); err != nil {
 			t.Fatal(err)
 		}
-		if got, _ := s.PushSubscriptions(ctx, alice.ID); len(got) != 2 || got[0].P256DH != "k3" {
-			t.Errorf("after subscribing again: %+v; want two browsers, the first with the new key", got)
+		if got, _ := s.PushSubscriptions(ctx, alice.ID); len(got) != 2 || got[0].P256DH != "k3" || got[0].App || !got[1].App {
+			t.Errorf("after subscribing again: %+v; want two, the first a browser with the new key, the second an app", got)
 		}
 
 		// Bob cannot remove alice's browser, but can take it over by
@@ -44,6 +44,7 @@ func TestPushSubscriptions(t *testing.T) {
 		if got, _ := s.PushSubscriptions(ctx, alice.ID); len(got) != 2 {
 			t.Errorf("bob's delete removed alice's browser: %+v", got)
 		}
+		// Subscribed from the interface, the app's endpoint is a browser's.
 		moved := &PushSubscription{UserID: bob.ID, Endpoint: second.Endpoint, P256DH: "k4", Auth: "s4", Created: 40}
 		if err := s.PutPush(ctx, moved); err != nil {
 			t.Fatal(err)
