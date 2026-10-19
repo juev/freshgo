@@ -225,6 +225,7 @@ func (h *Handler) oidcCallback(w http.ResponseWriter, r *http.Request) {
 			h.broken(w, r, err)
 			return
 		}
+		h.loginsEnded(s.who.user.ID)
 	}
 	if err := h.startSession(w, r, user, false); err != nil {
 		h.broken(w, r, err)

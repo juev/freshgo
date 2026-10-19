@@ -491,6 +491,7 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 			h.broken(w, r, err)
 			return
 		}
+		h.loginsEnded(who.user.ID)
 	}
 	h.setSession(w, r, "", 0)
 	http.Redirect(w, r, h.url("/"), http.StatusSeeOther)

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -46,6 +47,8 @@ func requestCounter() *prometheus.CounterVec {
 // observe counts every request by the status of its answer and logs it at
 // the level debug: its method, path, status and how long it took. The query
 // is left out, as it may carry a token, and so is anything of what was read.
+// A stream of events lasts as long as its page is open: it is logged as a
+// stream, so that its duration is not taken for a slow answer.
 func observe(next http.Handler, log *slog.Logger, requests *prometheus.CounterVec) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		began := time.Now()
@@ -55,6 +58,10 @@ func observe(next http.Handler, log *slog.Logger, requests *prometheus.CounterVe
 			sw.status = http.StatusOK
 		}
 		requests.WithLabelValues(strconv.Itoa(sw.status)).Inc()
-		log.Debug("request", "method", r.Method, "path", r.URL.Path, "status", sw.status, "duration", time.Since(began))
+		attrs := []any{"method", r.Method, "path", r.URL.Path, "status", sw.status, "duration", time.Since(began)}
+		if strings.HasPrefix(sw.Header().Get("Content-Type"), "text/event-stream") {
+			attrs = append(attrs, "stream", true)
+		}
+		log.Debug("request", attrs...)
 	})
 }

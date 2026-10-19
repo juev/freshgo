@@ -196,6 +196,7 @@ func (h *Handler) saveReset(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, http.StatusNotFound)
 		return
 	}
+	h.loginsEnded(user.ID)
 	h.log.Info("password reset by letter", "user", user.Name)
 	h.notify(w, r, "notice.password-reset", 0)
 	http.Redirect(w, r, h.url("/login"), http.StatusSeeOther)

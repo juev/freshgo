@@ -255,6 +255,9 @@ func (h *Handler) config(v *view, who *identity) string {
 			"keys": h.url("/settings/keys"), "subscriptions": h.url("/subscriptions"), "add": h.url("/subscriptions/add"),
 		},
 	}
+	if h.events != nil && who != nil && !who.anonymous {
+		c.URLs["events"] = h.url(eventsPath)
+	}
 	if h.pushing() {
 		c.URLs["push"], c.URLs["pushDelete"], c.URLs["worker"] = h.url(pushPath), h.url(pushDeletePath), h.url(workerPath)
 	}

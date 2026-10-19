@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/juev/freshgo/internal/authguard"
+	"github.com/juev/freshgo/internal/events"
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/mediaproxy"
 	"github.com/juev/freshgo/internal/refresh"
@@ -81,6 +82,9 @@ type Options struct {
 	// API, so that moving from one to the other does not start the count
 	// anew. Nil, and the interface has one of its own.
 	Guard *authguard.Guard
+	// Events tells the open pages of a user that entries of theirs changed;
+	// nil, and pages look for changes now and then.
+	Events *events.Broker
 }
 
 // Handler serves the interface.
@@ -132,6 +136,10 @@ type Handler struct {
 	oidc       oidcProviders
 	// versions are the versions of the public documents handed out.
 	versions versions
+	// events is Options.Events; heartbeat is how often a stream of them
+	// says it is there when there is nothing to tell.
+	events    *events.Broker
+	heartbeat time.Duration
 }
 
 // New returns the interface, or an error when what is built into the binary
@@ -144,7 +152,7 @@ func New(o Options) (*Handler, error) {
 	h := &Handler{
 		db: o.DB, log: o.Log, refresher: o.Refresher, translator: o.Translator, pushKey: o.PushKey, baseURL: o.BaseURL, version: o.Version, assets: map[string]string{},
 		proxies: o.TrustedProxies, allowlist: o.FetchAllowlist, mailer: o.Mailer, crossOrigin: http.NewCrossOriginProtection(), now: time.Now, hooks: o.Hooks,
-		guard: guard,
+		guard: guard, events: o.Events, heartbeat: heartbeat,
 	}
 	if h.hooks == nil {
 		h.hooks = &hooks.Registry{}
@@ -319,6 +327,9 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /login", h.login)
 	h.mux.HandleFunc("POST /login/code", h.loginCode)
 	h.mux.HandleFunc("POST /logout", h.logout)
+	if h.events != nil {
+		h.mux.HandleFunc("GET "+eventsPath, h.eventStream)
+	}
 	return h, nil
 }
 

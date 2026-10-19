@@ -308,6 +308,7 @@ func (h *Handler) updateUser(w http.ResponseWriter, r *http.Request) {
 	case "disable":
 		if err = setting("enabled", false); err == nil {
 			err = h.db.DeleteUserSessions(ctx, u.ID, "")
+			h.loginsEnded(u.ID)
 		}
 	case "totp-off":
 		// For a user who lost the app.

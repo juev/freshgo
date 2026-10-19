@@ -18,6 +18,7 @@ import (
 
 	"github.com/juev/freshgo/internal/authguard"
 	"github.com/juev/freshgo/internal/digest"
+	"github.com/juev/freshgo/internal/events"
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/fever"
 	"github.com/juev/freshgo/internal/greader"
@@ -161,6 +162,38 @@ func newMetrics(db *store.Store, refresher *refresh.Refresher, requests *prometh
 	return metrics
 }
 
+// newEvents returns what tells the open pages of a user that entries of
+// theirs changed: the store, whichever part of the server changed them, and
+// the refresher, when entries came. Notifications the refresher sends go on
+// as before.
+func newEvents(db *store.Store, refresher *refresh.Refresher) *events.Broker {
+	broker := &events.Broker{}
+	db.EntriesChanged = func(userID int64) { broker.Publish(userID, events.Tree) }
+	notify := refresher.Notify
+	refresher.Notify = func(ctx context.Context, u *store.User, since time.Time) {
+		broker.Publish(u.ID, events.Entries)
+		if notify != nil {
+			notify(ctx, u, since)
+		}
+	}
+	return broker
+}
+
+// newServer returns the server of handler. Its requests end with it, not
+// with ctx; the streams of events end as soon as it begins to shut down, so
+// that it does not wait for them.
+func newServer(ctx context.Context, handler http.Handler, broker *events.Broker) *http.Server {
+	server := &http.Server{
+		Handler:           handler,
+		ReadHeaderTimeout: 10 * time.Second,
+		// A request ends with the server, not with the signal: Shutdown
+		// gives it time first.
+		BaseContext: func(net.Listener) context.Context { return context.WithoutCancel(ctx) },
+	}
+	server.RegisterOnShutdown(broker.Close)
+	return server
+}
+
 // runServe answers API clients and refreshes the feeds until the process is
 // told to stop.
 func runServe(ctx context.Context, e env, args []string) (err error) {
@@ -206,10 +239,11 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 		}
 		mailer = sender
 	}
+	broker := newEvents(db, s.refresher)
 	pages, err := web.New(web.Options{
 		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL, Version: buildVersion(),
 		TrustedProxies: proxies, FetchAllowlist: conf.Allowlist(), Mailer: mailer, OIDCClientSecret: conf.OIDCClientSecret, Images: s.images, Services: s.images, Sources: s.images,
-		Translator: s.translator, PushKey: conf.VAPIDPublicKey, Guard: guard,
+		Translator: s.translator, PushKey: conf.VAPIDPublicKey, Guard: guard, Events: broker,
 	})
 	if err != nil {
 		return err
@@ -234,14 +268,10 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 			}
 		}()
 	}
-	server := &http.Server{
-		Handler: observe(routes(healthHandler(db.Ping, s.refresher.LastRun, s.log), api, feverAPI, s.icons, extensions(s.registry), hubs, pages),
+	server := newServer(ctx,
+		observe(routes(healthHandler(db.Ping, s.refresher.LastRun, s.log), api, feverAPI, s.icons, extensions(s.registry), hubs, pages),
 			s.log, requests),
-		ReadHeaderTimeout: 10 * time.Second,
-		// A request ends with the server, not with the signal: Shutdown
-		// gives it time first.
-		BaseContext: func(net.Listener) context.Context { return context.WithoutCancel(ctx) },
-	}
+		broker)
 	s.log.Info("listening", "address", listener.Addr().String())
 
 	// The scheduler stops with the server, whichever of the two ends first.
