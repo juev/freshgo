@@ -499,6 +499,9 @@ func TestE2EPagesInPlace(t *testing.T) {
 		b.login("alice")
 		b.run(chromedp.Evaluate[chromedp.Void](`window.stayed = true; window.refused = [];
 			document.addEventListener('securitypolicyviolation', (event) => window.refused.push(event.violatedDirective + ' ' + event.blockedURI))`))
+		if !read[bool](b, `htmx.config.prefix === '' && htmx.config.defaultTimeout === 0`) {
+			t.Errorf("htmx reads data-hx-* or gives up on a slow answer: %s", b.text(`JSON.stringify(htmx.config)`))
+		}
 		stayed := func(path string) string {
 			return `window.stayed && location.pathname === '` + path + `' && document.activeElement.id === 'content'`
 		}

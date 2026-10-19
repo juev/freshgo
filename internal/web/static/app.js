@@ -823,8 +823,14 @@
 	// another site, is opened as without the script.
 	document.addEventListener('htmx:error', (event) => {
 		const { ctx, error } = event.detail;
-		if (ctx && ctx.target === document.body && ctx.request.method === 'GET' && !(error && error.name === 'AbortError')) {
+		if (!ctx || ctx.target !== document.body || (error && error.name === 'AbortError')) {
+			return;
+		}
+		if (ctx.request.method === 'GET') {
 			location.href = ctx.request.action;
+		} else {
+			// A form is not sent twice; the reader is told it went nowhere.
+			say(t('js.failed'));
 		}
 	});
 	// What is not a page of the interface (a file, a feed) is not put in
