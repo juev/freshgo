@@ -163,18 +163,17 @@ func newMetrics(db *store.Store, refresher *refresh.Refresher, requests *prometh
 }
 
 // newEvents returns what tells the open pages of a user that entries of
-// theirs changed: the store, whichever part of the server changed them, and
-// the refresher, when entries came. Notifications the refresher sends go on
-// as before.
-func newEvents(db *store.Store, refresher *refresh.Refresher) *events.Broker {
+// theirs changed, and whether entries came: the store tells it, whichever
+// part of the server changed them, a refresh, an import, a page or an API
+// client.
+func newEvents(db *store.Store) *events.Broker {
 	broker := &events.Broker{}
-	db.EntriesChanged = func(userID int64) { broker.Publish(userID, events.Tree) }
-	notify := refresher.Notify
-	refresher.Notify = func(ctx context.Context, u *store.User, since time.Time) {
-		broker.Publish(u.ID, events.Entries)
-		if notify != nil {
-			notify(ctx, u, since)
+	db.EntriesChanged = func(userID int64, added bool) {
+		kind := events.Tree
+		if added {
+			kind = events.Entries
 		}
+		broker.Publish(userID, kind)
 	}
 	return broker
 }
@@ -239,7 +238,7 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 		}
 		mailer = sender
 	}
-	broker := newEvents(db, s.refresher)
+	broker := newEvents(db)
 	pages, err := web.New(web.Options{
 		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL, Version: buildVersion(),
 		TrustedProxies: proxies, FetchAllowlist: conf.Allowlist(), Mailer: mailer, OIDCClientSecret: conf.OIDCClientSecret, Images: s.images, Services: s.images, Sources: s.images,

@@ -93,7 +93,7 @@ func eventsSite(t *testing.T, beat time.Duration, test func(t *testing.T, s *sit
 	broker := &events.Broker{}
 	imported(t, Options{Events: broker}, func(t *testing.T, s *site) {
 		s.h.heartbeat = beat
-		s.db.EntriesChanged = func(userID int64) { broker.Publish(userID, events.Tree) }
+		s.db.EntriesChanged = func(userID int64, _ bool) { broker.Publish(userID, events.Tree) }
 		server := httptest.NewServer(s.h)
 		t.Cleanup(server.Close)
 		s.asAlice()
@@ -217,6 +217,7 @@ func TestEventsPerUser(t *testing.T) {
 			st.expect(": open")
 			streams = append(streams, st)
 		}
+		streams[0].expect("event: replaced")
 		streams[0].ends()
 	})
 }

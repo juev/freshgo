@@ -60,7 +60,7 @@ func (s *Store) TagEntry(ctx context.Context, userID, tagID, entryID int64) erro
 	if err != nil {
 		return fmt.Errorf("store: tag %d on entry %d: %w", tagID, entryID, err)
 	}
-	s.entriesChanged(userID)
+	s.entriesChanged(userID, false)
 	return nil
 }
 
@@ -154,7 +154,7 @@ func (s *Store) TagEntries(ctx context.Context, userID, tagID int64, entryIDs []
 				return fmt.Errorf("store: tag %d on entries: %w", tagID, err)
 			}
 		}
-		tx.entriesChanged(userID)
+		tx.entriesChanged(userID, false)
 		return nil
 	})
 }
@@ -170,7 +170,7 @@ func (s *Store) UntagEntries(ctx context.Context, userID, tagID int64, entryIDs 
 				return fmt.Errorf("store: tag %d off entries: %w", tagID, err)
 			}
 		}
-		tx.entriesChanged(userID)
+		tx.entriesChanged(userID, false)
 		return nil
 	})
 }

@@ -294,7 +294,7 @@ func (s *Store) SetEntriesRead(ctx context.Context, userID int64, ids []int64, r
 			changed = append(changed, some...)
 		}
 		if len(changed) > 0 {
-			tx.entriesChanged(userID)
+			tx.entriesChanged(userID, false)
 		}
 		return nil
 	})
@@ -330,7 +330,7 @@ func (s *Store) SetEntriesFavorite(ctx context.Context, userID int64, ids []int6
 				return fmt.Errorf("store: star entries: %w", err)
 			}
 		}
-		tx.entriesChanged(userID)
+		tx.entriesChanged(userID, false)
 		return nil
 	})
 }
@@ -349,7 +349,7 @@ func (s *Store) MarkSetRead(ctx context.Context, userID int64, set EntrySet, max
 		return nil, fmt.Errorf("store: mark entries read: %w", err)
 	}
 	if len(ids) > 0 {
-		s.entriesChanged(userID)
+		s.entriesChanged(userID, false)
 	}
 	return ids, nil
 }

@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -28,8 +27,7 @@ import (
 )
 
 // An open page hears of an entry read through the Google Reader API and of
-// entries a refresh brought, Web Push is still told of them, and the server
-// shuts down without waiting for the page.
+// entries that came, and the server shuts down without waiting for the page.
 func TestEventsReachOpenPages(t *testing.T) {
 	ctx := context.Background()
 	db, err := store.Open(ctx, config.DriverSQLite, filepath.Join(t.TempDir(), "freshgo.sqlite"))
@@ -66,9 +64,7 @@ func TestEventsReachOpenPages(t *testing.T) {
 	log := slog.New(slog.DiscardHandler)
 	registry := &hooks.Registry{}
 	refresher := refresh.New(db, client, registry, log)
-	var pushed atomic.Int32
-	refresher.Notify = func(context.Context, *store.User, time.Time) { pushed.Add(1) }
-	broker := newEvents(db, refresher)
+	broker := newEvents(db)
 	api := greader.New(greader.Options{DB: db, Refresher: refresher, Hooks: registry, Log: log})
 	pages, err := web.New(web.Options{DB: db, Refresher: refresher, Hooks: registry, Log: log, Version: "test", Events: broker})
 	if err != nil {
@@ -151,11 +147,10 @@ func TestEventsReachOpenPages(t *testing.T) {
 	}
 	expect("event: tree")
 
-	refresher.Notify(ctx, alice, time.Now())
-	expect("event: entries")
-	if pushed.Load() != 1 {
-		t.Errorf("Web Push was told %d times, want once", pushed.Load())
+	if err := db.InsertEntries(ctx, alice.ID, []*store.Entry{{FeedID: f.ID, GUID: "2"}}); err != nil {
+		t.Fatal(err)
 	}
+	expect("event: entries")
 
 	stop, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
