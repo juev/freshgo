@@ -474,6 +474,20 @@ button.link {
 	pointer-events: none;
 }
 
+/* The offer to list unread entries stays and is pressed; what is said
+   meanwhile goes below it. */
+.messages p.offer {
+	pointer-events: auto;
+}
+
+.messages p.offer button {
+	margin-left: var(--space);
+}
+
+.messages p.offer ~ p.said {
+	top: calc(var(--space) * 2 + 3rem);
+}
+
 /* The stream takes the whole width: the tree stands folded at the head of
    the stream and unfolds over it, not beside it. */
 .tree {

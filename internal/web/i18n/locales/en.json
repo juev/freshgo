@@ -333,6 +333,8 @@
   "js.mark-all": "Mark every unread entry listed here as read?",
   "js.new-entries": "New entries here: %d.",
   "js.no-entry": "No more entries.",
+  "js.unread-came": "Unread entries came.",
+  "js.show-unread": "Show them",
   "js.no-linkding": "No Linkding with an API token is set up: see Settings, Integrations.",
   "js.no-share": "No way to share is set up: see Settings, Integrations.",
   "js.palette": "Command palette",

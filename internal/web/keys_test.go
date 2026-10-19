@@ -285,6 +285,72 @@ func TestPartsForTheScript(t *testing.T) {
 	})
 }
 
+// U38: the tree comes with the state the stream would be listed in now, and
+// with the entries the page names as it lists them, so that the script
+// brings the list up to date.
+func TestTreeTellsTheList(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		ctx := context.Background()
+		alice := s.user("alice")
+		s.asAlice()
+		s.setting("alice", "default_view", "adaptive")
+		ids := listed(s.page("/feeds/1"))
+		first, second := strconv.FormatInt(ids[0], 10), strconv.FormatInt(ids[1], 10)
+		tree := func(target, shown string) answer {
+			t.Helper()
+			return s.send(httptest.NewRequest(http.MethodGet, target, nil), map[string]string{fragmentHeader: "tree", shownHeader: shown})
+		}
+
+		if page := s.page("/feeds/1"); !strings.Contains(page, `data-state="unread" data-adaptive role="feed"`) {
+			t.Errorf("an adaptive stream with unread entries does not say so:\n%s", page)
+		}
+		if page := s.page("/feeds/1?state=all"); !strings.Contains(page, `data-state="all" role="feed"`) {
+			t.Errorf("a state asked for is not said as one:\n%s", page)
+		}
+
+		// The entries named, as the stream lists them, and nothing for what
+		// is no entry of the user.
+		if _, err := s.db.SetEntriesRead(ctx, alice.ID, ids[:1], true, 1); err != nil {
+			t.Fatal(err)
+		}
+		a := tree("/feeds/1", first+", nothing,"+second+",999999999999")
+		if a.status != http.StatusOK || !strings.Contains(a.body, `<div class="entries" data-state="unread" data-adaptive>`) ||
+			strings.Count(a.body, "<article ") != 2 || !strings.Contains(a.body, `<article class="entry read" id="e`+first+`"`) ||
+			!strings.Contains(a.body, `<article class="entry" id="e`+second+`"`) ||
+			!strings.Contains(a.body, `<input type="hidden" name="next" value="/feeds/1">`) {
+			t.Errorf("the tree with the listed entries: status %d\n%s", a.status, a.body)
+		}
+
+		// A stream without unread entries is listed with all of them while
+		// it has none.
+		a = tree("/feeds/8", "")
+		if a.status != http.StatusOK || !strings.Contains(a.body, `<div class="entries" data-state="all" data-adaptive>`) || strings.Contains(a.body, "<article") {
+			t.Errorf("the tree of a stream without unread entries: status %d\n%s", a.status, a.body)
+		}
+		a = tree("/feeds/1?state=all", first)
+		if !strings.Contains(a.body, `<div class="entries" data-state="all">`) || strings.Count(a.body, "<article ") != 1 {
+			t.Errorf("the tree of a state asked for:\n%s", a.body)
+		}
+		s.setting("alice", "default_view", "all")
+		if a = tree("/feeds/1", ""); !strings.Contains(a.body, `<div class="entries" data-state="all">`) {
+			t.Errorf("the tree under default_view all:\n%s", a.body)
+		}
+	})
+}
+
+// No more entries are asked for with the tree than fit in a header.
+func TestShownEntriesAreLimited(t *testing.T) {
+	ids := make([]string, maxShown+5)
+	for i := range ids {
+		ids[i] = strconv.Itoa(i + 1)
+	}
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.Header.Set(shownHeader, strings.Join(ids, ","))
+	if got := shownEntries(r); len(got) != maxShown || got[0] != 1 || got[maxShown-1] != maxShown {
+		t.Errorf("shownEntries gives %d identifiers, %v…", len(got), got[:3])
+	}
+}
+
 var scriptText = regexp.MustCompile(`\bt\('([^']+)'\)`)
 
 // R17: every text the script asks for is handed to it, and exists.

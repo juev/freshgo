@@ -1673,6 +1673,91 @@ func TestE2EEvents(t *testing.T) {
 	})
 }
 
+// The list follows what changed elsewhere: a stream that listed all its
+// entries for want of unread ones lists the unread ones when some come,
+// at once while no entry is open and by an offer while one is, and a
+// stream listed as unread keeps its entries and shows their state.
+func TestE2EListFollowsChanges(t *testing.T) {
+	broker := &events.Broker{}
+	imported(t, Options{Events: broker}, func(t *testing.T, s *site) {
+		s.db.EntriesChanged = func(userID int64, added bool) {
+			kind := events.Tree
+			if added {
+				kind = events.Entries
+			}
+			broker.Publish(userID, kind)
+		}
+		ctx := context.Background()
+		alice := s.user("alice")
+		s.setting("alice", "default_view", "adaptive")
+		s.setting("alice", "display_posts", false)
+		ids := s.stored("alice", store.Listing{Set: store.EntrySet{FeedID: 8}})
+		if len(ids) < 2 {
+			t.Fatalf("feed 8 has %d entries, want two at least", len(ids))
+		}
+		b := browse(t, s)
+		b.login("alice")
+		list := `document.querySelector('.entries')`
+		rows := `document.querySelectorAll('.entries > article.entry')`
+		// A list put in place anew loses the mark.
+		mark := func() { b.run(chromedp.Evaluate[chromedp.Void](list + `.dataset.mark = 'kept'`)) }
+		openAll := func() {
+			t.Helper()
+			all := s.stored("alice", store.Listing{Set: store.EntrySet{FeedID: 8}})
+			b.open("/feeds/8")
+			b.until("all entries listed", list+`.dataset.state === 'all' && `+rows+`.length === `+strconv.Itoa(len(all)))
+			mark()
+		}
+		unread := func(entry int64) {
+			t.Helper()
+			if _, err := s.db.SetEntriesRead(ctx, alice.ID, []int64{entry}, false, 1); err != nil {
+				t.Fatal(err)
+			}
+		}
+
+		// Made unread elsewhere, no entry open: the unread one alone.
+		openAll()
+		unread(ids[0])
+		b.until("the unread entry listed alone", list+`.dataset.state === 'unread' && `+list+`.dataset.mark === undefined && `+
+			rows+`.length === 1 && `+rows+`[0].id === 'e`+strconv.FormatInt(ids[0], 10)+`'`)
+
+		// Listed as unread: read elsewhere, the entry stays and is read.
+		mark()
+		if _, err := s.db.SetEntriesRead(ctx, alice.ID, ids[:1], true, 2); err != nil {
+			t.Fatal(err)
+		}
+		b.until("the entry read in place", rows+`[0].classList.contains('read')`)
+		if got := b.text(list + `.dataset.mark + ' ' + ` + list + `.dataset.state + ' ' + ` + rows + `.length`); got != "kept unread 1" {
+			t.Errorf("the unread list after a read elsewhere: %s, want it kept", got)
+		}
+
+		// An entry stored by a refresh, no entry open: the same.
+		openAll()
+		if err := s.db.InsertEntries(ctx, alice.ID, []*store.Entry{{FeedID: 8, GUID: "came-now", Title: "Came now"}}); err != nil {
+			t.Fatal(err)
+		}
+		b.until("the new entry listed alone", list+`.dataset.state === 'unread' && `+rows+`.length === 1 && `+
+			rows+`[0].querySelector('.entry-title').textContent === 'Came now'`)
+		if _, err := s.db.SetEntriesRead(ctx, alice.ID, s.stored("alice", store.Listing{Set: store.EntrySet{FeedID: 8}, Read: ptr(false)}), true, 3); err != nil {
+			t.Fatal(err)
+		}
+
+		// An entry open: the list stays, the made-unread entry is shown
+		// unread, and the offer lists the unread ones.
+		openAll()
+		b.press("j")
+		b.until("an entry open", `document.querySelector('.entries > article.entry > details[open]')`)
+		unread(ids[1])
+		b.until("the offer", `document.querySelector('#messages p.offer button')`)
+		row := `document.getElementById('e` + strconv.FormatInt(ids[1], 10) + `')`
+		if got := b.text(list + `.dataset.mark + ' ' + ` + list + `.dataset.state + ' ' + ` + row + `.classList.contains('read')`); got != "kept all false" {
+			t.Errorf("the list with an entry open: %s, want it kept, the entry unread", got)
+		}
+		b.run(chromedp.Evaluate[chromedp.Void](`document.querySelector('#messages p.offer button').click()`))
+		b.until("the unread entries after the offer", list+`.dataset.state === 'unread' && `+rows+`.length === 1`)
+	})
+}
+
 func mustAtoi(t *testing.T, s string) int {
 	t.Helper()
 	n, err := strconv.Atoi(s)
