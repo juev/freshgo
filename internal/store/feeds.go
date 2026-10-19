@@ -134,6 +134,9 @@ func (s *Store) DeleteFeedEntries(ctx context.Context, userID, feedID int64) (in
 	if err != nil {
 		return 0, fmt.Errorf("store: delete entries of feed %d: %w", feedID, err)
 	}
+	if n > 0 {
+		s.entriesChanged(userID)
+	}
 	return n, nil
 }
 

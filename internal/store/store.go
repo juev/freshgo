@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"os"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -51,6 +52,14 @@ type Store struct {
 	// systemChanged is set inside a transaction that changed what System
 	// reads; the cache lets go of it once the transaction is committed.
 	systemChanged *bool
+	// EntriesChanged, when set, is told about a user whose entries were
+	// added, read or unread, starred or unstarred, or given or taken a
+	// label: once the transaction that changed them is committed. It must
+	// not wait. It is set before the Store is used.
+	EntriesChanged func(userID int64)
+	// changedUsers collects, inside a transaction, the users to tell
+	// EntriesChanged about once it is committed.
+	changedUsers *[]int64
 }
 
 // Open connects to the database and brings its schema up to date.
@@ -182,9 +191,12 @@ func (s *Store) InTx(ctx context.Context, fn func(tx *Store) error) error {
 	if err != nil {
 		return fmt.Errorf("store: begin: %w", err)
 	}
-	var systemChanged bool
+	var (
+		systemChanged bool
+		changedUsers  []int64
+	)
 	inner := *s
-	inner.q, inner.systemChanged = tx, &systemChanged
+	inner.q, inner.systemChanged, inner.changedUsers = tx, &systemChanged, &changedUsers
 	if err := fn(&inner); err != nil {
 		_ = tx.Rollback()
 		return err
@@ -195,7 +207,23 @@ func (s *Store) InTx(ctx context.Context, fn func(tx *Store) error) error {
 	if systemChanged {
 		s.system.forget()
 	}
+	slices.Sort(changedUsers)
+	for _, user := range slices.Compact(changedUsers) {
+		s.EntriesChanged(user)
+	}
 	return nil
+}
+
+// entriesChanged tells EntriesChanged that the entries of a user changed, or
+// has it told once the transaction is committed.
+func (s *Store) entriesChanged(userID int64) {
+	switch {
+	case s.EntriesChanged == nil:
+	case s.changedUsers != nil:
+		*s.changedUsers = append(*s.changedUsers, userID)
+	default:
+		s.EntriesChanged(userID)
+	}
 }
 
 func (s *Store) exec(ctx context.Context, query string, args ...any) (sql.Result, error) {
