@@ -103,8 +103,8 @@ func TestTooManySubscriptionsEndTheOldest(t *testing.T) {
 		subs = append(subs, b.Subscribe(t.Context(), 1))
 	}
 	for i, s := range subs {
-		if want := i < 2; ended(s) != want {
-			t.Errorf("subscription %d ended: %v, want %v", i, ended(s), want)
+		if want := i < 2; ended(s) != want || s.Replaced() != want {
+			t.Errorf("subscription %d ended: %v, replaced: %v, want %v", i, ended(s), s.Replaced(), want)
 		}
 	}
 	other := b.Subscribe(t.Context(), 2)
@@ -122,6 +122,9 @@ func TestCloseEndsEverySubscription(t *testing.T) {
 	b.Close()
 	if !ended(first) || !ended(second) {
 		t.Error("Close left a subscription open")
+	}
+	if first.Replaced() {
+		t.Error("Close is taken for newer subscriptions")
 	}
 	if late := b.Subscribe(t.Context(), 1); !ended(late) {
 		t.Error("a subscription after Close is open")

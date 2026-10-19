@@ -51,7 +51,7 @@ func (s *Store) InsertEntries(ctx context.Context, userID int64, entries []*Entr
 				return err
 			}
 		}
-		tx.entriesChanged(userID)
+		tx.entriesChanged(userID, true)
 		return nil
 	})
 }
@@ -113,7 +113,7 @@ func (s *Store) UpdateEntry(ctx context.Context, e *Entry) error {
 	if n == 0 {
 		return fmt.Errorf("store: update entry %d: %w", e.ID, ErrNotFound)
 	}
-	s.entriesChanged(e.UserID)
+	s.entriesChanged(e.UserID, false)
 	return s.indexText(ctx, e.UserID, e.ID, e.Title, e.Content)
 }
 
@@ -314,7 +314,7 @@ func (s *Store) DeleteOldEntries(ctx context.Context, userID, feedID int64, keep
 		return 0, fmt.Errorf("store: delete old entries of feed %d: %w", feedID, err)
 	}
 	if n > 0 {
-		s.entriesChanged(userID)
+		s.entriesChanged(userID, false)
 	}
 	return n, nil
 }
@@ -329,7 +329,7 @@ func (s *Store) MarkUnseenEntriesRead(ctx context.Context, userID, feedID, befor
 		return 0, fmt.Errorf("store: unseen entries of feed %d: %w", feedID, err)
 	}
 	if n > 0 {
-		s.entriesChanged(userID)
+		s.entriesChanged(userID, false)
 	}
 	return n, nil
 }
@@ -346,7 +346,7 @@ func (s *Store) KeepNewestUnread(ctx context.Context, userID, feedID int64, keep
 		return 0, fmt.Errorf("store: unread entries of feed %d: %w", feedID, err)
 	}
 	if n > 0 {
-		s.entriesChanged(userID)
+		s.entriesChanged(userID, false)
 	}
 	return n, nil
 }

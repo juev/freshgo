@@ -47,6 +47,8 @@ type Subscription struct {
 	// guards it.
 	pending Kind
 	ended   bool
+	// replaced is set when newer subscriptions of the user ended this one.
+	replaced bool
 }
 
 // Subscribe returns a subscription to what is published for user, which
@@ -66,6 +68,7 @@ func (b *Broker) Subscribe(ctx context.Context, user int64) *Subscription {
 	subs := append(b.subs[user], s)
 	if len(subs) > MaxPerUser {
 		for _, old := range subs[:len(subs)-MaxPerUser] {
+			old.replaced = true
 			old.end()
 		}
 		subs = slices.Clone(subs[len(subs)-MaxPerUser:])
@@ -106,6 +109,14 @@ func (s *Subscription) Ready() <-chan struct{} { return s.ready }
 
 // Done is closed when the subscription ends.
 func (s *Subscription) Done() <-chan struct{} { return s.done }
+
+// Replaced reports whether the subscription ended because the user made
+// MaxPerUser newer ones: one made again would end another.
+func (s *Subscription) Replaced() bool {
+	s.b.mu.Lock()
+	defer s.b.mu.Unlock()
+	return s.replaced
+}
 
 // Take returns what was published since it was last called.
 func (s *Subscription) Take() Kind {

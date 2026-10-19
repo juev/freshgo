@@ -20,7 +20,8 @@ const heartbeat = 30 * time.Second
 // tree changed ("tree") or that entries came ("entries"), and then the page
 // asks for what it shows again. Nothing of the entries goes over it. It ends
 // with the login it was opened under, which it looks at with every event
-// and every heartbeat.
+// and every heartbeat, and with "replaced" when newer streams of the user
+// took its place.
 func (h *Handler) eventStream(w http.ResponseWriter, r *http.Request) {
 	s := state(r)
 	who := s.who
@@ -53,6 +54,11 @@ func (h *Handler) eventStream(w http.ResponseWriter, r *http.Request) {
 		var text string
 		select {
 		case <-sub.Done():
+			// The page is not to come back for another stream: it
+			// would end one of another page.
+			if sub.Replaced() {
+				send("event: replaced\ndata: replaced\n\n")
+			}
 			return
 		case <-beat.C:
 			text = ": heartbeat\n\n"

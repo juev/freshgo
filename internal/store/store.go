@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"maps"
 	"net/url"
 	"os"
 	"runtime"
@@ -53,13 +54,15 @@ type Store struct {
 	// reads; the cache lets go of it once the transaction is committed.
 	systemChanged *bool
 	// EntriesChanged, when set, is told about a user whose entries were
-	// added, read or unread, starred or unstarred, or given or taken a
-	// label: once the transaction that changed them is committed. It must
-	// not wait. It is set before the Store is used.
-	EntriesChanged func(userID int64)
+	// added, updated or deleted, read or unread, starred or unstarred, or
+	// given or taken a label, and whether entries were added: once the
+	// transaction that changed them is committed. It must not wait. It is
+	// set before the Store is used.
+	EntriesChanged func(userID int64, added bool)
 	// changedUsers collects, inside a transaction, the users to tell
-	// EntriesChanged about once it is committed.
-	changedUsers *[]int64
+	// EntriesChanged about once it is committed, and whether entries of
+	// theirs were added.
+	changedUsers map[int64]bool
 }
 
 // Open connects to the database and brings its schema up to date.
@@ -191,12 +194,10 @@ func (s *Store) InTx(ctx context.Context, fn func(tx *Store) error) error {
 	if err != nil {
 		return fmt.Errorf("store: begin: %w", err)
 	}
-	var (
-		systemChanged bool
-		changedUsers  []int64
-	)
+	var systemChanged bool
+	changedUsers := map[int64]bool{}
 	inner := *s
-	inner.q, inner.systemChanged, inner.changedUsers = tx, &systemChanged, &changedUsers
+	inner.q, inner.systemChanged, inner.changedUsers = tx, &systemChanged, changedUsers
 	if err := fn(&inner); err != nil {
 		_ = tx.Rollback()
 		return err
@@ -207,22 +208,21 @@ func (s *Store) InTx(ctx context.Context, fn func(tx *Store) error) error {
 	if systemChanged {
 		s.system.forget()
 	}
-	slices.Sort(changedUsers)
-	for _, user := range slices.Compact(changedUsers) {
-		s.EntriesChanged(user)
+	for _, user := range slices.Sorted(maps.Keys(changedUsers)) {
+		s.EntriesChanged(user, changedUsers[user])
 	}
 	return nil
 }
 
 // entriesChanged tells EntriesChanged that the entries of a user changed, or
 // has it told once the transaction is committed.
-func (s *Store) entriesChanged(userID int64) {
+func (s *Store) entriesChanged(userID int64, added bool) {
 	switch {
 	case s.EntriesChanged == nil:
 	case s.changedUsers != nil:
-		*s.changedUsers = append(*s.changedUsers, userID)
+		s.changedUsers[userID] = s.changedUsers[userID] || added
 	default:
-		s.EntriesChanged(userID)
+		s.EntriesChanged(userID, added)
 	}
 }
 
