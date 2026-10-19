@@ -261,6 +261,15 @@ func TestPartsForTheScript(t *testing.T) {
 			t.Errorf("the tree for the script: status %d\n%s", a.status, a.body)
 		}
 
+		// U114: the links of the tree open a stream in place, and stay links
+		// a browser without the script follows.
+		page := s.page("/feeds/1")
+		if !strings.Contains(page, `<nav class="tree" id="tree" aria-label="Subscriptions" hx-boost:inherited="true" hx-target:inherited="#content" hx-select:inherited="#content" hx-swap:inherited="outerSync">`) ||
+			!strings.Contains(page, `<main class="page wide" id="content" tabindex="-1" hx-history-elt>`) ||
+			!strings.Contains(page, `<a href="/categories/2">Blogs</a>`) {
+			t.Errorf("the tree for streams in place:\n%s", page)
+		}
+
 		var places []place
 		if err := json.Unmarshal([]byte(s.page("/palette")), &places); err != nil {
 			t.Fatal(err)

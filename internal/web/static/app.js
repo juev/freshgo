@@ -13,9 +13,17 @@
 	const urls = config.urls || {};
 	const t = (key) => (config.texts && config.texts[key]) || key;
 
-	const entries = document.querySelector('.entries');
-	const tree = document.getElementById('tree');
+	// The stream and its tree are in the content, which a stream opened from
+	// the tree replaces; what the script does to the content is done again.
+	let entries = document.querySelector('.entries');
+	let tree = document.getElementById('tree');
 	const messages = document.getElementById('messages');
+
+	const mounts = [];
+	const onContent = (mount) => {
+		mounts.push(mount);
+		mount();
+	};
 
 	const el = (tag, attrs, ...children) => {
 		const node = document.createElement(tag);
@@ -67,12 +75,16 @@
 	// On a narrow screen the menu folds behind a button; without the script
 	// the button stays hidden and the menu in sight.
 	// So do the controls of a stream.
-	for (const fold of document.querySelectorAll('.menu-toggle, .filters-toggle')) {
-		fold.hidden = false;
-		fold.addEventListener('click', () => {
-			fold.setAttribute('aria-expanded', String(fold.getAttribute('aria-expanded') !== 'true'));
-		});
-	}
+	const foldable = (selector) => {
+		for (const fold of document.querySelectorAll(selector)) {
+			fold.hidden = false;
+			fold.addEventListener('click', () => {
+				fold.setAttribute('aria-expanded', String(fold.getAttribute('aria-expanded') !== 'true'));
+			});
+		}
+	};
+	foldable('.menu-toggle');
+	onContent(() => foldable('.filters-toggle'));
 
 	// ---- Entries ----
 
@@ -362,7 +374,10 @@
 		return post(form, article);
 	});
 
-	if (entries) {
+	onContent(() => {
+		if (!entries) {
+			return;
+		}
 		entries.addEventListener('submit', (event) => {
 			const article = event.target.closest('article.entry');
 			if (article && event.target.matches('form.entry-action')) {
@@ -397,17 +412,19 @@
 			setCurrent(named);
 			named.focus({ preventScroll: true });
 		}
-	}
+	});
 
 	// ---- Sorting ----
 
 	// The order applies as it is chosen; the button is for a page without
 	// the script.
-	const sorting = document.querySelector('form.sorting');
-	if (sorting) {
-		sorting.querySelector('button').hidden = true;
-		sorting.addEventListener('change', () => sorting.requestSubmit());
-	}
+	onContent(() => {
+		const sorting = document.querySelector('form.sorting');
+		if (sorting) {
+			sorting.querySelector('button').hidden = true;
+			sorting.addEventListener('change', () => sorting.requestSubmit());
+		}
+	});
 
 	// ---- Sharing ----
 
@@ -434,10 +451,12 @@
 			button.hidden = false;
 		}
 	}
-	revealShares(document);
-	for (const bar of document.querySelectorAll('.reader-bar')) {
-		bar.hidden = false;
-	}
+	onContent(() => {
+		revealShares(document);
+		for (const bar of document.querySelectorAll('.reader-bar')) {
+			bar.hidden = false;
+		}
+	});
 
 	document.addEventListener('click', (event) => {
 		const button = event.target.closest('button[data-share]');
@@ -578,15 +597,20 @@
 			return Promise.resolve(false);
 		}
 		if (!loading) {
-			entries.setAttribute('aria-busy', 'true');
+			const list = entries;
+			list.setAttribute('aria-busy', 'true');
 			loading = ask(link.href)
 				.then((response) => (response.ok ? response.text() : Promise.reject(new Error(response.status))))
 				.then((html) => {
+					// The page of a stream the reader has left goes nowhere.
+					if (!list.isConnected) {
+						return false;
+					}
 					const page = parse(html);
 					for (const article of page.querySelectorAll('.entries > article.entry')) {
 						if (!document.getElementById(article.id)) {
 							const added = document.adoptNode(article);
-							entries.append(added);
+							list.append(added);
 							revealShares(added);
 						}
 					}
@@ -605,7 +629,7 @@
 					return false;
 				})
 				.finally(() => {
-					entries.removeAttribute('aria-busy');
+					list.removeAttribute('aria-busy');
 					loading = null;
 				});
 		}
@@ -625,7 +649,7 @@
 			nearEnd.observe(more);
 		}
 	}
-	watchEnd();
+	onContent(watchEnd);
 
 	// ---- The tree ----
 
@@ -638,13 +662,15 @@
 		}
 		clearTimeout(treeTimer);
 		treeTimer = setTimeout(async () => {
+			const here = location.href;
 			let response;
 			try {
-				response = await ask(location.href, { headers: { 'X-Fragment': 'tree' } });
+				response = await ask(here, { headers: { 'X-Fragment': 'tree' } });
 			} catch {
 				return;
 			}
-			const answer = response.ok ? parse(await response.text()) : null;
+			// The tree of a stream the reader has left is not the one shown.
+			const answer = response.ok && location.href === here ? parse(await response.text()) : null;
 			const fresh = answer && answer.querySelector('details');
 			const old = tree.querySelector('details');
 			if (!fresh || !old) {
@@ -684,7 +710,10 @@
 		}
 	}
 
-	if (tree) {
+	onContent(() => {
+		if (!tree) {
+			return;
+		}
 		foldBranches();
 		// What the reader folds and unfolds is kept; a category the script
 		// opens, to show where the reader is, or a fresh tree brings open,
@@ -711,6 +740,9 @@
 				}
 			});
 		});
+	});
+
+	if (tree) {
 		// The tree unfolds over the stream: a click beside it folds it back.
 		document.addEventListener('click', (event) => {
 			const fold = tree.querySelector('details');
@@ -736,11 +768,44 @@
 		let at = links.findIndex((a) => a.getAttribute('aria-current') === 'page');
 		for (at += step; at >= 0 && at < links.length; at += step) {
 			if (!unreadOnly || links[at].parentElement.querySelector(':scope > .count')) {
-				location.href = links[at].href;
+				// The link opens the stream in place, as a click on it does.
+				links[at].click();
 				return;
 			}
 		}
 	};
+
+	// ---- Streams in place ----
+
+	// A link of the tree, and the way back and forward among the streams
+	// so opened, bring the content of the next page in place of this one
+	// (htmx, by the attributes of the tree). The content is busy while it
+	// comes, and what the script did to the old one it does to the new.
+	const content = document.getElementById('content');
+	const inContent = (event) => event.detail.ctx && event.detail.ctx.target === content;
+	document.addEventListener('htmx:before:request', (event) => {
+		if (inContent(event)) {
+			content.setAttribute('aria-busy', 'true');
+		}
+	});
+	document.addEventListener('htmx:after:swap', (event) => {
+		if (!inContent(event)) {
+			return;
+		}
+		entries = document.querySelector('.entries');
+		tree = document.getElementById('tree');
+		current = null;
+		for (const mount of mounts) {
+			mount();
+		}
+		window.scrollTo(0, 0);
+		content.focus({ preventScroll: true });
+	});
+	document.addEventListener('htmx:finally:request', (event) => {
+		if (inContent(event)) {
+			content.removeAttribute('aria-busy');
+		}
+	});
 
 	// ---- Dialogs ----
 

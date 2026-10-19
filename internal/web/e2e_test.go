@@ -93,8 +93,9 @@ func read[T any](b *browser, expression string, options ...chromedp.EvaluateOpti
 }
 
 // loaded is true of a page whose script has run: the script is deferred,
-// and a key pressed before it has run is a key nothing listens for.
-const loaded = `document.readyState === 'complete'`
+// and a key pressed before it has run is a key nothing listens for. A
+// stream opened in place (U114) has come when the content is no longer busy.
+const loaded = `document.readyState === 'complete' && !document.querySelector('main[aria-busy]')`
 
 // open types an address into the browser and waits for the page.
 func (b *browser) open(path string) {
@@ -402,6 +403,49 @@ func TestE2EDialogs(t *testing.T) {
 		b.until("back at the head of the tree, where everything is", `location.pathname === '/' && document.querySelector('#tree a[aria-current="page"]').textContent === 'All items'`)
 		b.press("U")
 		b.until("the next stream with unread entries", `location.pathname === '/categories/2'`)
+	})
+}
+
+// U114: a stream opened from the tree, by a link or by J and K, comes in
+// place of the one being read; the way back and forward goes through the
+// streams so opened, and the keys act on the stream that came.
+func TestE2EStreamsInPlace(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		b := browse(t, s)
+		b.login("alice")
+		// What stays set on the window shows that the page was not loaded
+		// again; what the policy of the page refuses is counted.
+		b.run(chromedp.Evaluate[chromedp.Void](`window.stayed = true; window.refused = [];
+			document.addEventListener('securitypolicyviolation', (event) => window.refused.push(event.violatedDirective + ' ' + event.blockedURI))`))
+		in := func(path, heading string) string {
+			return `window.stayed && location.pathname === '` + path + `' && document.getElementById('stream-heading').textContent === '` + heading + `'` +
+				` && document.querySelector('#tree a[aria-current="page"]').getAttribute('href') === '` + path + `'` +
+				` && document.title.startsWith('` + heading + ` · ')`
+		}
+
+		b.press("t")
+		b.tabTo(`#tree a[href="/categories/2"]`)
+		b.press(kb.Enter)
+		b.until("the category in place of everything", in("/categories/2", "Blogs"))
+		b.until("the focus on the content, the tree folded", `document.activeElement.id === 'content' && !document.querySelector('#tree details').open`)
+		b.accessible("a stream opened in place")
+		b.press("n")
+		b.until("an entry of the stream that came current", `document.activeElement.matches('.entries article.entry.current')`)
+		b.press("o")
+		b.until("the entry open", `document.activeElement.matches('.entries article.entry.current') && document.activeElement.querySelector('details').open`)
+
+		b.press("K")
+		b.until("everything again, by K", in("/", "All items"))
+		b.run(chromedp.Evaluate[chromedp.Void](`history.back()`))
+		b.until("the category again, by the way back", in("/categories/2", "Blogs"))
+		b.run(chromedp.Evaluate[chromedp.Void](`history.forward()`))
+		b.until("everything again, by the way forward", in("/", "All items"))
+		b.press("J")
+		b.until("the category again, by J", in("/categories/2", "Blogs"))
+
+		if refused := b.text(`window.refused.join('; ')`); refused != "" {
+			t.Errorf("the policy of the page refuses: %s", refused)
+		}
 	})
 }
 

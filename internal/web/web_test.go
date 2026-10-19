@@ -121,7 +121,7 @@ func TestAboutPage(t *testing.T) {
 		}
 		for _, want := range []string{
 			"<title>About · freshgo</title>", "Version 1.2.3", "<code>http://example.com</code>",
-			`<a class="skip" href="#content">Skip to content</a>`, `<main class="page" id="content" tabindex="-1">`,
+			`<a class="skip" href="#content">Skip to content</a>`, `<main class="page" id="content" tabindex="-1" hx-history-elt>`,
 			`<a href="/about" aria-current="page">About</a>`, `id="messages" role="status" aria-live="polite"`,
 		} {
 			if !strings.Contains(a.body, want) {
@@ -201,6 +201,16 @@ func TestStaticFiles(t *testing.T) {
 			}
 			if icon := s.get(link[1]); icon.status != http.StatusOK || !strings.HasPrefix(icon.header.Get("Content-Type"), kind) || len(icon.body) == 0 {
 				t.Errorf("GET %s: status %d, headers %v", link[1], icon.status, icon.header)
+			}
+		}
+		// htmx comes before the script, which listens for what it does (U114).
+		scripts := regexp.MustCompile(`<script src="(/static/(htmx\.min|app)\.js\?v=[0-9a-f]{12})" defer></script>`).FindAllStringSubmatch(page, -1)
+		if len(scripts) != 2 || scripts[0][2] != "htmx.min" || scripts[1][2] != "app" {
+			t.Fatalf("want htmx and then the script, deferred and versioned, in\n%s", page)
+		}
+		for _, script := range scripts {
+			if a := s.get(script[1]); a.status != http.StatusOK || !strings.HasPrefix(a.header.Get("Content-Type"), "text/javascript") {
+				t.Errorf("GET %s: status %d, headers %v", script[1], a.status, a.header)
 			}
 		}
 		// Asked for without its version, or with another, a file may be
