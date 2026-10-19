@@ -23,13 +23,16 @@ func TestObserve(t *testing.T) {
 			if err := http.NewResponseController(w).Flush(); err != nil {
 				t.Errorf("flush: %v", err)
 			}
+		case "/events":
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = io.WriteString(w, ": open\n\n")
 		}
 	})
 	for _, level := range []slog.Level{slog.LevelDebug, slog.LevelInfo} {
 		requests := requestCounter()
 		var logs strings.Builder
 		server := httptest.NewServer(observe(page, slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: level})), requests))
-		for _, path := range []string{"/missing?token=secret", "/stream", "/empty"} {
+		for _, path := range []string{"/missing?token=secret", "/stream", "/empty", "/events"} {
 			resp, err := http.Get(server.URL + path)
 			if err != nil {
 				t.Fatal(err)
@@ -37,8 +40,8 @@ func TestObserve(t *testing.T) {
 			_ = resp.Body.Close()
 		}
 		server.Close()
-		if found, ok := testutil.ToFloat64(requests.WithLabelValues("404")), testutil.ToFloat64(requests.WithLabelValues("200")); found != 1 || ok != 2 {
-			t.Errorf("level %s: counted %v answers 404 and %v answers 200, want 1 and 2", level, found, ok)
+		if found, ok := testutil.ToFloat64(requests.WithLabelValues("404")), testutil.ToFloat64(requests.WithLabelValues("200")); found != 1 || ok != 3 {
+			t.Errorf("level %s: counted %v answers 404 and %v answers 200, want 1 and 3", level, found, ok)
 		}
 		text := logs.String()
 		if level > slog.LevelDebug {
@@ -48,7 +51,7 @@ func TestObserve(t *testing.T) {
 			continue
 		}
 		lines := strings.Split(strings.TrimSpace(text), "\n")
-		want := []string{"method=GET path=/missing status=404", "method=GET path=/stream status=200", "method=GET path=/empty status=200"}
+		want := []string{"method=GET path=/missing status=404", "method=GET path=/stream status=200", "method=GET path=/empty status=200", "method=GET path=/events status=200"}
 		if len(lines) != len(want) {
 			t.Fatalf("log:\n%s\nwant %d lines", text, len(want))
 		}
@@ -64,6 +67,12 @@ func TestObserve(t *testing.T) {
 			}
 			if matched != 1 {
 				t.Errorf("log:\n%s\nhas %d lines with %q and a duration, want 1", text, matched, w)
+			}
+		}
+		// A stream of events is told apart from an answer that is slow.
+		for _, line := range lines {
+			if stream := strings.Contains(line, "path=/events"); strings.HasSuffix(line, " stream=true") != stream {
+				t.Errorf("log line %q: marked as a stream %v, want %v", line, !stream, stream)
 			}
 		}
 		if strings.Contains(text, "secret") {

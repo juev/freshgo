@@ -630,7 +630,7 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 // setWebPassword stores the hash of the web password of a user and ends the
 // logins of the user, except the one with the token hash keep.
 func (h *Handler) setWebPassword(ctx context.Context, userID int64, hash, keep string) error {
-	return h.db.InTx(ctx, func(tx *store.Store) error {
+	err := h.db.InTx(ctx, func(tx *store.Store) error {
 		err := tx.UpdateUserSettings(ctx, userID, func(settings map[string]json.RawMessage) error {
 			attrs(settings).set("passwordHash", hash)
 			return nil
@@ -640,6 +640,10 @@ func (h *Handler) setWebPassword(ctx context.Context, userID int64, hash, keep s
 		}
 		return tx.DeleteUserSessions(ctx, userID, keep)
 	})
+	if err == nil {
+		h.loginsEnded(userID)
+	}
+	return err
 }
 
 // changeAPIPassword gives the user another password for API clients, or
@@ -701,5 +705,6 @@ func (h *Handler) removeUser(ctx context.Context, u *store.User) error {
 	if err := h.db.DeleteUser(ctx, u.ID); err != nil {
 		return err
 	}
+	h.loginsEnded(u.ID)
 	return h.db.DeleteLogs(ctx, u.Name)
 }
