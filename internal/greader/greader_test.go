@@ -972,7 +972,11 @@ func BenchmarkListings(b *testing.B) {
 		b.Fatal(err)
 	}
 	b.Cleanup(func() { _ = db.Close() })
-	u := &store.User{Name: "alice"}
+	hash, err := bcrypt.GenerateFromPassword([]byte("alice-password"), bcrypt.MinCost)
+	if err != nil {
+		b.Fatal(err)
+	}
+	u := &store.User{Name: "alice", APIPasswordHash: string(hash)}
 	if err := db.CreateUser(ctx, u); err != nil {
 		b.Fatal(err)
 	}
