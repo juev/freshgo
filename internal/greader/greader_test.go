@@ -2,6 +2,8 @@ package greader
 
 import (
 	"context"
+	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -597,6 +599,20 @@ func TestAccess(t *testing.T) {
 		}
 		if status, _ := w.post("", "/accounts/ClientLogin", "Email=dave&Passwd="); status != http.StatusUnauthorized {
 			t.Errorf("login without an API password: status %d, want 401", status)
+		}
+		// The token such a user would have depends on nothing secret but
+		// the salt; it opens nothing, while the one ClientLogin hands out
+		// to a user with a password does.
+		salt, err := w.db.Salt(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sum := sha1.Sum([]byte(salt + "dave"))
+		if status, _ := w.get("GoogleLogin auth=dave/"+hex.EncodeToString(sum[:]), "/reader/api/0/token"); status != http.StatusUnauthorized {
+			t.Errorf("token of a user without an API password: status %d, want 401", status)
+		}
+		if status, _ := w.get(w.auth, "/reader/api/0/token"); status != http.StatusOK {
+			t.Errorf("token of a user with an API password: status %d, want 200", status)
 		}
 
 		// Every answer lets a web client of another origin read it and
