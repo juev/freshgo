@@ -345,7 +345,7 @@ Every setting is a flag and an environment variable, and can be written in a con
 | `-debug-listen` | `FRESHGO_DEBUG_LISTEN` | | Address the profiles of the Go runtime, under `/debug/pprof/`, and the Prometheus metrics, under `/metrics`, are handed out at, apart from the server and without a login: `127.0.0.1:6060`. They show what the server does and can keep it busy, so the address is not one for the public; see "Metrics". |
 | `-base-url` | `FRESHGO_BASE_URL` | | Public address of the server. Set it behind a reverse proxy: links to feed icons are built from it, and WebSub needs it. |
 | `-refresh-interval` | `FRESHGO_REFRESH_INTERVAL` | `10m` | How often `serve` looks for feeds that are due. |
-| `-fetch-allowlist` | `FRESHGO_FETCH_ALLOWLIST` | | Internal destinations feeds may be fetched from: `host:port`, a CIDR range, or `*`, separated by commas. Without it, requests to private and loopback addresses are refused. |
+| `-fetch-allowlist` | `FRESHGO_FETCH_ALLOWLIST` | | Internal destinations feeds may be fetched from: `host:port`, a CIDR range, or `*`, separated by commas. Without it, requests to private, loopback and reserved addresses are refused. |
 | `-websub` | `FRESHGO_WEBSUB` | off | Subscribe to the WebSub hubs feeds announce. |
 | `-trusted-proxies` | `FRESHGO_TRUSTED_PROXIES` | `127.0.0.0/8,::1/128` | Reverse proxies whose word is taken for who the user is and for the address of the browser: addresses or CIDR ranges, separated by commas. |
 | `-oidc-client-secret` | `FRESHGO_OIDC_CLIENT_SECRET` | | Secret of the client the installation is at its OpenID Connect provider; see "Signing in through a provider". |

@@ -13,27 +13,40 @@ import (
 )
 
 // internalRanges are the addresses a feed URL must not lead to: the list of
-// FreshRSS_http_Util::PRIVATE_SUBNETS plus multicast. IPv4-mapped IPv6
-// addresses are checked as IPv4, NAT64 ones by the IPv4 address they embed.
+// FreshRSS_http_Util::PRIVATE_SUBNETS plus multicast and the special-purpose
+// ranges of the IANA registries that are not reachable on the internet.
+// IPv4-mapped IPv6 addresses are checked as IPv4, NAT64 and 6to4 ones by the
+// IPv4 address they embed. Teredo is refused whole: the IPv4 address of its
+// client is obfuscated and that of its server is another one.
 var internalRanges = prefixes(
-	"0.0.0.0/8",      // this network
-	"10.0.0.0/8",     // private
-	"100.64.0.0/10",  // carrier-grade NAT
-	"127.0.0.0/8",    // loopback
-	"169.254.0.0/16", // link-local
-	"172.16.0.0/12",  // private
-	"192.168.0.0/16", // private
-	"224.0.0.0/4",    // multicast
-	"240.0.0.0/4",    // reserved, broadcast
-	"::/128",         // unspecified
-	"::1/128",        // loopback
-	"64:ff9b:1::/48", // local-use NAT64
-	"fc00::/7",       // unique local
-	"fe80::/10",      // link-local
-	"ff00::/8",       // multicast
+	"0.0.0.0/8",       // this network
+	"10.0.0.0/8",      // private
+	"100.64.0.0/10",   // carrier-grade NAT
+	"127.0.0.0/8",     // loopback
+	"169.254.0.0/16",  // link-local
+	"172.16.0.0/12",   // private
+	"192.0.0.0/24",    // IETF protocol assignments
+	"192.0.2.0/24",    // documentation
+	"192.168.0.0/16",  // private
+	"198.18.0.0/15",   // benchmarking
+	"198.51.100.0/24", // documentation
+	"203.0.113.0/24",  // documentation
+	"224.0.0.0/4",     // multicast
+	"240.0.0.0/4",     // reserved, broadcast
+	"::/128",          // unspecified
+	"::1/128",         // loopback
+	"64:ff9b:1::/48",  // local-use NAT64
+	"2001::/32",       // Teredo
+	"2001:db8::/32",   // documentation
+	"fc00::/7",        // unique local
+	"fe80::/10",       // link-local
+	"ff00::/8",        // multicast
 )
 
-var nat64 = netip.MustParsePrefix("64:ff9b::/96")
+var (
+	nat64     = netip.MustParsePrefix("64:ff9b::/96")
+	sixToFour = netip.MustParsePrefix("2002::/16")
+)
 
 func prefixes(list ...string) []netip.Prefix {
 	out := make([]netip.Prefix, len(list))
@@ -106,9 +119,11 @@ func (g *guard) allowed(ap netip.AddrPort) bool {
 }
 
 func internal(ip netip.Addr) bool {
-	if nat64.Contains(ip) {
-		b := ip.As16()
+	switch b := ip.As16(); {
+	case nat64.Contains(ip):
 		ip = netip.AddrFrom4([4]byte(b[12:]))
+	case sixToFour.Contains(ip):
+		ip = netip.AddrFrom4([4]byte(b[2:6]))
 	}
 	for _, r := range internalRanges {
 		if r.Contains(ip) {
