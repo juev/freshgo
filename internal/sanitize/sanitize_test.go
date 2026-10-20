@@ -45,6 +45,10 @@ var deviations = map[string]struct{ want, why string }{
 		`<table border="1"><tbody><tr><td colspan="2">c</td><th scope="col">h</th></tr></tbody></table>`,
 		"an HTML5 parser puts table rows into a tbody",
 	},
+	`<a href="JAVASCRIPT:alert(1)">x</a><a href="data:text/html,x">d</a><a href="mailto:a@b.c">m</a><a href="  /sp ">s</a><a href="#frag">f</a><a href="?q=1">q</a><a href="">e</a>`: {
+		`<a href="unsafe:javascript:alert(1)">x</a><a href="unsafe:data:text/html,x">d</a><a href="mailto:a@b.c">m</a><a href="http://example.org/sp">s</a><a href="http://example.org/dir/page#frag">f</a><a href="http://example.org/dir/page?q=1">q</a><a href="http://example.org/dir/page">e</a>`,
+		"the oracle predates FreshRSS 1.30.2, which blocks data: URLs too (FreshRSS#9417)",
+	},
 	`<audio src="a.mp3"></audio><video poster="p.jpg"><source src="v.webm" type="video/webm"><track src="s.vtt" kind="subtitles"></video>`: {
 		`<audio src="http://example.org/dir/a.mp3" controls="controls" preload="none"></audio><video poster="http://example.org/dir/p.jpg" controls="controls" preload="none"><source src="http://example.org/dir/v.webm" type="video/webm"><track src="http://example.org/dir/s.vtt" kind="subtitles"></video>`,
 		"libxml does not know that track is a void element",
@@ -116,6 +120,30 @@ func TestHTMLIsSafe(t *testing.T) {
 			if strings.Contains(lower, attr) {
 				t.Errorf("HTML(%q) = %q, keeps a script URL", input, got)
 			}
+		}
+	}
+}
+
+// A data: URL is a document a client without the CSP of the pages runs: it
+// stays only as an image, where it is inert. A frame shows web pages only.
+func TestHTMLKeepsDataURLsForImagesOnly(t *testing.T) {
+	for input, want := range map[string]string{
+		`<a href="data:text/html,<script>x()</script>">x</a>`:                                                 `<a href="unsafe:data:text/html,&lt;script&gt;x()&lt;/script&gt;">x</a>`,
+		`<a href="data:image/png;base64,AA">x</a>`:                                                            `<a href="unsafe:data:image/png;base64,AA">x</a>`,
+		`<iframe src="data:text/html,x"></iframe>`:                                                            `<iframe src="unsafe:data:text/html,x"`,
+		`<iframe src="ftp://example.org/a"></iframe>`:                                                         `<iframe src="unsafe:ftp://example.org/a"`,
+		`<iframe src="https://www.youtube.com/embed/a"></iframe>`:                                             `<iframe src="https://www.youtube.com/embed/a"`,
+		`<iframe src="/embed/a"></iframe>`:                                                                    `<iframe src="http://example.org/embed/a"`,
+		`<audio src="data:audio/mp3;base64,AA"></audio>`:                                                      `<audio src="unsafe:data:audio/mp3;base64,AA"`,
+		`<video src="data:video/mp4,x"><source src="data:video/webm,x"><track src="data:text/vtt,x"></video>`: `<video src="unsafe:data:video/mp4,x" controls="controls" preload="none"><source src="unsafe:data:video/webm,x"><track src="unsafe:data:text/vtt,x">`,
+		`<img src="data:image/png;base64,AA" longdesc="data:text/html,x">`:                                    `<img src="data:image/png;base64,AA" longdesc="unsafe:data:text/html,x">`,
+		`<img src="DATA:image/gif;base64,AA">`:                                                                `<img src="data:image/gif;base64,AA">`,
+		`<img src="data:text/html,x">`:                                                                        `<img src="unsafe:data:text/html,x">`,
+		`<video poster="data:image/jpeg;base64,AA"></video>`:                                                  `<video poster="data:image/jpeg;base64,AA"`,
+		`<blockquote cite="data:text/html,x">q</blockquote>`:                                                  `<blockquote cite="unsafe:data:text/html,x">`,
+	} {
+		if got := HTML(input, "http://example.org/dir/", nil); !strings.HasPrefix(got, want) {
+			t.Errorf("HTML(%q)\n got %q\nwant it to begin with %q", input, got, want)
 		}
 	}
 }
@@ -198,7 +226,8 @@ func TestAllowedScheme(t *testing.T) {
 		"http://example.org/":  true,
 		"relative/path":        true,
 		"mailto:a@b.c":         true,
-		"data:text/html,x":     true,
+		"data:text/html,x":     false,
+		"DATA:image/png,x":     false,
 		"javascript:alert(1)":  false,
 		"JavaScript:alert(1)":  false,
 		"java script:alert(1)": false,

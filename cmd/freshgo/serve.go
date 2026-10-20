@@ -101,21 +101,25 @@ func routes(health, api, feverAPI, icons, misc, hubs, pages http.Handler) http.H
 	})
 }
 
-// cleanStoredTexts cleans, once for a database, the texts that were stored
-// before every writer cleaned its own: an import used to store what
-// FreshRSS let through, and the pages cleaned every text they showed. They
-// show what is stored now, so nothing is shown before this is done.
+// cleanStoredTexts cleans, once for a database and the rules of the
+// sanitizer, the texts that were stored before: an import used to store what
+// FreshRSS let through, the pages cleaned every text they showed, and an
+// older sanitizer let through what the rules now take out. They show what is
+// stored now, so nothing is shown before this is done.
 func cleanStoredTexts(ctx context.Context, db *store.Store, log *slog.Logger) error {
-	_, err := db.Setting(ctx, store.SettingTextsCleaned)
-	if !errors.Is(err, store.ErrNotFound) {
+	rules, err := db.Setting(ctx, store.SettingTextsCleaned)
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return err
+	}
+	if rules == sanitize.Rules {
+		return nil
 	}
 	changed, err := db.RewriteEntryTexts(ctx, sanitize.Stored)
 	if err != nil {
 		return err
 	}
 	log.Info("cleaned the texts stored before", "changed", changed)
-	return db.SetSetting(ctx, store.SettingTextsCleaned, "1")
+	return db.SetSetting(ctx, store.SettingTextsCleaned, sanitize.Rules)
 }
 
 // debugHandler hands out the profiles of the Go runtime and the metrics of

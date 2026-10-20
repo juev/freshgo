@@ -102,6 +102,10 @@ var urlAttributes = map[string][]string{
 	"video": {"poster", "src"},
 }
 
+// Attributes that may hold a data:image/ URL: an image is inert where it is
+// only shown.
+var imageAttributes = map[string]string{"img": "src", "image": "src", "video": "poster"}
+
 // Attributes written without a value when it is empty.
 var booleanAttributes = set("allowfullscreen", "checked", "default", "disabled", "hidden",
 	"loop", "multiple", "muted", "noshade", "open", "playsinline", "readonly", "reversed",
@@ -159,6 +163,11 @@ const (
 	FullContentStart = "<!-- FULLCONTENT start //-->"
 	FullContentEnd   = "<!-- FULLCONTENT end //-->"
 )
+
+// Rules names the rules texts are cleaned by. It changes when a text that
+// was clean may not be any more, so that the stored texts are cleaned again
+// (storage.md, I13): 2 drops data: URLs other than images.
+const Rules = "2"
 
 // Stored cleans the texts of an entry that were stored without being
 // cleaned here: its text, and in its attributes the text the feed gave,
@@ -309,7 +318,7 @@ func (s *sanitizer) element(parent, n *html.Node) *html.Node {
 	for _, name := range urlAttributes[tag] {
 		for i := range n.Attr {
 			if n.Attr[i].Key == name {
-				n.Attr[i].Val = s.url(n.Attr[i].Val)
+				n.Attr[i].Val = s.url(tag, name, n.Attr[i].Val)
 			}
 		}
 	}
@@ -325,20 +334,33 @@ func (s *sanitizer) element(parent, n *html.Node) *html.Node {
 	return nil
 }
 
-func (s *sanitizer) url(value string) string {
+func (s *sanitizer) url(tag, attribute, value string) string {
 	absolute, ok := Absolutize(value, s.base)
 	if !ok {
 		// Browsers drop the control characters that made the URL unparsable,
 		// so the scheme check must not be skipped.
 		absolute = value
 	}
-	if !AllowedScheme(absolute) {
+	if imageAttributes[tag] == attribute && strings.HasPrefix(strings.ToLower(absolute), "data:image/") {
+		return absolute
+	}
+	if !AllowedScheme(absolute) || tag == "iframe" && !webScheme(absolute) {
 		return "unsafe:" + absolute
 	}
 	if s.forceHTTPS != nil {
 		return s.forceHTTPS(absolute)
 	}
 	return absolute
+}
+
+// webScheme tells whether a URL is http, https or relative: what a frame
+// may show.
+func webScheme(u string) bool {
+	scheme, _, ok := strings.Cut(u, ":")
+	if !ok || strings.ContainsAny(scheme, "/?#") {
+		return true
+	}
+	return strings.EqualFold(scheme, "http") || strings.EqualFold(scheme, "https")
 }
 
 func setAttribute(n *html.Node, key, value string) {

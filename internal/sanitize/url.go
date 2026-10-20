@@ -172,8 +172,9 @@ func unhex(c byte) byte {
 	return c - '0'
 }
 
-// AllowedScheme tells whether a URL may be kept: anything but javascript:
-// and schemes that are not plain letters and digits.
+// AllowedScheme tells whether a URL may be kept: anything but javascript:,
+// data: and schemes that are not plain letters and digits. A data: URL is a
+// document of its own, which a client without the CSP of the pages runs.
 func AllowedScheme(u string) bool {
 	scheme, _, ok := strings.Cut(u, ":")
 	if !ok {
@@ -187,5 +188,5 @@ func AllowedScheme(u string) bool {
 			return false
 		}
 	}
-	return !strings.EqualFold(scheme, "javascript")
+	return !strings.EqualFold(scheme, "javascript") && !strings.EqualFold(scheme, "data")
 }

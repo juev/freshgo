@@ -310,6 +310,20 @@ func TestServeCleansStoredTexts(t *testing.T) {
 	if got := content(); got != `<p onclick="x()">b</p>` {
 		t.Errorf("after the second start: %s; the texts were gone through again", got)
 	}
+	// Texts cleaned by older rules are cleaned again, once.
+	unclean.Content = `<a href="data:text/html,x">c</a>`
+	if err := db.UpdateEntry(ctx, unclean); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetSetting(ctx, store.SettingTextsCleaned, "1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cleanStoredTexts(ctx, db, log); err != nil {
+		t.Fatal(err)
+	}
+	if got := content(); got != `<a href="unsafe:data:text/html,x">c</a>` {
+		t.Errorf("after a start with new rules: %s", got)
+	}
 	if err := db.Close(); err != nil {
 		t.Fatal(err)
 	}

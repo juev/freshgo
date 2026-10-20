@@ -16,8 +16,8 @@ const (
 	// SettingForceHTTPS lists, one per line, the domains whose http:// links
 	// are rewritten to https:// in addition to the built-in list.
 	SettingForceHTTPS = "force_https"
-	// SettingTextsCleaned is there once the texts that were stored before
-	// every writer cleaned its own have been cleaned.
+	// SettingTextsCleaned names the rules of the sanitizer the stored texts
+	// were last cleaned by (sanitize.Rules).
 	SettingTextsCleaned = "texts_cleaned"
 )
 
