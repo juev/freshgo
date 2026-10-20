@@ -2,11 +2,12 @@ package web
 
 import (
 	"archive/zip"
-	"bytes"
+	"bufio"
 	"context"
 	"errors"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -259,17 +260,27 @@ func (h *Handler) exportFiles(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// The answer is made in full first: a failure half way is then an error
-	// page, not half a file.
-	var out bytes.Buffer
+	// page, not half a file. It is made in a file, as the entries carry their
+	// whole text and an export of a large account does not fit in memory.
+	spool, err := os.CreateTemp("", "freshgo-export-")
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	defer func() {
+		_ = spool.Close()
+		_ = os.Remove(spool.Name())
+	}()
+	out := bufio.NewWriter(spool)
 	name, contentType := files[0].name, "application/json; charset=utf-8"
 	if len(files) == 1 {
 		if name[len(name)-4:] == ".xml" {
 			contentType = "application/xml; charset=utf-8"
 		}
-		err = files[0].write(ctx, &out)
+		err = files[0].write(ctx, out)
 	} else {
 		name, contentType = "freshgo_"+user.Name+"_"+day+"_export.zip", "application/zip"
-		archive := zip.NewWriter(&out)
+		archive := zip.NewWriter(out)
 		for _, f := range files {
 			var member io.Writer
 			if member, err = archive.Create(f.name); err == nil {
@@ -283,6 +294,12 @@ func (h *Handler) exportFiles(w http.ResponseWriter, r *http.Request) {
 			err = archive.Close()
 		}
 	}
+	if err == nil {
+		err = out.Flush()
+	}
+	if err == nil {
+		_, err = spool.Seek(0, io.SeekStart)
+	}
 	if err != nil {
 		h.broken(w, r, err)
 		return
@@ -291,5 +308,5 @@ func (h *Handler) exportFiles(w http.ResponseWriter, r *http.Request) {
 	header.Set("Content-Type", contentType)
 	header.Set("Content-Disposition", `attachment; filename="`+name+`"`)
 	header.Set("Cache-Control", "no-store")
-	_, _ = out.WriteTo(w)
+	_, _ = io.Copy(w, spool)
 }

@@ -3,14 +3,19 @@ package web
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"testing"
 
+	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/store"
+	"github.com/juev/freshgo/internal/transfer"
 )
 
 // archived reads the files of a ZIP archive by name.
@@ -176,5 +181,81 @@ func TestExportAndImport(t *testing.T) {
 		if got := notice(s.shown("/subscriptions/transfer")); !strings.HasPrefix(got, "Imported in part") || len(s.feeds("bob")) != len(feeds) {
 			t.Errorf("import past the limit of feeds: notice %q, %d feeds", got, len(s.feeds("bob")))
 		}
+	})
+}
+
+// An export is made in a temporary file and sent from it: the files are
+// those transfer.Write makes, and the temporary file is gone after the
+// answer, after a failure half way and after the reader went away.
+func TestExportGoesThroughATemporaryFile(t *testing.T) {
+	// trip is what a handler of entries does to the export under way.
+	var trip func()
+	registry := &hooks.Registry{}
+	registry.EntryBeforeDisplay.Add(0, func(_ context.Context, e *store.Entry) (*store.Entry, bool) {
+		if trip != nil {
+			trip()
+		}
+		return e, true
+	})
+	imported(t, Options{Hooks: registry}, func(t *testing.T, s *site) {
+		trip = nil
+		spool := t.TempDir()
+		t.Setenv("TMPDIR", spool)
+		left := func(when string) {
+			t.Helper()
+			if names, err := os.ReadDir(spool); err != nil || len(names) != 0 {
+				t.Errorf("%s: the temporary directory holds %v (%v)", when, names, err)
+			}
+		}
+		s.asAlice()
+		form := url.Values{"starred": {"1"}, "feed": {"1"}}
+
+		a := s.post("/subscriptions/export", form)
+		if a.status != http.StatusOK {
+			t.Fatalf("export: status %d\n%s", a.status, a.body)
+		}
+		left("after the export")
+		files := archived(t, a.body)
+		alice := s.user("alice")
+		for _, c := range []struct {
+			kind, prefix, suffix string
+			set                  store.EntrySet
+		}{
+			{"starred", "starred_", ".json", store.EntrySet{OnlyFavorite: true}},
+			{"feed/1", "feed_", "_1.json", store.EntrySet{FeedID: 1}},
+		} {
+			name := c.kind
+			var got string
+			for file, content := range files {
+				if strings.HasPrefix(file, c.prefix) && strings.HasSuffix(file, c.suffix) {
+					got = content
+				}
+			}
+			var head struct{ Title string }
+			if err := json.Unmarshal([]byte(got), &head); err != nil {
+				t.Fatalf("%s: %v\n%s", name, err, got)
+			}
+			var want bytes.Buffer
+			if err := transfer.Write(t.Context(), &want, s.db, registry, alice, transfer.Document{Kind: c.kind, Title: head.Title, Set: c.set}); err != nil {
+				t.Fatal(err)
+			}
+			if got != want.String() {
+				t.Errorf("%s in the archive differs from what transfer.Write makes:\n%s\nwant\n%s", name, got, want.String())
+			}
+		}
+
+		// The reader goes away while the entries are written.
+		ctx, cancel := context.WithCancel(t.Context())
+		trip = cancel
+		r := httptest.NewRequestWithContext(ctx, http.MethodPost, "/subscriptions/export", strings.NewReader(form.Encode()))
+		s.send(r, map[string]string{"Content-Type": "application/x-www-form-urlencoded", "Sec-Fetch-Site": "same-origin"})
+		left("after the reader went away")
+
+		// The database goes away while the entries are written.
+		trip = func() { _ = s.db.Close() }
+		if a := s.post("/subscriptions/export", form); a.status != http.StatusInternalServerError || a.header.Get("Content-Disposition") != "" {
+			t.Errorf("export that fails half way: status %d, headers %v", a.status, a.header)
+		}
+		left("after a failure")
 	})
 }
