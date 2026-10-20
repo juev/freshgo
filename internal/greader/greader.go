@@ -443,7 +443,9 @@ func (h *Handler) authenticate(ctx context.Context, r *http.Request) (user *stor
 	if err != nil {
 		return nil, 0, err
 	}
-	if !readSettings(user.Settings).enabled {
+	// Without an API password the token would depend on nothing but the
+	// salt, and ClientLogin never hands it out.
+	if !readSettings(user.Settings).enabled || user.APIPasswordHash == "" {
 		return nil, http.StatusUnauthorized, nil
 	}
 	want, err := h.authToken(ctx, user)
