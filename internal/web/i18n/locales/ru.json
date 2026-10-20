@@ -1,5 +1,6 @@
 {
   "about.api": "Приложения для чтения лент, работающие с Google Reader API, подключаются по этому адресу:",
+  "about.author": "Автор:",
   "about.heading": "О программе",
   "about.license": "freshgo — свободная программа под лицензией GNU Affero General Public License версии 3.",
   "about.source": "Исходный код",

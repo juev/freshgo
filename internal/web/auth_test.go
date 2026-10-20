@@ -145,6 +145,9 @@ func TestLogin(t *testing.T) {
 			strings.Contains(page.body, `href="/login"`) {
 			t.Errorf("a page after the login does not show the user and the way out:\n%s", page.body)
 		}
+		if !strings.Contains(page.body, `<a href="https://denis.evsyukov.org">Denis Evsyukov</a>`) {
+			t.Errorf("the about page does not name its author:\n%s", page.body)
+		}
 		// Somebody who is logged in has no use for the login page.
 		if a := s.get("/login?next=/about"); a.status != http.StatusSeeOther || a.header.Get("Location") != "/about" {
 			t.Errorf("GET /login when logged in: status %d, Location %q", a.status, a.header.Get("Location"))
