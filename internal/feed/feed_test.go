@@ -349,3 +349,18 @@ func TestParseResolvesAgainstFeedURL(t *testing.T) {
 		t.Errorf("without a feed link: link %q, content %q", a.Link, b.Content)
 	}
 }
+
+// The link of an entry is opened by clients that do not have the CSP of the
+// pages: a data: document is marked like a javascript: one.
+func TestParseMarksDataLinks(t *testing.T) {
+	const doc = `<rss version="2.0"><channel><title>T</title>
+<item><title>A</title><link>data:text/html,x</link></item>
+</channel></rss>`
+	f, err := Parse([]byte(doc), Options{URL: "http://feeds.example.org/feed.xml"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := f.Items[0].Link; got != "unsafe:data:text/html,x" {
+		t.Errorf("link %q, want it marked unsafe", got)
+	}
+}
