@@ -735,9 +735,10 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 // opens: a stream holds the text of every entry it lists, folded or not.
 // The frames of the given hosts are told where the reader comes from, which
 // some players ask for before they play: everything else an entry embeds
-// is told nothing.
+// is told nothing. Its web links open in a tab of their own, so following
+// one does not take the reader away from the list.
 func prepared(content string, hosts []string) string {
-	if !strings.Contains(content, "<img") && !strings.Contains(content, "<iframe") {
+	if !strings.Contains(content, "<img") && !strings.Contains(content, "<iframe") && !strings.Contains(content, "<a") {
 		return content
 	}
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader("<html><body>" + content + "</body></html>"))
@@ -749,6 +750,13 @@ func prepared(content string, hosts []string) string {
 		address, err := url.Parse(frame.AttrOr("src", ""))
 		if err == nil && slices.Contains(hosts, strings.ToLower(address.Hostname())) {
 			frame.SetAttr("referrerpolicy", "strict-origin-when-cross-origin")
+		}
+	})
+	doc.Find("a[href]").Each(func(_ int, link *goquery.Selection) {
+		address, err := url.Parse(link.AttrOr("href", ""))
+		if err == nil && (address.Scheme == "http" || address.Scheme == "https") {
+			link.SetAttr("target", "_blank")
+			link.SetAttr("rel", "noopener")
 		}
 	})
 	out, err := doc.Find("body").Html()

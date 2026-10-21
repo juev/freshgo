@@ -1,6 +1,6 @@
 {{define "content"}}
 <article class="entry single{{if .Data.Entry.Read}} read{{end}}" id="e{{.Data.Entry.ID}}">
-<h1>{{if .Data.Entry.Link}}<a href="{{.Data.Entry.Link}}" rel="noopener noreferrer">{{.Heading}}</a>{{else}}{{.Heading}}{{end}}</h1>
+<h1>{{if .Data.Entry.Link}}<a href="{{.Data.Entry.Link}}" target="_blank" rel="noopener noreferrer">{{.Heading}}</a>{{else}}{{.Heading}}{{end}}</h1>
 {{if .Data.CanChange}}
 <div class="entry-actions">
 {{template "entry-actions" (dict "Entry" .Data.Entry "Here" .Data.Here "Page" .)}}
