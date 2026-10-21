@@ -175,7 +175,18 @@ func TestUserSettings(t *testing.T) {
 			t.Errorf("the text of an entry made ready for a page = %s", ready)
 		}
 		if plain := `<p>a <b>b</b></p>`; prepared(plain, []string{"video.example"}) != plain {
-			t.Errorf("a text without images and frames changed: %s", prepared(plain, nil))
+			t.Errorf("a text without images, frames and links changed: %s", prepared(plain, nil))
+		}
+		// U116: a web link opens in a tab of its own, so the reader stays on
+		// the list; a mail link and one the sanitizer disarmed are left alone.
+		for text, want := range map[string]string{
+			`<p><a href="https://example.org/a">a</a> <a href="http://example.org/b">b</a></p>`:          `<p><a href="https://example.org/a" target="_blank" rel="noopener">a</a> <a href="http://example.org/b" target="_blank" rel="noopener">b</a></p>`,
+			`<a href="https://example.org/a"><img src="https://example.org/i.png"/></a>`:                 `<a href="https://example.org/a" target="_blank" rel="noopener"><img src="https://example.org/i.png" loading="lazy"/></a>`,
+			`<a href="mailto:a@example.org">m</a><a href="unsafe:javascript:x()">x</a><a name="n">n</a>`: `<a href="mailto:a@example.org">m</a><a href="unsafe:javascript:x()">x</a><a name="n">n</a>`,
+		} {
+			if got := prepared(text, nil); got != want {
+				t.Errorf("prepared(%s) = %s, want %s", text, got, want)
+			}
 		}
 	})
 }

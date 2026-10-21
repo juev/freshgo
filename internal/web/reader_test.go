@@ -330,11 +330,11 @@ func TestEntryIsShown(t *testing.T) {
 			for _, want := range []string{
 				`Tom &amp; &#34;Jerry&#34; &lt;b&gt;`, `<a href="/feeds/1">Atom corpus</a>`, `Ann, Bo`,
 				`<time datetime="2026-03-02T08:30:00&#43;09:00">2026-03-02 08:30</time>`,
-				`<p>Text <a href="https://example.org/relative"`, `cats, mice`, `work &amp; play`,
-				`href="https://example.org/a?b=1&amp;c=2" rel="noopener noreferrer"`,
+				`<p>Text <a href="https://example.org/relative" target="_blank" rel="noopener">link</a>`, `cats, mice`, `work &amp; play`,
+				`href="https://example.org/a?b=1&amp;c=2" target="_blank" rel="noopener noreferrer"`,
 				`<audio controls preload="none" src="https://example.org/s.mp3"></audio>`, `>Episode</a>`,
 				`<img src="https://example.org/pic.png" alt="example.org/pic.png" loading="lazy">`,
-				`<a href="https://example.org/doc.pdf" rel="noopener noreferrer" type="application/pdf">`,
+				`<a href="https://example.org/doc.pdf" target="_blank" rel="noopener noreferrer" type="application/pdf">`,
 			} {
 				if !strings.Contains(body, want) {
 					t.Errorf("GET %s: no %q in\n%s", target, want, body)

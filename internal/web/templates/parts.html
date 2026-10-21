@@ -14,9 +14,9 @@
 {{range .Attachments}}
 <li>
 {{if eq .Kind "image"}}<img src="{{.URL}}" alt="{{.Title}}" loading="lazy">
-{{else if eq .Kind "audio"}}<audio controls preload="none" src="{{.URL}}"></audio> <a href="{{.URL}}" rel="noopener noreferrer">{{.Title}}</a>
-{{else if eq .Kind "video"}}<video controls preload="none" src="{{.URL}}"></video> <a href="{{.URL}}" rel="noopener noreferrer">{{.Title}}</a>
-{{else}}<a href="{{.URL}}" rel="noopener noreferrer"{{if .Type}} type="{{.Type}}"{{end}}>{{.Title}}</a>{{end}}
+{{else if eq .Kind "audio"}}<audio controls preload="none" src="{{.URL}}"></audio> <a href="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.Title}}</a>
+{{else if eq .Kind "video"}}<video controls preload="none" src="{{.URL}}"></video> <a href="{{.URL}}" target="_blank" rel="noopener noreferrer">{{.Title}}</a>
+{{else}}<a href="{{.URL}}" target="_blank" rel="noopener noreferrer"{{if .Type}} type="{{.Type}}"{{end}}>{{.Title}}</a>{{end}}
 </li>
 {{end}}
 </ul>
@@ -153,7 +153,7 @@
 <div class="entry-body">
 <div class="entry-actions">
 {{if .CanChange}}{{template "entry-actions" (dict "Entry" .Entry "Here" .Here "Page" .Page "Row" true)}}{{end}}
-{{if .Entry.Link}}<a class="original" href="{{.Entry.Link}}" rel="noopener noreferrer">{{.Page.T "entry.original"}}</a>{{end}}
+{{if .Entry.Link}}<a class="original" href="{{.Entry.Link}}" target="_blank" rel="noopener noreferrer">{{.Page.T "entry.original"}}</a>{{end}}
 <a class="entry-page" href="{{.Entry.URL}}">{{.Page.T "entry.page"}}</a>
 {{template "share" (dict "Entry" .Entry "Here" .Here "CanChange" .CanChange "Page" .Page)}}
 <button type="button" class="link" data-fold hidden>{{.Page.T "entry.fold"}}</button>
