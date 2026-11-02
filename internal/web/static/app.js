@@ -1031,6 +1031,13 @@
 		// A page that comes is where a loaded one would be, at once.
 		const top = restored(event.detail.ctx) && history.state ? history.state.scrolled || 0 : 0;
 		window.scrollTo({ top, behavior: 'instant' });
+		if (top > 0) {
+			// The mounts above change the layout of the toolbar, and in the
+			// first frame after the swap the page has been seen to move by a
+			// couple of pixels from the place just set. The place is taken
+			// again once that frame is laid out.
+			requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo({ top, behavior: 'instant' })));
+		}
 		if (content && !document.querySelector('[autofocus]')) {
 			content.focus({ preventScroll: true });
 		}
