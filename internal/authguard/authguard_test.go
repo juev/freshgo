@@ -137,6 +137,7 @@ func TestKey(t *testing.T) {
 
 func TestClientAddr(t *testing.T) {
 	proxies := []netip.Prefix{netip.MustParsePrefix("10.1.0.0/16")}
+	chain := []netip.Prefix{netip.MustParsePrefix("127.0.0.0/8"), netip.MustParsePrefix("10.0.0.0/8")}
 	request := func(remote string, forwarded ...string) *http.Request {
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 		r.RemoteAddr = remote
@@ -159,6 +160,16 @@ func TestClientAddr(t *testing.T) {
 		{"a header that is not an address", request("10.1.0.1:4000", "not an address"), proxies, "10.1.0.1"},
 		{"an IPv6 proxy", request("[fd00::1]:4000", "fd00::2"), []netip.Prefix{netip.MustParsePrefix("fd00::/8")}, "fd00::2"},
 		{"no trusted proxy", request("10.1.0.1:4000", "198.51.100.7"), nil, "10.1.0.1"},
+		{"a chain of trusted proxies", request("127.0.0.1:4000", "203.0.113.9, 10.0.0.2"), chain, "203.0.113.9"},
+		{"a chain over a forged address", request("127.0.0.1:4000", "6.6.6.6, 203.0.113.9, 10.0.0.2"), chain, "203.0.113.9"},
+		{"a chain split over several lines", request("127.0.0.1:4000", "6.6.6.6", "203.0.113.9, 10.0.0.2", "10.0.0.3"), chain, "203.0.113.9"},
+		{"every hop trusted", request("127.0.0.1:4000", "10.0.0.7, 10.0.0.2"), chain, "10.0.0.7"},
+		{"a mapped IPv4 proxy hop", request("127.0.0.1:4000", "203.0.113.9, ::ffff:10.0.0.2"), chain, "203.0.113.9"},
+		{"a mapped IPv4 client", request("127.0.0.1:4000", "::ffff:203.0.113.9"), chain, "203.0.113.9"},
+		{"an unparsable hop of the chain", request("127.0.0.1:4000", "203.0.113.9, junk, 10.0.0.2"), chain, "127.0.0.1"},
+		{"an unparsable hop left of the client", request("127.0.0.1:4000", "junk, 203.0.113.9, 10.0.0.2"), chain, "203.0.113.9"},
+		{"an empty hop", request("127.0.0.1:4000", "203.0.113.9, "), chain, "127.0.0.1"},
+		{"a chain of an untrusted connection", request("192.0.2.9:4000", "203.0.113.9, 10.0.0.2"), chain, "192.0.2.9"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

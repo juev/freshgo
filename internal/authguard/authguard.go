@@ -134,6 +134,10 @@ func FromProxy(r *http.Request, proxies []netip.Prefix) bool {
 	if err != nil {
 		return false
 	}
+	return trusted(addr, proxies)
+}
+
+func trusted(addr netip.Addr, proxies []netip.Prefix) bool {
 	addr = addr.Unmap()
 	for _, proxy := range proxies {
 		if proxy.Contains(addr) {
@@ -143,9 +147,14 @@ func FromProxy(r *http.Request, proxies []netip.Prefix) bool {
 	return false
 }
 
-// ClientAddr returns the address a request comes from: behind a trusted
-// reverse proxy the one the proxy says it took the request from, which is
-// the last it added to X-Forwarded-For.
+// ClientAddr returns the address a request comes from. Behind a trusted
+// reverse proxy it is the first address of X-Forwarded-For, read from the
+// right over all of the header's lines, that is not a trusted proxy itself:
+// each proxy of a chain appends the address it took the request from, so the
+// addresses left of it are the client's own claim and can be forged. When
+// every hop is a trusted proxy it is the leftmost one. A hop that is not an
+// address makes the header useless and the address of the connection is
+// returned.
 func ClientAddr(r *http.Request, proxies []netip.Prefix) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -154,13 +163,23 @@ func ClientAddr(r *http.Request, proxies []netip.Prefix) string {
 	if !FromProxy(r, proxies) {
 		return host
 	}
-	forwarded := r.Header.Values("X-Forwarded-For")
-	if len(forwarded) == 0 {
+	var hops []string
+	for _, line := range r.Header.Values("X-Forwarded-For") {
+		hops = append(hops, strings.Split(line, ",")...)
+	}
+	if len(hops) == 0 {
 		return host
 	}
-	hops := strings.Split(forwarded[len(forwarded)-1], ",")
-	if client, err := netip.ParseAddr(strings.TrimSpace(hops[len(hops)-1])); err == nil {
-		return client.Unmap().String()
+	var client netip.Addr
+	for i := len(hops) - 1; i >= 0; i-- {
+		hop, err := netip.ParseAddr(strings.TrimSpace(hops[i]))
+		if err != nil {
+			return host
+		}
+		client = hop.Unmap()
+		if !trusted(client, proxies) {
+			break
+		}
 	}
-	return host
+	return client.String()
 }
