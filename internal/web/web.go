@@ -116,6 +116,9 @@ type Handler struct {
 	guard       *authguard.Guard
 	// codeLogins are the logins that wait for the code of an app.
 	codeLogins codeLogins
+	// ceremonies are the challenges given to authenticators of passkeys
+	// whose answers are awaited.
+	ceremonies ceremonies
 	// undos are the last actions of users that can be taken back.
 	undos undoing
 	// letters holds back letters to one user after the first few.
@@ -295,6 +298,10 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /settings/profile/password", h.protect(members, h.changePassword))
 	h.mux.HandleFunc("POST /settings/profile/totp", h.protect(members, h.changeTOTP))
 	h.mux.HandleFunc("POST /settings/profile/api-password", h.protect(members, h.changeAPIPassword))
+	h.mux.HandleFunc("POST "+passkeyBeginPath, h.protect(members, h.beginPasskey))
+	h.mux.HandleFunc("POST "+passkeyFinishPath, h.protect(members, h.finishPasskey))
+	h.mux.HandleFunc("POST /settings/profile/passkeys/{id}/rename", h.protect(members, h.renamePasskey))
+	h.mux.HandleFunc("POST /settings/profile/passkeys/{id}/delete", h.protect(members, h.deletePasskey))
 	h.mux.HandleFunc("POST /settings/profile/delete", h.protect(members, h.deleteAccount))
 	h.mux.HandleFunc("GET /log", h.protect(members, h.journal))
 	h.mux.HandleFunc("POST /log/clear", h.protect(members, h.clearJournal))

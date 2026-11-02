@@ -79,6 +79,48 @@
 </form>
 {{end}}
 
+{{if .Data.Passkeys.Show}}
+<h2>{{.T "settings.passkeys"}}</h2>
+{{if .Data.Passkeys.Rows}}
+<table class="data">
+<thead><tr>
+<th scope="col">{{.T "settings.passkeys.name"}}</th>
+<th scope="col">{{.T "settings.passkeys.created"}}</th>
+<th scope="col">{{.T "settings.passkeys.used"}}</th>
+<th scope="col"><span class="visually-hidden">{{.T "form.actions"}}</span></th>
+</tr></thead>
+<tbody>
+{{range .Data.Passkeys.Rows}}<tr>
+<td><form method="post" action="{{$.URL "/settings/profile/passkeys"}}/{{.ID}}/rename" class="form inline">
+<label class="visually-hidden" for="passkey-name-{{.ID}}">{{$.T "settings.passkeys.name"}}</label>
+<input type="text" id="passkey-name-{{.ID}}" name="name" value="{{.Name}}" maxlength="64" autocomplete="off" required>
+<button type="submit">{{$.T "settings.passkeys.rename"}}</button>
+</form></td>
+<td>{{.Created}}</td>
+<td>{{if .Used}}{{.Used}}{{else}}{{$.T "settings.passkeys.never"}}{{end}}</td>
+<td><form method="post" action="{{$.URL "/settings/profile/passkeys"}}/{{.ID}}/delete"><button type="submit">{{$.T "form.delete"}}</button></form></td>
+</tr>
+{{end}}</tbody>
+</table>
+{{else}}
+<p>{{.T "settings.passkeys.none"}}</p>
+{{end}}
+{{if .Data.Passkeys.On}}
+<p class="hint">{{.T "settings.passkeys.intro"}}</p>
+<p class="hint" id="passkey-needs-browser">{{.T "settings.passkeys.needs-browser"}}</p>
+<div id="passkey-add" class="form" hidden data-begin="{{.URL "/settings/profile/passkeys/begin"}}" data-finish="{{.URL "/settings/profile/passkeys/finish"}}">
+<p>
+<label for="passkey-new">{{.T "settings.passkeys.new"}}</label>
+<input type="text" id="passkey-new" maxlength="64" autocomplete="off" placeholder="{{.T "settings.passkeys.default-name"}}">
+</p>
+<p><button type="button" id="passkey-register">{{.T "settings.passkeys.add"}}</button></p>
+<p class="alert" id="passkey-failed" role="alert" hidden>{{.T "settings.passkeys.failed"}}</p>
+</div>
+{{else}}
+<p class="hint">{{.T "settings.passkeys.unavailable"}}</p>
+{{end}}
+{{end}}
+
 <h2>{{.T "settings.api-password"}}</h2>
 <form method="post" action="{{.URL "/settings/profile/api-password"}}" class="form">
 <p>

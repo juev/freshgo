@@ -596,6 +596,106 @@
 		});
 	});
 
+	// ---- Passkeys ----
+
+	// An authenticator speaks bytes and the server base64url.
+	const fromBase64url = (text) => {
+		const padded = text.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(text.length / 4) * 4, '=');
+		return Uint8Array.from(atob(padded), (c) => c.charCodeAt(0));
+	};
+	const toBase64url = (buffer) => btoa(String.fromCharCode(...new Uint8Array(buffer)))
+		.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+	const descriptors = (list) => (list || []).map((item) => ({ ...item, id: fromBase64url(item.id) }));
+	const postJSON = (url, body) => ask(url, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(body),
+	});
+
+	// ceremony asks the server for the options of a ceremony, has the
+	// authenticator answer them and hands the answer back to the server;
+	// it returns the answer of the server. The server asks for a recent login
+	// before it adds a passkey: the reader is sent to give one.
+	const ceremony = async (begin, body, finish, use) => {
+		const began = await postJSON(begin, body);
+		if (began.status === 403) {
+			const refusal = await began.json().catch(() => ({}));
+			if (refusal.reauth) {
+				window.location.assign(refusal.reauth);
+				return null;
+			}
+		}
+		if (!began.ok) {
+			throw new Error(`HTTP ${began.status}`);
+		}
+		const finished = await postJSON(finish, await use((await began.json()).publicKey));
+		if (!finished.ok) {
+			throw new Error(`HTTP ${finished.status}`);
+		}
+		return finished;
+	};
+
+	const registration = async (options) => {
+		const credential = await navigator.credentials.create({
+			publicKey: {
+				...options,
+				challenge: fromBase64url(options.challenge),
+				user: { ...options.user, id: fromBase64url(options.user.id) },
+				excludeCredentials: descriptors(options.excludeCredentials),
+			},
+		});
+		return {
+			id: credential.id,
+			rawId: toBase64url(credential.rawId),
+			type: credential.type,
+			authenticatorAttachment: credential.authenticatorAttachment || undefined,
+			response: {
+				clientDataJSON: toBase64url(credential.response.clientDataJSON),
+				attestationObject: toBase64url(credential.response.attestationObject),
+				transports: credential.response.getTransports ? credential.response.getTransports() : [],
+			},
+			clientExtensionResults: credential.getClientExtensionResults(),
+		};
+	};
+
+	// attempt runs a ceremony behind a button: the button waits meanwhile,
+	// and the line that says it failed is shown when it does.
+	const attempt = async (button, run) => {
+		const failed = document.getElementById('passkey-failed');
+		failed.hidden = true;
+		button.disabled = true;
+		button.setAttribute('aria-busy', 'true');
+		try {
+			await run();
+		} catch {
+			failed.hidden = false;
+		} finally {
+			button.disabled = false;
+			button.removeAttribute('aria-busy');
+		}
+	};
+
+	// The profile adds a passkey; what offers it is hidden until the browser
+	// is found to have passkeys.
+	onContent(() => {
+		if (!window.PublicKeyCredential || !navigator.credentials) {
+			return;
+		}
+		const add = document.getElementById('passkey-add');
+		if (add) {
+			document.getElementById('passkey-needs-browser').hidden = true;
+			add.hidden = false;
+			const button = document.getElementById('passkey-register');
+			button.addEventListener('click', () => attempt(button, async () => {
+				const finished = await ceremony(add.dataset.begin, { name: document.getElementById('passkey-new').value },
+					add.dataset.finish, registration);
+				if (finished) {
+					window.location.reload();
+				}
+			}));
+		}
+	});
+
 	// ---- The next page ----
 
 	let loading = null;
