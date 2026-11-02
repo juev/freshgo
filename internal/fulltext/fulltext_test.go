@@ -237,3 +237,16 @@ func TestNestedMatchesAreBounded(t *testing.T) {
 		t.Errorf("three nested matches: %q, %v", got, err)
 	}
 }
+
+func TestCheckSelector(t *testing.T) {
+	for _, valid := range []string{"", "article", ".a, .b", "article, ", "div:has(p)"} {
+		if err := CheckSelector(valid); err != nil {
+			t.Errorf("CheckSelector(%q) = %v, want nil", valid, err)
+		}
+	}
+	for _, invalid := range []string{"p[", "div:has(> p)", ", "} {
+		if err := CheckSelector(invalid); !errors.Is(err, ErrSelector) {
+			t.Errorf("CheckSelector(%q) = %v, want ErrSelector", invalid, err)
+		}
+	}
+}
