@@ -63,6 +63,21 @@ type Store struct {
 	// EntriesChanged about once it is committed, and whether entries of
 	// theirs were added.
 	changedUsers map[int64]bool
+	// exactNames makes the names of categories and labels clash only when
+	// they are equal byte for byte, as the database enforces; see
+	// WithExactNames.
+	exactNames bool
+}
+
+// WithExactNames returns a Store over the same connection or transaction
+// that refuses a name of a category or a label only when another has exactly
+// the same, not one that differs in case. It is for copying data that was
+// kept in a system that tells names apart by case, such as a FreshRSS
+// database: pairs stored that way are not merged.
+func (s *Store) WithExactNames() *Store {
+	exact := *s
+	exact.exactNames = true
+	return &exact
 }
 
 // Open connects to the database and brings its schema up to date.

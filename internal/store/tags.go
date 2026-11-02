@@ -124,6 +124,10 @@ func (s *Store) nameFree(ctx context.Context, userID int64, name, selfTable stri
 			return fmt.Errorf("lock names: %w", err)
 		}
 	}
+	same := strings.EqualFold
+	if s.exactNames {
+		same = func(a, b string) bool { return a == b }
+	}
 	var taken string
 	for _, table := range []string{"categories", "tags"} {
 		rows, err := s.query(ctx, `SELECT id, name FROM `+table+` WHERE user_id = ?`, userID)
@@ -147,7 +151,7 @@ func (s *Store) nameFree(ctx context.Context, userID int64, name, selfTable stri
 				if r.name == name {
 					return nil
 				}
-			case strings.EqualFold(r.name, name) && taken == "":
+			case same(r.name, name) && taken == "":
 				taken = "a category"
 				if table == "tags" {
 					taken = "a label"

@@ -1026,3 +1026,48 @@ func TestImportNamesDefaultCategoryInTheLanguageOfTheUser(t *testing.T) {
 		t.Errorf("warnings = %q, want one starting with %q", report.Warnings, want)
 	}
 }
+
+// FreshRSS tells names apart by case, so a database may hold categories
+// News and news, or a category and a label that differ only in case. The
+// import keeps them all; they are pairs stored, not merged.
+func TestImportKeepsNamesThatDifferInCase(t *testing.T) {
+	ctx := context.Background()
+	dir := brokenCopy(t)
+	sourceExec(t, dir, "bob", `INSERT INTO category (id, name, kind, lastUpdate, error, attributes) VALUES
+		(91, 'news', 0, 0, 0, NULL), (92, 'Новости', 0, 0, 0, NULL)`)
+	sourceExec(t, dir, "bob", `INSERT INTO tag (id, name, attributes) VALUES (90, 'новости', NULL)`)
+
+	driver, dsn := storetest.Engines()[0].New(t)
+	dst, err := store.Open(ctx, driver, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = dst.Close() })
+	if _, err := Run(ctx, dst, Options{DataDir: dir}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	u, err := dst.UserByName(ctx, "bob")
+	if err != nil {
+		t.Fatal(err)
+	}
+	categories, err := dst.Categories(ctx, u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tags, err := dst.Tags(ctx, u.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	has := map[string]bool{}
+	for _, c := range categories {
+		has["category "+c.Name] = true
+	}
+	for _, l := range tags {
+		has["label "+l.Name] = true
+	}
+	for _, want := range []string{"category News", "category news", "category Новости", "label новости"} {
+		if !has[want] {
+			t.Errorf("%s is missing after the import; have %v", want, has)
+		}
+	}
+}
