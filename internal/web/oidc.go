@@ -34,6 +34,9 @@ const (
 	maxOIDCNext = 2048
 	// oidcTimeout bounds one request to the provider.
 	oidcTimeout = 15 * time.Second
+	// oidcGroupsScope is the scope some providers release the claim groups
+	// for; the claim is read for the administrators' group.
+	oidcGroupsScope = "groups"
 )
 
 // oidcAttempt is a sign-in on its way through the provider.
@@ -120,7 +123,21 @@ func (h *Handler) oidcClient(r *http.Request, system store.System) (context.Cont
 		Endpoint: provider.Endpoint(), RedirectURL: h.absolute(r, oidcCallbackPath),
 		Scopes: []string{oidc.ScopeOpenID, "profile"},
 	}
+	if system.OIDC.AdminGroup != "" && offersScope(provider, oidcGroupsScope) {
+		config.Scopes = append(config.Scopes, oidcGroupsScope)
+	}
 	return oidc.ClientContext(r.Context(), h.oidc.client), config, provider.Verifier(&oidc.Config{ClientID: system.OIDC.ClientID}), nil
+}
+
+// offersScope reports whether the discovery document of the provider lists
+// the scope. A provider may refuse a scope it does not know with
+// invalid_scope (RFC 6749, 4.1.2.1), so a scope that is not listed is not
+// asked for.
+func offersScope(provider *oidc.Provider, scope string) bool {
+	var discovery struct {
+		ScopesSupported []string `json:"scopes_supported"`
+	}
+	return provider.Claims(&discovery) == nil && slices.Contains(discovery.ScopesSupported, scope)
 }
 
 // setOIDCAttempt hands the browser a sign-in to bring back from the
@@ -246,6 +263,12 @@ type oidcClaims struct {
 	Groups json.RawMessage `json:"groups"`
 }
 
+// hasGroups reports whether the provider said anything about the groups of
+// the user, an empty list included.
+func (c oidcClaims) hasGroups() bool {
+	return len(c.Groups) > 0 && string(c.Groups) != "null"
+}
+
 // inGroup reports whether the claims put the user in the group.
 func (c oidcClaims) inGroup(group string) bool {
 	var groups []string
@@ -260,7 +283,9 @@ func (c oidcClaims) inGroup(group string) bool {
 }
 
 // oidcIdentity trades the code of the provider for its tokens and returns
-// what the ID token says about the user.
+// what the ID token says about the user. With an administrators' group set,
+// a user whose ID token has no claim groups is asked about it at the
+// userinfo endpoint, as some providers release it only there.
 func (h *Handler) oidcIdentity(r *http.Request, system store.System, attempt oidcAttempt, code string) (oidcClaims, error) {
 	var claims oidcClaims
 	ctx, config, verifier, err := h.oidcClient(r, system)
@@ -289,7 +314,46 @@ func (h *Handler) oidcIdentity(r *http.Request, system store.System, attempt oid
 	if claims.Subject == "" {
 		return claims, fmt.Errorf("%w: the ID token names no subject", errOIDC)
 	}
+	if system.OIDC.AdminGroup == "" || claims.hasGroups() {
+		return claims, nil
+	}
+	if err := h.oidcUserInfoGroups(ctx, r, system, token, &claims); err != nil {
+		return claims, err
+	}
+	if !claims.hasGroups() {
+		h.log.Warn("the provider gave no claim groups, so no user is in the group of administrators",
+			"claim", "groups", "provider", system.OIDC.Issuer, "user", claims.Name, "admin_group", system.OIDC.AdminGroup)
+	}
 	return claims, nil
+}
+
+// oidcUserInfoGroups reads the claim groups from the userinfo endpoint into
+// claims. A provider without the endpoint leaves them unset; one that has it
+// and fails to answer fails the sign-in, as a user taken for out of the group
+// at a failed request would lose the role without anyone having changed it.
+func (h *Handler) oidcUserInfoGroups(ctx context.Context, r *http.Request, system store.System, token *oauth2.Token, claims *oidcClaims) error {
+	provider, err := h.oidc.get(r.Context(), system.OIDC.Issuer)
+	if err != nil {
+		return err
+	}
+	if provider.UserInfoEndpoint() == "" {
+		return nil
+	}
+	info, err := provider.UserInfo(ctx, oauth2.StaticTokenSource(token))
+	if err != nil {
+		return err
+	}
+	if info.Subject != claims.Subject {
+		return fmt.Errorf("%w: userinfo is of another subject than the ID token", errOIDC)
+	}
+	var found struct {
+		Groups json.RawMessage `json:"groups"`
+	}
+	if err := info.Claims(&found); err != nil {
+		return err
+	}
+	claims.Groups = found.Groups
+	return nil
 }
 
 // oidcUser returns the user the claims are of: the one the subject belongs

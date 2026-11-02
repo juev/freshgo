@@ -1,15 +1,18 @@
 package web
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -44,10 +47,49 @@ type provider struct {
 	// itself waiting until it is closed, and then fails it; held counts them.
 	hold chan struct{}
 	held atomic.Int32
+	// scopes are the scopes the discovery document lists; scope is what the
+	// client is expected to ask for.
+	scopes []string
+	scope  string
+	// groups are the groups of the user; they are released in the ID token or
+	// at the userinfo endpoint, as groupsAt says, and only to a client that
+	// asked for the scope groups when scoped is set. userinfo, when set, puts
+	// an endpoint of that name into the discovery document.
+	groups   []string
+	groupsAt string
+	scoped   bool
+	userinfo bool
+	// lastCode is the sign-in the userinfo endpoint answers for.
+	lastCode providerCode
+	// spoilInfo changes the claims of the userinfo answer.
+	spoilInfo func(claims map[string]any)
 }
 
 type providerCode struct {
-	nonce, challenge, user string
+	nonce, challenge, user, scope string
+}
+
+// releases reports whether the provider gives the groups to the client of the
+// sign-in at the place.
+func (p *provider) releases(code providerCode, at string) bool {
+	return p.groups != nil && p.groupsAt == at && (!p.scoped || slices.Contains(strings.Fields(code.scope), "groups"))
+}
+
+// userInfo answers the client that holds the access token of the last sign-in.
+func (p *provider) userInfo(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Authorization") != "Bearer access" {
+		http.Error(w, "no token", http.StatusUnauthorized)
+		return
+	}
+	claims := map[string]any{"sub": "subject of " + p.lastCode.user, "preferred_username": p.lastCode.user}
+	if p.releases(p.lastCode, "userinfo") {
+		claims["groups"] = p.groups
+	}
+	if p.spoilInfo != nil {
+		p.spoilInfo(claims)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(claims)
 }
 
 func newProvider(t *testing.T) *provider {
@@ -62,6 +104,7 @@ func newProvider(t *testing.T) *provider {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /token", p.token)
+	mux.HandleFunc("GET /userinfo", p.userInfo)
 	mux.Handle("/", discovery)
 	mux.HandleFunc("GET /.well-known/openid-configuration", func(w http.ResponseWriter, r *http.Request) {
 		if p.hold != nil {
@@ -70,7 +113,23 @@ func newProvider(t *testing.T) *provider {
 			http.Error(w, "busy", http.StatusServiceUnavailable)
 			return
 		}
-		discovery.ServeHTTP(w, r)
+		// What the provider says beyond the stub: the scopes, the endpoint.
+		recorded := httptest.NewRecorder()
+		discovery.ServeHTTP(recorded, r)
+		var document map[string]any
+		if err := json.Unmarshal(recorded.Body.Bytes(), &document); err != nil {
+			t.Error(err)
+			http.Error(w, "stub failed", http.StatusInternalServerError)
+			return
+		}
+		if p.scopes != nil {
+			document["scopes_supported"] = p.scopes
+		}
+		if p.userinfo {
+			document["userinfo_endpoint"] = p.server.URL + "/userinfo"
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(document)
 	})
 	p.server = httptest.NewServer(mux)
 	t.Cleanup(p.server.Close)
@@ -102,6 +161,10 @@ func (p *provider) token(w http.ResponseWriter, r *http.Request) {
 		"exp": time.Now().Add(time.Hour).Unix(), "iat": time.Now().Unix(),
 		"nonce": code.nonce, "preferred_username": code.user,
 	}
+	p.lastCode = code
+	if p.releases(code, "id_token") {
+		claims["groups"] = p.groups
+	}
 	if p.spoil != nil {
 		p.spoil(claims)
 	}
@@ -131,13 +194,13 @@ func (p *provider) signIn(s *site, next string, change func(back url.Values)) an
 		s.t.Fatalf("the sign-in starts at %q, want the provider", start.header.Get("Location"))
 	}
 	q := at.Query()
-	if q.Get("client_id") != oidcTestClient || q.Get("response_type") != "code" || q.Get("scope") != "openid profile" ||
+	if q.Get("client_id") != oidcTestClient || q.Get("response_type") != "code" || q.Get("scope") != p.scope ||
 		q.Get("redirect_uri") != "https://reader.example/oidc/callback" || q.Get("code_challenge_method") != "S256" ||
 		len(q.Get("state")) < 32 || len(q.Get("nonce")) < 32 {
 		s.t.Fatalf("what the provider is asked: %v", q)
 	}
 	code := fmt.Sprintf("code-%d", len(p.codes)+1)
-	p.codes[code] = providerCode{nonce: q.Get("nonce"), challenge: q.Get("code_challenge"), user: p.user}
+	p.codes[code] = providerCode{nonce: q.Get("nonce"), challenge: q.Get("code_challenge"), user: p.user, scope: q.Get("scope")}
 	back := url.Values{"code": {code}, "state": {q.Get("state")}}
 	if change != nil {
 		change(back)
@@ -155,7 +218,8 @@ func withProvider(t *testing.T, test func(t *testing.T, s *site, p *provider)) {
 			system.OIDC = store.OIDC{Issuer: p.server.URL, ClientID: oidcTestClient}
 			system.HTTPAuthAutoRegister = false
 		})
-		p.user, p.spoil, p.signWith = "alice", nil, nil
+		p.user, p.spoil, p.signWith, p.scope = "alice", nil, nil, "openid profile"
+		p.scopes, p.groups, p.groupsAt, p.scoped, p.userinfo, p.spoilInfo = nil, nil, "", false, false, nil
 		s.whoami(members)
 		test(t, s, p)
 	})
@@ -330,6 +394,112 @@ func TestOIDCAdministratorsGroup(t *testing.T) {
 		p.spoil = nil
 		if a := p.signIn(s, "/", nil); a.status != http.StatusSeeOther || s.signedInAs() != "bob, administrator" {
 			t.Errorf("bob without a group of administrators: status %d, signed in as %q", a.status, s.signedInAs())
+		}
+	})
+}
+
+// Where the claim groups comes from decides whether a member of the group of
+// administrators stays one: the provider may release it for a scope only, or
+// at the userinfo endpoint only, or not at all.
+func TestOIDCGroupsClaim(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		// provider sets the provider up for the case; scope is what the
+		// client has to ask for.
+		provider func(p *provider)
+		scope    string
+		want     string
+	}{
+		{"the scope is listed and the claim is released for it", func(p *provider) {
+			p.scopes, p.groupsAt, p.scoped = []string{"openid", "profile", "groups"}, "id_token", true
+		}, "openid profile groups", "bob, administrator"},
+		{"the scope is not listed, so it is not asked for", func(p *provider) {
+			p.scopes, p.groupsAt, p.scoped = []string{"openid", "profile"}, "id_token", true
+		}, "openid profile", "bob"},
+		{"the discovery document lists no scopes", func(p *provider) {
+			p.groupsAt, p.scoped = "id_token", true
+		}, "openid profile", "bob"},
+		{"the claim is in the ID token without the scope", func(p *provider) {
+			p.scopes, p.groupsAt = []string{"openid", "profile"}, "id_token"
+		}, "openid profile", "bob, administrator"},
+		{"the claim is at the userinfo endpoint only", func(p *provider) {
+			p.scopes, p.groupsAt, p.userinfo = []string{"openid", "profile"}, "userinfo", true
+		}, "openid profile", "bob, administrator"},
+		{"the claim is at the userinfo endpoint for the scope", func(p *provider) {
+			p.scopes, p.groupsAt, p.scoped, p.userinfo = []string{"openid", "profile", "groups"}, "userinfo", true, true
+		}, "openid profile groups", "bob, administrator"},
+		{"the provider has no userinfo endpoint", func(p *provider) {
+			p.scopes, p.groupsAt = []string{"openid", "profile"}, "userinfo"
+		}, "openid profile", "bob"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			withProvider(t, func(t *testing.T, s *site, p *provider) {
+				s.system(func(system *store.System) { system.OIDC.AdminGroup = "readers-admin" })
+				p.user, p.groups, p.scope = "bob", []string{"staff", "readers-admin"}, c.scope
+				c.provider(p)
+				if a := p.signIn(s, "/", nil); a.status != http.StatusSeeOther || s.signedInAs() != c.want {
+					t.Errorf("status %d, signed in as %q, want %q", a.status, s.signedInAs(), c.want)
+				}
+			})
+		})
+	}
+}
+
+// Without the administrators' group the scope is not asked for, whatever the
+// provider lists, and the userinfo endpoint is not called.
+func TestOIDCGroupsNotAskedWithoutGroup(t *testing.T) {
+	withProvider(t, func(t *testing.T, s *site, p *provider) {
+		p.scopes, p.userinfo = []string{"openid", "profile", "groups"}, true
+		if a := p.signIn(s, "/", nil); a.status != http.StatusSeeOther {
+			t.Errorf("the sign-in: status %d\n%s", a.status, a.body)
+		}
+	})
+}
+
+// A user whose provider gives the claim nowhere is taken for out of the group,
+// and the log says which claim was missing.
+func TestOIDCGroupsClaimMissingIsLogged(t *testing.T) {
+	withProvider(t, func(t *testing.T, s *site, p *provider) {
+		var logs bytes.Buffer
+		s.h.log = slog.New(slog.NewTextHandler(&logs, nil))
+		s.system(func(system *store.System) { system.OIDC.AdminGroup = "readers-admin" })
+		p.user = "bob"
+		s.setting("bob", "is_admin", true)
+		p.userinfo = true
+		if a := p.signIn(s, "/", nil); a.status != http.StatusSeeOther || s.signedInAs() != "bob" {
+			t.Errorf("a provider that releases no groups: status %d, signed in as %q", a.status, s.signedInAs())
+		}
+		if log := logs.String(); !strings.Contains(log, "claim=groups") || !strings.Contains(log, "level=WARN") {
+			t.Errorf("the log of a missing claim:\n%s", log)
+		}
+
+		// An empty list is an answer, not a missing claim.
+		logs.Reset()
+		p.groups, p.groupsAt = []string{}, "id_token"
+		if a := p.signIn(s, "/", nil); a.status != http.StatusSeeOther || s.signedInAs() != "bob" {
+			t.Errorf("a user in no group: status %d, signed in as %q", a.status, s.signedInAs())
+		}
+		if strings.Contains(logs.String(), "claim=groups") {
+			t.Errorf("a user in no group is logged as a missing claim:\n%s", logs.String())
+		}
+	})
+}
+
+// A userinfo endpoint that fails does not take the role away: the sign-in
+// fails.
+func TestOIDCGroupsUserInfoFails(t *testing.T) {
+	withProvider(t, func(t *testing.T, s *site, p *provider) {
+		s.system(func(system *store.System) { system.OIDC.AdminGroup = "readers-admin" })
+		p.user = "bob"
+		s.setting("bob", "is_admin", true)
+		p.userinfo = true
+		p.groups, p.groupsAt = []string{"readers-admin"}, "userinfo"
+		p.spoilInfo = func(claims map[string]any) { claims["sub"] = "somebody else" }
+		if a := p.signIn(s, "/", nil); a.status != http.StatusBadGateway || s.signedInAs() != "" {
+			t.Errorf("userinfo of another subject: status %d, signed in as %q", a.status, s.signedInAs())
+		}
+		if bob := s.user("bob"); !readPreferences(bob).IsAdmin {
+			t.Error("bob lost the role on a failed sign-in")
 		}
 	})
 }
