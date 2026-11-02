@@ -318,6 +318,7 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /admin/users", h.administrators(h.createUser))
 	h.mux.HandleFunc("GET /admin/users/{name}", h.administrators(h.userPage))
 	h.mux.HandleFunc("POST /admin/users/{name}", h.administrators(h.updateUser))
+	h.mux.HandleFunc("POST /admin/users/{name}/passkeys/delete", h.administrators(h.removeUserPasskeys))
 	h.mux.HandleFunc("GET /admin/system", h.administrators(h.systemPage))
 	h.mux.HandleFunc("POST /admin/system", h.administrators(h.saveSystem))
 	h.mux.HandleFunc("GET /admin/authentication", h.administrators(h.authenticationPage))

@@ -717,6 +717,10 @@
 		const signIn = document.getElementById('passkey-signin');
 		if (signIn) {
 			signIn.hidden = false;
+			const needs = document.getElementById('passkey-signin-needs-browser');
+			if (needs) {
+				needs.hidden = true;
+			}
 			const button = signIn.querySelector('button');
 			button.addEventListener('click', () => attempt(button, async () => {
 				const remember = document.getElementById('remember');

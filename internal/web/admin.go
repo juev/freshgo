@@ -71,7 +71,7 @@ func (h *Handler) showReauth(w http.ResponseWriter, r *http.Request, status int,
 	if problem != "" {
 		problem = v.T(problem)
 	}
-	form := loginForm{Next: next, Error: problem}
+	form := loginForm{Next: next, Error: problem, PasswordOff: state(r).system.PasswordLoginOff}
 	// Signing in again is as good as the password, and all there is for a
 	// user who has none.
 	if s := state(r); h.oidcOn(s.system) {
@@ -95,6 +95,10 @@ func (h *Handler) reauth(w http.ResponseWriter, r *http.Request) {
 	next := r.PostForm.Get("next")
 	if who.session == nil {
 		http.Redirect(w, r, h.localTarget(next), http.StatusSeeOther)
+		return
+	}
+	if state(r).system.PasswordLoginOff {
+		h.showReauth(w, r, http.StatusForbidden, next, "login.password-off")
 		return
 	}
 	if !h.confirmed(w, r, func(status int, problem string) { h.showReauth(w, r, status, next, problem) }) {
@@ -209,6 +213,8 @@ type userPage struct {
 	TOTP    bool
 	Email   string
 	Problem string
+	// Passkeys are the passkeys of the user.
+	Passkeys passkeysPart
 }
 
 // namedUser finds the user a request names.
@@ -247,6 +253,10 @@ func (h *Handler) showUser(w http.ResponseWriter, r *http.Request, status int, u
 		},
 		Self: u.ID == s.who.user.ID, Protected: isDefault || u.ID == s.who.user.ID,
 		TOTP: prefs.TOTPSecret != "", Email: readAttrs(u.Settings).text("mail_login"),
+	}
+	if page.Passkeys, err = h.passkeysOf(r.Context(), s.system, u); err != nil {
+		h.broken(w, r, err)
+		return
 	}
 	if problem != "" {
 		page.Problem = v.T(problem)
@@ -468,11 +478,17 @@ func (h *Handler) saveSystem(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) saveAuthentication(w http.ResponseWriter, r *http.Request) {
 	who := state(r).who
+	passkeys, err := h.db.Passkeys(r.Context(), who.user.ID)
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
 	h.saveSystemWith(w, r, "authentication", func(form url.Values, system *store.System) string {
 		switch kind := form.Get("auth_type"); kind {
 		case store.AuthForm, store.AuthHTTP, store.AuthNone:
 			system.AuthType = kind
 		}
+		system.PasswordLoginOff = form.Get("password_login_off") != ""
 		system.AllowAnonymous = form.Get("allow_anonymous") != ""
 		system.AllowAnonymousRefresh = form.Get("allow_anonymous_refresh") != ""
 		system.APIEnabled = form.Get("api_enabled") != ""
@@ -492,8 +508,15 @@ func (h *Handler) saveAuthentication(w http.ResponseWriter, r *http.Request) {
 		system.OIDC = store.OIDC{Issuer: issuer, ClientID: client, AdminGroup: strings.TrimSpace(form.Get("oidc_admin_group"))}
 		// A login by password nobody has would lock everybody out, unless
 		// there is a provider to sign in through.
-		if system.AuthType == store.AuthForm && who.prefs.PasswordHash == "" && !h.oidcOn(*system) {
+		if system.AuthType == store.AuthForm && !system.PasswordLoginOff && who.prefs.PasswordHash == "" && !h.oidcOn(*system) {
 			return "admin.problem.no-password"
+		}
+		// Without logins by password the administrator who asks has to be
+		// able to log in some other way: with a passkey that can be used
+		// here, or through the provider.
+		if system.AuthType == store.AuthForm && system.PasswordLoginOff && !h.oidcOn(*system) &&
+			(len(passkeys) == 0 || !h.passkeysOn(*system)) {
+			return "admin.problem.no-passkey"
 		}
 		// So would a way of telling users apart that does not know the
 		// administrator who asks for it: the reverse proxy has to vouch for

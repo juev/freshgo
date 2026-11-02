@@ -188,6 +188,13 @@ func (h *Handler) loginCode(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, maxLoginForm)
 	token, code := r.PostFormValue("token"), r.PostFormValue("code")
 	texts := h.view(r, "", "login.heading")
+	// A password typed before the installation stopped taking them is not
+	// a login to finish.
+	if s.system.PasswordLoginOff {
+		h.codeLogins.done(token)
+		h.showLogin(w, r, http.StatusForbidden, loginForm{Error: texts.T("login.password-off")})
+		return
+	}
 	now := h.now()
 	login, ok := h.codeLogins.get(token, now)
 	if !ok {

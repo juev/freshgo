@@ -373,8 +373,9 @@ type loginForm struct {
 	// Provider is what the provider visitors can sign in through is called
 	// and ProviderURL where that starts; both empty without one.
 	Provider, ProviderURL string
-	// Passkeys says a visitor can log in with a passkey.
-	Passkeys bool
+	// Passkeys says a visitor can log in with a passkey; PasswordOff that
+	// a password is not a way to log in, so the form for one is not shown.
+	Passkeys, PasswordOff bool
 }
 
 // showLogin shows the login page with what the form says, the way through
@@ -391,7 +392,7 @@ func (h *Handler) showLogin(w http.ResponseWriter, r *http.Request, status int, 
 	if h.oidcOn(s.system) {
 		form.Provider, form.ProviderURL = oidcName(s.system), h.oidcStart(form.Next)
 	}
-	form.Passkeys = h.passkeysOn(s.system)
+	form.Passkeys, form.PasswordOff = h.passkeysOn(s.system), s.system.PasswordLoginOff
 	v.Data = form
 	h.render(w, r, status, "login", v)
 }
@@ -420,6 +421,11 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		h.showLogin(w, r, status, loginForm{Name: name, Next: next, Error: message})
 	}
 	texts := h.view(r, "", "login.heading")
+	// No password is looked at, so there is nothing to tell by the time.
+	if s.system.PasswordLoginOff {
+		refuse(http.StatusForbidden, texts.T("login.password-off"))
+		return
+	}
 
 	now := h.now()
 	// A name no user can have is refused without a look at anything: it

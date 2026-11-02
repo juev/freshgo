@@ -37,6 +37,10 @@ type System struct {
 	// user is created.
 	DefaultUser string `json:"default_user"`
 	AuthType    string `json:"auth_type"`
+	// PasswordLoginOff refuses a login by password: users log in with a
+	// passkey or through the provider. The passwords of API clients are
+	// not part of it.
+	PasswordLoginOff bool `json:"password_login_off"`
 	// AllowAnonymous lets visitors who are not logged in read the entries
 	// of the default user; AllowAnonymousRefresh also lets them refresh the
 	// feeds.
