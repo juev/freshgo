@@ -1466,7 +1466,9 @@ func TestE2ESubscriptions(t *testing.T) {
 		b.login("alice")
 
 		// + leads to the page that adds a feed, with the focus in its field.
-		b.press("+")
+		// It is pressed with b.key: KeyEvent types the plus into the field
+		// when the page comes between the keydown and the character.
+		b.key("+", "Equal")
 		b.until("the page that adds a feed, the focus in the address", `location.pathname === '/subscriptions/add' && document.activeElement.id === 'url'`)
 		b.accessible("the page that adds a feed")
 		b.press(remote.URL+"/feed.xml", kb.Enter)
