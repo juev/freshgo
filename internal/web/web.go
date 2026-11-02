@@ -310,6 +310,8 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST "+passkeyLoginFinishPath, h.finishPasskeyLogin)
 	h.mux.HandleFunc("GET /oidc/login", h.oidcLogin)
 	h.mux.HandleFunc("GET "+oidcCallbackPath, h.oidcCallback)
+	h.mux.HandleFunc("POST "+passkeyReauthBeginPath, h.protect(members, h.beginPasskeyReauth))
+	h.mux.HandleFunc("POST "+passkeyReauthFinishPath, h.protect(members, h.finishPasskeyReauth))
 	h.mux.HandleFunc("GET /reauth", h.protect(members, h.reauthPage))
 	h.mux.HandleFunc("POST /reauth", h.protect(members, h.reauth))
 	h.mux.HandleFunc("GET /admin/users", h.administrators(h.usersPage))

@@ -77,6 +77,11 @@ func (h *Handler) showReauth(w http.ResponseWriter, r *http.Request, status int,
 	if s := state(r); h.oidcOn(s.system) {
 		form.Provider, form.ProviderURL = oidcName(s.system), h.oidcStart(next)
 	}
+	var err error
+	if form.Passkeys, err = h.canReauthByPasskey(r); err != nil {
+		h.broken(w, r, err)
+		return
+	}
 	v.Data = form
 	h.render(w, r, status, "reauth", v)
 }

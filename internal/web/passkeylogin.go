@@ -132,3 +132,112 @@ func (h *Handler) finishPasskeyLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	h.answerJSON(w, r, http.StatusOK, map[string]string{"next": h.localTarget(cer.next)})
 }
+
+// Where the script of the page that asks for the password again begins and
+// finishes the answer with a passkey.
+const (
+	passkeyReauthBeginPath  = "/passkeys/reauth/begin"
+	passkeyReauthFinishPath = "/passkeys/reauth/finish"
+)
+
+// canReauthByPasskey reports whether the user who asks has a passkey to
+// answer /reauth with.
+func (h *Handler) canReauthByPasskey(r *http.Request) (bool, error) {
+	s := state(r)
+	if !h.passkeysOn(s.system) || s.who.session == nil {
+		return false, nil
+	}
+	passkeys, err := h.db.Passkeys(r.Context(), s.who.user.ID)
+	return len(passkeys) > 0, err
+}
+
+// beginPasskeyReauth starts the answer to /reauth with a passkey of the user
+// who asks, and answers with the options for the authenticator: only the
+// passkeys of that user are asked for.
+func (h *Handler) beginPasskeyReauth(w http.ResponseWriter, r *http.Request) {
+	s := state(r)
+	rp, ok := h.passkeyContext(w, r)
+	if !ok {
+		return
+	}
+	var in struct {
+		Next string `json:"next"`
+	}
+	if !h.passkeyBody(w, r, &in) {
+		return
+	}
+	if s.who.session == nil {
+		h.refuse(w, http.StatusBadRequest)
+		return
+	}
+	user, err := h.loadPasskeyUser(r.Context(), s.who.user, false)
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	if len(user.credentials) == 0 || len(user.handle) == 0 {
+		h.refuse(w, http.StatusNotFound)
+		return
+	}
+	assertion, session, err := rp.BeginLogin(user, webauthn.WithUserVerification(protocol.VerificationRequired))
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	cer := &ceremony{kind: ceremonyReauth, session: *session, userID: s.who.user.ID, login: loginOf(s.who), next: in.Next}
+	if h.startCeremony(w, r, cer) {
+		h.answerJSON(w, r, http.StatusOK, assertion)
+	}
+}
+
+// finishPasskeyReauth takes the signature of the authenticator and makes the
+// login fresh, as typing the password does. The ceremony must be the one
+// this browser began, for this user, in this login.
+func (h *Handler) finishPasskeyReauth(w http.ResponseWriter, r *http.Request) {
+	ctx, s := r.Context(), state(r)
+	rp, ok := h.passkeyContext(w, r)
+	if !ok {
+		return
+	}
+	cer, ok := h.takeCeremony(w, r, ceremonyReauth)
+	if !ok || cer.userID != s.who.user.ID || cer.login != loginOf(s.who) || s.who.session == nil {
+		h.refuse(w, http.StatusBadRequest)
+		return
+	}
+	user, err := h.loadPasskeyUser(ctx, s.who.user, false)
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxPasskeyBody)
+	credential, err := rp.FinishLogin(user, cer.session, r)
+	if err != nil {
+		h.log.Warn("answer to reauthentication with a passkey refused", "user", s.who.user.Name, "error", err)
+		h.refuse(w, http.StatusUnauthorized)
+		return
+	}
+	if credential.Authenticator.CloneWarning {
+		h.log.Warn("answer with a passkey refused: its counter of signatures did not go forward", "user", s.who.user.Name)
+		h.refuse(w, http.StatusUnauthorized)
+		return
+	}
+	found, err := h.db.PasskeyByCredential(ctx, credential.ID)
+	if err == nil && found.UserID != s.who.user.ID {
+		err = errors.New("web: the passkey is not the user's")
+	}
+	data, marshalErr := json.Marshal(credential)
+	if err == nil {
+		err = marshalErr
+	}
+	if err == nil {
+		err = h.db.UsePasskey(ctx, found.ID, data, h.now().Unix())
+	}
+	if err == nil {
+		err = h.db.ConfirmSession(ctx, s.who.session.TokenHash, h.now().Unix())
+	}
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	h.answerJSON(w, r, http.StatusOK, map[string]string{"next": h.localTarget(cer.next)})
+}
