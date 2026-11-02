@@ -5,6 +5,9 @@
 <p>{{if .Data.Row.Default}}{{.T "admin.user.default"}}{{else if .Data.Row.Admin}}{{.T "admin.user.admin"}}{{else}}{{.T "admin.user.plain"}}{{end}}{{if not .Data.Row.Enabled}}, {{.T "admin.user.disabled"}}{{end}}.
 {{.N "admin.user.feed-count" .Data.Row.Feeds}}, {{.N "admin.user.entry-count" .Data.Row.Entries}}.{{if .Data.Email}} {{.Data.Email}}{{end}}</p>
 
+{{if .Data.Self}}
+<p class="muted">{{.T "admin.user.own-credentials"}} <a href="{{.URL "/settings/profile"}}">{{.T "settings.profile.heading"}}</a>.</p>
+{{else}}
 <h2>{{.T "settings.password"}}</h2>
 <form method="post" action="{{.URL "/admin/users"}}/{{.Data.Row.Name}}" class="form">
 <input type="hidden" name="action" value="password">
@@ -26,6 +29,7 @@
 <p>{{.T "admin.user.totp"}}</p>
 <p><button type="submit" name="action" value="totp-off">{{.T "settings.totp.turn-off"}}</button></p>
 </form>
+{{end}}
 {{end}}
 
 {{if not .Data.Protected}}
