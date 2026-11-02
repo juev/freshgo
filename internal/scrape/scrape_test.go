@@ -246,6 +246,41 @@ func TestDecodeJSONKeepsOrder(t *testing.T) {
 	}
 }
 
+// A byte order mark before the JSON gives the same entries as no mark, for a
+// JSON Feed and for a document read with dot notation.
+func TestJSONWithByteOrderMark(t *testing.T) {
+	const bom = "\xEF\xBB\xBF"
+	tests := []struct {
+		name string
+		body string
+		src  Source
+	}{
+		{"JSON Feed", `{"title":"Feed","items":[{"id":"1","url":"https://example.org/a","title":"A","content_text":"text"},{"id":"2","url":"https://example.org/b","title":"B","content_text":"more"}]}`, Source{Kind: KindJSONFeed}},
+		{"dot notation", `{"posts":[{"u":"https://example.org/a","t":"A"},{"u":"https://example.org/b","t":"B"}]}`, Source{
+			Kind:       KindJSONDotNotation,
+			Attributes: []byte(`{"json_dotnotation":{"item":"posts","itemUri":"u","itemTitle":"t"}}`),
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			want, err := RSS([]byte(tt.body), tt.src)
+			if err != nil {
+				t.Fatalf("without the mark: %v", err)
+			}
+			if !strings.Contains(string(want), "https://example.org/b") {
+				t.Fatalf("the reference result lacks the second item:\n%s", want)
+			}
+			got, err := RSS([]byte(bom+tt.body), tt.src)
+			if err != nil {
+				t.Fatalf("with the mark: %v", err)
+			}
+			if string(got) != string(want) {
+				t.Errorf("with the mark:\n%s\nwithout:\n%s", got, want)
+			}
+		})
+	}
+}
+
 func TestSplitAuthors(t *testing.T) {
 	for in, want := range map[string]string{
 		"One":             "One",
