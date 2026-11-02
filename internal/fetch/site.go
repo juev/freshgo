@@ -18,6 +18,13 @@ func (p Params) OwnedBy(site string) Params {
 	return p
 }
 
+// SameSite reports whether address is on the website at site (see sameSite);
+// false for an address that cannot be parsed.
+func SameSite(address, site string) bool {
+	u, err := url.Parse(address)
+	return err == nil && sameSite(u, site)
+}
+
 // sameSite reports whether the host of u belongs to the website at site:
 // the same host, or the same registrable domain (eTLD+1). A site that cannot
 // be parsed owns nothing.

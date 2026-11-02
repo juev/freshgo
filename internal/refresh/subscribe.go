@@ -68,7 +68,7 @@ func (r *Refresher) AddFeed(ctx context.Context, u *store.User, f *store.Feed) e
 			return err
 		}
 		var doc *feed.Feed
-		if resp, doc, err = r.fetchNew(ctx, j, f, params); err != nil {
+		if resp, doc, params, err = r.fetchNew(ctx, j, f, params); err != nil {
 			return err
 		}
 		if f.Name == "" {
@@ -152,34 +152,47 @@ func (r *Refresher) userJob(ctx context.Context, u *store.User) (*job, error) {
 // it. When the address answers with a web page, the feed the page announces
 // is fetched in its place and becomes the address of the feed. So does the
 // address a permanent redirect leads to.
-func (r *Refresher) fetchNew(ctx context.Context, j *job, f *store.Feed, params fetch.Params) (*fetch.Response, *feed.Feed, error) {
-	// A feed a page announces is fetched with the settings of the typed
-	// address only when it is on the same website.
-	params = params.OwnedBy(f.URL)
+//
+// A feed announced on another website than the typed address does not take
+// over the basic auth, the cookie and the headers of the feed: they are
+// dropped from f, and the returned settings are those of f as it stays.
+func (r *Refresher) fetchNew(ctx context.Context, j *job, f *store.Feed, params fetch.Params) (*fetch.Response, *feed.Feed, fetch.Params, error) {
+	typed := f.URL
+	params = params.OwnedBy(typed)
 	for announced := false; ; announced = true {
 		req := fetch.Request{URL: strings.TrimSuffix(f.URL, forceFeedSuffix), Accept: fetch.AcceptFeed, Params: params}
 		r.hooks.FetchBefore.Call(ctx, hooks.Fetch{Feed: f, Request: &req})
 		resp, err := r.client.Fetch(ctx, req)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, params, err
 		}
 		if resp.PermanentURL != "" {
 			f.URL = withoutCredentials(resp.PermanentURL)
 		}
 		doc, err := parse(j, f, resp)
 		if err == nil {
-			return resp, doc, nil
+			return resp, doc, params, nil
 		}
 		// Whatever is wrong with the document, it may be a web page: few of
 		// them are XML enough to be told from a broken feed.
 		if announced {
-			return nil, nil, err
+			return nil, nil, params, err
 		}
 		link := announcedFeed(resp.Body, resp.URL)
 		if link == "" {
-			return nil, nil, err
+			return nil, nil, params, err
 		}
 		f.URL = link
+		if !fetch.SameSite(link, typed) {
+			attributes, err := fetch.WithoutCredentials(f.Attributes)
+			if err != nil {
+				return nil, nil, params, err
+			}
+			f.HTTPAuth, f.Attributes = "", attributes
+			if params, err = fetch.FeedParams(f.HTTPAuth, f.Attributes); err != nil {
+				return nil, nil, params, err
+			}
+		}
 	}
 }
 

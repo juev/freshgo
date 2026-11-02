@@ -352,7 +352,7 @@ func TestPagesByBrowser(t *testing.T) {
 // its user: basic auth, a cookie and a header of its own.
 func credentialed(f *store.Feed) {
 	f.HTTPAuth = "alice:secret"
-	f.Attributes = json.RawMessage(`{"curl_params":{"10022":"session=secret","10023":["X-Token: t0ken"]}}`)
+	f.Attributes = json.RawMessage(`{"curl_params":{"10018":"special/1","10022":"session=secret","10023":["X-Token: t0ken"]}}`)
 }
 
 func hasCredentials(h http.Header) bool {

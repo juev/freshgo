@@ -89,6 +89,29 @@ var proxyScheme = regexp.MustCompile(`^.*://`)
 // headerName is an HTTP token: a name net/http agrees to send.
 var headerName = regexp.MustCompile("^[!#$%&'*+.^_`|~0-9A-Za-z-]+$")
 
+// WithoutCredentials returns the attributes of a feed without the settings
+// that identify its user to a website: the cookie and the headers of
+// curl_params. The proxy, the user agent, the TLS settings and the rest stay.
+func WithoutCredentials(attributes json.RawMessage) (json.RawMessage, error) {
+	var a map[string]json.RawMessage
+	if err := json.Unmarshal(attributes, &a); err != nil || a == nil {
+		return attributes, err
+	}
+	// PHP writes an empty array as [], which holds nothing to drop.
+	var curl map[string]json.RawMessage
+	if json.Unmarshal(a["curl_params"], &curl) != nil || curl == nil {
+		return attributes, nil
+	}
+	delete(curl, curlCookie)
+	delete(curl, curlHTTPHeader)
+	inner, err := json.Marshal(curl)
+	if err != nil {
+		return nil, err
+	}
+	a["curl_params"] = inner
+	return json.Marshal(a)
+}
+
 // FeedParams reads the request settings of a feed: its HTTP credentials and
 // the keys curl_params, ssl_verify and timeout of its attributes.
 func FeedParams(httpAuth string, attributes json.RawMessage) (Params, error) {
