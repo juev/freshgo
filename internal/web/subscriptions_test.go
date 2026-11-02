@@ -1348,3 +1348,41 @@ func TestFeedPagesByBrowser(t *testing.T) {
 		}
 	})
 }
+
+// R9: names of categories and labels are one set whatever their case,
+// Cyrillic included.
+func TestSubscriptionNamesIgnoreCase(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		s.asAlice()
+		taken := "A category or a label has this name already."
+		if _, body := s.follow("/subscriptions/categories", url.Values{"name": {"Новости"}}); notice(body) != "Category added." {
+			t.Fatalf("creating Новости: notice %q", notice(body))
+		}
+		for name, form := range map[string]string{
+			"BLOGS": "/subscriptions/categories", "новости": "/subscriptions/categories", "LATER": "/subscriptions/categories",
+			"blogs": "/subscriptions/labels", "НОВОСТИ": "/subscriptions/labels", "Later": "/subscriptions/labels", "WORK & PLAY": "/subscriptions/labels",
+		} {
+			if location, body := s.follow(form, url.Values{"name": {name}}); location != "/subscriptions" || notice(body) != taken {
+				t.Errorf("creating %q at %s: at %q, notice %q, want %q", name, form, location, notice(body), taken)
+			}
+		}
+
+		// Renaming to a name another one has in another case is refused, and
+		// changing only the case of an own name is not.
+		category := formValues(t, s.shown("/subscriptions/categories/2"))
+		category.Set("name", "WORK & PLAY")
+		if a := s.post("/subscriptions/categories/2", category); a.status != http.StatusBadRequest || !strings.Contains(a.body, "has this name already") {
+			t.Errorf("renaming a category to WORK & PLAY: status %d", a.status)
+		}
+		category.Set("name", "BLOGS")
+		if a := s.post("/subscriptions/categories/2", category); a.status == http.StatusBadRequest || s.category("alice", 2).Name != "BLOGS" {
+			t.Errorf("renaming Blogs to BLOGS: status %d, name %q", a.status, s.category("alice", 2).Name)
+		}
+		if a := s.post("/subscriptions/labels/1", url.Values{"name": {"blogs"}}); a.status != http.StatusBadRequest || !strings.Contains(a.body, "has this name already") {
+			t.Errorf("renaming a label to blogs: status %d", a.status)
+		}
+		if a := s.post("/subscriptions/labels/1", url.Values{"name": {"LATER"}}); a.status == http.StatusBadRequest || s.label("alice", 1).Name != "LATER" {
+			t.Errorf("renaming later to LATER: status %d, name %q", a.status, s.label("alice", 1).Name)
+		}
+	})
+}

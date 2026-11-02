@@ -385,3 +385,46 @@ func TestExportPublicLeavesCredentialsOut(t *testing.T) {
 		}
 	})
 }
+
+// A category of a document is the one the user has under the same name in
+// another case, and two spellings in one document make one category.
+func TestImportMatchesCategoriesIgnoringCase(t *testing.T) {
+	const doc = `<?xml version="1.0"?>
+<opml version="2.0"><body>
+  <outline text="news"><outline text="A" xmlUrl="http://example.org/a"/></outline>
+  <outline text="новости"><outline text="B" xmlUrl="http://example.org/b"/></outline>
+  <outline text="Sport"><outline text="C" xmlUrl="http://example.org/c"/></outline>
+  <outline text="SPORT"><outline text="D" xmlUrl="http://example.org/d"/></outline>
+</body></opml>`
+	eachEngine(t, func(t *testing.T, db *store.Store, u *store.User) {
+		ctx := context.Background()
+		for _, name := range []string{"News", "Новости"} {
+			if err := db.CreateCategory(ctx, &store.Category{UserID: u.ID, Name: name}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if _, err := Import(ctx, db, &hooks.Registry{}, u, []byte(doc), Limits{}); err != nil {
+			t.Fatalf("Import: %v", err)
+		}
+		categories, err := db.Categories(ctx, u.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		names := map[int64]string{}
+		for _, c := range categories {
+			names[c.ID] = c.Name
+		}
+		feeds, err := db.Feeds(ctx, u.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := map[string]string{}
+		for _, f := range feeds {
+			got[f.Name] = names[f.CategoryID]
+		}
+		want := map[string]string{"A": "News", "B": "Новости", "C": "Sport", "D": "Sport"}
+		if !reflect.DeepEqual(got, want) || len(categories) != 4 {
+			t.Errorf("categories of the feeds = %v, %d categories; want %v and 4 (default, News, Новости, Sport)", got, len(categories), want)
+		}
+	})
+}

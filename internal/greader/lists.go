@@ -89,12 +89,7 @@ func (lib *library) listed(u *store.User) map[int64][]*store.Feed {
 }
 
 func (lib *library) categoryNamed(name string) *store.Category {
-	for _, c := range lib.categories {
-		if c.Name == name {
-			return c
-		}
-	}
-	return nil
+	return store.CategoryNamed(lib.categories, name)
 }
 
 func (lib *library) feedAt(address string) *store.Feed {
@@ -125,12 +120,7 @@ func (h *Handler) labels(ctx context.Context, u *store.User) ([]*store.Tag, erro
 }
 
 func labelNamed(tags []*store.Tag, name string) *store.Tag {
-	for _, t := range tags {
-		if t.Name == name {
-			return t
-		}
-	}
-	return nil
+	return store.TagNamed(tags, name)
 }
 
 var schemePrefix = regexp.MustCompile(`(?i)^https?://(www[.])?`)

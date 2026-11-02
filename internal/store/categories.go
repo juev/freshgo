@@ -7,10 +7,10 @@ import (
 
 // CreateCategory adds a category. A zero c.ID is replaced with a new
 // identifier; a taken identifier or a name taken by a category or by a label
-// gives ErrConflict.
+// gives ErrConflict; names are compared ignoring case.
 func (s *Store) CreateCategory(ctx context.Context, c *Category) error {
 	return s.InTx(ctx, func(tx *Store) error {
-		if err := tx.nameFree(ctx, "tags", c.UserID, c.Name); err != nil {
+		if err := tx.nameFree(ctx, c.UserID, c.Name, "categories", 0); err != nil {
 			return fmt.Errorf("store: create category %q: %w", c.Name, err)
 		}
 		if err := tx.assignID(ctx, c.UserID, seqCategory, &c.ID); err != nil {
@@ -32,7 +32,7 @@ func (s *Store) CreateCategory(ctx context.Context, c *Category) error {
 // by a label ErrConflict.
 func (s *Store) UpdateCategory(ctx context.Context, c *Category) error {
 	return s.InTx(ctx, func(tx *Store) error {
-		if err := tx.nameFree(ctx, "tags", c.UserID, c.Name); err != nil {
+		if err := tx.nameFree(ctx, c.UserID, c.Name, "categories", c.ID); err != nil {
 			return fmt.Errorf("store: update category %d: %w", c.ID, err)
 		}
 		n, err := tx.affected(ctx, `

@@ -1338,10 +1338,8 @@ var errLabelLong = errors.New("web: the name of the label is too long")
 func (h *Handler) labelNamed(ctx context.Context, userID int64, name string) (int64, error) {
 	find := func() (int64, error) {
 		labels, err := h.db.Tags(ctx, userID)
-		for _, l := range labels {
-			if l.Name == name {
-				return l.ID, err
-			}
+		if l := store.TagNamed(labels, name); l != nil {
+			return l.ID, err
 		}
 		return 0, err
 	}

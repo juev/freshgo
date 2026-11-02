@@ -435,6 +435,17 @@ var defaultCategoryNames = map[string]string{
 	"sk": "Bez kategórie", "tr": "Kategorisiz", "uk": "Без категорії", "zh-CN": "未分类", "zh-TW": "未分類",
 }
 
+// sameName tells whether one of the names is the given one, ignoring case,
+// as the store compares the names of categories.
+func sameName(names map[string]bool, name string) bool {
+	for n := range names {
+		if strings.EqualFold(n, name) {
+			return true
+		}
+	}
+	return false
+}
+
 func (u *userImport) categories() error {
 	rows, err := u.src.query(u.ctx, `SELECT "id", "name", "kind", "lastUpdate", "error", "attributes" FROM `+u.src.table("category")+` ORDER BY "id"`)
 	if err != nil {
@@ -475,7 +486,7 @@ func (u *userImport) categories() error {
 			if !known {
 				shown = store.DefaultCategoryName
 			}
-			if names[shown] {
+			if sameName(names, shown) {
 				u.warnf("the default category keeps the name %q: another category is called %q, as FreshRSS shows the default one", c.Name, shown)
 			} else {
 				c.Name = shown

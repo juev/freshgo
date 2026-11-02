@@ -590,18 +590,16 @@ func attachLabels(ctx context.Context, tx *store.Store, u *store.User, labelled 
 	if err != nil {
 		return err
 	}
-	byName := make(map[string]int64, len(labels))
-	for _, l := range labels {
-		byName[l.Name] = l.ID
-	}
 	names := make([]string, 0, len(labelled))
 	for name := range labelled {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		id, has := byName[name]
-		if !has {
+		var id int64
+		if l := store.TagNamed(labels, name); l != nil {
+			id = l.ID
+		} else {
 			created := &store.Tag{UserID: u.ID, Name: name}
 			switch err := tx.CreateTag(ctx, created); {
 			case errors.Is(err, store.ErrConflict):
@@ -612,6 +610,7 @@ func attachLabels(ctx context.Context, tx *store.Store, u *store.User, labelled 
 				return err
 			}
 			id = created.ID
+			labels = append(labels, created)
 		}
 		if err := tx.TagEntries(ctx, u.ID, id, labelled[name]); err != nil {
 			return err
@@ -785,10 +784,8 @@ func categoryNamed(ctx context.Context, tx *store.Store, u *store.User, name str
 	if err != nil {
 		return 0, false, err
 	}
-	for _, c := range categories {
-		if c.Name == name {
-			return c.ID, false, nil
-		}
+	if c := store.CategoryNamed(categories, name); c != nil {
+		return c.ID, false, nil
 	}
 	if limit > 0 && len(categories) >= limit {
 		return 0, true, nil
