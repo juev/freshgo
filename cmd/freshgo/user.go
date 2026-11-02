@@ -24,7 +24,7 @@ const minPasswordLength = 7
 func userCommands() []command {
 	return []command{
 		{"create", "add a user; the password is read from standard input", runUserCreate, nil},
-		{"passwd", "change the password of a user, read from standard input", runUserPasswd, nil},
+		{"passwd", "change the password of a user, read from standard input; for an administrator it also switches logins by password on again", runUserPasswd, nil},
 		{"totp-off", "let a user who lost the app log in by the password alone", runUserTOTPOff, nil},
 		{"list", "list the users", runUserList, nil},
 		{"delete", "delete a user with all their feeds and entries", runUserDelete, nil},
@@ -202,6 +202,7 @@ func runUserPasswd(ctx context.Context, e env, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	switchedOn := false
 	err = db.InTx(ctx, func(tx *store.Store) error {
 		err := tx.UpdateUserSettings(ctx, u.ID, func(settings map[string]json.RawMessage) error {
 			raw, err := json.Marshal(hash)
@@ -214,14 +215,40 @@ func runUserPasswd(ctx context.Context, e env, args []string) (err error) {
 		if err := tx.SetAPIPasswordHash(ctx, u.ID, hash, store.FeverKey(u.Name, password)); err != nil {
 			return err
 		}
+		// The way back in for an administrator who lost the passkeys while
+		// logins by password were switched off.
+		system, err := tx.System(ctx)
+		if err != nil {
+			return err
+		}
+		if system.PasswordLoginOff && (u.Name == system.DefaultUser || isAdmin(u)) {
+			system.PasswordLoginOff, switchedOn = false, true
+			if err := tx.SetSystem(ctx, system); err != nil {
+				return err
+			}
+		}
 		// Whoever is logged in with the old password is logged out.
 		return tx.DeleteUserSessions(ctx, u.ID, "")
 	})
 	if err != nil {
 		return err
 	}
-	_, err = fmt.Fprintf(e.stdout, "password of %s changed; browsers and clients have to log in again\n", name)
+	if _, err = fmt.Fprintf(e.stdout, "password of %s changed; browsers and clients have to log in again\n", name); err != nil {
+		return err
+	}
+	if switchedOn {
+		_, err = fmt.Fprintf(e.stdout, "logins by password were switched off; %s is an administrator, so they are switched on again\n", name)
+	}
 	return err
+}
+
+// isAdmin reports whether the settings of the user make them an administrator.
+func isAdmin(u *store.User) bool {
+	var settings struct {
+		IsAdmin bool `json:"is_admin"`
+	}
+	_ = json.Unmarshal(u.Settings, &settings)
+	return settings.IsAdmin
 }
 
 func runUserList(ctx context.Context, e env, args []string) (err error) {
