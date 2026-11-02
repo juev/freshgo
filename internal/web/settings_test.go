@@ -658,3 +658,63 @@ func TestAdministratorOwnCredentials(t *testing.T) {
 		}
 	})
 }
+
+// Changing the password gives the browser that changed it a login of a new
+// secret, so a copy of its old cookie, taken together with the old password,
+// is worth nothing; the choice of being remembered and the time of the
+// password typed last are carried over.
+func TestPasswordChangeRenewsLogin(t *testing.T) {
+	for _, remember := range []bool{false, true} {
+		t.Run(fmt.Sprintf("remember=%v", remember), func(t *testing.T) {
+			imported(t, Options{}, func(t *testing.T, s *site) {
+				ctx := context.Background()
+				now := s.clock()
+				more := url.Values{}
+				if remember {
+					more.Set("remember", "1")
+				}
+				if a := s.login("alice", "alice-web-password", more); a.status != http.StatusSeeOther {
+					t.Fatalf("login: status %d", a.status)
+				}
+				oldCookie := s.cookies[sessionCookie]
+				oldHash := tokenHash(oldCookie.Value)
+				typedAt := now.Add(-5 * time.Minute).Unix()
+				if err := s.db.ConfirmSession(ctx, oldHash, typedAt); err != nil {
+					t.Fatal(err)
+				}
+				leaked := &site{t: t, db: s.db, h: s.h, cookies: map[string]*http.Cookie{sessionCookie: oldCookie}}
+				if a := leaked.get("/settings/profile"); a.status != http.StatusOK {
+					t.Fatalf("the copy of the cookie before the change: status %d", a.status)
+				}
+
+				form := url.Values{"password": {"alice-web-password"}, "new": {"new-password"}, "again": {"new-password"}}
+				if a := s.post("/settings/profile/password", form); a.status != http.StatusSeeOther {
+					t.Fatalf("changing the password: status %d", a.status)
+				}
+				if a := leaked.get("/settings/profile"); a.status != http.StatusSeeOther || !strings.HasPrefix(a.header.Get("Location"), "/login") {
+					t.Errorf("the old cookie after the change: status %d, location %q, want the login page", a.status, a.header.Get("Location"))
+				}
+				cookie := s.cookies[sessionCookie]
+				if cookie == nil || cookie.Value == oldCookie.Value {
+					t.Fatalf("the browser that changed the password got the cookie %v, want another secret", cookie)
+				}
+				if (cookie.MaxAge > 0) != remember {
+					t.Errorf("remember=%v: MaxAge of the new cookie = %d", remember, cookie.MaxAge)
+				}
+				if a := s.get("/settings/profile"); a.status != http.StatusOK {
+					t.Errorf("the browser that changed the password: status %d, want it logged in", a.status)
+				}
+				renewed, err := s.db.Session(ctx, tokenHash(cookie.Value), now.Unix())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if renewed.Persistent != remember || renewed.Authenticated != typedAt {
+					t.Errorf("the new login: persistent %v, authenticated %d; want %v, %d", renewed.Persistent, renewed.Authenticated, remember, typedAt)
+				}
+				if _, err := s.db.Session(ctx, oldHash, now.Unix()); err == nil {
+					t.Error("the old login is still stored")
+				}
+			})
+		})
+	}
+}
