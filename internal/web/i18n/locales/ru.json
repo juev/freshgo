@@ -662,6 +662,7 @@
   "query.up.short": "Выше",
   "reauth.heading": "Подтвердите, что это вы",
   "reauth.intro": "Администрирование время от времени снова спрашивает пароль.",
+  "reauth.passkey": "Подтвердить passkey",
   "reauth.submit": "Продолжить",
   "refresh.submit": "Обновить",
   "register.accept": "Я принимаю",

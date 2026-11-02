@@ -622,6 +622,7 @@
   "query.up.short": "Up",
   "reauth.heading": "Confirm it is you",
   "reauth.intro": "Administration asks for your password again after a while.",
+  "reauth.passkey": "Use a passkey",
   "reauth.submit": "Continue",
   "refresh.submit": "Refresh",
   "register.accept": "I accept the",
