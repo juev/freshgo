@@ -18,8 +18,10 @@ type object struct {
 }
 
 // decodeJSON reads a JSON document into objects, []any, string, json.Number,
-// bool and nil.
+// bool and nil. A leading UTF-8 byte order mark is dropped: encoding/json
+// refuses it, and RFC 8259 section 8.1 lets a parser ignore it.
 func decodeJSON(data []byte) (any, error) {
+	data = bytes.TrimPrefix(data, []byte("\xEF\xBB\xBF"))
 	d := json.NewDecoder(bytes.NewReader(data))
 	d.UseNumber()
 	v, err := decodeValue(d)
