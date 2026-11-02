@@ -20,6 +20,22 @@ func TagNamed(tags []*Tag, name string) *Tag {
 	return tags[i]
 }
 
+// NamedCategoryOrTag resolves a name that may be of a category or of a label,
+// as user/-/label/<name> of the Google Reader API is: a row of exactly that
+// name, whichever table it is in, wins over one that differs in case; else
+// the category found by CategoryNamed, else the label found by TagNamed. At
+// most one of the two results is not nil.
+func NamedCategoryOrTag(categories []*Category, tags []*Tag, name string) (*Category, *Tag) {
+	c, t := CategoryNamed(categories, name), TagNamed(tags, name)
+	if t != nil && t.Name == name && (c == nil || c.Name != name) {
+		return nil, t
+	}
+	if c != nil {
+		return c, nil
+	}
+	return nil, t
+}
+
 // pickName is the one way a name of a category or of a label is matched:
 // ignoring case, by Unicode folding, so that "News" and "news", "Новости" and
 // "новости" are one name. It is done here and not in SQL because SQLite folds

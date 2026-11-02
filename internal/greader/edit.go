@@ -206,20 +206,18 @@ func (h *Handler) renameTag(ctx context.Context, q *request) error {
 	if err != nil {
 		return err
 	}
-	if c := lib.categoryNamed(from); c != nil {
+	c, tag, err := h.categoryOrLabel(ctx, q.user.ID, lib, from)
+	switch {
+	case err != nil:
+		return err
+	case c != nil:
 		renamed := *c
 		renamed.Name = to
 		err = h.db.UpdateCategory(ctx, &renamed)
-	} else {
-		var tags []*store.Tag
-		if tags, err = h.db.Tags(ctx, q.user.ID); err != nil {
-			return err
-		}
-		tag := labelNamed(tags, from)
-		if tag == nil {
-			return errBadRequest
-		}
+	case tag != nil:
 		err = h.db.RenameTag(ctx, q.user.ID, tag.ID, to)
+	default:
+		return errBadRequest
 	}
 	if err != nil && !errors.Is(err, store.ErrConflict) {
 		return err
@@ -243,18 +241,16 @@ func (h *Handler) disableTag(ctx context.Context, q *request) error {
 	if err != nil {
 		return err
 	}
-	if c := lib.categoryNamed(name); c != nil {
+	c, tag, err := h.categoryOrLabel(ctx, q.user.ID, lib, name)
+	switch {
+	case err != nil:
+		return err
+	case c != nil:
 		err = h.db.DeleteCategory(ctx, q.user.ID, c.ID)
-	} else {
-		var tags []*store.Tag
-		if tags, err = h.db.Tags(ctx, q.user.ID); err != nil {
-			return err
-		}
-		tag := labelNamed(tags, name)
-		if tag == nil {
-			return errBadRequest
-		}
+	case tag != nil:
 		err = h.db.DeleteTag(ctx, q.user.ID, tag.ID)
+	default:
+		return errBadRequest
 	}
 	if err != nil {
 		return err

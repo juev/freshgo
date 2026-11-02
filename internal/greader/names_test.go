@@ -81,3 +81,50 @@ func TestLabelNamesIgnoreCase(t *testing.T) {
 		}
 	})
 }
+
+// With a category and a label that differ only in case, as a FreshRSS import
+// can store, the exact name wins whichever of the two has it; any other case
+// is the category.
+func TestExactLabelNameWinsOverCategory(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		exact := w.db.WithExactNames()
+		category := &store.Category{UserID: w.alice.ID, Name: "News"}
+		label := &store.Tag{UserID: w.alice.ID, Name: "news"}
+		if err := exact.CreateCategory(ctx, category); err != nil {
+			t.Fatal(err)
+		}
+		if err := exact.CreateTag(ctx, label); err != nil {
+			t.Fatal(err)
+		}
+		f := w.feed(w.alice, &store.Feed{Name: "A", Priority: priorityMain, CategoryID: category.ID})
+		w.entries(w.alice,
+			&store.Entry{ID: 1 * second, FeedID: f.ID, Title: "in the category"},
+			&store.Entry{ID: 2 * second, FeedID: f.ID, Title: "labelled"})
+		if err := w.db.TagEntry(ctx, w.alice.ID, label.ID, 2*second); err != nil {
+			t.Fatal(err)
+		}
+
+		for name, want := range map[string][]string{
+			"news": {"2000000"},
+			"News": {"2000000", "1000000"},
+			"NEWS": {"2000000", "1000000"},
+		} {
+			if got := w.ids("n=10&s=user/-/label/" + name); !reflect.DeepEqual(got, want) {
+				t.Errorf("stream of label/%s = %v, want %v", name, got, want)
+			}
+		}
+
+		// rename-tag and disable-tag resolve the name alike.
+		w.ok("/reader/api/0/rename-tag", "s=user/-/label/news&dest=user/-/label/Later")
+		tags, err := w.db.Tags(ctx, w.alice.ID)
+		if err != nil || len(tags) != 1 || tags[0].Name != "Later" {
+			t.Errorf("labels after renaming label/news = %v, %v; want the label renamed", tags, err)
+		}
+		w.ok("/reader/api/0/disable-tag", "s=user/-/label/NEWS")
+		categories, err := w.db.Categories(ctx, w.alice.ID)
+		if err != nil || len(categories) != 1 {
+			t.Errorf("categories after disabling label/NEWS = %v, %v; want the category gone", categories, err)
+		}
+	})
+}
