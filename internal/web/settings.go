@@ -434,6 +434,8 @@ type profilePage struct {
 	// PushKey is the public key the browser subscribes with, empty where
 	// notifications are not offered.
 	PushKey string
+	// Passkeys are the passkeys of the user.
+	Passkeys passkeysPart
 }
 
 var (
@@ -456,6 +458,11 @@ func (h *Handler) showProfile(w http.ResponseWriter, r *http.Request, status int
 			return
 		}
 		page.Setup = setup
+	}
+	var err error
+	if page.Passkeys, err = h.passkeysOf(r.Context(), s.system, s.who.user); err != nil {
+		h.broken(w, r, err)
+		return
 	}
 	if stored := s.who.prefs.Token; stored != "" {
 		address := "?" + url.Values{"user": {s.who.user.Name}, "token": {stored}}.Encode()
