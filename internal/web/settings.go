@@ -615,21 +615,31 @@ func (h *Handler) changePassword(w http.ResponseWriter, r *http.Request) {
 		h.broken(w, r, err)
 		return
 	}
-	keep := ""
+	life := time.Duration(0)
 	if who.session != nil {
-		keep = who.session.TokenHash
+		life = sessionLife(who.session.Persistent, state(r).system)
 	}
-	if err := h.setWebPassword(ctx, who.user.ID, hash, keep); err != nil {
+	token, err := h.setWebPassword(ctx, who.user.ID, hash, who.session, life)
+	if err != nil {
 		h.broken(w, r, err)
 		return
+	}
+	if token != "" {
+		if !who.session.Persistent {
+			life = 0
+		}
+		h.setSession(w, r, token, life)
 	}
 	h.notify(w, r, "notice.password", 0)
 	http.Redirect(w, r, h.url("/settings/profile"), http.StatusSeeOther)
 }
 
-// setWebPassword stores the hash of the web password of a user and ends the
-// logins of the user, except the one with the token hash keep.
-func (h *Handler) setWebPassword(ctx context.Context, userID int64, hash, keep string) error {
+// setWebPassword stores the hash of the web password of a user and ends every
+// login of the user. A login given as replaced is put in the place of a new
+// one that lasts life, whose secret is returned for the browser that changed
+// the password.
+func (h *Handler) setWebPassword(ctx context.Context, userID int64, hash string, replaced *store.Session, life time.Duration) (string, error) {
+	token := ""
 	err := h.db.InTx(ctx, func(tx *store.Store) error {
 		err := tx.UpdateUserSettings(ctx, userID, func(settings map[string]json.RawMessage) error {
 			attrs(settings).set("passwordHash", hash)
@@ -638,12 +648,23 @@ func (h *Handler) setWebPassword(ctx context.Context, userID int64, hash, keep s
 		if err != nil {
 			return err
 		}
-		return tx.DeleteUserSessions(ctx, userID, keep)
+		if err := tx.DeleteUserSessions(ctx, userID, ""); err != nil {
+			return err
+		}
+		if replaced == nil {
+			return nil
+		}
+		next, secret, err := successor(replaced, h.now(), life)
+		if err != nil {
+			return err
+		}
+		token = secret
+		return tx.CreateSession(ctx, next)
 	})
 	if err == nil {
 		h.loginsEnded(userID)
 	}
-	return err
+	return token, err
 }
 
 // changeAPIPassword gives the user another password for API clients, or

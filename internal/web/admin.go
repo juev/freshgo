@@ -299,7 +299,7 @@ func (h *Handler) updateUser(w http.ResponseWriter, r *http.Request) {
 		}
 		// One password for the web interface and for API clients, and
 		// whoever is logged in with the old one is logged out.
-		if err = h.setWebPassword(ctx, u.ID, hash, ""); err == nil {
+		if _, err = h.setWebPassword(ctx, u.ID, hash, nil, 0); err == nil {
 			err = h.db.SetAPIPasswordHash(ctx, u.ID, hash, store.FeverKey(u.Name, password))
 		}
 		notice = "notice.password"
