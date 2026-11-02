@@ -32,6 +32,31 @@
 {{end}}
 {{end}}
 
+{{if .Data.Passkeys.Rows}}
+<h2>{{.T "settings.passkeys"}}</h2>
+<p class="hint">{{.T "admin.user.passkeys.hint"}}</p>
+<table class="data">
+<thead><tr>
+<th scope="col">{{.T "settings.passkeys.name"}}</th>
+<th scope="col">{{.T "settings.passkeys.created"}}</th>
+<th scope="col">{{.T "settings.passkeys.used"}}</th>
+<th scope="col"><span class="visually-hidden">{{.T "form.actions"}}</span></th>
+</tr></thead>
+<tbody>
+{{range .Data.Passkeys.Rows}}<tr>
+<td>{{.Name}}</td>
+<td>{{.Created}}</td>
+<td>{{if .Used}}{{.Used}}{{else}}{{$.T "settings.passkeys.never"}}{{end}}</td>
+<td>{{if not $.Data.Self}}<form method="post" action="{{$.URL "/admin/users"}}/{{$.Data.Row.Name}}/passkeys/delete"><input type="hidden" name="id" value="{{.ID}}"><button type="submit">{{$.T "form.delete"}}</button></form>{{end}}</td>
+</tr>
+{{end}}</tbody>
+</table>
+{{if not .Data.Self}}<form method="post" action="{{.URL "/admin/users"}}/{{.Data.Row.Name}}/passkeys/delete" class="form">
+<input type="hidden" name="id" value="all">
+<p><button type="submit">{{.T "admin.user.passkeys.remove-all"}}</button></p>
+</form>{{end}}
+{{end}}
+
 {{if not .Data.Protected}}
 <h2>{{.T "form.actions"}}</h2>
 <form method="post" action="{{.URL "/admin/users"}}/{{.Data.Row.Name}}" class="feed-actions">

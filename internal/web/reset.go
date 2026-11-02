@@ -18,7 +18,7 @@ const resetLife = time.Hour
 // resetOn reports whether users can have their password reset by a letter:
 // they log in by password and the server can send letters.
 func (h *Handler) resetOn(system store.System) bool {
-	return system.AuthType == store.AuthForm && h.mailer != nil
+	return system.AuthType == store.AuthForm && !system.PasswordLoginOff && h.mailer != nil
 }
 
 // resetPage is what the page that resets a password shows: the form that

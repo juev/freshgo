@@ -8,6 +8,8 @@
 {{template "options" .Data.AuthTypes}}</select>
 <span class="hint" id="auth-hint">{{.T "admin.auth.hint"}}</span>
 </p>
+{{template "check" (dict "Name" "password_login_off" "Label" (.T "admin.auth.password-off") "On" .Data.System.PasswordLoginOff)}}
+<p class="hint">{{.T "admin.auth.password-off.hint"}}</p>
 {{template "check" (dict "Name" "http_auth_auto_register" "Label" (.T "admin.auth.auto-register") "On" .Data.System.HTTPAuthAutoRegister)}}
 <fieldset>
 <legend>{{.T "admin.auth.oidc"}}</legend>

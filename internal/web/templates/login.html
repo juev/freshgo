@@ -1,7 +1,8 @@
 {{define "content"}}
 <h1>{{.Heading}}</h1>
 {{if .Data.Error}}<p class="alert" role="alert">{{.Data.Error}}</p>{{end}}
-<form method="post" action="{{.URL "/login"}}" class="form">
+{{if .Data.PasswordOff}}<p class="hint">{{.T "login.password-off"}}</p>
+{{else}}<form method="post" action="{{.URL "/login"}}" class="form">
 <input type="hidden" name="next" value="{{.Data.Next}}">
 <p>
 <label for="username">{{.T "login.username"}}</label>
@@ -18,9 +19,17 @@
 {{range .Data.Before}}{{.}}
 {{end}}<p><button type="submit">{{.T "login.submit"}}</button></p>
 </form>
+{{end}}
 {{if .Data.Passkeys}}
-<p id="passkey-signin" hidden data-begin="{{.URL "/passkeys/login/begin"}}" data-finish="{{.URL "/passkeys/login/finish"}}" data-next="{{.Data.Next}}"><button type="button">{{.T "login.passkey"}}</button></p>
+<div id="passkey-signin" class="form" hidden data-begin="{{.URL "/passkeys/login/begin"}}" data-finish="{{.URL "/passkeys/login/finish"}}" data-next="{{.Data.Next}}">
+{{if .Data.PasswordOff}}<p class="check">
+<input type="checkbox" id="remember" value="1">
+<label for="remember">{{.T "login.remember"}}</label>
+</p>
+{{end}}<p><button type="button">{{.T "login.passkey"}}</button></p>
+</div>
 <p class="alert" id="passkey-failed" role="alert" hidden>{{.T "login.passkey.failed"}}</p>
+{{if .Data.PasswordOff}}<p class="hint" id="passkey-signin-needs-browser">{{.T "login.passkey.needs-browser"}}</p>{{end}}
 {{end}}
 {{if .Data.Provider}}<p><a href="{{.Data.ProviderURL}}" hx-boost="false">{{.T "login.oidc" .Data.Provider}}</a></p>{{end}}
 {{if .Data.CanReset}}<p><a href="{{.URL "/reset"}}">{{.T "login.forgot"}}</a></p>{{end}}

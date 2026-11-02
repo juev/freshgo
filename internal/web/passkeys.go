@@ -519,13 +519,25 @@ func (h *Handler) renamePasskey(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// deletePasskey removes a passkey of the user.
+// deletePasskey removes a passkey of the user. Without logins by password
+// the last passkey is the user's only way in, unless a provider is there to
+// sign in through: it stays.
 func (h *Handler) deletePasskey(w http.ResponseWriter, r *http.Request) {
+	ctx, s := r.Context(), state(r)
 	id, ok := h.passkeyID(w, r)
 	if !ok || !h.form(w, r) {
 		return
 	}
-	switch err := h.db.DeletePasskey(r.Context(), state(r).who.user.ID, id); {
+	passkeys, err := h.db.Passkeys(ctx, s.who.user.ID)
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	if s.system.PasswordLoginOff && len(passkeys) <= 1 && !h.oidcOn(s.system) {
+		h.profileProblem(w, r, http.StatusBadRequest, "settings.problem.passkey-last")
+		return
+	}
+	switch err := h.db.DeletePasskey(ctx, s.who.user.ID, id); {
 	case errors.Is(err, store.ErrNotFound):
 		h.fail(w, r, http.StatusNotFound)
 	case err != nil:
@@ -533,5 +545,45 @@ func (h *Handler) deletePasskey(w http.ResponseWriter, r *http.Request) {
 	default:
 		h.notify(w, r, "notice.passkey-removed", 0)
 		http.Redirect(w, r, h.url("/settings/profile"), http.StatusSeeOther)
+	}
+}
+
+// removeUserPasskeys removes a passkey of another user, or all of them
+// (`id` is `all`), on the word of an administrator, for a user who lost the
+// device. Whoever may have it also has a login made with it, so the logins
+// of the user end. An administrator's own passkeys are removed in their
+// profile, where the last one is kept while there is no other way in.
+func (h *Handler) removeUserPasskeys(w http.ResponseWriter, r *http.Request) {
+	ctx, s := r.Context(), state(r)
+	u, ok := h.namedUser(w, r)
+	if !ok || !h.form(w, r) {
+		return
+	}
+	if u.ID == s.who.user.ID {
+		h.showUser(w, r, http.StatusBadRequest, u, "admin.problem.passkey-self")
+		return
+	}
+	var err error
+	notice := "notice.passkey-removed"
+	if id := r.PostForm.Get("id"); id == "all" {
+		err, notice = h.db.DeleteUserPasskeys(ctx, u.ID), "notice.passkeys-removed"
+	} else if n, parseErr := strconv.ParseInt(id, 10, 64); parseErr == nil && n > 0 {
+		err = h.db.DeletePasskey(ctx, u.ID, n)
+	} else {
+		h.fail(w, r, http.StatusBadRequest)
+		return
+	}
+	if err == nil {
+		err = h.db.DeleteUserSessions(ctx, u.ID, "")
+		h.loginsEnded(u.ID)
+	}
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		h.fail(w, r, http.StatusNotFound)
+	case err != nil:
+		h.broken(w, r, err)
+	default:
+		h.notify(w, r, notice, 0)
+		http.Redirect(w, r, h.url("/admin/users/"+u.Name), http.StatusSeeOther)
 	}
 }

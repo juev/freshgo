@@ -2,7 +2,7 @@
 <h1>{{.Heading}}</h1>
 <p>{{.T "reauth.intro"}}</p>
 {{template "problem" .Data.Error}}
-<form method="post" action="{{.URL "/reauth"}}" class="form">
+{{if not .Data.PasswordOff}}<form method="post" action="{{.URL "/reauth"}}" class="form">
 <input type="hidden" name="next" value="{{.Data.Next}}">
 <p>
 <label for="password">{{.T "login.password"}}</label>
@@ -10,6 +10,7 @@
 </p>
 <p><button type="submit">{{.T "reauth.submit"}}</button></p>
 </form>
+{{end}}
 {{if .Data.Passkeys}}
 <p id="passkey-signin" hidden data-begin="{{.URL "/passkeys/reauth/begin"}}" data-finish="{{.URL "/passkeys/reauth/finish"}}" data-next="{{.Data.Next}}"><button type="button">{{.T "reauth.passkey"}}</button></p>
 <p class="alert" id="passkey-failed" role="alert" hidden>{{.T "login.passkey.failed"}}</p>

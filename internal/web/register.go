@@ -35,7 +35,8 @@ func unconfirmed(s *request) bool {
 // registrationOpen reports whether visitors can make an account for
 // themselves, and when they cannot, the key of the text that says why.
 func (h *Handler) registrationOpen(ctx context.Context, system store.System) (bool, string, error) {
-	if system.AuthType != store.AuthForm {
+	// An account made here has a password and nothing else to log in with.
+	if system.AuthType != store.AuthForm || system.PasswordLoginOff {
 		return false, "register.closed", nil
 	}
 	if system.ForceEmailValidation && h.mailer == nil {
