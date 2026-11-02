@@ -2,6 +2,7 @@ package refresh
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -268,9 +269,11 @@ func TestCheckURL(t *testing.T) {
 }
 
 // F4: a feed the typed page announces on another website is fetched without
-// the credentials of the typed address; one on the same website gets them.
+// the credentials of the typed address and is stored without them, so its
+// refreshes send none either; a feed on the same website keeps them.
 func TestAddFeedCredentialsStayOnTheWebsiteOfTheAddress(t *testing.T) {
 	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
 		var mu sync.Mutex
 		sent := map[string]http.Header{}
 		feedPage := func(rw http.ResponseWriter, req *http.Request) {
@@ -285,31 +288,81 @@ func TestAddFeedCredentialsStayOnTheWebsiteOfTheAddress(t *testing.T) {
 		w.serveBody("/foreign/", "text/html", `<link rel="alternate" type="application/rss+xml" href="http://`+otherHost(w.server)+`/announced.xml">`)
 		w.serveBody("/same/", "text/html", `<link rel="alternate" type="application/rss+xml" href="/own.xml">`)
 
-		for path, want := range map[string]struct {
-			feed        string
+		for _, tc := range []struct {
+			page, feed  string
 			credentials bool
 		}{
-			"/foreign/": {"/announced.xml", false},
-			"/same/":    {"/own.xml", true},
+			{"/foreign/", "/announced.xml", false},
+			{"/same/", "/own.xml", true},
 		} {
-			u := w.user("user"+strings.Trim(path, "/"), "")
-			f := &store.Feed{URL: w.server.URL + path}
+			u := w.user("user"+strings.Trim(tc.page, "/"), "")
+			f := &store.Feed{URL: w.server.URL + tc.page}
 			credentialed(f)
-			if err := w.r.AddFeed(context.Background(), u, f); err != nil {
-				t.Fatalf("AddFeed of %s: %v", path, err)
+			if err := w.r.AddFeed(ctx, u, f); err != nil {
+				t.Fatalf("AddFeed of %s: %v", tc.page, err)
 			}
+			check := func(when string) {
+				t.Helper()
+				mu.Lock()
+				h, ok := sent[tc.feed]
+				mu.Unlock()
+				if !ok {
+					t.Fatalf("%s, %s: the announced feed was not requested", tc.page, when)
+				}
+				if got := h.Get("Authorization") != "" && h.Get("Cookie") == "session=secret" && h.Get("X-Token") == "t0ken"; got != tc.credentials {
+					t.Errorf("%s, %s: announced feed got %v; credentials expected: %v", tc.page, when, h, tc.credentials)
+				}
+				if !tc.credentials && hasCredentials(h) {
+					t.Errorf("%s, %s: announced feed got %v; want none of the credentials", tc.page, when, h)
+				}
+				if h.Get("User-Agent") != "special/1" {
+					t.Errorf("%s, %s: User-Agent %q; the user agent of the feed stays", tc.page, when, h.Get("User-Agent"))
+				}
+			}
+			check("on adding")
+
+			params, err := fetch.FeedParams(f.HTTPAuth, f.Attributes)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if kept := params.BasicAuth != "" && params.Cookie != "" && len(params.Header) > 0; kept != tc.credentials {
+				t.Errorf("%s: stored settings %+v; credentials kept: %v, expected %v", tc.page, params, kept, tc.credentials)
+			}
+			if !tc.credentials && (params.BasicAuth != "" || params.Cookie != "" || len(params.Header) > 0) {
+				t.Errorf("%s: stored settings %+v; want none of the credentials", tc.page, params)
+			}
+			if params.UserAgent != "special/1" {
+				t.Errorf("%s: stored user agent %q; the other settings stay", tc.page, params.UserAgent)
+			}
+
 			mu.Lock()
-			h, ok := sent[want.feed]
+			delete(sent, tc.feed)
 			mu.Unlock()
-			if !ok {
-				t.Fatalf("%s: the announced feed was not requested", path)
+			w.later()
+			if err := w.r.RefreshFeed(ctx, u, f.ID); err != nil {
+				t.Fatalf("RefreshFeed of %s: %v", tc.page, err)
 			}
-			if want.credentials && (h.Get("Authorization") == "" || h.Get("Cookie") == "" || h.Get("X-Token") == "") {
-				t.Errorf("%s: announced feed got %v; want the credentials", path, h)
-			}
-			if !want.credentials && hasCredentials(h) {
-				t.Errorf("%s: announced feed got %v; want none of the credentials", path, h)
-			}
+			check("on refresh")
 		}
 	})
+}
+
+func TestWithoutCredentials(t *testing.T) {
+	in := json.RawMessage(`{"ssl_verify":false,"curl_params":{"10018":"ua","10022":"c=1","10023":["X: y"],"10004":"proxy:1080","101":0}}`)
+	out, err := fetch.WithoutCredentials(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := fetch.FeedParams("", out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Cookie != "" || len(p.Header) != 0 || p.UserAgent != "ua" || !p.Insecure || p.Proxy == nil {
+		t.Errorf("settings %+v; want the cookie and headers dropped and the rest kept", p)
+	}
+	for _, same := range []string{`{}`, `{"curl_params":[]}`, `null`} {
+		if got, err := fetch.WithoutCredentials(json.RawMessage(same)); err != nil || string(got) != same {
+			t.Errorf("WithoutCredentials(%s) = %s, %v; want it unchanged", same, got, err)
+		}
+	}
 }
