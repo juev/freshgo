@@ -17,7 +17,10 @@ import (
 // ranges of the IANA registries that are not reachable on the internet.
 // IPv4-mapped IPv6 addresses are checked as IPv4, NAT64 and 6to4 ones by the
 // IPv4 address they embed. Teredo is refused whole: the IPv4 address of its
-// client is obfuscated and that of its server is another one.
+// client is obfuscated and that of its server is another one. So is the
+// deprecated IPv4-compatible range ::/96, which includes the unspecified and
+// loopback addresses: unwrapped, ::1 would read as the public 0.0.0.1, and
+// whether a host routes the range depends on its system.
 var internalRanges = prefixes(
 	"0.0.0.0/8",       // this network
 	"10.0.0.0/8",      // private
@@ -33,13 +36,13 @@ var internalRanges = prefixes(
 	"203.0.113.0/24",  // documentation
 	"224.0.0.0/4",     // multicast
 	"240.0.0.0/4",     // reserved, broadcast
-	"::/128",          // unspecified
-	"::1/128",         // loopback
+	"::/96",           // IPv4-compatible, unspecified, loopback
 	"64:ff9b:1::/48",  // local-use NAT64
 	"2001::/32",       // Teredo
 	"2001:db8::/32",   // documentation
 	"fc00::/7",        // unique local
 	"fe80::/10",       // link-local
+	"fec0::/10",       // deprecated site-local
 	"ff00::/8",        // multicast
 )
 
