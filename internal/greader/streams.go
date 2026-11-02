@@ -72,14 +72,13 @@ func (h *Handler) labelStream(ctx context.Context, u *store.User, name string) (
 	if err != nil {
 		return stream{}, err
 	}
-	if c := lib.categoryNamed(name); c != nil {
-		return stream{set: store.EntrySet{CategoryID: c.ID, MinPriority: ptr(priorityCategory)}}, nil
-	}
-	tags, err := h.db.Tags(ctx, u.ID)
-	if err != nil {
+	c, t, err := h.categoryOrLabel(ctx, u.ID, lib, name)
+	switch {
+	case err != nil:
 		return stream{}, err
-	}
-	if t := labelNamed(tags, name); t != nil {
+	case c != nil:
+		return stream{set: store.EntrySet{CategoryID: c.ID, MinPriority: ptr(priorityCategory)}}, nil
+	case t != nil:
 		return stream{set: store.EntrySet{LabelID: t.ID}}, nil
 	}
 	return stream{empty: true}, nil

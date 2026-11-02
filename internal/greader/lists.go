@@ -119,6 +119,17 @@ func (h *Handler) labels(ctx context.Context, u *store.User) ([]*store.Tag, erro
 	return tags, nil
 }
 
+// categoryOrLabel resolves the name of user/-/label/<name>: see
+// store.NamedCategoryOrTag. At most one of the results is not nil.
+func (h *Handler) categoryOrLabel(ctx context.Context, userID int64, lib *library, name string) (*store.Category, *store.Tag, error) {
+	tags, err := h.db.Tags(ctx, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	c, t := store.NamedCategoryOrTag(lib.categories, tags, name)
+	return c, t, nil
+}
+
 func labelNamed(tags []*store.Tag, name string) *store.Tag {
 	return store.TagNamed(tags, name)
 }
