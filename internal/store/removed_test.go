@@ -218,3 +218,79 @@ func TestRemoveAndRestoreTag(t *testing.T) {
 		}
 	})
 }
+
+// A pair of names that differ only in case, stored before names were matched
+// ignoring case or imported from FreshRSS, does not stop the undo of the
+// deletion of one of them; a name taken exactly meanwhile still does.
+func TestRestoreOfAMemberOfAStoredPair(t *testing.T) {
+	eachEngine(t, func(t *testing.T, s *Store) {
+		ctx := context.Background()
+		u := mustUser(t, s, "alice")
+		exact := s.WithExactNames()
+		upper, lower := &Category{UserID: u.ID, Name: "Sport"}, &Category{UserID: u.ID, Name: "sport"}
+		for _, c := range []*Category{upper, lower} {
+			if err := exact.CreateCategory(ctx, c); err != nil {
+				t.Fatal(err)
+			}
+		}
+		f := &Feed{UserID: u.ID, URL: "https://example.org/feed", Name: "Blog", CategoryID: lower.ID, Priority: PriorityMain}
+		if err := s.CreateFeed(ctx, f); err != nil {
+			t.Fatal(err)
+		}
+		entries := []*Entry{{FeedID: f.ID, GUID: "a", Title: "A"}}
+		if err := s.InsertEntries(ctx, u.ID, entries); err != nil {
+			t.Fatal(err)
+		}
+		big, small := &Tag{UserID: u.ID, Name: "News"}, &Tag{UserID: u.ID, Name: "news"}
+		for _, tag := range []*Tag{big, small} {
+			if err := exact.CreateTag(ctx, tag); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := s.TagEntries(ctx, u.ID, small.ID, []int64{entries[0].ID}); err != nil {
+			t.Fatal(err)
+		}
+
+		removedCategory, err := s.RemoveCategory(ctx, u.ID, lower.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.RestoreCategory(ctx, removedCategory); err != nil {
+			t.Fatalf("RestoreCategory of sport next to Sport: %v", err)
+		}
+		if got, err := s.FeedByID(ctx, u.ID, f.ID); err != nil || got.CategoryID != lower.ID {
+			t.Errorf("feed after the undo = %+v, %v; want it back in sport", got, err)
+		}
+
+		removedTag, err := s.RemoveTag(ctx, u.ID, small.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := s.RestoreTag(ctx, removedTag); err != nil {
+			t.Fatalf("RestoreTag of news next to News: %v", err)
+		}
+		if ids, err := s.EntryTagIDs(ctx, u.ID, entries[0].ID); err != nil || !slices.Equal(ids, []int64{small.ID}) {
+			t.Errorf("labels of the entry after the undo = %v, %v; want news", ids, err)
+		}
+
+		// The same name created meanwhile is a real collision.
+		if _, err := s.RemoveTag(ctx, u.ID, small.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := exact.CreateTag(ctx, &Tag{UserID: u.ID, Name: "news"}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.RestoreTag(ctx, removedTag); !errors.Is(err, ErrConflict) {
+			t.Errorf("RestoreTag of a name taken exactly: %v, want ErrConflict", err)
+		}
+		if _, err := s.RemoveCategory(ctx, u.ID, lower.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := exact.CreateCategory(ctx, &Category{UserID: u.ID, Name: "sport"}); err != nil {
+			t.Fatal(err)
+		}
+		if err := s.RestoreCategory(ctx, removedCategory); !errors.Is(err, ErrConflict) {
+			t.Errorf("RestoreCategory of a name taken exactly: %v, want ErrConflict", err)
+		}
+	})
+}

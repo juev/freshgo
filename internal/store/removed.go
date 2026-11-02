@@ -148,11 +148,13 @@ func (s *Store) RemoveCategory(ctx context.Context, userID, id int64) (*RemovedC
 
 // RestoreCategory puts a removed category back under its identifier and
 // takes back those of its feeds that are still in the default category. A
-// name taken meanwhile, or a category of that identifier, gives ErrConflict.
+// name taken meanwhile, or a category of that identifier, gives ErrConflict;
+// a name that differs only in case does not, since the category is put back
+// as it was.
 func (s *Store) RestoreCategory(ctx context.Context, removed *RemovedCategory) error {
 	c := *removed.Category
 	return s.InTx(ctx, func(tx *Store) error {
-		if err := tx.CreateCategory(ctx, &c); err != nil {
+		if err := tx.WithExactNames().CreateCategory(ctx, &c); err != nil {
 			return err
 		}
 		for chunk := range slices.Chunk(removed.Feeds, idChunk) {
@@ -199,11 +201,11 @@ func (s *Store) RemoveTag(ctx context.Context, userID, id int64) (*RemovedTag, e
 
 // RestoreTag puts a removed label back under its identifier, on those of its
 // entries that are still there. A name taken meanwhile, or a label of that
-// identifier, gives ErrConflict.
+// identifier, gives ErrConflict; a name that differs only in case does not.
 func (s *Store) RestoreTag(ctx context.Context, removed *RemovedTag) error {
 	t := *removed.Tag
 	return s.InTx(ctx, func(tx *Store) error {
-		if err := tx.CreateTag(ctx, &t); err != nil {
+		if err := tx.WithExactNames().CreateTag(ctx, &t); err != nil {
 			return err
 		}
 		return tx.TagEntries(ctx, t.UserID, t.ID, removed.Entries)
