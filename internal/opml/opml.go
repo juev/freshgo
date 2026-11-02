@@ -666,12 +666,10 @@ func Import(ctx context.Context, db *store.Store, registry *hooks.Registry, u *s
 			return err
 		}
 		var (
-			byName   = map[string]int64{}
 			known    = map[string]*store.Feed{}
 			position = -1
 		)
 		for _, c := range categories {
-			byName[c.Name] = c.ID
 			var p int
 			if raw, set := readAttributes(c.Attributes)["position"]; set && json.Unmarshal(raw, &p) == nil {
 				position = max(position, p)
@@ -684,8 +682,13 @@ func Import(ctx context.Context, db *store.Store, registry *hooks.Registry, u *s
 			if len(g.feeds) == 0 {
 				continue
 			}
-			categoryID, exists := byName[g.name]
-			if !exists && g.category != nil && g.name != "" && limits.Categories > 0 && len(byName) >= limits.Categories {
+			var categoryID int64
+			existing := store.CategoryNamed(categories, g.name)
+			exists := existing != nil
+			if exists {
+				categoryID = existing.ID
+			}
+			if !exists && g.category != nil && g.name != "" && limits.Categories > 0 && len(categories) >= limits.Categories {
 				// One category too many: its feeds go to the default one.
 				incomplete = true
 			} else if !exists && g.category != nil && g.name != "" {
@@ -709,7 +712,7 @@ func Import(ctx context.Context, db *store.Store, registry *hooks.Registry, u *s
 					return err
 				default:
 					categoryID = c.ID
-					byName[g.name] = c.ID
+					categories = append(categories, c)
 				}
 			}
 			if categoryID == 0 {

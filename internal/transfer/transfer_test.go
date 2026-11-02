@@ -422,3 +422,76 @@ func TestImportRefusals(t *testing.T) {
 		}
 	})
 }
+
+// A category or a label of a source is the one the user has under the same
+// name in another case, Cyrillic included; a name nobody has is made once,
+// whatever case the items spell it in.
+func TestImportMatchesNamesIgnoringCase(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		u := w.user("alice", `{"timezone":"UTC"}`)
+		for _, name := range []string{"News", "Новости"} {
+			w.must(w.db.CreateCategory(ctx, &store.Category{UserID: u.ID, Name: name}))
+		}
+		for _, name := range []string{"Keep", "Важное"} {
+			w.must(w.db.CreateTag(ctx, &store.Tag{UserID: u.ID, Name: name}))
+		}
+		document := `{"items":[
+			{"id":"g1","origin":{"feedUrl":"http://a.example/rss","category":"news"},"title":"A","categories":["user/-/label/keep","user/-/label/ВАЖНОЕ","user/-/label/Fresh"]},
+			{"id":"g2","origin":{"feedUrl":"http://b.example/rss","category":"новости"},"title":"B","categories":["user/-/label/FRESH"]},
+			{"id":"g3","origin":{"feedUrl":"http://c.example/rss","category":"Sport"},"title":"C"},
+			{"id":"g4","origin":{"feedUrl":"http://d.example/rss","category":"SPORT"},"title":"D"}
+		]}`
+		if _, err := Import(ctx, w.db, &hooks.Registry{}, u, "export.json", []byte(document), options); err != nil {
+			t.Fatal(err)
+		}
+		categories, err := w.db.Categories(ctx, u.ID)
+		w.must(err)
+		names := map[int64]string{}
+		for _, c := range categories {
+			names[c.ID] = c.Name
+		}
+		got := map[string]string{}
+		for url, f := range w.feeds(u) {
+			got[url] = names[f.CategoryID]
+		}
+		want := map[string]string{"http://a.example/rss": "News", "http://b.example/rss": "Новости", "http://c.example/rss": "Sport", "http://d.example/rss": "Sport"}
+		for url, category := range want {
+			if got[url] != category {
+				t.Errorf("category of %s = %q, want %q", url, got[url], category)
+			}
+		}
+		if len(categories) != 4 {
+			t.Errorf("%d categories, want 4 (default, News, Новости, Sport)", len(categories))
+		}
+
+		labels, err := w.db.Tags(ctx, u.ID)
+		w.must(err)
+		var labelNames []string
+		for _, l := range labels {
+			labelNames = append(labelNames, l.Name)
+		}
+		if want := []string{"Keep", "Важное", "FRESH"}; !reflect.DeepEqual(labelNames, want) {
+			t.Errorf("labels = %q, want %q", labelNames, want)
+		}
+		byGUID := map[string][]string{}
+		for _, e := range w.entries(u) {
+			byGUID[e.GUID] = e.Labels
+		}
+		if want := []string{"FRESH", "Keep", "Важное"}; !reflect.DeepEqual(byGUID["g1"], want) {
+			t.Errorf("labels of g1 = %q, want %q", byGUID["g1"], want)
+		}
+		if want := []string{"FRESH"}; !reflect.DeepEqual(byGUID["g2"], want) {
+			t.Errorf("labels of g2 = %q, want %q", byGUID["g2"], want)
+		}
+
+		// A source that lists its categories only by their names.
+		remote := &Remote{Categories: []string{"NEWS", "НОВОСТИ", "Travel", "travel"}}
+		if _, err := ImportRemote(ctx, w.db, &hooks.Registry{}, u, remote, options); err != nil {
+			t.Fatal(err)
+		}
+		if categories, err = w.db.Categories(ctx, u.ID); err != nil || len(categories) != 5 {
+			t.Errorf("after a remote import: %d categories, %v; want 5 (Travel is the only new one)", len(categories), err)
+		}
+	})
+}

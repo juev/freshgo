@@ -25,10 +25,8 @@ func categoryNamed(ctx context.Context, db *store.Store, u *store.User, name str
 	if err != nil {
 		return 0, err
 	}
-	for _, c := range categories {
-		if c.Name == name {
-			return c.ID, nil
-		}
+	if c := store.CategoryNamed(categories, name); c != nil {
+		return c.ID, nil
 	}
 	c := &store.Category{UserID: u.ID, Name: name}
 	if err := db.CreateCategory(ctx, c); errors.Is(err, store.ErrConflict) {

@@ -577,12 +577,23 @@ func TestEntryLabels(t *testing.T) {
 		if got, want := labels(), []string{"later", "work & play"}; !reflect.DeepEqual(got, want) {
 			t.Errorf("labels = %v, want %v", got, want)
 		}
+		s.post(path+"/labels", url.Values{"label": {"2"}, "new": {"LATER"}, "next": {path}})
+		if got, want := labels(), []string{"later", "work & play"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("labels after LATER = %v, want %v: another case is the same label", got, want)
+		}
 		s.post(path+"/labels", url.Values{"new": {"Blogs"}, "next": {path}})
 		if got := labels(); got != nil {
 			t.Errorf("labels = %v, want none", got)
 		}
 		if body := s.page(path); !strings.Contains(body, "A category has this name already") {
 			t.Errorf("no notice about the taken name\n%s", body)
+		}
+		s.post(path+"/labels", url.Values{"new": {"BLOGS"}, "next": {path}})
+		if got := labels(); got != nil {
+			t.Errorf("labels after BLOGS = %v, want none: a category has the name in another case", got)
+		}
+		if body := s.page(path); !strings.Contains(body, "A category has this name already") {
+			t.Errorf("no notice about BLOGS\n%s", body)
 		}
 		s.post(path+"/labels", url.Values{"new": {strings.Repeat("я", 192)}, "next": {path}})
 		if body := s.page(path); !strings.Contains(body, "too long") {

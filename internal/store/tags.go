@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/juev/freshgo/internal/config"
 )
@@ -14,7 +15,7 @@ import (
 // ErrConflict.
 func (s *Store) CreateTag(ctx context.Context, t *Tag) error {
 	return s.InTx(ctx, func(tx *Store) error {
-		if err := tx.nameFree(ctx, "categories", t.UserID, t.Name); err != nil {
+		if err := tx.nameFree(ctx, t.UserID, t.Name, "tags", 0); err != nil {
 			return fmt.Errorf("store: create tag %q: %w", t.Name, err)
 		}
 		if err := tx.assignID(ctx, t.UserID, seqTag, &t.ID); err != nil {
@@ -85,7 +86,7 @@ func (s *Store) EntryTagIDs(ctx context.Context, userID, entryID int64) ([]int64
 // category gives ErrConflict, a missing label ErrNotFound.
 func (s *Store) RenameTag(ctx context.Context, userID, id int64, name string) error {
 	return s.InTx(ctx, func(tx *Store) error {
-		if err := tx.nameFree(ctx, "categories", userID, name); err != nil {
+		if err := tx.nameFree(ctx, userID, name, "tags", id); err != nil {
 			return fmt.Errorf("store: rename tag %d: %w", id, err)
 		}
 		n, err := tx.affected(ctx, `UPDATE tags SET name = ? WHERE user_id = ? AND id = ?`, name, userID, id)
@@ -104,14 +105,18 @@ func (s *Store) RenameTag(ctx context.Context, userID, id int64, name string) er
 // value is arbitrary.
 const labelNamesLockID = 0x6c61626c // "labl"
 
-// nameFree gives ErrConflict when a row of the table, categories or tags,
-// already has the name: the two share the names of user/-/label/<name>.
+// nameFree gives ErrConflict when a category or a label other than the one
+// being written already has the name, ignoring case: the two share the names
+// of user/-/label/<name>. self is the table, categories or tags, and the
+// identifier of the row being renamed; a zero selfID is a row not yet
+// stored. A row whose name stays as it is passes, so a pair stored before
+// names were matched ignoring case can still be edited.
 // No table holds both, so on PostgreSQL the transaction takes a lock on the
 // names of the user first and keeps it until it ends: a category and a label
 // given the same name at once are then checked one after the other. It has
 // to be called inside InTx, before the name is written. SQLite has a single
 // writer anyway.
-func (s *Store) nameFree(ctx context.Context, table string, userID int64, name string) error {
+func (s *Store) nameFree(ctx context.Context, userID int64, name, selfTable string, selfID int64) error {
 	if s.driver == config.DriverPostgres {
 		// The user is folded into the 32 bits of the key; two users who
 		// share a key only wait for each other.
@@ -119,17 +124,39 @@ func (s *Store) nameFree(ctx context.Context, table string, userID int64, name s
 			return fmt.Errorf("lock names: %w", err)
 		}
 	}
-	var taken int
-	err := s.queryRow(ctx, `SELECT COUNT(*) FROM `+table+` WHERE user_id = ? AND name = ?`, userID, name).Scan(&taken)
-	if err != nil {
-		return err
-	}
-	if taken > 0 {
-		owner := "a category"
-		if table == "tags" {
-			owner = "a label"
+	var taken string
+	for _, table := range []string{"categories", "tags"} {
+		rows, err := s.query(ctx, `SELECT id, name FROM `+table+` WHERE user_id = ?`, userID)
+		if err != nil {
+			return err
 		}
-		return fmt.Errorf("%w: %s has this name", ErrConflict, owner)
+		type row struct {
+			id   int64
+			name string
+		}
+		found, err := collect(rows, func(sc scanner) (row, error) {
+			var r row
+			return r, sc.Scan(&r.id, &r.name)
+		})
+		if err != nil {
+			return err
+		}
+		for _, r := range found {
+			switch {
+			case table == selfTable && r.id == selfID:
+				if r.name == name {
+					return nil
+				}
+			case strings.EqualFold(r.name, name) && taken == "":
+				taken = "a category"
+				if table == "tags" {
+					taken = "a label"
+				}
+			}
+		}
+	}
+	if taken != "" {
+		return fmt.Errorf("%w: %s has this name", ErrConflict, taken)
 	}
 	return nil
 }
@@ -180,7 +207,7 @@ func (s *Store) UntagEntries(ctx context.Context, userID, tagID int64, entryIDs 
 // ErrNotFound.
 func (s *Store) UpdateTag(ctx context.Context, t *Tag) error {
 	return s.InTx(ctx, func(tx *Store) error {
-		if err := tx.nameFree(ctx, "categories", t.UserID, t.Name); err != nil {
+		if err := tx.nameFree(ctx, t.UserID, t.Name, "tags", t.ID); err != nil {
 			return fmt.Errorf("store: update tag %d: %w", t.ID, err)
 		}
 		n, err := tx.affected(ctx, `UPDATE tags SET name = ?, attributes = ? WHERE user_id = ? AND id = ?`,
