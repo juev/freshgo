@@ -658,6 +658,26 @@
 		};
 	};
 
+	const assertion = async (options) => {
+		const credential = await navigator.credentials.get({
+			publicKey: { ...options, challenge: fromBase64url(options.challenge), allowCredentials: descriptors(options.allowCredentials) },
+		});
+		const { response } = credential;
+		return {
+			id: credential.id,
+			rawId: toBase64url(credential.rawId),
+			type: credential.type,
+			authenticatorAttachment: credential.authenticatorAttachment || undefined,
+			response: {
+				clientDataJSON: toBase64url(response.clientDataJSON),
+				authenticatorData: toBase64url(response.authenticatorData),
+				signature: toBase64url(response.signature),
+				userHandle: response.userHandle ? toBase64url(response.userHandle) : undefined,
+			},
+			clientExtensionResults: credential.getClientExtensionResults(),
+		};
+	};
+
 	// attempt runs a ceremony behind a button: the button waits meanwhile,
 	// and the line that says it failed is shown when it does.
 	const attempt = async (button, run) => {
@@ -675,8 +695,8 @@
 		}
 	};
 
-	// The profile adds a passkey; what offers it is hidden until the browser
-	// is found to have passkeys.
+	// The profile adds a passkey and the login page logs in with one; what
+	// offers either is hidden until the browser is found to have passkeys.
 	onContent(() => {
 		if (!window.PublicKeyCredential || !navigator.credentials) {
 			return;
@@ -691,6 +711,19 @@
 					add.dataset.finish, registration);
 				if (finished) {
 					window.location.reload();
+				}
+			}));
+		}
+		const signIn = document.getElementById('passkey-signin');
+		if (signIn) {
+			signIn.hidden = false;
+			const button = signIn.querySelector('button');
+			button.addEventListener('click', () => attempt(button, async () => {
+				const remember = document.getElementById('remember');
+				const finished = await ceremony(signIn.dataset.begin,
+					{ next: signIn.dataset.next, remember: Boolean(remember && remember.checked) }, signIn.dataset.finish, assertion);
+				if (finished) {
+					window.location.assign((await finished.json()).next);
 				}
 			}));
 		}

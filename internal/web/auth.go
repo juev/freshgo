@@ -373,6 +373,8 @@ type loginForm struct {
 	// Provider is what the provider visitors can sign in through is called
 	// and ProviderURL where that starts; both empty without one.
 	Provider, ProviderURL string
+	// Passkeys says a visitor can log in with a passkey.
+	Passkeys bool
 }
 
 // showLogin shows the login page with what the form says, the way through
@@ -389,6 +391,7 @@ func (h *Handler) showLogin(w http.ResponseWriter, r *http.Request, status int, 
 	if h.oidcOn(s.system) {
 		form.Provider, form.ProviderURL = oidcName(s.system), h.oidcStart(form.Next)
 	}
+	form.Passkeys = h.passkeysOn(s.system)
 	v.Data = form
 	h.render(w, r, status, "login", v)
 }

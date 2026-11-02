@@ -18,6 +18,10 @@
 {{range .Data.Before}}{{.}}
 {{end}}<p><button type="submit">{{.T "login.submit"}}</button></p>
 </form>
+{{if .Data.Passkeys}}
+<p id="passkey-signin" hidden data-begin="{{.URL "/passkeys/login/begin"}}" data-finish="{{.URL "/passkeys/login/finish"}}" data-next="{{.Data.Next}}"><button type="button">{{.T "login.passkey"}}</button></p>
+<p class="alert" id="passkey-failed" role="alert" hidden>{{.T "login.passkey.failed"}}</p>
+{{end}}
 {{if .Data.Provider}}<p><a href="{{.Data.ProviderURL}}" hx-boost="false">{{.T "login.oidc" .Data.Provider}}</a></p>{{end}}
 {{if .Data.CanReset}}<p><a href="{{.URL "/reset"}}">{{.T "login.forgot"}}</a></p>{{end}}
 {{if .Data.CanRegister}}<p><a href="{{.URL "/register"}}">{{.T "register.heading"}}</a></p>{{end}}

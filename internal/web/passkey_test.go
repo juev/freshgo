@@ -144,6 +144,37 @@ func (a *authenticator) created(options string) string {
 	return string(body)
 }
 
+// asserted answers the options of a login.
+func (a *authenticator) asserted(options string) string {
+	a.t.Helper()
+	var o struct {
+		PublicKey struct {
+			Challenge string `json:"challenge"`
+		} `json:"publicKey"`
+	}
+	if err := json.Unmarshal([]byte(options), &o); err != nil {
+		a.t.Fatalf("options %s: %v", options, err)
+	}
+	a.count++
+	data := a.authData(false)
+	client := a.clientData("webauthn.get", o.PublicKey.Challenge)
+	hash := sha256.Sum256(client)
+	signed := sha256.Sum256(append(append([]byte{}, data...), hash[:]...))
+	signature, err := ecdsa.SignASN1(rand.Reader, a.key, signed[:])
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	response := map[string]any{"clientDataJSON": b64(client), "authenticatorData": b64(data), "signature": b64(signature)}
+	if a.handle != nil {
+		response["userHandle"] = b64(a.handle)
+	}
+	body, err := json.Marshal(map[string]any{"id": b64(a.id), "rawId": b64(a.id), "type": "public-key", "response": response, "clientExtensionResults": map[string]any{}})
+	if err != nil {
+		a.t.Fatal(err)
+	}
+	return string(body)
+}
+
 // passkeyAt is a site whose server knows the public address passkeys are
 // bound to.
 func passkeyAt(t *testing.T, test func(t *testing.T, s *site)) {

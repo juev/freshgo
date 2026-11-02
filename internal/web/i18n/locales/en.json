@@ -426,6 +426,8 @@
   },
   "login.oidc": "Sign in with %s",
   "login.oidc.failed": "Signing in through the provider did not work. Try again, or ask the administrator.",
+  "login.passkey": "Sign in with a passkey",
+  "login.passkey.failed": "Signing in with a passkey did not work. Try again, or sign in another way.",
   "login.password": "Password",
   "login.remember": "Keep me signed in on this device",
   "login.submit": "Sign in",
