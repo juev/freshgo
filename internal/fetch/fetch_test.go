@@ -1000,3 +1000,79 @@ func TestAllowed(t *testing.T) {
 		t.Errorf("another scheme with everything allowed: %v, want ErrForbiddenAddress", err)
 	}
 }
+
+func TestSameSite(t *testing.T) {
+	for _, tc := range []struct {
+		request, site string
+		want          bool
+	}{
+		{"https://example.org/a", "https://example.org/feed", true},
+		{"https://EXAMPLE.org./a", "https://example.org/feed", true},
+		{"https://www.example.org/a", "https://rss.example.org/feed", true},
+		{"https://example.org/a", "https://rss.example.org/feed", true},
+		{"https://example.org:8443/a", "http://example.org/feed", true},
+		{"https://blog.example.co.uk/a", "https://www.example.co.uk/feed", true},
+		{"https://münchen.example/a", "https://xn--mnchen-3ya.example/feed", true},
+		{"https://example.org/a", "https://example.com/feed", false},
+		{"https://example.org/a", "https://notexample.org/feed", false},
+		{"https://a.example.co.uk/a", "https://b.example.org/feed", false},
+		// A public suffix is shared by unrelated websites.
+		{"https://one.github.io/a", "https://two.github.io/feed", false},
+		{"https://one.co.uk/a", "https://two.co.uk/feed", false},
+		{"http://localhost/a", "http://localhost/feed", true},
+		{"http://localhost/a", "http://other.localhost/feed", false},
+		{"http://10.0.0.1/a", "http://10.0.0.1:8080/feed", true},
+		{"http://10.0.0.1/a", "http://10.0.0.2/feed", false},
+		{"http://127.0.0.1/a", "http://localhost/feed", false},
+		{"https://example.org/a", "::not a url", false},
+	} {
+		u, err := url.Parse(tc.request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := sameSite(u, tc.site); got != tc.want {
+			t.Errorf("sameSite(%s, %s) = %v, want %v", tc.request, tc.site, got, tc.want)
+		}
+	}
+}
+
+// F4: the settings that identify the user go to the website of the feed only,
+// from the first request on; the proxy-independent settings go everywhere.
+func TestCredentialsGoToTheWebsiteOfTheFeedOnly(t *testing.T) {
+	var got http.Header
+	s := serve(t, func(_ http.ResponseWriter, r *http.Request) { got = r.Header.Clone() })
+	// The same listener, named another way, is another website.
+	other := "http://localhost:" + strings.TrimPrefix(hostOf(s), "127.0.0.1:")
+	c := newClient(t, Options{Allowlist: []string{strings.TrimPrefix(other, "http://")}}, s)
+	params := Params{
+		BasicAuth: "alice:secret",
+		Cookie:    "session=secret",
+		Header:    http.Header{"X-Token": {"t0ken"}},
+		UserAgent: "special/1",
+	}
+
+	if _, err := c.Fetch(context.Background(), Request{URL: s.URL, Params: params.OwnedBy(s.URL + "/feed")}); err != nil {
+		t.Fatalf("own website: %v", err)
+	}
+	if got.Get("Authorization") == "" || got.Get("Cookie") != "session=secret" || got.Get("X-Token") != "t0ken" {
+		t.Errorf("own website got %v; want the credentials", got)
+	}
+
+	if _, err := c.Fetch(context.Background(), Request{URL: other, Params: params.OwnedBy(s.URL + "/feed")}); err != nil {
+		t.Fatalf("other website: %v", err)
+	}
+	if got.Get("Authorization") != "" || got.Get("Cookie") != "" || got.Get("X-Token") != "" {
+		t.Errorf("other website got %v; want none of the credentials", got)
+	}
+	if got.Get("User-Agent") != "special/1" {
+		t.Errorf("other website: User-Agent %q; the user agent of the feed stays", got.Get("User-Agent"))
+	}
+
+	// Without a website, as for the feed's own address, nothing is held back.
+	if _, err := c.Fetch(context.Background(), Request{URL: other, Params: params}); err != nil {
+		t.Fatalf("no website: %v", err)
+	}
+	if got.Get("Authorization") == "" || got.Get("Cookie") == "" || got.Get("X-Token") == "" {
+		t.Errorf("request without a website got %v; want the credentials", got)
+	}
+}

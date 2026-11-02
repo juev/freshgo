@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/juev/freshgo/internal/store"
@@ -342,6 +344,92 @@ func TestPagesByBrowser(t *testing.T) {
 		}
 		if e := w.entry(f, "b"); !strings.Contains(e.Content, "First. The harbour") {
 			t.Errorf("the entry lost its text to a page that was not read: %q", e.Content)
+		}
+	})
+}
+
+// credentialed is a feed with every kind of request setting that identifies
+// its user: basic auth, a cookie and a header of its own.
+func credentialed(f *store.Feed) {
+	f.HTTPAuth = "alice:secret"
+	f.Attributes = json.RawMessage(`{"curl_params":{"10022":"session=secret","10023":["X-Token: t0ken"]}}`)
+}
+
+func hasCredentials(h http.Header) bool {
+	return h.Get("Authorization") != "" || h.Get("Cookie") != "" || h.Get("X-Token") != ""
+}
+
+// F4: the cookie, the password and the headers of a feed go to the pages of
+// its own website only; an entry may link anywhere.
+func TestFullTextCredentialsStayOnTheWebsiteOfTheFeed(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		u := w.user("alice", `{}`)
+		var mu sync.Mutex
+		sent := map[string]http.Header{}
+		page := func(rw http.ResponseWriter, req *http.Request) {
+			mu.Lock()
+			sent[req.Host+req.URL.Path] = req.Header.Clone()
+			mu.Unlock()
+			rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = io.WriteString(rw, articlePage)
+		}
+		w.serve("/articles/own", page)
+		w.serve("/articles/foreign", page)
+		own := w.server.URL + "/articles/own"
+		foreign := "http://" + otherHost(w.server) + "/articles/foreign"
+		w.serveBody("/feed", rssType, rss("Blog",
+			item{guid: "own", title: "Own", link: own, body: "Summary"},
+			item{guid: "foreign", title: "Foreign", link: foreign, body: "Summary"}))
+		w.feed(u, "/feed", func(f *store.Feed) {
+			credentialed(f)
+			f.PathEntries = "article .body"
+		})
+		if st := w.runOne(); st.NewEntries != 2 || st.Failed != 0 {
+			t.Fatalf("stats %+v", st)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		if h := sent[strings.TrimPrefix(own, "http://")]; h.Get("Authorization") == "" || h.Get("Cookie") != "session=secret" || h.Get("X-Token") != "t0ken" {
+			t.Errorf("page of the feed's website got %v; want the credentials", h)
+		}
+		h, ok := sent[strings.TrimPrefix(foreign, "http://")]
+		if !ok {
+			t.Fatal("the page on another website was not requested")
+		}
+		if hasCredentials(h) {
+			t.Errorf("page on another website got %v; want none of the credentials", h)
+		}
+	})
+}
+
+// F4: the same for the page a user completes or previews by hand.
+func TestCompleteAndPreviewCredentialsStayOnTheWebsiteOfTheFeed(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		u := w.user("alice", `{}`)
+		var got http.Header
+		w.serve("/articles/foreign", func(rw http.ResponseWriter, req *http.Request) {
+			got = req.Header.Clone()
+			rw.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = io.WriteString(rw, readablePage)
+		})
+		w.serveBody("/feed", rssType, rss("Blog", item{guid: "a", title: "A", link: "http://" + otherHost(w.server) + "/articles/foreign", body: "Summary"}))
+		f := w.feed(u, "/feed", credentialed)
+		if st := w.runOne(); st.NewEntries != 1 {
+			t.Fatalf("stats %+v", st)
+		}
+		if err := w.r.CompleteEntry(context.Background(), u, w.entry(f, "a").ID, true); err != nil {
+			t.Fatalf("CompleteEntry: %v", err)
+		}
+		if got == nil || hasCredentials(got) {
+			t.Errorf("page on another website got %v; want a request without the credentials", got)
+		}
+
+		got = nil
+		if _, err := w.r.PreviewArticle(context.Background(), u, f.ID, "", true, "", false); err != nil {
+			t.Fatalf("PreviewArticle: %v", err)
+		}
+		if got == nil || hasCredentials(got) {
+			t.Errorf("preview: page on another website got %v; want a request without the credentials", got)
 		}
 	})
 }

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/juev/freshgo/internal/favicon"
@@ -264,4 +265,51 @@ func TestCheckURL(t *testing.T) {
 			t.Errorf("CheckURL(%q) = %q, %v; want ErrBadURL", address, got, err)
 		}
 	}
+}
+
+// F4: a feed the typed page announces on another website is fetched without
+// the credentials of the typed address; one on the same website gets them.
+func TestAddFeedCredentialsStayOnTheWebsiteOfTheAddress(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		var mu sync.Mutex
+		sent := map[string]http.Header{}
+		feedPage := func(rw http.ResponseWriter, req *http.Request) {
+			mu.Lock()
+			sent[req.URL.Path] = req.Header.Clone()
+			mu.Unlock()
+			rw.Header().Set("Content-Type", "application/rss+xml")
+			_, _ = io.WriteString(rw, blogFeed)
+		}
+		w.serve("/announced.xml", feedPage)
+		w.serve("/own.xml", feedPage)
+		w.serveBody("/foreign/", "text/html", `<link rel="alternate" type="application/rss+xml" href="http://`+otherHost(w.server)+`/announced.xml">`)
+		w.serveBody("/same/", "text/html", `<link rel="alternate" type="application/rss+xml" href="/own.xml">`)
+
+		for path, want := range map[string]struct {
+			feed        string
+			credentials bool
+		}{
+			"/foreign/": {"/announced.xml", false},
+			"/same/":    {"/own.xml", true},
+		} {
+			u := w.user("user"+strings.Trim(path, "/"), "")
+			f := &store.Feed{URL: w.server.URL + path}
+			credentialed(f)
+			if err := w.r.AddFeed(context.Background(), u, f); err != nil {
+				t.Fatalf("AddFeed of %s: %v", path, err)
+			}
+			mu.Lock()
+			h, ok := sent[want.feed]
+			mu.Unlock()
+			if !ok {
+				t.Fatalf("%s: the announced feed was not requested", path)
+			}
+			if want.credentials && (h.Get("Authorization") == "" || h.Get("Cookie") == "" || h.Get("X-Token") == "") {
+				t.Errorf("%s: announced feed got %v; want the credentials", path, h)
+			}
+			if !want.credentials && hasCredentials(h) {
+				t.Errorf("%s: announced feed got %v; want none of the credentials", path, h)
+			}
+		}
+	})
 }

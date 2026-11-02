@@ -46,7 +46,7 @@ func (c *completion) off() bool {
 }
 
 func (r *Refresher) completion(j *job, f *store.Feed, attrs attributes, params fetch.Params) *completion {
-	c := &completion{selector: strings.TrimSpace(f.PathEntries), params: params}
+	c := &completion{selector: strings.TrimSpace(f.PathEntries), params: params.OwnedBy(f.URL)}
 	c.filter, _ = get[string](attrs, "path_entries_filter")
 	c.filter = strings.TrimSpace(c.filter)
 	c.action, _ = get[string](attrs, "content_action")
@@ -194,7 +194,7 @@ func (r *Refresher) CompleteEntry(ctx context.Context, u *store.User, entryID in
 		filter, _ := get[string](attrs, "path_entries_filter")
 		browser, _ := get[bool](attrs, "page_by_browser")
 		article, err := fulltext.Article(ctx, r.client, fulltext.Request{
-			URL: e.Link, Params: params, Automatic: true, Filter: filter, ForceHTTPS: https.URL, Read: r.reader(browser),
+			URL: e.Link, Params: params.OwnedBy(f.URL), Automatic: true, Filter: filter, ForceHTTPS: https.URL, Read: r.reader(browser),
 		})
 		if err != nil {
 			return err

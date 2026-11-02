@@ -244,6 +244,9 @@ func (c *Client) Fetch(ctx context.Context, req Request) (*Response, error) {
 		header:  p.Header.Clone(),
 		timeout: c.timeout,
 	}
+	if p.Site != "" && !sameSite(u, p.Site) {
+		h.auth, h.cookie, h.header = "", "", nil
+	}
 	if p.Timeout > 0 {
 		h.timeout = p.Timeout
 	}
