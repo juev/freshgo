@@ -46,6 +46,10 @@ type Params struct {
 	MaxRedirects int
 	// NoRedirects makes any redirect an error.
 	NoRedirects bool
+	// Site is the address of the website the cookie, the basic auth and the
+	// extra headers belong to (see OwnedBy). A request to another website
+	// goes without them. Empty sends them to every address.
+	Site string
 }
 
 // Keys of feed.attributes.curl_params: the numeric values of the PHP

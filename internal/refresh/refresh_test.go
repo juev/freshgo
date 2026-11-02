@@ -104,7 +104,7 @@ func newWorld(t *testing.T, db *store.Store) *world {
 func (w *world) refresher() *Refresher {
 	w.t.Helper()
 	host := strings.TrimPrefix(w.server.URL, "http://")
-	client, err := fetch.New(fetch.Options{UserAgent: "freshgo/test", Allowlist: []string{host}})
+	client, err := fetch.New(fetch.Options{UserAgent: "freshgo/test", Allowlist: []string{host, otherHost(w.server)}})
 	if err != nil {
 		w.t.Fatal(err)
 	}
@@ -1432,4 +1432,11 @@ func TestMetrics(t *testing.T) {
 			t.Errorf("metrics:\n got %v\nwant %v", got, want)
 		}
 	})
+}
+
+// otherHost names the test server by "localhost" instead of its address:
+// another host, so another website, on the same listener.
+func otherHost(s *httptest.Server) string {
+	u, _ := url.Parse(s.URL)
+	return "localhost:" + u.Port()
 }

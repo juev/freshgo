@@ -212,7 +212,7 @@ func (r *Refresher) PreviewArticle(ctx context.Context, u *store.User, feedID in
 		return "", err
 	}
 	return fulltext.Article(ctx, r.client, fulltext.Request{
-		URL: entries[0].Link, Params: params, Selector: selector, Automatic: automatic, Filter: filter, ForceHTTPS: https.URL,
+		URL: entries[0].Link, Params: params.OwnedBy(f.URL), Selector: selector, Automatic: automatic, Filter: filter, ForceHTTPS: https.URL,
 		Read: r.reader(browser),
 	})
 }

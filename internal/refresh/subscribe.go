@@ -153,6 +153,9 @@ func (r *Refresher) userJob(ctx context.Context, u *store.User) (*job, error) {
 // is fetched in its place and becomes the address of the feed. So does the
 // address a permanent redirect leads to.
 func (r *Refresher) fetchNew(ctx context.Context, j *job, f *store.Feed, params fetch.Params) (*fetch.Response, *feed.Feed, error) {
+	// A feed a page announces is fetched with the settings of the typed
+	// address only when it is on the same website.
+	params = params.OwnedBy(f.URL)
 	for announced := false; ; announced = true {
 		req := fetch.Request{URL: strings.TrimSuffix(f.URL, forceFeedSuffix), Accept: fetch.AcceptFeed, Params: params}
 		r.hooks.FetchBefore.Call(ctx, hooks.Fetch{Feed: f, Request: &req})
