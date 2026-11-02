@@ -132,7 +132,7 @@ In `internal/store`, each run on SQLite and, under `make test-integration`, on P
 - S14, S15: `TestFeedRoundTrip`, `TestUpdateFeed`, `TestUpdateEntry`, `TestLockFeedSerializes`. S16: `TestEntryStatesAndLastSeen`.
 - S17: `TestCleanupTouchesOneFeed`; the rules are compared with FreshRSS by `TestPurgeMatchesFreshRSS` in `internal/refresh`. S18: `TestAutoReadStatements`.
 - S26: `TestWebSubSubscriptions`.
-- S29: `TestSystem`. S30: `TestSessions`. S41: `TestOIDCIdentities`. S43: `TestPushSubscriptions`. S44: `TestPasskeys`. S42: `TestRemoveAndRestoreFeed`, `TestRemoveAndRestoreCategory`, `TestRemoveAndRestoreTag`. S31: `TestUpdateUserSettings`, `TestFirstUserIsTheDefault`.
+- S29: `TestSystem`. S30: `TestSessions`. S41: `TestOIDCIdentities`. S43: `TestPushSubscriptions`. S45: `TestPasskeys`. S42: `TestRemoveAndRestoreFeed`, `TestRemoveAndRestoreCategory`, `TestRemoveAndRestoreTag`. S31: `TestUpdateUserSettings`, `TestFirstUserIsTheDefault`.
 - S27: `TestValidUserName`. S28: `TestSetAPIPasswordHash`, `TestDeleteUser`; from the command line to an API client, `TestUsersFromTheCommandLine` in `cmd/freshgo`.
 - S11: `TestSettings`. S12: `TestCustomIcon`. S24: `TestIcons`. S25: `TestSalt`. S13: counters raised to 5 and 9 → next category 6, next feed 10; lowering has no effect. `TestRaiseCounters`.
 - Field fidelity: every column of a feed, category, entry and label survives a write and a read, including non-ASCII text, markup characters and a NULL hash. `TestFeedRoundTrip`, `TestEntryRoundTrip`, `TestTags`.
