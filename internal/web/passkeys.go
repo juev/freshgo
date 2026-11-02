@@ -119,9 +119,11 @@ type ceremony struct {
 	// a login, where the answer says who it is.
 	userID int64
 	login  string
-	// name is what a registration names the passkey.
-	name    string
-	expires time.Time
+	// name is what a registration names the passkey; next and persistent
+	// are where a login lands and whether it outlives the browser.
+	name, next string
+	persistent bool
+	expires    time.Time
 }
 
 // ceremonies keeps the challenges that wait for an answer, by the hash of

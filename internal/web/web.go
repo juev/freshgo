@@ -306,6 +306,8 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("GET /log", h.protect(members, h.journal))
 	h.mux.HandleFunc("POST /log/clear", h.protect(members, h.clearJournal))
 	h.mux.HandleFunc("GET "+mediaproxy.Path+"{digest}/{address}", h.media)
+	h.mux.HandleFunc("POST "+passkeyLoginBeginPath, h.beginPasskeyLogin)
+	h.mux.HandleFunc("POST "+passkeyLoginFinishPath, h.finishPasskeyLogin)
 	h.mux.HandleFunc("GET /oidc/login", h.oidcLogin)
 	h.mux.HandleFunc("GET "+oidcCallbackPath, h.oidcCallback)
 	h.mux.HandleFunc("GET /reauth", h.protect(members, h.reauthPage))
