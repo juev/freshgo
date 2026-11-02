@@ -85,6 +85,16 @@ func matcher(selector string) (goquery.Matcher, error) {
 	return compiled, nil
 }
 
+// CheckSelector reports whether Article can read a selector or a filter as
+// the settings of a feed give it: nil for none, else ErrSelector.
+func CheckSelector(selector string) error {
+	if selector == "" {
+		return nil
+	}
+	_, err := matcher(strings.Trim(selector, selectorPadding))
+	return err
+}
+
 // refreshTarget strips what precedes the address in the content of a
 // refresh meta element: "5; url=".
 var refreshTarget = regexp.MustCompile(`(?i)^[0-9.; ]*\s*(url\s*=)?\s*`)

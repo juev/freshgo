@@ -17,6 +17,7 @@ import (
 	pagebrowser "github.com/juev/freshgo/internal/browser"
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/fetch"
+	"github.com/juev/freshgo/internal/fulltext"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/scrape"
 	"github.com/juev/freshgo/internal/search"
@@ -465,6 +466,11 @@ func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, can
 		}
 	}
 	f.PathEntries = get("path_entries")
+	// A selector that does not compile fails at every refresh, where the
+	// feed only keeps its own text, so it is refused here.
+	if fulltext.CheckSelector(f.PathEntries) != nil && problem == "" {
+		problem = "feed.problem.selector"
+	}
 
 	a := readAttrs(f.Attributes)
 	if get("path_entries_auto") != "" {
@@ -495,6 +501,9 @@ func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, can
 		delete(a, "path_entries_conditions")
 	}
 	if filter := get("path_entries_filter"); filter != "" {
+		if fulltext.CheckSelector(filter) != nil && problem == "" {
+			problem = "feed.problem.filter"
+		}
 		a.set("path_entries_filter", filter)
 	} else {
 		delete(a, "path_entries_filter")

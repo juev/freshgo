@@ -666,6 +666,43 @@ func TestFeedFormSOCKS4(t *testing.T) {
 	})
 }
 
+// A selector or a filter that cannot be compiled would fail at every refresh,
+// so the form does not store it; one that can be is stored as before.
+func TestFeedFormChecksSelectors(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		s.asAlice()
+		before := s.feed("alice", 1)
+		for _, tc := range []struct{ field, value, message string }{
+			{"path_entries", "div:has(> p)", "The selector for the article is not valid CSS"},
+			{"path_entries", "p[", "The selector for the article is not valid CSS"},
+			{"path_entries_filter", "div:has(> p)", "The filter for the article is not valid CSS"},
+			{"path_entries_filter", "p[", "The filter for the article is not valid CSS"},
+		} {
+			form := s.feedForm(1)
+			form.Set(tc.field, tc.value)
+			form.Set("name", "Not stored")
+			a := s.post("/subscriptions/feeds/1", form)
+			if a.status != http.StatusBadRequest || !strings.Contains(a.body, tc.message) || !strings.Contains(a.body, `role="alert"`) {
+				t.Errorf("%s = %q: status %d, want 400 with %q", tc.field, tc.value, a.status, tc.message)
+			}
+			after := s.feed("alice", 1)
+			if after.Name == "Not stored" || after.PathEntries != before.PathEntries || string(after.Attributes) != string(before.Attributes) {
+				t.Errorf("%s = %q was stored: %+v", tc.field, tc.value, after)
+			}
+		}
+
+		form := s.feedForm(1)
+		form.Set("path_entries", "article, ")
+		form.Set("path_entries_filter", ".ad")
+		if a := s.post("/subscriptions/feeds/1", form); a.status != http.StatusSeeOther {
+			t.Fatalf("valid selector and filter: status %d\n%s", a.status, a.body)
+		}
+		if f := s.feed("alice", 1); f.PathEntries != "article," || decoded(t, f.Attributes)["path_entries_filter"] != ".ad" {
+			t.Errorf("valid selector and filter stored as %q, %v", f.PathEntries, decoded(t, f.Attributes)["path_entries_filter"])
+		}
+	})
+}
+
 // R9: a feed gets an icon of the user's own and gives it up.
 func TestFeedIcon(t *testing.T) {
 	imported(t, Options{}, func(t *testing.T, s *site) {
