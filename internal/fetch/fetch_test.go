@@ -530,7 +530,7 @@ func TestRedirectToInternalAddressIsRefused(t *testing.T) {
 }
 
 func TestGuardAddresses(t *testing.T) {
-	g, err := newGuard([]string{"192.168.1.0/24", "10.0.0.5:8080", "[fd00::1]:443"})
+	g, err := newGuard([]string{"192.168.1.0/24", "10.0.0.5:8080", "[fd00::1]:443", "[::a00:2]:80", "fec0:0:0:5::/64"})
 	if err != nil {
 		t.Fatalf("newGuard: %v", err)
 	}
@@ -575,6 +575,17 @@ func TestGuardAddresses(t *testing.T) {
 		{"[2002:5db8:d822::1]:80", true},
 		{"[2001:0:4136:e378:8000:63bf:3fff:fdd2]:80", false},
 		{"[2001:4860:4860::8888]:80", true},
+		// IPv4-compatible and site-local ranges.
+		{"[::7f00:1]:80", false},
+		{"[::a00:1]:80", false},
+		{"[::192.168.1.1]:80", false},
+		{"[::5db8:d822]:80", false},
+		{"[::1:0:0]:80", true},
+		{"[::1:0:0:0]:80", true},
+		{"[fec0::1]:80", false},
+		{"[feff:ffff::1]:80", false},
+		{"[fe80::1]:80", false},
+		{"[2600::1]:80", true},
 		// The allowlist.
 		{"192.168.1.20:80", true},
 		{"[::ffff:192.168.1.20]:80", true},
@@ -583,6 +594,10 @@ func TestGuardAddresses(t *testing.T) {
 		{"10.0.0.5:80", false},
 		{"[fd00::1]:443", true},
 		{"[fd00::1]:80", false},
+		{"[::a00:2]:80", true},
+		{"[::a00:2]:81", false},
+		{"[fec0:0:0:5::7]:80", true},
+		{"[fec0:0:0:6::7]:80", false},
 	}
 	for _, tt := range tests {
 		ap, err := netip.ParseAddrPort(tt.address)
