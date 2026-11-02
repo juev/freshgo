@@ -277,7 +277,12 @@ func (h *Handler) updateUser(w http.ResponseWriter, r *http.Request) {
 		target = "/admin/users/" + u.Name
 	)
 	action := r.PostForm.Get("action")
-	if protected && slices.Contains([]string{"disable", "demote", "delete"}, action) {
+	// The own password and second factor are changed on the profile page,
+	// which asks for the current password and a code; this form asks for
+	// neither, so a stolen fresh login would be enough to take the account.
+	own := u.ID == s.who.user.ID
+	if protected && slices.Contains([]string{"disable", "demote", "delete"}, action) ||
+		own && slices.Contains([]string{"password", "totp-off"}, action) {
 		h.showUser(w, r, http.StatusBadRequest, u, "admin.problem.protected")
 		return
 	}
@@ -293,13 +298,8 @@ func (h *Handler) updateUser(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		// One password for the web interface and for API clients, and
-		// whoever is logged in with the old one is logged out; the
-		// administrator's own login stays.
-		keep := ""
-		if u.ID == s.who.user.ID && s.who.session != nil {
-			keep = s.who.session.TokenHash
-		}
-		if err = h.setWebPassword(ctx, u.ID, hash, keep); err == nil {
+		// whoever is logged in with the old one is logged out.
+		if err = h.setWebPassword(ctx, u.ID, hash, ""); err == nil {
 			err = h.db.SetAPIPasswordHash(ctx, u.ID, hash, store.FeverKey(u.Name, password))
 		}
 		notice = "notice.password"

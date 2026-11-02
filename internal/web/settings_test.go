@@ -606,3 +606,55 @@ func TestJournalPage(t *testing.T) {
 		}
 	})
 }
+
+// The own account takes the password and the second factor only through the
+// profile, which asks for the current password; the form of an administrator
+// asks for nothing, so it must not reach them.
+func TestAdministratorOwnCredentials(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		const secret = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP"
+		s.asAlice()
+		s.setting("alice", "totp_secret", secret)
+		s.setting("bob", "totp_secret", secret)
+		before := s.user("alice")
+
+		for _, form := range []url.Values{
+			{"action": {"password"}, "new": {"stolen-password"}, "again": {"stolen-password"}},
+			{"action": {"totp-off"}},
+		} {
+			a := s.post("/admin/users/alice", form)
+			if a.status != http.StatusBadRequest || !strings.Contains(a.body, `role="alert"`) || !strings.Contains(a.body, "your own account") {
+				t.Errorf("%s of one's own account: status %d, want 400 with the problem", form.Get("action"), a.status)
+			}
+		}
+		if _, on := s.settings("alice")["totp_secret"]; !on {
+			t.Error("the second factor of the administrator went off through user management")
+		}
+		if after := s.user("alice"); after.FeverKey != before.FeverKey || after.FeverKey == store.FeverKey("alice", "stolen-password") {
+			t.Error("the password of the administrator changed through user management")
+		}
+
+		own := s.shown("/admin/users/alice")
+		for _, absent := range []string{`value="password"`, `name="again"`, `value="totp-off"`} {
+			if strings.Contains(own, absent) {
+				t.Errorf("the page of the own account still has %s", absent)
+			}
+		}
+		if !strings.Contains(own, `href="/settings/profile"`) {
+			t.Error("the page of the own account does not point to the profile")
+		}
+
+		other := s.shown("/admin/users/bob")
+		for _, present := range []string{`value="password"`, `value="totp-off"`} {
+			if !strings.Contains(other, present) {
+				t.Errorf("the page of another user lacks %s", present)
+			}
+		}
+		if a := s.post("/admin/users/bob", url.Values{"action": {"password"}, "new": {"bobs-new-password"}, "again": {"bobs-new-password"}}); a.status != http.StatusSeeOther {
+			t.Errorf("another user's password: status %d", a.status)
+		}
+		if a := s.post("/admin/users/bob", url.Values{"action": {"totp-off"}}); a.status != http.StatusSeeOther {
+			t.Errorf("another user's totp-off: status %d", a.status)
+		}
+	})
+}
