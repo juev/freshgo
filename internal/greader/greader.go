@@ -25,6 +25,7 @@ import (
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/refresh"
 	"github.com/juev/freshgo/internal/store"
+	"github.com/juev/freshgo/internal/translate"
 )
 
 // Alias is the path FreshRSS serves the API at. Requests under it are
@@ -37,10 +38,11 @@ const maxBody = 1 << 20
 
 // Options are what a Handler works with.
 type Options struct {
-	DB        *store.Store
-	Refresher *refresh.Refresher
-	Hooks     *hooks.Registry
-	Log       *slog.Logger
+	Translator *translate.Translator
+	DB         *store.Store
+	Refresher  *refresh.Refresher
+	Hooks      *hooks.Registry
+	Log        *slog.Logger
 	// BaseURL is the public address of the server, without a trailing
 	// slash. When empty, links are built from the request.
 	BaseURL string
@@ -61,17 +63,18 @@ type Options struct {
 
 // Handler answers the requests of the Google Reader API.
 type Handler struct {
-	db        *store.Store
-	refresher *refresh.Refresher
-	hooks     *hooks.Registry
-	log       *slog.Logger
-	baseURL   string
-	media     bool
-	guard     *authguard.Guard
-	decoys    authguard.Decoys
-	proxies   []netip.Prefix
-	pushKey   string
-	now       func() time.Time
+	translator *translate.Translator
+	db         *store.Store
+	refresher  *refresh.Refresher
+	hooks      *hooks.Registry
+	log        *slog.Logger
+	baseURL    string
+	media      bool
+	guard      *authguard.Guard
+	decoys     authguard.Decoys
+	proxies    []netip.Prefix
+	pushKey    string
+	now        func() time.Time
 }
 
 // New returns a Handler.
@@ -81,7 +84,8 @@ func New(o Options) *Handler {
 		guard = &authguard.Guard{}
 	}
 	return &Handler{
-		db: o.DB, refresher: o.Refresher, hooks: o.Hooks, log: o.Log, baseURL: o.BaseURL, media: o.MediaProxy,
+		translator: o.Translator,
+		db:         o.DB, refresher: o.Refresher, hooks: o.Hooks, log: o.Log, baseURL: o.BaseURL, media: o.MediaProxy,
 		guard: guard, proxies: o.TrustedProxies, pushKey: o.PushKey, now: time.Now,
 	}
 }
@@ -243,7 +247,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	endpoint := h.dispatch
-	if pushRequest(q) {
+	if translationRequest(q) {
+		endpoint = h.translation
+	} else if pushRequest(q) {
 		endpoint = h.push
 	} else if len(q.parts) < 5 || q.parts[1] != "reader" || q.parts[2] != "api" || q.parts[3] != "0" {
 		badRequest(w)

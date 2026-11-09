@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/text/language"
 	"golang.org/x/text/language/display"
 
@@ -25,8 +26,9 @@ const attribute = "translations"
 // record is the translation of an entry into one language, as far as it
 // has come.
 type record struct {
-	Title   string `json:"title"`
-	Content string `json:"content"`
+	SameLanguage bool   `json:"same_language,omitempty"`
+	Title        string `json:"title"`
+	Content      string `json:"content"`
 	// Done of Total paragraphs were asked for; Failed of them stand in the
 	// language of the source.
 	Done   int `json:"done"`
@@ -57,6 +59,7 @@ func records(e *store.Entry) (map[string]json.RawMessage, map[string]record) {
 
 // State is the translation of an entry into a language as a page shows it.
 type State struct {
+	SameLanguage bool
 	// Exists reports a translation of the text the entry has now, whole or
 	// in part; Shown that the reader looks at it and not at the original.
 	Exists, Shown bool
@@ -87,11 +90,12 @@ func Of(e *store.Entry, tag string) State {
 type Translator struct {
 	db     *store.Store
 	client *Client
+	steps  *semaphore.Weighted
 }
 
 // New returns a Translator.
 func New(db *store.Store, client *Client) *Translator {
-	return &Translator{db: db, client: client}
+	return &Translator{db: db, client: client, steps: semaphore.NewWeighted(1)}
 }
 
 // sampleSize is about how many bytes of a text the model is shown to tell
@@ -104,6 +108,14 @@ const sampleSize = 600
 // ErrSameLanguage and stores nothing, and translates the title. A
 // translation the reader had hidden is shown again.
 func (t *Translator) Step(ctx context.Context, userID, entryID int64, tag language.Tag) (State, error) {
+	if err := t.steps.Acquire(ctx, 1); err != nil {
+		return State{}, err
+	}
+	defer t.steps.Release(1)
+	return t.step(ctx, userID, entryID, tag, true)
+}
+
+func (t *Translator) step(ctx context.Context, userID, entryID int64, tag language.Tag, show bool) (State, error) {
 	e, err := t.db.EntryByID(ctx, userID, entryID)
 	if err != nil {
 		return State{}, err
@@ -176,7 +188,10 @@ func (t *Translator) Step(ctx context.Context, userID, entryID int64, tag langua
 	if err := t.client.translate(ctx, rest[:n], name, &st); err != nil {
 		return State{}, err
 	}
-	rec.Done, rec.Failed, rec.Hidden, rec.At = rec.Done+n, rec.Failed+st.Failed, false, len(every)
+	rec.Done, rec.Failed, rec.At = rec.Done+n, rec.Failed+st.Failed, len(every)
+	if show {
+		rec.Hidden = false
+	}
 	if n < len(rest) {
 		for i, run := range every {
 			if run == rest[n] {
@@ -187,7 +202,10 @@ func (t *Translator) Step(ctx context.Context, userID, entryID int64, tag langua
 		rec.Done = rec.Total
 	}
 	rec.Content = render(root)
-	return t.store(ctx, userID, entryID, key, func(fresh *store.Entry, _ record, _ bool) (record, bool) {
+	return t.store(ctx, userID, entryID, key, func(fresh *store.Entry, old record, _ bool) (record, bool) {
+		if !show {
+			rec.Hidden = old.Hidden
+		}
 		// The text was changed meanwhile: what was translated is of another text.
 		return rec, hashOf(fresh) == rec.Of
 	})

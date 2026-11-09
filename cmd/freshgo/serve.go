@@ -93,7 +93,8 @@ func routes(health, api, feverAPI, icons, misc, hubs, pages http.Handler) http.H
 			feverAPI.ServeHTTP(w, r)
 		case path == greader.Alias, strings.HasPrefix(path, greader.Alias+"/"),
 			strings.HasPrefix(path, "/accounts/"), strings.HasPrefix(path, "/reader/"),
-			path == greader.PushPath, strings.HasPrefix(path, greader.PushPath+"/"):
+			path == greader.PushPath, strings.HasPrefix(path, greader.PushPath+"/"),
+			path == greader.TranslationPath, strings.HasPrefix(path, greader.TranslationPath+"/"):
 			api.ServeHTTP(w, r)
 		default:
 			pages.ServeHTTP(w, r)
@@ -228,7 +229,7 @@ func runServe(ctx context.Context, e env, args []string) (err error) {
 	guard := &authguard.Guard{}
 	api := greader.New(greader.Options{
 		DB: db, Refresher: s.refresher, Hooks: s.registry, Log: s.log, BaseURL: conf.BaseURL, MediaProxy: true,
-		Guard: guard, TrustedProxies: proxies, PushKey: conf.VAPIDPublicKey,
+		Guard: guard, TrustedProxies: proxies, PushKey: conf.VAPIDPublicKey, Translator: s.translator,
 	})
 	feverAPI := fever.New(fever.Options{
 		DB: db, Hooks: s.registry, Log: s.log, Guard: guard, TrustedProxies: proxies,

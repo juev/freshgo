@@ -46,6 +46,9 @@ func TestRoutes(t *testing.T) {
 		status int
 		body   string
 	}{
+		"/api/freshgo/translation":                {200, "api /api/freshgo/translation"},
+		"/api/freshgo/translation/entry":          {200, "api /api/freshgo/translation/entry"},
+		"/api/freshgo/translationx":               {200, "pages /api/freshgo/translationx"},
 		"/accounts/ClientLogin":                   {200, "api /accounts/ClientLogin"},
 		"/reader/api/0/token":                     {200, "api /reader/api/0/token"},
 		"/api/greader.php":                        {200, "api /api/greader.php"},
