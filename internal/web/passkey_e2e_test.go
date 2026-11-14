@@ -58,10 +58,12 @@ func TestE2EPasskeys(t *testing.T) {
 			}}),
 		)
 
-		// Adding a passkey in the profile.
+		// Adding a passkey in the profile. The hint must leave the screen,
+		// not just carry hidden: a display rule of the stylesheet beats the
+		// attribute (#216).
 		b.login("alice")
 		b.open("/settings/profile")
-		b.until("the form of a passkey", `document.getElementById('passkey-add') && !document.getElementById('passkey-add').hidden && document.getElementById('passkey-needs-browser').hidden`)
+		b.until("the form of a passkey", `document.getElementById('passkey-add') && !document.getElementById('passkey-add').hidden && getComputedStyle(document.getElementById('passkey-needs-browser')).display === 'none'`)
 		b.run(chromedp.SendKeys("#passkey-new", "virtual key"), chromedp.Click("#passkey-register"))
 		b.until("the passkey listed", `document.querySelector('table.data') && document.querySelector('input[name=name][value="virtual key"]')`)
 		if got := s.passkeys("alice"); len(got) != 1 || got[0].Name != "virtual key" {
@@ -87,7 +89,7 @@ func TestE2EPasskeys(t *testing.T) {
 		// With logins by password off, only the passkey is left on the page.
 		s.system(func(sys *store.System) { sys.PasswordLoginOff = true })
 		b.run(chromedp.Click(".account button"))
-		b.until("the login page without a password", `location.pathname === '/login' && !document.getElementById('password') && document.getElementById('passkey-signin') && !document.getElementById('passkey-signin').hidden && document.getElementById('passkey-signin-needs-browser').hidden`)
+		b.until("the login page without a password", `location.pathname === '/login' && !document.getElementById('password') && document.getElementById('passkey-signin') && !document.getElementById('passkey-signin').hidden && getComputedStyle(document.getElementById('passkey-signin-needs-browser')).display === 'none'`)
 		b.run(chromedp.Click("#remember"), chromedp.Click("#passkey-signin button"))
 		b.until("the reading screen after the passkey", `location.pathname === '/' && document.querySelector('.entries')`)
 

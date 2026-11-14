@@ -1,6 +1,12 @@
 /* freshgo: one stylesheet, two looks, each light and dark. Colours and sizes are variables;
    nothing below the :root blocks names a colour. */
 
+/* A display rule of an element beats the user-agent rule of [hidden], so
+   the attribute alone would leave the element on the screen. */
+[hidden] {
+	display: none !important;
+}
+
 /* Keep the space reserved while a direct response is being parsed. The
    early script releases the entire list at DOMContentLoaded, not image load. */
 .preparing-reader .entries {
