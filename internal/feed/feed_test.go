@@ -194,21 +194,13 @@ func TestParseSanitizesContentOfAnyType(t *testing.T) {
 	}
 }
 
-// Parsing time grows with the size of the document, not with its square.
+// Large inputs must still be parsed completely. The separate scaling guard
+// checks complexity without imposing a machine-dependent wall-clock budget.
 func TestParseLargeDocuments(t *testing.T) {
-	for name, doc := range map[string]string{
-		"many items":       `<rss><channel><title>T</title>` + strings.Repeat(`<item/>`, 200000) + `</channel></rss>`,
-		"many text chunks": `<rss><channel><item><description>` + strings.Repeat(`xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx<b/>`, 200000) + `</description></item></channel></rss>`,
-		"many authors and media": `<rss xmlns:media="http://search.yahoo.com/mrss/" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel>` +
-			strings.Repeat(`<item><media:content url="http://e.test/a.png"/></item>`, 50000) + `</channel></rss>`,
-	} {
-		start := time.Now()
-		if _, err := Parse([]byte(doc), Options{}); err != nil {
-			t.Errorf("%s: %v", name, err)
-		}
-		if took := time.Since(start); took > 20*time.Second {
-			t.Errorf("%s: %d bytes took %v", name, len(doc), took)
-		}
+	for _, fixture := range largeDocuments {
+		t.Run(fixture.name, func(t *testing.T) {
+			checkLargeDocument(t, fixture, fixture.count, fixture.document(fixture.count))
+		})
 	}
 }
 
