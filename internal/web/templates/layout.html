@@ -10,6 +10,7 @@
 <link rel="manifest" href="{{.URL "/manifest.webmanifest"}}" crossorigin="use-credentials">
 <link rel="stylesheet" href="{{.Asset "app.css"}}">
 <meta name="htmx-config" content='{"prefix": "", "defaultTimeout": 0}'>
+{{if eq .Section "reader"}}<script src="{{.Asset "ready.js"}}"></script>{{end}}
 <script src="{{.Asset "htmx.min.js"}}" defer></script>
 <script src="{{.Asset "app.js"}}" defer></script>
 </head>

@@ -775,16 +775,16 @@ type choice struct {
 
 // readerPage is what the reading screen shows.
 type readerPage struct {
-	Tree     tree
-	Entries  []article
-	Unread   int
-	States   []choice
-	Sorts    []choice
-	Sort     string
-	Asc      bool
-	Query    string
-	Problem  string
-	State    string
+	Tree    tree
+	Entries []article
+	Unread  int
+	States  []choice
+	Sorts   []choice
+	Sort    string
+	Asc     bool
+	Query   string
+	Problem string
+	State   string
 	// Adaptive says that State follows whether the stream has unread
 	// entries.
 	Adaptive bool
@@ -863,10 +863,17 @@ func (h *Handler) reader(kind string) http.HandlerFunc {
 		if showing.view != "" {
 			expanded = showing.view == viewExpanded
 		}
+		// A conditional navigation renders the exact snapshot time of its
+		// prepared page. Its contents are still read afresh below; only the
+		// cutoff of "mark all" is kept. Old or future cutoffs cannot be reused.
+		before := h.now().UnixMicro()
+		if at, err := strconv.ParseInt(r.Header.Get("X-Prepared-At"), 10, 64); err == nil && at <= before && at > before-int64(30*time.Second/time.Microsecond) {
+			before = at
+		}
 		page := readerPage{
 			Unread: s.unread, Sort: showing.sort, Asc: showing.asc, Query: showing.query, State: showing.state,
 			Adaptive: showing.adaptive, Asked: showing.asked, Path: s.path(), Here: showing.here(r.URL), Expanded: expanded,
-			Before: h.now().UnixMicro(), CanChange: !who.anonymous,
+			Before: before, CanChange: !who.anonymous,
 			CanRefresh: !who.anonymous || state(r).system.AllowAnonymousRefresh,
 		}
 		if !who.anonymous {

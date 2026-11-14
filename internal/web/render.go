@@ -2,7 +2,9 @@ package web
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"embed"
+	"fmt"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -159,7 +161,12 @@ func (h *Handler) fragment(w http.ResponseWriter, r *http.Request, name string, 
 // render writes a page. It is rendered in full first, so that a template
 // that fails gives an error page instead of half a page.
 func (h *Handler) render(w http.ResponseWriter, r *http.Request, status int, page string, v *view) {
-	v.Notice = h.notice(w, r, v)
+	// A speculative reader GET must not consume a one-shot notice. Normal
+	// navigation still gets it, and therefore cannot match the prepared HTML.
+	preparing := page == "reader" && r.Header.Get("X-Prepare") == "true"
+	if !preparing {
+		v.Notice = h.notice(w, r, v)
+	}
 	var out bytes.Buffer
 	if err := h.pages[page].ExecuteTemplate(&out, "layout", v); err != nil {
 		h.log.Error("page cannot be rendered", "page", page, "path", r.URL.Path, "error", err)
@@ -170,6 +177,20 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, status int, pag
 	if w.Header().Get("Cache-Control") == "" {
 		// Pages show the reader's own data and change with every action.
 		w.Header().Set("Cache-Control", "no-store")
+	}
+	if page == "reader" && status == http.StatusOK {
+		// Validate the complete rendered representation after authentication,
+		// not an event counter: preferences, filters and changes from other
+		// clients must all be checked, even while SSE is disconnected.
+		tag := fmt.Sprintf(`"%x"`, sha256.Sum256(out.Bytes()))
+		w.Header().Set("ETag", tag)
+		w.Header().Set("X-Prepared-At", strconv.FormatInt(v.Data.(readerPage).Before, 10))
+		w.Header().Set("Cache-Control", "no-store")
+		w.Header().Add("Vary", "X-Prepare, X-Prepared-At")
+		if !preparing && r.Header.Get("If-None-Match") == tag {
+			w.WriteHeader(http.StatusNotModified)
+			return
+		}
 	}
 	w.WriteHeader(status)
 	_, _ = out.WriteTo(w)
