@@ -12,6 +12,7 @@ import (
 
 	"github.com/chromedp/cdproto/webauthn"
 	"github.com/chromedp/chromedp"
+	"github.com/chromedp/chromedp/kb"
 
 	"github.com/juev/freshgo/internal/store"
 )
@@ -72,6 +73,15 @@ func TestE2EPasskeys(t *testing.T) {
 		if b.text(`document.getElementById('passkey-failed').hidden`) != "true" {
 			t.Error("the page says the passkey failed")
 		}
+		// The added date stays on one line even where the column is
+		// narrower, as the Russian page makes it (#217).
+		s.setting("alice", "language", "ru")
+		b.open("/settings/profile")
+		if !read[bool](b, `(el => { if (!el) return false; const r = document.createRange(); r.selectNodeContents(el); return r.getClientRects().length === 1 })(document.querySelector('table.data td.date'))`) {
+			t.Error("the added date does not stay on one line")
+		}
+		s.setting("alice", "language", "en")
+		b.open("/settings/profile")
 
 		// Logging in with it, from the login page.
 		b.run(chromedp.Click(".account button"))
@@ -100,5 +110,22 @@ func TestE2EPasskeys(t *testing.T) {
 		b.until("the page that asks again", `location.pathname === '/reauth' && !document.getElementById('password') && document.getElementById('passkey-signin') && !document.getElementById('passkey-signin').hidden`)
 		b.run(chromedp.Click("#passkey-signin button"))
 		b.until("the administration", `location.pathname === '/admin/users'`)
+
+		// Removing a passkey asks first, as the other removals do (#217).
+		// With passwords on again, the last passkey may go.
+		s.system(func(sys *store.System) { sys.PasswordLoginOff = false })
+		b.open("/settings/profile")
+		b.tabTo(`table.data details.danger form[action$="/delete"] button, table.data details.danger summary`)
+		if b.focus() != "summary" {
+			t.Fatalf("the button that removes a passkey can be reached before its question is open: focus on %s", b.focus())
+		}
+		b.press(kb.Enter)
+		b.tabTo(`table.data form[action$="/delete"] button`)
+		b.accessible("the question before removing a passkey")
+		b.press(kb.Enter)
+		b.until("the passkey removed", `location.pathname === '/settings/profile' && document.querySelector('#messages').textContent.includes('Passkey removed.')`)
+		if got := s.passkeys("alice"); len(got) != 0 {
+			t.Errorf("passkeys after the removal: %+v", got)
+		}
 	})
 }

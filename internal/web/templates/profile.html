@@ -96,9 +96,15 @@
 <input type="text" id="passkey-name-{{.ID}}" name="name" value="{{.Name}}" maxlength="64" autocomplete="off" required>
 <button type="submit">{{$.T "settings.passkeys.rename"}}</button>
 </form></td>
-<td>{{.Created}}</td>
-<td>{{if .Used}}{{.Used}}{{else}}{{$.T "settings.passkeys.never"}}{{end}}</td>
-<td><form method="post" action="{{$.URL "/settings/profile/passkeys"}}/{{.ID}}/delete"><button type="submit">{{$.T "form.delete"}}</button></form></td>
+<td class="date">{{.Created}}</td>
+<td class="date">{{if .Used}}{{.Used}}{{else}}{{$.T "settings.passkeys.never"}}{{end}}</td>
+<td><details class="menu danger">
+<summary>{{$.T "settings.passkeys.delete"}}</summary>
+<form method="post" action="{{$.URL "/settings/profile/passkeys"}}/{{.ID}}/delete">
+<p>{{$.T "settings.passkeys.delete.confirm"}}</p>
+<button type="submit">{{$.T "form.delete"}}</button>
+</form>
+</details></td>
 </tr>
 {{end}}</tbody>
 </table>

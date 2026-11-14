@@ -235,7 +235,8 @@ func TestAdministratorRemovesPasskeys(t *testing.T) {
 		one, two := bob.addPasskey("one"), bob.addPasskey("two")
 		s.addPasskey("alice's")
 		page := s.get("/admin/users/bob").body
-		for _, want := range []string{">one<", ">two<", `action="/admin/users/bob/passkeys/delete"`, `name="id" value="all"`} {
+		for _, want := range []string{">one<", ">two<", `action="/admin/users/bob/passkeys/delete"`, `name="id" value="all"`,
+			"<summary>Delete…</summary>", "The passkey is deleted. The device that uses it can no longer log in with it."} {
 			if !strings.Contains(page, want) {
 				t.Errorf("the page of bob lacks %q", want)
 			}

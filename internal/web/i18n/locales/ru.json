@@ -750,6 +750,8 @@
   "settings.passkeys.add": "Добавить passkey",
   "settings.passkeys.created": "Добавлен",
   "settings.passkeys.default-name": "Passkey",
+  "settings.passkeys.delete": "Удалить…",
+  "settings.passkeys.delete.confirm": "Passkey будет удалён. Устройство, которое им пользуется, больше не сможет с ним войти.",
   "settings.passkeys.failed": "Passkey не добавлен. Попробуйте ещё раз.",
   "settings.passkeys.intro": "Passkey позволяет войти без пароля и без кода из приложения: устройство проверяет, что это вы, по отпечатку пальца, лицу или PIN-коду. Passkey можно завести на каждое устройство, число их не ограничено.",
   "settings.passkeys.name": "Название",

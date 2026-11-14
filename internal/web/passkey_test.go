@@ -559,6 +559,12 @@ func TestPasskeyManagement(t *testing.T) {
 		if !strings.Contains(page, "never") {
 			t.Error("a passkey that never logged in is not said to be unused")
 		}
+		// The removal asks first, as the other removals do (#217).
+		for _, want := range []string{"<summary>Delete…</summary>", "The passkey is deleted. The device that uses it can no longer log in with it."} {
+			if !strings.Contains(page, want) {
+				t.Errorf("the profile page lacks %q", want)
+			}
+		}
 
 		target := "/settings/profile/passkeys/" + itoa(list[0].ID)
 		location, body := s.follow(target+"/rename", url.Values{"name": {" desk "}})
