@@ -1224,6 +1224,8 @@ kbd {
 }
 
 .form fieldset {
+	/* Native controls must not impose their intrinsic width on the column. */
+	min-width: 0;
 	margin: calc(var(--space) * 3) 0;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
