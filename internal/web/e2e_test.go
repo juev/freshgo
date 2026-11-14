@@ -162,6 +162,11 @@ func (b *browser) eventually(what string, ok func() bool) {
 			if strings.Contains(what, "%s") {
 				what = fmt.Sprintf(what, b.focus())
 			}
+			if diag, err := chromedp.Run(b.ctx, chromedp.Evaluate[[]string](`(window.__diag || []).slice(-400)`)); err == nil {
+				for _, line := range diag {
+					b.t.Logf("diag: %s", line)
+				}
+			}
 			b.t.Fatalf("timed out waiting: %s", what)
 		}
 		time.Sleep(30 * time.Millisecond)
@@ -494,8 +499,40 @@ func TestE2EPagesInPlace(t *testing.T) {
 		b := browse(t, s)
 		// The way back goes by popstate, as in a browser without the
 		// navigation API (Firefox); TestE2EStreamsInPlace goes by the API.
+		// The recorder keeps the focus, the keys, the htmx requests and the
+		// scroll of the page; eventually dumps it when a wait times out, so
+		// a flake of the navigation can be read (#220).
 		b.run(command(page.AddScriptToEvaluateOnNewDocument, page.AddScriptToEvaluateOnNewDocumentParams{
-			Source: `Object.defineProperty(window, 'navigation', { value: undefined })`,
+			Source: `Object.defineProperty(window, 'navigation', { value: undefined });
+(() => {
+	window.__diag = [];
+	const rec = (kind, data) => {
+		const d = window.__diag;
+		d.push(Math.round(performance.now()) + ' ' + kind + (data === undefined ? '' : ' ' + JSON.stringify(data)));
+		if (d.length > 4000) d.splice(0, d.length - 4000);
+	};
+	const name = (e) => e && e.id ? '#' + e.id : (e ? e.tagName.toLowerCase() : '');
+	document.addEventListener('focusin', (e) => rec('focus', name(e.target)), true);
+	document.addEventListener('keydown', (e) => { if (e.key === 'Enter') rec('key-enter', { target: name(e.target), prevented: e.defaultPrevented }); }, true);
+	document.addEventListener('click', (e) => rec('click', { target: name(e.target), prevented: e.defaultPrevented }), true);
+	for (const ev of ['htmx:config:request', 'htmx:before:request', 'htmx:before:response', 'htmx:before:swap', 'htmx:after:swap', 'htmx:error', 'htmx:finally:request', 'htmx:before:history:update', 'htmx:after:request']) {
+		document.addEventListener(ev, (e) => {
+			const ctx = e.detail && e.detail.ctx;
+			const info = { path: location.pathname };
+			if (ctx && ctx.request) { info.method = ctx.request.method; info.action = ctx.request.action; info.restore = Boolean(ctx.request.headers && ctx.request.headers['HX-History-Restore-Request']); }
+			if (ctx && ctx.response) { info.status = ctx.response.status; info.type = ctx.response.headers && ctx.response.headers.get('Content-Type'); }
+			if (ev === 'htmx:before:history:update' || ev === 'htmx:after:swap') { info.state = history.state; info.scrollY = window.scrollY; }
+			if (e.detail && e.detail.error) info.error = String(e.detail.error);
+			rec(ev, info);
+		});
+	}
+	window.addEventListener('popstate', (e) => rec('popstate', { state: e.state, path: location.pathname, scrollY: window.scrollY }));
+	window.addEventListener('pageshow', (e) => rec('pageshow', { persisted: e.persisted, path: location.pathname }));
+	window.addEventListener('pagehide', () => rec('pagehide', { path: location.pathname }));
+	const origScrollTo = window.scrollTo.bind(window);
+	window.scrollTo = function (...args) { rec('scrollTo', args); return origScrollTo(...args); };
+	new PerformanceObserver((list) => { for (const r of list.getEntries()) rec('net', { name: r.name.replace(location.origin, ''), dur: Math.round(r.duration) }); }).observe({ type: 'resource', buffered: true });
+})();`,
 		}))
 		b.login("alice")
 		b.run(chromedp.Evaluate[chromedp.Void](`window.stayed = true; window.refused = [];
@@ -548,6 +585,9 @@ func TestE2EPagesInPlace(t *testing.T) {
 		b.press("?")
 		b.until("the help in the language that came", `document.querySelector('dialog[open]') && document.querySelector('dialog[open]').textContent.includes('Клавиши') && document.querySelector('dialog[open]').textContent.includes('Открыть следующую статью')`)
 		b.press(kb.Escape)
+		// The close event restores the focus after the trap is released; a
+		// Tab that lands before it has its focus stolen back.
+		b.until("the help closed", `!document.querySelector('dialog')`)
 
 		if refused := b.text(`window.refused.join('; ')`); refused != "" {
 			t.Errorf("the policy of the page refuses: %s", refused)
