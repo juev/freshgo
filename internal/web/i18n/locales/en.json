@@ -708,6 +708,8 @@
   "settings.passkeys.add": "Add a passkey",
   "settings.passkeys.created": "Added",
   "settings.passkeys.default-name": "Passkey",
+  "settings.passkeys.delete": "Delete…",
+  "settings.passkeys.delete.confirm": "The passkey is deleted. The device that uses it can no longer log in with it.",
   "settings.passkeys.failed": "The passkey was not added. Try again.",
   "settings.passkeys.intro": "A passkey logs you in without a password or a code: your device checks that it is you, with a fingerprint, a face or a PIN. You can have as many as you like, one for each device.",
   "settings.passkeys.name": "Name",

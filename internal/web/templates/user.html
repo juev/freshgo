@@ -45,9 +45,16 @@
 <tbody>
 {{range .Data.Passkeys.Rows}}<tr>
 <td>{{.Name}}</td>
-<td>{{.Created}}</td>
-<td>{{if .Used}}{{.Used}}{{else}}{{$.T "settings.passkeys.never"}}{{end}}</td>
-<td>{{if not $.Data.Self}}<form method="post" action="{{$.URL "/admin/users"}}/{{$.Data.Row.Name}}/passkeys/delete"><input type="hidden" name="id" value="{{.ID}}"><button type="submit">{{$.T "form.delete"}}</button></form>{{end}}</td>
+<td class="date">{{.Created}}</td>
+<td class="date">{{if .Used}}{{.Used}}{{else}}{{$.T "settings.passkeys.never"}}{{end}}</td>
+<td>{{if not $.Data.Self}}<details class="menu danger">
+<summary>{{$.T "settings.passkeys.delete"}}</summary>
+<form method="post" action="{{$.URL "/admin/users"}}/{{$.Data.Row.Name}}/passkeys/delete">
+<input type="hidden" name="id" value="{{.ID}}">
+<p>{{$.T "settings.passkeys.delete.confirm"}}</p>
+<button type="submit">{{$.T "form.delete"}}</button>
+</form>
+</details>{{end}}</td>
 </tr>
 {{end}}</tbody>
 </table>

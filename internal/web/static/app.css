@@ -1411,6 +1411,11 @@ table.data thead th {
 	border-bottom-color: var(--border);
 }
 
+/* A date is read as one whole; a narrow column breaks it mid-number. */
+table.data td.date {
+	white-space: nowrap;
+}
+
 table.log td:last-child {
 	overflow-wrap: anywhere;
 	font-family: var(--font-mono);
