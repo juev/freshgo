@@ -60,7 +60,78 @@
 	const parse = (html) => new DOMParser().parseFromString(html, 'text/html');
 
 	// ask fetches a page or a part of one as the reader in front of it.
-	const ask = (url, options) => fetch(url, { credentials: 'same-origin', ...options });
+	const ask = (url, options) => {
+		if (options?.method && options.method !== 'GET') {
+			forgetPrepared();
+		}
+		return fetch(url, { credentials: 'same-origin', ...options });
+	};
+
+	// Only one unread page is prepared, in memory and for this mounted page.
+	// It is never shown without an authenticated conditional GET. Events are
+	// only an early eviction hint; a missed event cannot make stale HTML valid.
+	let prepared = null;
+	let preparing = null;
+	let prepareTimer = 0;
+	function forgetPrepared() {
+		clearTimeout(prepareTimer);
+		preparing?.abort();
+		preparing = prepared = null;
+	}
+	const prepareUnread = () => {
+		forgetPrepared();
+		if (!document.querySelector('.account-name') || !urls.unread || document.hidden || navigator.connection?.saveData) {
+			return;
+		}
+		const url = new URL(urls.unread, location.href);
+		if (url.origin !== location.origin || url.href === location.href || entries?.dataset.state === 'unread') {
+			return;
+		}
+		prepareTimer = setTimeout(async () => {
+			const controller = new AbortController();
+			preparing = controller;
+			const timeout = setTimeout(() => controller.abort(), 5000);
+			try {
+				const response = await ask(url.href, { headers: { 'X-Prepare': 'true' }, signal: controller.signal, redirect: 'error' });
+				if (!response.ok || !response.headers.get('Content-Type')?.startsWith('text/html') || !response.headers.has('ETag') || !response.headers.has('X-Prepared-At')) {
+					await response.body?.cancel();
+					return;
+				}
+				// Bound both the retained HTML and a response being downloaded.
+				const reader = response.body.getReader();
+				const chunks = [];
+				let size = 0;
+				for (;;) {
+					const { value, done } = await reader.read();
+					if (done) {
+						break;
+					}
+					size += value.byteLength;
+					if (size > 2 * 1024 * 1024) {
+						await reader.cancel();
+						return;
+					}
+					chunks.push(value);
+				}
+				if (!controller.signal.aborted) {
+					prepared = { url: url.href, body: new Blob(chunks), headers: response.headers, until: performance.now() + 15000 };
+				}
+			} catch {
+				// Speculation is optional: navigation still uses its normal request.
+			} finally {
+				clearTimeout(timeout);
+				if (preparing === controller) {
+					preparing = null;
+				}
+			}
+		}, 100);
+	};
+	window.addEventListener('pagehide', forgetPrepared);
+	document.addEventListener('visibilitychange', () => {
+		if (document.hidden) {
+			forgetPrepared();
+		}
+	});
 
 	// ---- The colour of the window ----
 
@@ -754,13 +825,16 @@
 						return false;
 					}
 					const page = parse(html);
+					const batch = document.createDocumentFragment();
+					const seen = new Set(Array.from(list.children, (article) => article.id));
 					for (const article of page.querySelectorAll('.entries > article.entry')) {
-						if (!document.getElementById(article.id)) {
-							const added = document.adoptNode(article);
-							list.append(added);
-							revealShares(added);
+						if (!seen.has(article.id)) {
+							seen.add(article.id);
+							batch.append(document.adoptNode(article));
 						}
 					}
+					revealShares(batch);
+					list.append(batch);
 					const more = page.querySelector('.more');
 					const old = document.querySelector('.more');
 					if (more) {
@@ -883,6 +957,7 @@
 	// refreshTree brings the counts of the tree and the state of the listed
 	// entries up to date; elsewhere says that the change came from elsewhere.
 	function refreshTree(elsewhere = false) {
+		forgetPrepared();
 		if (!tree) {
 			return;
 		}
@@ -1103,6 +1178,20 @@
 	});
 	document.addEventListener('htmx:before:request', (event) => {
 		if (inPlace(event)) {
+			const cached = prepared;
+			forgetPrepared();
+			const { ctx } = event.detail;
+			if (ctx.request.method === 'GET' && !restored(ctx) && cached && cached.until > performance.now()
+				&& new URL(ctx.request.action, location.href).href === cached.url) {
+				const fetchPage = ctx.fetch;
+				ctx.fetch = async (url, options) => {
+					const headers = new Headers(options.headers);
+					headers.set('If-None-Match', cached.headers.get('ETag'));
+					headers.set('X-Prepared-At', cached.headers.get('X-Prepared-At'));
+					const response = await fetchPage(url, { ...options, headers });
+					return response.status === 304 ? new Response(cached.body, { headers: cached.headers }) : response;
+				};
+			}
 			busy(true);
 		}
 	});
@@ -1184,6 +1273,8 @@
 			busy(false);
 		}
 	});
+
+	onContent(prepareUnread);
 
 	// ---- Dialogs ----
 
