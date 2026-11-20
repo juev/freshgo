@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,6 +71,12 @@ type Source struct {
 type item struct {
 	title, content, link, author, timestamp, thumbnail, guid string
 	tags                                                     []string
+	enclosures                                               []enclosure
+}
+
+type enclosure struct {
+	url, mediaType string
+	length         *int
 }
 
 // RSS returns the document as RSS 2.0.
@@ -207,6 +214,22 @@ func (d *document) rss(src Source) []byte {
 			b.WriteString("\"/>\n<media:content url=\"")
 			escape(&b, it.thumbnail)
 			b.WriteString("\" medium=\"image\"></media:content>\n")
+		}
+		for _, enclosure := range it.enclosures {
+			b.WriteString(`<enclosure url="`)
+			escape(&b, enclosure.url)
+			b.WriteByte('"')
+			if enclosure.mediaType != "" {
+				b.WriteString(` type="`)
+				escape(&b, enclosure.mediaType)
+				b.WriteByte('"')
+			}
+			if enclosure.length != nil {
+				b.WriteString(` length="`)
+				b.WriteString(strconv.Itoa(*enclosure.length))
+				b.WriteByte('"')
+			}
+			b.WriteString("/>\n")
 		}
 		b.WriteString("<description>")
 		escape(&b, it.content)

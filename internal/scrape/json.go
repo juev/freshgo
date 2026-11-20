@@ -216,17 +216,36 @@ func text(v any, path string) string {
 
 // jsonFeedNotation maps the fields of a standard JSON Feed.
 var jsonFeedNotation = map[string]string{
-	"feedTitle":       "title",
-	"item":            "items",
-	"itemTitle":       "title",
-	"itemContent":     "content_text",
-	"itemContentHTML": "content_html",
-	"itemUri":         "url",
-	"itemTimestamp":   "date_published",
-	"itemTimeFormat":  `Y-m-d\TH:i:s.vP`,
-	"itemThumbnail":   "image",
-	"itemCategories":  "tags",
-	"itemUid":         "id",
+	"feedTitle":            "title",
+	"item":                 "items",
+	"itemTitle":            "title",
+	"itemContent":          "content_text",
+	"itemContentHTML":      "content_html",
+	"itemUri":              "url",
+	"itemTimestamp":        "date_published",
+	"itemTimeFormat":       `Y-m-d\TH:i:s.vP`,
+	"itemThumbnail":        "image",
+	"itemCategories":       "tags",
+	"itemUid":              "id",
+	"itemAttachment":       "attachments",
+	"itemAttachmentUrl":    "url",
+	"itemAttachmentType":   "mime_type",
+	"itemAttachmentLength": "size_in_bytes",
+}
+
+func attachmentLength(value any) *int {
+	var raw string
+	switch v := value.(type) {
+	case json.Number:
+		raw = v.String()
+	case string:
+		raw = strings.TrimSpace(v)
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 0 {
+		return nil
+	}
+	return &n
 }
 
 // scrapeJSON is FreshRSS_dotNotation_Util::convertJsonToRss.
@@ -286,6 +305,21 @@ func scrapeJSON(body []byte, src Source, notation map[string]string) (*document,
 		}
 		it.thumbnail = get(entry, "itemThumbnail")
 		it.guid = get(entry, "itemUid")
+		if path := notation["itemAttachment"]; path != "" {
+			list, _ := lookup(entry, path)
+			for _, attachment := range elements(list) {
+				address := phpTrim(get(attachment, "itemAttachmentUrl"))
+				if address == "" {
+					continue
+				}
+				e := enclosure{url: address, mediaType: get(attachment, "itemAttachmentType")}
+				if lengthPath := notation["itemAttachmentLength"]; lengthPath != "" {
+					length, _ := lookup(attachment, lengthPath)
+					e.length = attachmentLength(length)
+				}
+				it.enclosures = append(it.enclosures, e)
+			}
+		}
 		if it.finish() {
 			doc.items = append(doc.items, it)
 		}
