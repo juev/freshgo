@@ -160,6 +160,52 @@ func TestParseAgainstFreshRSS(t *testing.T) {
 	}
 }
 
+func TestParseAtomHTTPSNamespace(t *testing.T) {
+	const document = `<atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xml:base="https://example.org/">` +
+		`<atom:title>Example feed</atom:title><atom:subtitle>Updates</atom:subtitle>` +
+		`<atom:link rel="self" href="feed.atom"/><atom:link href="index.html"/>` +
+		`<atom:entry><atom:id>urn:example:one</atom:id><atom:title>First entry</atom:title>` +
+		`<atom:link href="posts/one"/><atom:author><atom:name>Alice</atom:name></atom:author>` +
+		`<atom:content type="xhtml"><div xmlns="http://www.w3.org/1999/xhtml">` +
+		`<p>Read <a href="notes">the notes</a>.</p></div></atom:content></atom:entry></atom:feed>`
+
+	for _, tc := range []struct {
+		name, doc string
+	}{
+		{"prefixed", document},
+		{"default", strings.NewReplacer("xmlns:atom=", "xmlns=", "<atom:", "<", "</atom:", "</").Replace(document)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			want, err := Parse([]byte(tc.doc), Options{})
+			if err != nil {
+				t.Fatalf("canonical namespace: %v", err)
+			}
+			want.AssignGUIDs(CriteriaID, false)
+			if want.Title != "Example feed" || want.SelfURL != "https://example.org/feed.atom" || len(want.Items) != 1 {
+				t.Fatalf("unexpected canonical feed: %+v", want)
+			}
+			item := want.Items[0]
+			if item.GUID != "urn:example:one" || item.Link != "https://example.org/posts/one" || !strings.Contains(item.Content, `<a href="https://example.org/notes">the notes</a>`) {
+				t.Fatalf("unexpected canonical entry: %+v", item)
+			}
+			got, err := Parse([]byte(strings.ReplaceAll(tc.doc, nsAtom10, "https://www.w3.org/2005/Atom")), Options{})
+			if err != nil {
+				t.Fatalf("HTTPS namespace: %v", err)
+			}
+			got.AssignGUIDs(CriteriaID, false)
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("HTTPS namespace: got %+v, want %+v", got, want)
+			}
+		})
+	}
+
+	for _, other := range []string{"https://www.w3.org/2005/Atom/", "https://purl.org/atom/ns#"} {
+		if _, err := Parse([]byte(strings.ReplaceAll(document, nsAtom10, other)), Options{}); err == nil {
+			t.Errorf("unexpectedly accepted namespace %q", other)
+		}
+	}
+}
+
 // SimplePie hands such content over as it came; here it is cleaned.
 func TestParseSanitizesContentOfAnyType(t *testing.T) {
 	const payload = `&lt;script&gt;alert(1)&lt;/script&gt;&lt;img src=x onerror=alert(2)&gt;&lt;a href="javascript:alert(3)"&gt;x&lt;/a&gt;`

@@ -95,6 +95,8 @@ func (n *node) attr(name string) (string, bool) {
 
 func normalizeSpace(space string) string {
 	switch {
+	case space == "https://www.w3.org/2005/Atom":
+		return nsAtom10
 	case space == "xml":
 		return nsXML
 	case mediaNamespaces[space]:
