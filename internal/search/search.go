@@ -114,9 +114,8 @@ var (
 	leadingOr    = regexp.MustCompile(`(?i)^OR\b`)
 	openingParen = regexp.MustCompile(`(?:^|[^\\])\(`)
 
-	namedQueryQuoted = regexp.MustCompile(`\bsearch:(?:"(.*?)"|'(.*?)')`)
-	namedQueryBare   = regexp.MustCompile(`\bsearch:([^ \t\n\v\f\r"']*)`)
-	numberedQuery    = regexp.MustCompile(`\bS:([0-9,]+)`)
+	namedQuery    = regexp.MustCompile(`\bsearch:(?:"[^"\n]*"|'[^'\n]*'|[^ 	\n\v\f\r"']*)`)
+	numberedQuery = regexp.MustCompile(`\bS:[0-9,]+`)
 )
 
 func (p *parser) boolean(input string, level int, op string) (*Query, error) {
@@ -201,21 +200,9 @@ func notEmpty(s string) bool {
 	return s != "" && s != "0"
 }
 
-// replaceEach is PHP's str_replace with lists: every occurrence of each
-// string is replaced in turn, in what the earlier replacements left.
-func replaceEach(input string, from, to []string) string {
-	for i, f := range from {
-		if f != "" {
-			input = strings.ReplaceAll(input, f, to[i])
-		}
-	}
-	return input
-}
-
 // expandNamedQueries puts saved searches in place of search:name.
 func (p *parser) expandNamedQueries(input string) string {
-	sets := [][][]string{namedQueryQuoted.FindAllStringSubmatch(input, -1), namedQueryBare.FindAllStringSubmatch(input, -1)}
-	if len(sets[0])+len(sets[1]) == 0 {
+	if !strings.Contains(input, "search:") {
 		return input
 	}
 	queries := map[string]string{}
@@ -224,42 +211,25 @@ func (p *parser) expandNamedQueries(input string) string {
 			queries[saved.Name] = strings.Trim(saved.Search, phpSpace)
 		}
 	}
-	var from, to []string
-	for _, matches := range sets {
-		for i := len(matches) - 1; i >= 0; i-- {
-			m := matches[i]
-			name := unescapeLiterals(strings.Trim(firstGroup(m), phpSpace))
-			from = append(from, m[0])
-			if search := queries[name]; notEmpty(search) {
-				to = append(to, "("+escapeLiterals(search)+")")
-			} else {
-				to = append(to, "")
-			}
+	// Replace only the original matches, not prefixes inside other tokens
+	// or text inserted by an earlier replacement.
+	return namedQuery.ReplaceAllStringFunc(input, func(reference string) string {
+		name := reference[len("search:"):]
+		if len(name) >= 2 && (name[0] == '"' || name[0] == '\'') {
+			name = name[1 : len(name)-1]
 		}
-	}
-	return replaceEach(input, from, to)
-}
-
-// firstGroup returns the first non-empty capture of a match.
-func firstGroup(m []string) string {
-	for _, g := range m[1:] {
-		if g != "" {
-			return g
+		if search := queries[unescapeLiterals(strings.Trim(name, phpSpace))]; notEmpty(search) {
+			return "(" + escapeLiterals(search) + ")"
 		}
-	}
-	return ""
+		return ""
+	})
 }
 
 // expandNumberedQueries puts saved searches in place of S:1,2.
 func (p *parser) expandNumberedQueries(input string) string {
-	matches := numberedQuery.FindAllStringSubmatch(input, -1)
-	if len(matches) == 0 {
-		return input
-	}
-	var from, to []string
-	for i := len(matches) - 1; i >= 0; i-- {
+	return numberedQuery.ReplaceAllStringFunc(input, func(reference string) string {
 		var found []string
-		for _, id := range strings.Split(matches[i][1], ",") {
+		for _, id := range strings.Split(reference[len("S:"):], ",") {
 			// An empty number counts as zero, as intval makes it.
 			n, err := strconv.Atoi(id)
 			if (err != nil && id != "") || n >= len(p.opts.Queries) {
@@ -269,14 +239,11 @@ func (p *parser) expandNumberedQueries(input string) string {
 				found = append(found, escapeLiterals(search))
 			}
 		}
-		from = append(from, matches[i][0])
 		if len(found) > 0 {
-			to = append(to, "(("+strings.Join(found, ") OR (")+"))")
-		} else {
-			to = append(to, "")
+			return "((" + strings.Join(found, ") OR (") + "))"
 		}
-	}
-	return replaceEach(input, from, to)
+		return ""
+	})
 }
 
 // splitOr cuts the input at the word OR and keeps the word between the pieces.

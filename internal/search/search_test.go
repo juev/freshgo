@@ -248,6 +248,56 @@ func TestAgainstFreshRSS(t *testing.T) {
 	}
 }
 
+func TestSavedSearchReferences(t *testing.T) {
+	queries := make([]SavedQuery, 13)
+	queries[1] = SavedQuery{Name: "News", Search: "author:Alice"}
+	queries[10] = SavedQuery{Name: "Newsletter", Search: "author:Bob"}
+	queries[2] = SavedQuery{Name: "News OR (daily)", Search: "author:Bob"}
+	queries[12] = SavedQuery{Name: "Literal", Search: `intitle:"xS:1 xsearch:News"`}
+
+	for _, tt := range []struct {
+		input string
+		want  string
+	}{
+		{`S:10 OR S:1`, "Alice,Bob"},
+		{`S:1 OR S:10`, "Alice,Bob"},
+		{`search:Newsletter OR search:News`, "Alice,Bob"},
+		{`search:News OR search:Newsletter`, "Alice,Bob"},
+		{`S:1,10 S:1,10`, "Alice,Bob"},
+		{`S:1,10 OR S:1`, "Alice,Bob"},
+		{`search:News search:News`, "Alice"},
+		{`search:"News OR (daily)" OR search:News`, "Alice,Bob"},
+		{`search:'Newsletter' OR search:News`, "Alice,Bob"},
+		{`search:Newsletter search:Newsroom S:100`, "Bob"},
+		{`S:1 OR S:100`, "Alice"},
+		{`-S:1`, "Bob,Carol"},
+		{`intitle:"xsearch:News" search:News`, "Alice"},
+		{`intitle:"xS:1" S:1`, "Alice"},
+		{`search:News search:Literal`, "Alice"},
+		{`S:1 S:12`, "Alice"},
+	} {
+		t.Run(tt.input, func(t *testing.T) {
+			q, err := Parse(tt.input, Options{Queries: queries})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var matches []string
+			for i, author := range []string{"Alice", "Bob", "Carol"} {
+				entry := &Entry{Authors: []string{author}}
+				if i == 0 {
+					entry.Title = "xS:1 xsearch:News"
+				}
+				if q.Match(entry) {
+					matches = append(matches, author)
+				}
+			}
+			if got := strings.Join(matches, ","); got != tt.want {
+				t.Errorf("matches %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestLimits(t *testing.T) {
 	if _, err := Parse(strings.Repeat("a ", maxLength/2+1), Options{}); !errors.Is(err, ErrTooLong) {
 		t.Errorf("a query over the length limit: error %v, want ErrTooLong", err)
