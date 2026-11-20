@@ -11,7 +11,7 @@ Out of scope: fetching (`internal/fetch`), storing and change detection (plan st
 
 ## Requirements
 
-- G1. The GUID of an item is the first non-empty of: `atom:id` (Atom 1.0, then 0.3), RSS `guid`, `dc:identifier` (1.1, then 1.0), `rdf:about` of the item. An Atom element inside an RSS item counts.
+- G1. The GUID of an item is the first non-empty of: `atom:id` (Atom 1.0, then 0.3), RSS `guid`, `dc:identifier` (1.1, then 1.0), `rdf:about` of the item. An Atom element inside an RSS item counts. On input, `https://www.w3.org/2005/Atom` is accepted as an alias for the canonical Atom 1.0 namespace `http://www.w3.org/2005/Atom`.
 - G2. The identifier is transformed in this order: surrounding whitespace removed; `&`, `<`, `>` and `"` HTML-encoded (the single quote is not); `http://` replaced with `https://` when the host is on the force-https list; bytes below 32 and above 127 removed; whitespace that this exposed at the ends removed; cut to 767 bytes. An identifier that comes out as `0` counts as absent, as PHP takes it.
 - G3. The force-https list is the 22 domains FreshRSS ships plus the `force-https.txt` of the installation, which import carries over (`settings`). A listed domain covers its subdomains. Matching is case-sensitive and looks at the text after `http://` up to the first `/`, `?` or `#`, without credentials and port. A port number above 65535 makes the URL one PHP cannot parse: it is left alone.
 - G4. An item without an identifier gets `sha1(link . date)`; without a link, `sha1(link . date . title)` if it has a title, else `sha1(link . date . title . content)`. The parts are in the form of G6. An item with nothing at all has an empty GUID.
