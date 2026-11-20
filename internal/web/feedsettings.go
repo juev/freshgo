@@ -552,7 +552,16 @@ func applyFeed(r *http.Request, f *store.Feed, categories []*store.Category, can
 			delete(a, "xpath")
 		}
 	case scrape.KindJSONDotNotation, scrape.KindHTMLXPathJSON:
-		if settings := scraped("json-", append([]string{"feedTitle"}, scrapeFields...)); len(settings) > 0 {
+		settings := scraped("json-", append([]string{"feedTitle"}, scrapeFields...))
+		// Imported attachment paths have no fields of their own in the form.
+		var old map[string]string
+		_ = json.Unmarshal(a["json_dotnotation"], &old)
+		for _, key := range []string{"itemAttachment", "itemAttachmentUrl", "itemAttachmentType", "itemAttachmentLength"} {
+			if value, ok := old[key]; ok {
+				settings[key] = value
+			}
+		}
+		if len(settings) > 0 {
 			a.set("json_dotnotation", settings)
 		} else {
 			delete(a, "json_dotnotation")

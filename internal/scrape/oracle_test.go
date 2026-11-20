@@ -18,6 +18,13 @@ var contentDeviations = map[string]struct{ want, why string }{
 	"xml-ms/1": {"Body &lt;b&gt;escaped&lt;/b&gt; text", "FreshRSS encodes the text of a removed element twice"},
 }
 
+var attributeDeviations = map[string]struct{ want, why string }{
+	"jsonfeed-edge/3": {
+		`{"thumbnail":{"url":"http://f.example.org/3.png"},"enclosures":[{"url":"http://f.example.org/3.png","medium":"image"},{"url":"http://f.example.org/3.mp3","type":"audio/mpeg","length":1000}]}`,
+		"FreshRSS 1.30.1 drops JSON attachments; FreshRSS #9510 retains them",
+	},
+}
+
 // Each case of testdata/reference/oracle/scrape-cases.json scraped by
 // freshgo gives what FreshRSS 1.30.1 stores for the same page and settings
 // (scrape.json, written by oracle/generate.sh).
@@ -111,6 +118,12 @@ func TestRSSAgainstFreshRSS(t *testing.T) {
 				}
 				if !reflect.DeepEqual(it.Tags, e.Tags) && len(it.Tags)+len(e.Tags) > 0 {
 					t.Errorf("item %d %q: tags %q, want %q", i, e.Title, it.Tags, e.Tags)
+				}
+				if d, ok := attributeDeviations[c.Name+"/"+e.GUID]; ok {
+					if sameJSON(json.RawMessage(d.want), e.Attributes) {
+						t.Errorf("item %d %q is listed as a deviation (%s) but FreshRSS gives the same attributes", i, e.Title, d.why)
+					}
+					e.Attributes = json.RawMessage(d.want)
 				}
 				if !sameJSON(it.Attributes(), e.Attributes) {
 					t.Errorf("item %d %q: attributes %s, want %s", i, e.Title, it.Attributes(), e.Attributes)

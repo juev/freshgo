@@ -591,6 +591,32 @@ func TestFeedSettings(t *testing.T) {
 	})
 }
 
+func TestFeedFormKeepsAttachmentPaths(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		s.asAlice()
+		for _, kind := range []int{30, 35} {
+			f := s.feed("alice", 1)
+			f.Kind = kind
+			f.Attributes = json.RawMessage(`{"xPathToJson":"//script","json_dotnotation":{"item":"posts","itemAttachment":"media","itemAttachmentUrl":"url","itemAttachmentType":"type","itemAttachmentLength":"bytes"}}`)
+			if err := s.db.UpdateFeed(t.Context(), f); err != nil {
+				t.Fatal(err)
+			}
+			form := s.feedForm(1)
+			form.Set("json-item", "stories")
+			s.follow("/subscriptions/feeds/1", form)
+			got := readAttrs(readAttrs(s.feed("alice", 1).Attributes)["json_dotnotation"])
+			for key, want := range map[string]string{
+				"item": `"stories"`, "itemAttachment": `"media"`, "itemAttachmentUrl": `"url"`,
+				"itemAttachmentType": `"type"`, "itemAttachmentLength": `"bytes"`,
+			} {
+				if string(got[key]) != want {
+					t.Errorf("kind %d: %s after saving = %s, want %s", kind, key, got[key], want)
+				}
+			}
+		}
+	})
+}
+
 // Request settings the form cannot show, or shows otherwise than they are
 // stored, survive the form as it is shown.
 func TestFeedFormKeepsRequestSettings(t *testing.T) {
