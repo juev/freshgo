@@ -110,6 +110,9 @@ func TestLogin(t *testing.T) {
 			t.Fatalf("GET / without a login: status %d, Location %q", a.status, a.header.Get("Location"))
 		}
 		form := s.get("/login?next=%2Ftest%2Fwhoami%3Fa%3D1")
+		if form.header.Get("Cross-Origin-Opener-Policy") != "same-origin" {
+			t.Errorf("GET /login: Cross-Origin-Opener-Policy = %q, want same-origin", form.header.Get("Cross-Origin-Opener-Policy"))
+		}
 		for _, want := range []string{
 			`<form method="post" action="/login"`, `name="next" value="/test/whoami?a=1"`,
 			`<label for="username">User name</label>`, `name="username" value="" required autocomplete="username"`,
@@ -124,6 +127,9 @@ func TestLogin(t *testing.T) {
 		a := s.login("alice", "alice-web-password", url.Values{"next": {"/test/whoami?a=1"}})
 		if a.status != http.StatusSeeOther || a.header.Get("Location") != "/test/whoami?a=1" {
 			t.Fatalf("login: status %d, Location %q, body\n%s", a.status, a.header.Get("Location"), a.body)
+		}
+		if reader := s.get("/"); reader.status != http.StatusOK || reader.header.Get("Cross-Origin-Opener-Policy") != "same-origin" {
+			t.Errorf("GET / as alice: status %d, Cross-Origin-Opener-Policy = %q", reader.status, reader.header.Get("Cross-Origin-Opener-Policy"))
 		}
 		cookie := a.header.Get("Set-Cookie")
 		for _, want := range []string{sessionCookie + "=", "; Path=/", "; HttpOnly", "; SameSite=Lax"} {

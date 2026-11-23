@@ -358,6 +358,7 @@ const hsts = "max-age=31536000"
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	header := w.Header()
 	header.Set("Content-Security-Policy", contentSecurityPolicy)
+	header.Set("Cross-Origin-Opener-Policy", "same-origin")
 	header.Set("X-Content-Type-Options", "nosniff")
 	header.Set("Referrer-Policy", "same-origin")
 	if h.secure(r) {

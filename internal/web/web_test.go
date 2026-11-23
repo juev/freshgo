@@ -129,11 +129,12 @@ func TestAboutPage(t *testing.T) {
 			}
 		}
 		for name, want := range map[string]string{
-			"Content-Type":            "text/html; charset=utf-8",
-			"Cache-Control":           "no-store",
-			"X-Content-Type-Options":  "nosniff",
-			"Referrer-Policy":         "same-origin",
-			"Content-Security-Policy": contentSecurityPolicy,
+			"Content-Type":               "text/html; charset=utf-8",
+			"Cache-Control":              "no-store",
+			"X-Content-Type-Options":     "nosniff",
+			"Referrer-Policy":            "same-origin",
+			"Content-Security-Policy":    contentSecurityPolicy,
+			"Cross-Origin-Opener-Policy": "same-origin",
 		} {
 			if got := a.header.Get(name); got != want {
 				t.Errorf("GET /about: %s = %q, want %q", name, got, want)

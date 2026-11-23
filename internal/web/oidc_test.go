@@ -239,6 +239,9 @@ func TestOIDCSignIn(t *testing.T) {
 	withProvider(t, func(t *testing.T, s *site, p *provider) {
 		host := strings.TrimPrefix(p.server.URL, "http://")
 		page := s.shown("/login?next=%2Fsubscriptions")
+		if a := s.get("/oidc/login?next=%2Fsubscriptions"); a.header.Get("Cross-Origin-Opener-Policy") != "same-origin" {
+			t.Errorf("GET /oidc/login: Cross-Origin-Opener-Policy = %q, want same-origin", a.header.Get("Cross-Origin-Opener-Policy"))
+		}
 		if !strings.Contains(page, `<a href="/oidc/login?next=%2Fsubscriptions" hx-boost="false">Sign in with `+host+`</a>`) || !strings.Contains(page, `name="password"`) {
 			t.Errorf("the login page does not offer the provider next to the password:\n%s", page)
 		}
@@ -246,6 +249,9 @@ func TestOIDCSignIn(t *testing.T) {
 		a := p.signIn(s, "/subscriptions", nil)
 		if a.status != http.StatusSeeOther || a.header.Get("Location") != "/subscriptions" {
 			t.Fatalf("back from the provider: status %d, Location %q\n%s", a.status, a.header.Get("Location"), a.body)
+		}
+		if a.header.Get("Cross-Origin-Opener-Policy") != "same-origin" {
+			t.Errorf("OIDC callback: Cross-Origin-Opener-Policy = %q, want same-origin", a.header.Get("Cross-Origin-Opener-Policy"))
 		}
 		if who := s.signedInAs(); who != "alice, administrator" {
 			t.Errorf("signed in as %q, want alice", who)

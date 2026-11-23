@@ -288,8 +288,10 @@ func TestSharedQuery(t *testing.T) {
 		page := s.get(base + ".html")
 		// The page is rendered for whoever asks: it is not for a cache to
 		// hand to somebody else, as the documents are.
-		if page.header.Get("Cache-Control") != "no-store" || !strings.Contains(page.body, `action="`+base+`.html"`) || !strings.Contains(page.body, `name="q"`) {
-			t.Errorf("GET %s.html: Cache-Control %q, or no form of its own", base, page.header.Get("Cache-Control"))
+		if page.header.Get("Cache-Control") != "no-store" || page.header.Get("Cross-Origin-Opener-Policy") != "same-origin" ||
+			!strings.Contains(page.body, `action="`+base+`.html"`) || !strings.Contains(page.body, `name="q"`) {
+			t.Errorf("GET %s.html: Cache-Control %q, COOP %q, or no form of its own", base,
+				page.header.Get("Cache-Control"), page.header.Get("Cross-Origin-Opener-Policy"))
 		}
 		if page.status != http.StatusOK || !strings.Contains(page.body, "<h1>Blogs &amp; more</h1>") || strings.Count(page.body, `<article class="entry single"`) != len(want) ||
 			strings.Contains(page.body, `href="/feeds/`) || strings.Contains(page.body, `action="/entries/`) {
