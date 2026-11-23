@@ -105,6 +105,24 @@ func And(a, b *Query) *Query {
 	return &Query{parts: []*Query{&left, &right}}
 }
 
+// Or returns a query that matches when any of the given queries matches.
+// With no queries it returns nil.
+func Or(queries ...*Query) *Query {
+	if len(queries) == 0 {
+		return nil
+	}
+	parts := make([]*Query, 0, len(queries))
+	for i, q := range queries {
+		part := *q
+		part.op = opOr
+		if i == 0 {
+			part.op = opAnd
+		}
+		parts = append(parts, &part)
+	}
+	return &Query{parts: parts}
+}
+
 // phpSpace is what PHP's trim removes.
 const phpSpace = " \n\r\t\v\x00"
 

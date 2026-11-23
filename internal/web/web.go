@@ -274,6 +274,7 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /subscriptions/labels", h.protect(members, h.createLabel))
 	h.mux.HandleFunc("GET /subscriptions/labels/{id}", h.protect(members, h.labelPage))
 	h.mux.HandleFunc("POST /subscriptions/labels/{id}", h.protect(members, h.saveLabel))
+	h.mux.HandleFunc("POST /subscriptions/labels/{id}/preview", h.protect(members, h.previewLabel))
 	h.mux.HandleFunc("POST /subscriptions/labels/{id}/delete", h.protect(members, h.deleteLabel))
 	h.mux.HandleFunc("GET /stats", h.protect(members, h.statsOverview))
 	h.mux.HandleFunc("GET /stats/repartition", h.protect(members, h.statsRepartition))

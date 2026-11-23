@@ -14,6 +14,7 @@ import (
 
 	"github.com/juev/freshgo/internal/fetch"
 	"github.com/juev/freshgo/internal/refresh"
+	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
 )
 
@@ -712,15 +713,32 @@ func (h *Handler) createLabel(w http.ResponseWriter, r *http.Request) {
 type labelPage struct {
 	Label   *store.Tag
 	ReadURL string
+	Name    string
 	Filters string
 	Problem string
+	Preview *labelPreview
 }
 
-func (h *Handler) showLabel(w http.ResponseWriter, r *http.Request, status int, l *store.Tag, problem string) {
+type labelPreview struct {
+	name    string
+	filters string
+	Entries []choice
+	Errors  []error
+	Empty   string
+	More    bool
+}
+
+func (h *Handler) showLabel(w http.ResponseWriter, r *http.Request, status int, l *store.Tag, problem string, preview *labelPreview) {
 	v := h.view(r, "subscriptions", "label.heading")
-	page := labelPage{Label: l, ReadURL: "/labels/" + strconv.FormatInt(l.ID, 10), Filters: readAttrs(l.Attributes).filtersFor("label")}
+	page := labelPage{
+		Label: l, ReadURL: "/labels/" + strconv.FormatInt(l.ID, 10),
+		Name: l.Name, Filters: readAttrs(l.Attributes).filtersFor("label"), Preview: preview,
+	}
 	if problem != "" {
 		page.Problem = v.T(problem)
+	}
+	if preview != nil {
+		page.Name, page.Filters = preview.name, preview.filters
 	}
 	v.Heading, v.Data = l.Name, page
 	h.render(w, r, status, "label", v)
@@ -728,8 +746,48 @@ func (h *Handler) showLabel(w http.ResponseWriter, r *http.Request, status int, 
 
 func (h *Handler) labelPage(w http.ResponseWriter, r *http.Request) {
 	if l, ok := h.ownLabel(w, r); ok {
-		h.showLabel(w, r, http.StatusOK, l, "")
+		h.showLabel(w, r, http.StatusOK, l, "", nil)
 	}
+}
+
+// previewLabel tests the rules in the form against the user's stored entries.
+func (h *Handler) previewLabel(w http.ResponseWriter, r *http.Request) {
+	l, ok := h.ownLabel(w, r)
+	if !ok || !h.form(w, r) {
+		return
+	}
+	preview := &labelPreview{name: r.PostForm.Get("name"), filters: r.PostForm.Get("filters_label")}
+	a := attrs{}
+	a.setFilters(search.ActionLabel, lines(preview.filters))
+	who := state(r).who
+	prefs := readReading(who.user)
+	rules, problems := search.ParseRules(a["filters"], search.Options{
+		Queries: search.ParseSavedQueries(prefs.Queries), Now: h.now().In(prefs.location()),
+	})
+	preview.Errors = problems
+	if len(rules) == 0 {
+		preview.Empty = "label.preview.no-rules"
+		h.showLabel(w, r, http.StatusOK, l, "", preview)
+		return
+	}
+
+	queries := make([]*search.Query, 0, len(rules))
+	for _, rule := range rules {
+		queries = append(queries, rule.Query)
+	}
+	ctx := r.Context()
+	entries, next, err := h.db.ListPage(ctx, who.user.ID, store.Listing{Search: search.Or(queries...), Limit: 20})
+	if err != nil {
+		h.broken(w, r, err)
+		return
+	}
+	for _, e := range entries {
+		if e, ok := h.hooks.EntryBeforeDisplay.Call(ctx, e); ok {
+			preview.Entries = append(preview.Entries, choice{Name: e.Title, URL: "/entries/" + strconv.FormatInt(e.ID, 10)})
+		}
+	}
+	preview.Empty, preview.More = "label.preview.no-matches", next != ""
+	h.showLabel(w, r, http.StatusOK, l, "", preview)
 }
 
 // saveLabel stores the name and the filters the form gives for a label.
@@ -760,7 +818,7 @@ func (h *Handler) saveLabel(w http.ResponseWriter, r *http.Request) {
 	}
 	if problem != "" {
 		l.Name = name
-		h.showLabel(w, r, http.StatusBadRequest, l, problem)
+		h.showLabel(w, r, http.StatusBadRequest, l, problem, nil)
 		return
 	}
 	h.notify(w, r, "notice.saved", 0)

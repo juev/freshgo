@@ -1495,6 +1495,32 @@ func TestE2ESettings(t *testing.T) {
 	})
 }
 
+func TestE2ELabelRulePreview(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		entry := &store.Entry{FeedID: 1, GUID: "preview-keyboard", Title: "Keyboard preview result"}
+		if err := s.db.InsertEntries(context.Background(), s.user("alice").ID, []*store.Entry{entry}); err != nil {
+			t.Fatal(err)
+		}
+		b := browse(t, s)
+		b.login("alice")
+		b.open("/subscriptions/labels/1")
+		b.tabTo("#filters_label")
+		b.run(chromedp.Evaluate[chromedp.Void](`document.querySelector('#filters_label').select()`))
+		b.press("intitle:Keyboard")
+		if draft := b.text(`document.querySelector('#filters_label').value`); draft != "intitle:Keyboard" {
+			t.Fatalf("draft = %q, want intitle:Keyboard", draft)
+		}
+		b.tabTo(`button[formaction$="/labels/1/preview"]`)
+		b.press(kb.Enter)
+		b.until("the preview of the unsaved label rule", `document.querySelector('.preview a')?.textContent === 'Keyboard preview result'`)
+		b.until("the label preview focused", `document.activeElement.matches('section.preview')`)
+		b.accessible("the settings of a label with a preview")
+		if got := s.label("alice", 1); strings.Contains(string(got.Attributes), "intitle:Keyboard") {
+			t.Errorf("preview saved the rule: %s", got.Attributes)
+		}
+	})
+}
+
 // R7, R9: a feed is added, set up, refreshed and given up with the
 // keyboard alone.
 func TestE2ESubscriptions(t *testing.T) {
