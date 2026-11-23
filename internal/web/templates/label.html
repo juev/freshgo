@@ -5,15 +5,33 @@
 <form method="post" action="{{.URL "/subscriptions/labels"}}/{{.Data.Label.ID}}" class="form">
 <p>
 <label for="name">{{.T "form.name"}}</label>
-<input type="text" id="name" name="name" value="{{.Data.Label.Name}}" maxlength="191" required{{if .Data.Problem}} aria-invalid="true" aria-describedby="form-problem"{{end}}>
+<input type="text" id="name" name="name" value="{{.Data.Name}}" maxlength="191" required{{if .Data.Problem}} aria-invalid="true" aria-describedby="form-problem"{{end}}>
 </p>
 <p>
 <label for="filters_label">{{.T "label.filters"}}</label>
 <textarea id="filters_label" name="filters_label" rows="4" spellcheck="false" aria-describedby="filters-hint">{{.Data.Filters}}</textarea>
 <span class="hint" id="filters-hint">{{.T "form.filters-hint"}}</span>
 </p>
-<p><button type="submit">{{.T "keys.save"}}</button></p>
+<p><button type="submit">{{.T "keys.save"}}</button>
+<button type="submit" formaction="{{.URL "/subscriptions/labels"}}/{{.Data.Label.ID}}/preview" formnovalidate>{{.T "label.preview"}}</button></p>
 </form>
+{{with .Data.Preview}}
+<section class="preview" aria-labelledby="label-preview-heading" tabindex="-1" autofocus>
+<h2 id="label-preview-heading">{{$.T "label.preview.heading"}}</h2>
+{{if .Errors}}
+<h3>{{$.T "label.preview.errors"}}</h3>
+<ul>
+{{range .Errors}}<li>{{.}}</li>
+{{end}}</ul>
+{{end}}
+{{if .Entries}}
+<ul>
+{{range .Entries}}<li><a href="{{$.URL .URL}}">{{if .Name}}{{.Name}}{{else}}{{$.T "entry.untitled"}}{{end}}</a></li>
+{{end}}</ul>
+{{if .More}}<p>{{$.T "label.preview.more"}}</p>{{end}}
+{{else}}<p>{{$.T .Empty}}</p>{{end}}
+</section>
+{{end}}
 <details class="menu danger">
 <summary>{{.T "label.delete"}}</summary>
 <form method="post" action="{{.URL "/subscriptions/labels"}}/{{.Data.Label.ID}}/delete">

@@ -1174,6 +1174,91 @@ func TestLabels(t *testing.T) {
 	})
 }
 
+func TestLabelRulePreview(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		s.asAlice()
+		s.follow("/subscriptions/labels", url.Values{"name": {"Saved label"}})
+		const label = "/subscriptions/labels/3"
+		s.follow(label, url.Values{"name": {"Saved label"}, "filters_label": {"intitle:saved-rule"}})
+		before := s.label("alice", 3)
+		s.setting("alice", "queries", []map[string]string{{"name": "preview-alpha", "search": "intitle:pvc-alpha"}})
+
+		ctx := context.Background()
+		first := &store.Entry{FeedID: 1, GUID: "preview-a", Title: "pvc-alpha"}
+		second := &store.Entry{FeedID: 8, GUID: "preview-b", Title: "pvc-beta", IsRead: true}
+		overlap := &store.Entry{FeedID: 1, GUID: "preview-both", Title: "pvc-alpha pvc-beta"}
+		unrelated := &store.Entry{FeedID: 1, GUID: "preview-no", Title: "pvc-other"}
+		if err := s.db.InsertEntries(ctx, s.user("alice").ID, []*store.Entry{first, second, overlap, unrelated}); err != nil {
+			t.Fatal(err)
+		}
+		bob := s.user("bob")
+		feeds, err := s.db.Feeds(ctx, bob.ID)
+		if err != nil || len(feeds) == 0 {
+			t.Fatalf("Bob's feeds: %v, %v", feeds, err)
+		}
+		foreign := &store.Entry{FeedID: feeds[0].ID, GUID: "preview-foreign", Title: "pvc-beta from Bob"}
+		if err := s.db.InsertEntries(ctx, bob.ID, []*store.Entry{foreign}); err != nil {
+			t.Fatal(err)
+		}
+
+		form := url.Values{"name": {"Draft label"}, "filters_label": {"L:999 search:preview-alpha\nintitle:pvc-beta\nintitle:/[/"}}
+		a := s.post(label+"/preview", form)
+		if a.status != http.StatusOK {
+			t.Fatalf("preview status = %d", a.status)
+		}
+		if got := formValues(t, a.body); got.Get("name") != form.Get("name") || got.Get("filters_label") != form.Get("filters_label") {
+			t.Errorf("preview form = %v, want the draft", got)
+		}
+		for _, e := range []*store.Entry{first, second, overlap} {
+			link := fmt.Sprintf(`href="/entries/%d">%s</a>`, e.ID, e.Title)
+			if count := strings.Count(a.body, link); count != 1 {
+				t.Errorf("preview contains %d links to %q, want 1", count, e.Title)
+			}
+		}
+		for _, title := range []string{unrelated.Title, foreign.Title} {
+			if strings.Contains(a.body, title) {
+				t.Errorf("preview contains %q", title)
+			}
+		}
+		if !strings.Contains(a.body, "Rules with errors") || !strings.Contains(a.body, "missing closing ]") {
+			t.Error("preview did not explain the invalid regular expression")
+		}
+		if after := s.label("alice", 3); !reflect.DeepEqual(before, after) {
+			t.Errorf("preview changed label from %+v to %+v", before, after)
+		}
+		if ids := s.stored("alice", store.Listing{Set: store.EntrySet{LabelID: 3}}); len(ids) != 0 {
+			t.Errorf("preview attached the label to %v", ids)
+		}
+
+		a = s.post(label+"/preview", url.Values{"filters_label": {"intitle:pvc-absent"}})
+		if a.status != http.StatusOK || !strings.Contains(a.body, "No articles match these rules.") {
+			t.Errorf("no matches: status %d or missing message", a.status)
+		}
+		a = s.post(label+"/preview", url.Values{"filters_label": {"intitle:/[/"}})
+		if a.status != http.StatusOK || !strings.Contains(a.body, "Enter at least one valid rule.") || strings.Contains(a.body, first.Title) {
+			t.Errorf("no valid rules: status %d, missing message, or articles shown", a.status)
+		}
+		if a = s.post("/subscriptions/labels/999/preview", form); a.status != http.StatusNotFound {
+			t.Errorf("preview of a missing label: status %d, want 404", a.status)
+		}
+
+		var many []*store.Entry
+		for i := range 22 {
+			title := fmt.Sprintf("pvc-limit-%02d", i)
+			many = append(many, &store.Entry{FeedID: 1, GUID: title, Title: title})
+		}
+		if err := s.db.InsertEntries(ctx, s.user("alice").ID, many); err != nil {
+			t.Fatal(err)
+		}
+		a = s.post(label+"/preview", url.Values{"filters_label": {"intitle:pvc-limit"}})
+		if a.status != http.StatusOK || strings.Count(a.body, `">pvc-limit-`) != 20 ||
+			strings.Contains(a.body, "pvc-limit-01") || !strings.Contains(a.body, "pvc-limit-21") ||
+			!strings.Contains(a.body, "More articles match.") {
+			t.Errorf("bounded preview: status %d or wrong list of matches", a.status)
+		}
+	})
+}
+
 // Filters of one action leave those of the others alone.
 func TestFiltersByAction(t *testing.T) {
 	a := readAttrs(json.RawMessage(`{"filters":[{"search":"a","actions":["read","star"]},{"search":"b","actions":["read"]},{"search":"c","actions":["star"]}]}`))
