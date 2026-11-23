@@ -862,6 +862,29 @@ button.star[aria-pressed="true"] {
 	color: var(--unread);
 }
 
+.entry > .entry-title {
+	grid-column: 2;
+	min-width: 0;
+	max-width: 100%;
+	margin: var(--row-pad) var(--space) 0;
+}
+
+.entry-original-title {
+	color: inherit;
+	text-decoration: none;
+}
+
+.entry-open-here {
+	flex: none;
+	margin-left: auto;
+}
+
+.entry:has(> details[open]) > .entry-original-heading {
+	font-size: 1.35em;
+	font-weight: 700;
+	color: var(--accent);
+}
+
 .entry.read .entry-title {
 	font-weight: 400;
 	color: var(--read);
@@ -1498,6 +1521,12 @@ table.log td:last-child {
 	font-size: 1.5em;
 }
 
+:root[data-look="modern"] .entry:has(> details[open]) > .entry-original-heading {
+	color: var(--text);
+	font-weight: 400;
+	font-size: 1.5em;
+}
+
 /* Not see-through: the text passes under it. */
 :root[data-look="modern"] .entry-actions {
 	background: var(--bg);
@@ -1766,6 +1795,7 @@ table.log td:last-child {
 	.views button,
 	.tabs a,
 	.entry-actions a,
+	.entry-open-here,
 	.entry-actions button,
 	.entry-actions summary,
 	.stream-settings,

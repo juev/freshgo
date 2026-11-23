@@ -24,6 +24,7 @@
 {{template "options" (index .Data.Options "sort_order")}}</select>
 </p>
 {{template "check" (dict "Name" "display_posts" "Label" (.T "settings.display-posts") "On" (index .Data.On "display_posts"))}}
+{{template "check" (dict "Name" "title_opens_website" "Label" (.T "settings.open-original") "On" (index .Data.On "title_opens_website"))}}
 {{template "check" (dict "Name" "auto_load_more" "Label" (.T "settings.auto-load-more") "On" (index .Data.On "auto_load_more"))}}
 {{template "check" (dict "Name" "hide_read_feeds" "Label" (.T "settings.hide-read-feeds") "On" (index .Data.On "hide_read_feeds"))}}
 {{template "check" (dict "Name" "show_fav_unread" "Label" (.T "settings.show-fav-unread") "On" (index .Data.On "show_fav_unread"))}}

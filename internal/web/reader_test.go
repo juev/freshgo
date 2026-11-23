@@ -191,6 +191,44 @@ func TestReadingScreen(t *testing.T) {
 	})
 }
 
+func TestOriginalTitlePreference(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		s.asAlice()
+		if body := s.page("/"); strings.Contains(body, `class="entry-original-title"`) || strings.Contains(body, `class="entry-open-here"`) {
+			t.Error("article titles open on the original site without the preference")
+		}
+		form := s.formAt("/settings/reading", "/settings/reading")
+		form.Set("title_opens_website", "1")
+		s.follow("/settings/reading", form)
+		body := s.page("/?state=all")
+		if !strings.Contains(body, `class="entry-original-title"`) || !strings.Contains(body, `target="_blank" rel="noopener noreferrer"`) || !strings.Contains(body, `class="entry-open-here">`) {
+			t.Errorf("article rows lack the original or in-reader link\n%s", body)
+		}
+		ids := listed(body)
+		if len(ids) == 0 {
+			t.Fatal("the all-entries stream is empty")
+		}
+		entry := s.entry("alice", ids[0])
+		entry.Link = ""
+		if err := s.db.UpdateEntry(context.Background(), entry); err != nil {
+			t.Fatal(err)
+		}
+		body = s.page("/?state=all")
+		start := strings.Index(body, `id="e`+strconv.FormatInt(entry.ID, 10)+`"`)
+		if start < 0 {
+			t.Fatal("the entry without a source URL is missing from the list")
+		}
+		end := strings.Index(body[start:], `</article>`)
+		if end < 0 {
+			t.Fatal("the entry without a source URL is missing its end tag")
+		}
+		row := body[start : start+end]
+		if strings.Contains(row, `class="entry-original-title"`) || strings.Contains(row, `class="entry-open-here"`) {
+			t.Error("an entry without a source URL offers an original-site action")
+		}
+	})
+}
+
 // R4: a stream is read page by page, each entry once; the size of the page
 // and how a stream is listed by default are the user's settings, and a feed
 // or a category may have an order of its own.

@@ -82,9 +82,13 @@ func TestUserSettings(t *testing.T) {
 
 		// Reading.
 		form = s.formAt("/settings/reading", "/settings/reading")
+		if form.Get("title_opens_website") != "" {
+			t.Error("opening article titles on the original site is on by default")
+		}
 		for key, value := range map[string]string{
 			"posts_per_page": "7", "default_view": "all", "sort": "title", "sort_order": "ASC", "display_posts": "1",
-			"mark_reception": "1", "mark_gone": "1", "max_n_unread_on": "1", "max_n_unread": "30",
+			"title_opens_website": "1",
+			"mark_reception":      "1", "mark_gone": "1", "max_n_unread_on": "1", "max_n_unread": "30",
 			"same_title_in_feed_on": "1", "same_title_in_feed": "5", "mark_updated_article_unread": "1",
 			"filters_read": "intitle:ad", "filters_star": "author:me\nintitle:ad",
 		} {
@@ -96,7 +100,7 @@ func TestUserSettings(t *testing.T) {
 		s.follow("/settings/reading", form)
 		got = s.settings("alice")
 		when := got["mark_when"].(map[string]any)
-		if got["posts_per_page"] != 7.0 || got["default_view"] != "all" || got["sort"] != "title" || got["sort_order"] != "ASC" ||
+		if got["posts_per_page"] != 7.0 || got["default_view"] != "all" || got["sort"] != "title" || got["sort_order"] != "ASC" || got["title_opens_website"] != true ||
 			got["display_posts"] != true || got["auto_load_more"] != false || got["hide_read_feeds"] != false ||
 			got["mark_updated_article_unread"] != true || when["article"] != false || when["reception"] != true || when["gone"] != true ||
 			when["max_n_unread"] != 30.0 || when["same_title_in_feed"] != 5.0 ||

@@ -82,6 +82,7 @@ type reading struct {
 	HideReadFeeds *bool  `json:"hide_read_feeds"`
 	ShowFavUnread bool   `json:"show_fav_unread"`
 	DisplayPosts  bool   `json:"display_posts"`
+	OpenOriginal  bool   `json:"title_opens_website"`
 	AutoLoadMore  *bool  `json:"auto_load_more"`
 	MarkWhen      struct {
 		Article *bool `json:"article"`
@@ -579,8 +580,9 @@ const excerptLength = 200
 
 // article is an entry as a page shows it.
 type article struct {
-	ID    int64
-	Title string
+	ID           int64
+	Title        string
+	OpenOriginal bool
 	// URL is the page of the entry, Link the address the feed gave it.
 	URL      string
 	Link     string
@@ -706,7 +708,8 @@ func (h *Handler) articles(ctx context.Context, v *view, lib *library, userID in
 		}
 		a := article{
 			ID: e.ID, Title: title, Translation: offered, Summary: summed, Summarise: summarise, SuggestLabels: suggest, Suggested: translate.LabelSuggestions(e), URL: h.url("/entries/" + strconv.FormatInt(e.ID, 10)),
-			Authors: strings.Join(e.Authors, ", "), Date: date.Format("2006-01-02 15:04"), DateTime: date.Format(time.RFC3339),
+			OpenOriginal: prefs.OpenOriginal && v.User != "",
+			Authors:      strings.Join(e.Authors, ", "), Date: date.Format("2006-01-02 15:04"), DateTime: date.Format(time.RFC3339),
 			// What is stored is clean: every writer cleans what it stores, and
 			// serve cleaned once what was stored before they did.
 			Content:     template.HTML(throughServer(prepared(content, prefs.Referrers))), //nolint:gosec // cleaned when it was stored
