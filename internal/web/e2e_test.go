@@ -19,6 +19,7 @@ import (
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/input"
 	"github.com/chromedp/cdproto/page"
+	"github.com/chromedp/cdproto/target"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
 
@@ -336,6 +337,137 @@ func TestE2EReadingWithKeys(t *testing.T) {
 		}
 		b.until("the entry after, by the space bar", current(ids[4], true))
 		b.accessible("the reading screen with an entry open")
+	})
+}
+
+func TestE2EOriginalTitleAndReaderAction(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		s.asAlice()
+		form := s.formAt("/settings/reading", "/settings/reading")
+		form.Set("title_opens_website", "1")
+		form.Set("mark_article", "1")
+		form.Del("display_posts")
+		s.follow("/settings/reading", form)
+		ids := s.stored("alice", store.Listing{Set: mainStream(), Read: ptr(false)})
+		if len(ids) < 2 {
+			t.Fatal("need two unread entries to check keyboard and pointer activation")
+		}
+		id, pointerID := ids[0], ids[1]
+		source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("original source")) }))
+		defer source.Close()
+		for entryID, path := range map[int64]string{id: "/keyboard", pointerID: "/pointer"} {
+			entry := s.entry("alice", entryID)
+			entry.Link = source.URL + path
+			if err := s.db.UpdateEntry(context.Background(), entry); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if s.entry("alice", id).IsRead {
+			t.Fatal("the selected entry is already read before the browser opens it")
+		}
+		b := browse(t, s)
+		b.login("alice")
+		b.run(command(emulation.SetDeviceMetricsOverride, emulation.SetDeviceMetricsOverrideParams{Width: 360, Height: 740, DeviceScaleFactor: 1, Mobile: true}))
+		b.open("/")
+		selector := e(id) + " .entry-original-title"
+		if got := read[bool](b, `!document.querySelector('`+e(id)+` details').open`); !got {
+			t.Fatal("the selected entry did not start closed")
+		}
+		original := read[string](b, `document.querySelector('`+selector+`').href`)
+		newTab := chromedp.WaitNewTarget(b.ctx, func(info *target.Info) bool {
+			return info.Type == "page" && info.URL == original
+		})
+		b.run(chromedp.Evaluate[chromedp.Void](`document.querySelector('` + selector + `').focus()`))
+		if got := read[string](b, `document.activeElement.className`); got != "entry-original-title" {
+			t.Fatalf("the original title did not receive keyboard focus: %q", got)
+		}
+		b.press(kb.Enter)
+		select {
+		case <-newTab:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("keyboard activation did not open %s in a new tab", original)
+		}
+		if s.entry("alice", id).IsRead {
+			t.Fatal("opening the original site marked the entry read")
+		}
+		b.until("the row stays closed in the reader", `!document.querySelector('`+e(id)+` details').open`)
+		readerSummary := e(id) + " details > summary"
+		b.run(chromedp.Evaluate[chromedp.Void](`document.querySelector('` + readerSummary + `').focus()`))
+		b.press(kb.Enter)
+		b.until("the in-reader action expands the entry", `document.querySelector('`+e(id)+` details').open`)
+		b.until("the reader applies the mark-on-open response", `document.querySelector('`+e(id)+`.read')`)
+		if !s.entry("alice", id).IsRead {
+			t.Error("the in-reader action did not mark the entry read")
+		}
+		if got := read[string](b, `document.querySelector('`+e(id)+` .entry-original-title')?.getAttribute('href')`); got != original {
+			t.Errorf("the title link disappeared during the in-place entry update: %q", got)
+		}
+		pointerSelector := e(pointerID) + " .entry-original-title"
+		pointerURL := read[string](b, `document.querySelector('`+pointerSelector+`').href`)
+		pointerTab := chromedp.WaitNewTarget(b.ctx, func(info *target.Info) bool {
+			return info.Type == "page" && info.URL == pointerURL
+		})
+		b.run(chromedp.Click(pointerSelector))
+		select {
+		case <-pointerTab:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("pointer activation did not open %s in a new tab", pointerURL)
+		}
+		if s.entry("alice", pointerID).IsRead || read[bool](b, `document.querySelector('`+e(pointerID)+` details').open`) {
+			t.Error("pointer activation opened the row or marked it read")
+		}
+		if got := read[bool](b, `document.documentElement.scrollWidth <= document.documentElement.clientWidth`); !got {
+			dimensions := read[[]int](b, `[document.documentElement.scrollWidth, document.documentElement.clientWidth]`)
+			t.Errorf("the original and in-reader actions overflow the viewport: widths %v", dimensions)
+		}
+	})
+}
+
+func TestE2ENoScriptOriginalTitle(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		s.setting("alice", "title_opens_website", true)
+		s.setting("alice", "display_posts", false)
+		s.setting("alice", "mark_when", map[string]any{"article": true})
+		ids := s.stored("alice", store.Listing{Set: mainStream(), Read: ptr(false)})
+		if len(ids) == 0 {
+			t.Fatal("there is no unread entry to open")
+		}
+		id := ids[0]
+		source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("original source")) }))
+		defer source.Close()
+		entry := s.entry("alice", id)
+		entry.Link = source.URL + "/original"
+		if err := s.db.UpdateEntry(context.Background(), entry); err != nil {
+			t.Fatal(err)
+		}
+		b := browse(t, s)
+		b.run(command(emulation.SetScriptExecutionDisabled, emulation.SetScriptExecutionDisabledParams{Value: true}))
+		b.login("alice")
+		b.open("/")
+		selector := e(id) + " .entry-original-title"
+		original := read[string](b, `document.querySelector('`+selector+`')?.href`)
+		if original == "" {
+			t.Fatal("the source title is missing without JavaScript")
+		}
+		newTab := chromedp.WaitNewTarget(b.ctx, func(info *target.Info) bool {
+			return info.Type == "page" && info.URL == original
+		})
+		b.run(chromedp.Evaluate[chromedp.Void](`document.querySelector('` + selector + `').focus()`))
+		b.press(kb.Enter)
+		select {
+		case <-newTab:
+		case <-time.After(10 * time.Second):
+			t.Fatalf("the source link did not open %s without JavaScript", original)
+		}
+		if s.entry("alice", id).IsRead || read[bool](b, `document.querySelector('`+e(id)+` details').open`) {
+			t.Error("opening the original site opened the row or marked the entry read without JavaScript")
+		}
+		b.run(chromedp.Evaluate[chromedp.Void](`document.querySelector('` + e(id) + ` details > summary').focus()`))
+		b.press(kb.Enter)
+		b.until("the in-reader summary works without JavaScript", `document.querySelector('`+e(id)+` details').open`)
+		if s.entry("alice", id).IsRead {
+			t.Error("an entry opened without JavaScript was unexpectedly marked read")
+		}
 	})
 }
 

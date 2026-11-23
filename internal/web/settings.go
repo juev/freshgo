@@ -211,6 +211,7 @@ func (h *Handler) showReading(w http.ResponseWriter, r *http.Request, status int
 	page.Options["sort_order"] = orderOptions(v, order)[1:]
 	when := readAttrs(s["mark_when"])
 	page.On["display_posts"] = prefs.DisplayPosts
+	page.On["title_opens_website"] = prefs.OpenOriginal
 	page.On["auto_load_more"] = prefs.AutoLoadMore == nil || *prefs.AutoLoadMore
 	page.On["hide_read_feeds"] = prefs.HideReadFeeds == nil || *prefs.HideReadFeeds
 	page.On["show_fav_unread"] = prefs.ShowFavUnread
@@ -265,6 +266,7 @@ func (h *Handler) saveReading(w http.ResponseWriter, r *http.Request) {
 			s.set("sort_order", order)
 		}
 		s.set("display_posts", on("display_posts"))
+		s.set("title_opens_website", on("title_opens_website"))
 		s.set("auto_load_more", on("auto_load_more"))
 		s.set("hide_read_feeds", on("hide_read_feeds"))
 		s.set("show_fav_unread", on("show_fav_unread"))

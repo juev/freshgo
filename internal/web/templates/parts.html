@@ -142,10 +142,11 @@
 {{define "article"}}
 <article class="entry{{if .Entry.Read}} read{{end}}" id="e{{.Entry.ID}}" aria-labelledby="t{{.Entry.ID}}" tabindex="-1">
 {{if .CanChange}}{{template "entry-star" (dict "Entry" .Entry "Here" .Here "Page" .Page)}}{{end}}
+{{if and .Entry.OpenOriginal .Entry.Link}}<h2 class="entry-title entry-original-heading" id="t{{.Entry.ID}}"><a class="entry-original-title" href="{{.Entry.Link}}" target="_blank" rel="noopener noreferrer">{{.Entry.Title}}</a></h2>{{end}}
 <details{{if .Expanded}} open{{end}}>
 <summary>
 {{if .Entry.ShowFeed}}<span class="entry-feed">{{.Entry.Feed}}</span>{{end}}
-<h2 class="entry-title" id="t{{.Entry.ID}}">{{.Entry.Title}}</h2>
+{{if and .Entry.OpenOriginal .Entry.Link}}<span class="entry-open-here">{{.Page.T "entry.open-here"}}</span>{{else}}<h2 class="entry-title" id="t{{.Entry.ID}}">{{.Entry.Title}}</h2>{{end}}
 {{if .Entry.Excerpt}}<span class="entry-excerpt">{{.Entry.Excerpt}}</span>{{end}}
 {{if .Entry.ShowDate}}<time datetime="{{.Entry.DateTime}}">{{.Entry.Date}}</time>{{end}}
 <span class="entry-state visually-hidden">{{if not .Entry.Read}}{{.Page.T "entry.unread"}}{{end}}{{if .Entry.Starred}} {{.Page.T "entry.starred"}}{{end}}</span>

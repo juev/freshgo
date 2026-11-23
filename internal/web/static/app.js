@@ -297,8 +297,9 @@
 			} else if (old) {
 				old.remove();
 			} else if (now && part === '.entry-excerpt') {
-				// The row has it after the title.
-				article.querySelector('.entry-title').after(now);
+				// The row has it after the title, or after the disclosure action
+				// when the title links to the original site.
+				(article.querySelector('.entry-open-here') || article.querySelector('.entry-title')).after(now);
 			} else if (now && part === '.entry-summary') {
 				// It stands between the line of the entry and its text.
 				article.querySelector('.entry-meta').after(now);
