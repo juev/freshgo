@@ -1836,3 +1836,36 @@ table.log td:last-child {
 		--row-pad: 0.65rem;
 	}
 }
+
+.filter-list {
+	list-style: none;
+	padding: 0;
+	max-width: 48rem;
+}
+
+.filter-list > li, .filter-part + .filter-part {
+	border-top: 1px solid var(--border);
+	padding-block: .75rem;
+}
+
+.filter-list > li > div {
+	display: flex;
+	flex-wrap: wrap;
+	gap: .5rem;
+	align-items: baseline;
+}
+
+.filter-scopes {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+	gap: .75rem;
+}
+
+.filter-scopes select {
+	width: 100%;
+}
+
+.filter-pattern {
+	font-family: ui-monospace, monospace;
+	overflow-wrap: anywhere;
+}

@@ -1,0 +1,107 @@
+{{define "content"}}
+<h1>{{.Heading}}</h1>
+{{template "problem" .Data.Problem}}
+{{if .Data.Detail}}<p class="filter-pattern">{{.Data.Detail}}</p>{{end}}
+{{$path := .URL "/settings/filtering"}}
+{{if .Data.ConfirmDelete}}
+<p>{{.T "filtering.confirm-delete" (or .Data.Filter.Title (.T "filtering.unnamed"))}}</p>
+<form method="post" action="{{$path}}" hx-boost="false" class="feed-actions">
+<input type="hidden" name="filter" value="{{.Data.Index}}">
+<input type="hidden" name="version" value="{{.Data.Version}}">
+<button type="submit" name="command" value="delete">{{.T "filtering.delete"}}</button>
+<a href="{{$path}}">{{.T "filtering.cancel"}}</a>
+</form>
+{{else if .Data.Index}}
+<form method="post" action="{{$path}}" hx-boost="false" class="form settings">
+<input type="hidden" name="filter" value="{{.Data.Index}}">
+<input type="hidden" name="version" value="{{.Data.Version}}">
+<input type="hidden" name="rules" value="{{len .Data.Rules}}">
+<input type="hidden" name="actions" value="{{len .Data.Actions}}">
+<button type="submit" name="command" value="save" hidden>{{.T "keys.save"}}</button>
+<fieldset>
+<legend>{{if eq .Data.Index "new"}}{{.T "filtering.new"}}{{else}}{{.T "filtering.edit"}}{{end}}</legend>
+<p><label for="filter-title">{{.T "form.name"}}</label>
+<input type="text" id="filter-title" name="title" value="{{.Data.Filter.Title}}"></p>
+{{template "check" (dict "Name" "enabled" "Label" (.T "filtering.enabled") "On" .Data.Filter.Enabled)}}
+<p><label for="filter-match">{{.T "filtering.match"}}</label>
+<select id="filter-match" name="match" aria-describedby="filter-match-hint">
+<option value="all"{{if not .Data.Filter.MatchAny}} selected{{end}}>{{.T "filtering.all"}}</option>
+<option value="any"{{if .Data.Filter.MatchAny}} selected{{end}}>{{.T "filtering.any"}}</option>
+</select>
+<span class="hint" id="filter-match-hint">{{.T "filtering.match-hint"}}</span></p>
+{{template "check" (dict "Name" "inverse" "Label" (.T "filtering.invert-filter") "On" .Data.Filter.Inverse)}}
+</fieldset>
+
+<fieldset>
+<legend>{{.T "filtering.rules"}}</legend>
+<p class="hint">{{.T "filtering.rules-hint"}}</p>
+{{range $i, $rule := .Data.Rules}}
+<div class="filter-part">
+{{if $rule.Rule.LegacyScope}}<input type="hidden" name="rule.{{$i}}.legacy_scope" value="1">
+<p class="hint">{{$.T "filtering.legacy-scope"}}</p>{{end}}
+<p><label for="rule-{{$i}}-field">{{$.T "filtering.field"}}</label>
+<select id="rule-{{$i}}-field" name="rule.{{$i}}.field">{{template "options" $rule.Fields}}</select></p>
+<p><label for="rule-{{$i}}-pattern">{{$.T "filtering.pattern"}}</label>
+<textarea rows="2" class="filter-pattern" id="rule-{{$i}}-pattern" name="rule.{{$i}}.pattern" spellcheck="false" dir="ltr" required>{{$rule.Rule.Pattern}}</textarea></p>
+{{template "check" (dict "Name" (printf "rule.%d.inverse" $i) "Label" ($.T "filtering.invert-rule") "On" $rule.Rule.Inverse)}}
+<div class="filter-scopes">
+<p><label for="rule-{{$i}}-feeds">{{$.T "filtering.feeds"}}</label>
+<select multiple size="4" id="rule-{{$i}}-feeds" name="rule.{{$i}}.feeds">{{template "options" $rule.Feeds}}</select></p>
+<p><label for="rule-{{$i}}-categories">{{$.T "filtering.categories"}}</label>
+<select multiple size="4" id="rule-{{$i}}-categories" name="rule.{{$i}}.categories">{{template "options" $rule.Categories}}</select></p>
+</div>
+<p><button type="submit" formnovalidate name="command" value="remove-rule:{{$i}}" class="link">{{$.T "filtering.remove-rule"}}</button></p>
+</div>
+{{end}}
+<p><button type="submit" formnovalidate name="command" value="add-rule">{{.T "filtering.add-rule"}}</button></p>
+</fieldset>
+
+<fieldset>
+<legend>{{.T "filtering.actions"}}</legend>
+<p class="hint">{{.T "filtering.label-hint"}} <a href="{{.URL "/subscriptions#labels"}}" target="_blank" rel="noopener" hx-boost="false">{{.T "filtering.create-label"}}</a></p>
+{{range $i, $action := .Data.Actions}}
+<div class="filter-part">
+<div class="filter-scopes">
+<p><label for="action-{{$i}}-type">{{$.T "filtering.action"}}</label>
+<select id="action-{{$i}}-type" name="action.{{$i}}.type">{{template "options" $action.Types}}</select></p>
+<p><label for="action-{{$i}}-label">{{$.T "filtering.action-label"}}</label>
+<select id="action-{{$i}}-label" name="action.{{$i}}.label">{{template "options" $action.Labels}}</select></p>
+</div>
+<p class="feed-actions">
+<button type="submit" formnovalidate name="command" value="action-up:{{$i}}" class="link"{{if eq $i 0}} disabled{{end}}>{{$.T "filtering.up"}}</button>
+<button type="submit" formnovalidate name="command" value="action-down:{{$i}}" class="link"{{if eq $i $.Data.LastAction}} disabled{{end}}>{{$.T "filtering.down"}}</button>
+<button type="submit" formnovalidate name="command" value="remove-action:{{$i}}" class="link">{{$.T "filtering.remove-action"}}</button>
+</p>
+</div>
+{{end}}
+<p><button type="submit" formnovalidate name="command" value="add-action">{{.T "filtering.add-action"}}</button></p>
+</fieldset>
+<p class="feed-actions">
+<button type="submit" name="command" value="save">{{.T "keys.save"}}</button>
+<a href="{{$path}}">{{.T "filtering.cancel"}}</a>
+</p>
+</form>
+{{else}}
+<p><a href="{{.URL "/settings/filtering?filter=new"}}">{{.T "filtering.new"}}</a></p>
+{{if .Data.Filters}}
+<ul class="filter-list">
+{{range $i, $filter := .Data.Filters}}
+<li>
+<div>
+<a href="{{$.URL (printf "/settings/filtering?filter=%d" $i)}}">{{or $filter.Title ($.T "filtering.unnamed")}}</a>
+<span class="muted">{{if and $filter.Enabled $filter.Rules $filter.Actions}}{{$.T "filtering.enabled"}}{{else}}{{$.T "filtering.inactive"}}{{end}}</span>
+</div>
+<form method="post" action="{{$path}}" hx-boost="false" class="feed-actions">
+<input type="hidden" name="filter" value="{{$i}}">
+<input type="hidden" name="version" value="{{$.Data.Version}}">
+<button type="submit" class="link" name="command" value="up"{{if eq $i 0}} disabled{{end}}>{{$.T "filtering.up"}}</button>
+<button type="submit" class="link" name="command" value="down"{{if eq $i $.Data.LastFilter}} disabled{{end}}>{{$.T "filtering.down"}}</button>
+<button type="submit" class="link" name="command" value="toggle">{{if $filter.Enabled}}{{$.T "filtering.disable"}}{{else}}{{$.T "filtering.enable"}}{{end}}</button>
+<a href="{{$.URL (printf "/settings/filtering?filter=%d&delete=1" $i)}}">{{$.T "filtering.delete"}}</a>
+</form>
+</li>
+{{end}}
+</ul>
+{{else}}<p class="muted">{{.T "filtering.empty"}}</p>{{end}}
+{{end}}
+{{end}}
