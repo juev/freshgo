@@ -30,6 +30,8 @@ Filter actions in the refresh (`internal/refresh`, see `refresh.md`):
 - Q14. An entry that is not stored yet is matched under the identifier it would get at the time of the refresh.
 - Q17. `suggest` is a fourth action, which FreshRSS does not have: a matching rule of the user or of the feed with it asks the language model for label suggestions for a new entry, after the entry is stored (`refresh.md`, F42). It changes nothing of the entry: it is not read, starred or labelled by it, and the actions of the same rule are done as they are. The forms offer it for the user and for a feed; the refresh looks at the rules of the user, of the category and of the feed, in the order of Q11.
 
+- Q18. **Settings → Filtering** stores ordered article filters. Each filter matches any or all of its rules using case-insensitive PCRE2 on article fields. Rules can be scoped to feeds or categories, and both rules and filters can be inverted. Filters use stable IDs for feeds, categories and labels. Actions skip the article, mark it read, star it, assign a label, or stop the remaining article filters. Refresh applies them as described in F26 of `refresh.md`.
+
 ## Decisions
 
 - **The parser is ported expression by expression**, not redesigned: what a filter of an existing installation means is defined by what FreshRSS made of it. The lookbehind assertions of the PCRE expressions are written out as an explicit character before the match.

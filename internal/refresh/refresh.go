@@ -25,6 +25,7 @@ import (
 	"github.com/juev/freshgo/internal/favicon"
 	"github.com/juev/freshgo/internal/feed"
 	"github.com/juev/freshgo/internal/fetch"
+	"github.com/juev/freshgo/internal/filters"
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
@@ -272,9 +273,11 @@ type job struct {
 	categories map[int64]*category
 	// search is what the queries of filters are read against; rules are the
 	// user's own filters, labels the rules of the labels that have any.
-	search search.Options
-	rules  []search.Rule
-	labels []labelRules
+	search         search.Options
+	rules          []search.Rule
+	labels         []labelRules
+	articleFilters []filters.Compiled
+	filterLabels   map[int64]struct{}
 	// pushing are the feeds whose WebSub hub can be relied on, by identifier.
 	pushing map[int64]bool
 }

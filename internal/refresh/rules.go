@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/juev/freshgo/internal/filters"
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/search"
 	"github.com/juev/freshgo/internal/store"
@@ -30,6 +31,13 @@ func (r *Refresher) rules(j *job, raw json.RawMessage, owner string, id int64) [
 func (r *Refresher) loadRules(ctx context.Context, j *job) error {
 	j.search = search.Options{Queries: j.conf.queries, Now: r.now().In(j.conf.location)}
 	j.rules = r.rules(j, j.conf.filters, "settings", j.user.ID)
+	saved, err := filters.Decode(readAttributes(j.user.Settings)[filters.SettingsKey])
+	if err == nil {
+		j.articleFilters, err = filters.Compile(saved)
+	}
+	if err != nil {
+		r.log.Warn("Article filters are invalid and were skipped", "user", j.user.Name, "error", err)
+	}
 	for id, c := range j.categories {
 		c.rules = r.rules(j, c.attrs["filters"], "category", id)
 	}
@@ -37,7 +45,9 @@ func (r *Refresher) loadRules(ctx context.Context, j *job) error {
 	if err != nil {
 		return err
 	}
+	j.filterLabels = make(map[int64]struct{}, len(tags))
 	for _, tag := range tags {
+		j.filterLabels[tag.ID] = struct{}{}
 		var labelling []search.Rule
 		for _, rule := range r.rules(j, readAttributes(tag.Attributes)["filters"], "label", tag.ID) {
 			if rule.Has(search.ActionLabel) {
@@ -108,4 +118,37 @@ func labelsFor(j *job, f *store.Feed, e *store.Entry, now int64) []int64 {
 		}
 	}
 	return tagIDs
+}
+
+type filterResult struct {
+	drop   bool
+	read   bool
+	star   bool
+	labels []int64
+}
+
+func filterActions(j *job, f *store.Feed, e *store.Entry) filterResult {
+	var result filterResult
+	if len(j.articleFilters) == 0 {
+		return result
+	}
+	article := filters.Article{
+		FeedID: f.ID, CategoryID: f.CategoryID, Title: e.Title, Content: e.Content, Link: e.Link,
+		Authors: e.Authors, Tags: e.Tags,
+	}
+	for _, action := range filters.Actions(j.articleFilters, article) {
+		switch action.Type {
+		case filters.ActionSkip:
+			result.drop = true
+		case filters.ActionRead:
+			result.read = true
+		case filters.ActionStar:
+			result.star = true
+		case filters.ActionLabel:
+			if _, ok := j.filterLabels[action.LabelID]; ok {
+				result.labels = append(result.labels, action.LabelID)
+			}
+		}
+	}
+	return result
 }

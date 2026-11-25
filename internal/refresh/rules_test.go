@@ -3,6 +3,8 @@ package refresh
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -126,6 +128,105 @@ func TestFilterByDate(t *testing.T) {
 		}
 		if got, want := w.starred(f), []string{"old"}; !reflect.DeepEqual(got, want) {
 			t.Errorf("starred: %v, want %v", got, want)
+		}
+	})
+}
+
+func TestArticleFiltersOnIngest(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		u := w.user("alice", `{"filters":[{"search":"intitle:native","actions":["star"]}]}`)
+		label := &store.Tag{UserID: u.ID, Name: "matched"}
+		if err := w.db.CreateTag(ctx, label); err != nil {
+			t.Fatal(err)
+		}
+		first := w.feed(u, "/first", nil)
+		second := w.feed(u, "/second", nil)
+		rules := fmt.Sprintf(`[
+			{"enabled":true,"rules":[],"actions":[{"type":"skip"}]},
+			{"enabled":true,"rules":[{"field":"title","pattern":"^Jet (?=promo)"}],"actions":[{"type":"skip"}]},
+			{"enabled":true,"rules":[{"field":"both","pattern":"keep me","inverse":true,"feed_ids":[%d]}],
+				"actions":[{"type":"read"},{"type":"label","label_id":%d},{"type":"stop"}]},
+			{"enabled":true,"rules":[{"field":"title","pattern":"^ordinary$"}],"actions":[{"type":"star"}]}
+		]`, first.ID, label.ID)
+		if err := w.db.UpdateUserSettings(ctx, u.ID, func(s map[string]json.RawMessage) error {
+			s["article_filters"] = json.RawMessage(rules)
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		ordinary := item{guid: "ordinary", title: "Ordinary", body: "article"}
+		keep := item{guid: "keep", title: "Native story", body: "Keep me"}
+		ad := item{guid: "ad", title: "JET Promo", body: "article"}
+		w.serveBody("/first", rssType, rss("First", ad, ordinary, keep))
+		w.serveBody("/second", rssType, rss("Second", ad, ordinary))
+		if st := w.runOne(); st.NewEntries != 3 || st.Failed != 0 {
+			t.Fatalf("stats %+v", st)
+		}
+		if got := w.unread(first); !reflect.DeepEqual(got, []string{"keep"}) {
+			t.Errorf("scoped unread entries: %v", got)
+		}
+		if got := w.labelled(first, label); !reflect.DeepEqual(got, []string{"ordinary"}) {
+			t.Errorf("scoped labels: %v", got)
+		}
+		if got := w.starred(first); !reflect.DeepEqual(got, []string{"keep"}) {
+			t.Errorf("native rules and stop action: %v", got)
+		}
+		if got := w.unread(second); !reflect.DeepEqual(got, []string{"ordinary"}) {
+			t.Errorf("unscoped unread entries: %v", got)
+		}
+		if got := w.starred(second); !reflect.DeepEqual(got, []string{"ordinary"}) {
+			t.Errorf("starred second-feed entries: %v", got)
+		}
+	})
+}
+
+func TestArticleFilterTargetsSurviveChanges(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		ctx := context.Background()
+		u := w.user("alice", `{}`)
+		category := &store.Category{UserID: u.ID, Name: "Before"}
+		label := &store.Tag{UserID: u.ID, Name: "Before label"}
+		if err := w.db.CreateCategory(ctx, category); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.db.CreateTag(ctx, label); err != nil {
+			t.Fatal(err)
+		}
+		feed := w.feed(u, "/old", func(f *store.Feed) { f.CategoryID = category.ID })
+		w.serve("/old", func(rw http.ResponseWriter, req *http.Request) {
+			http.Redirect(rw, req, "/new", http.StatusMovedPermanently)
+		})
+		if err := w.db.UpdateUserSettings(ctx, u.ID, func(s map[string]json.RawMessage) error {
+			s["article_filters"] = json.RawMessage(fmt.Sprintf(`[
+				{"enabled":true,"rules":[{"field":"title","pattern":"^New","feed_ids":[%d]}],"actions":[{"type":"read"}]},
+				{"enabled":true,"rules":[{"field":"title","pattern":"^New","category_ids":[%d]}],"actions":[{"type":"label","label_id":%d}]}
+			]`, feed.ID, category.ID, label.ID))
+			return nil
+		}); err != nil {
+			t.Fatal(err)
+		}
+		w.serveBody("/new", rssType, rss("Moved", item{guid: "first", title: "New first", body: "first"}))
+		if stats := w.runOne(); stats.NewEntries != 1 || w.storedFeed(feed).URL != w.server.URL+"/new" {
+			t.Fatalf("first refresh = %+v or feed did not follow redirect", stats)
+		}
+		category.Name = "After"
+		if err := w.db.UpdateCategory(ctx, category); err != nil {
+			t.Fatal(err)
+		}
+		if err := w.db.RenameTag(ctx, u.ID, label.ID, "After label"); err != nil {
+			t.Fatal(err)
+		}
+		w.later()
+		w.serveBody("/new", rssType, rss("Moved", item{guid: "second", title: "New second", body: "second"}))
+		if stats := w.runOne(); stats.NewEntries != 1 {
+			t.Fatalf("second refresh = %+v", stats)
+		}
+		if got := w.unread(feed); len(got) != 0 {
+			t.Errorf("filters left entries unread: %v", got)
+		}
+		if got := w.labelled(feed, label); len(got) != 2 {
+			t.Errorf("label was attached to %v", got)
 		}
 	})
 }
