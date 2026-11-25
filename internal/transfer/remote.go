@@ -31,6 +31,9 @@ type Remote struct {
 	Categories []string
 	Feeds      []RemoteFeed
 	Entries    []RemoteEntry
+	// FilterAccount identifies the source account for all filters in the batch.
+	FilterAccount string
+	Filters       []RemoteFilter
 	// Warnings are what the source holds and freshgo cannot carry over.
 	Warnings []string
 }
@@ -99,8 +102,10 @@ func ImportRemote(ctx context.Context, db *store.Store, registry *hooks.Registry
 			return err
 		}
 		byURL := make(map[string]*store.Feed, len(existing))
+		feedIDs := make(map[int64]bool, len(existing))
 		for _, f := range existing {
 			byURL[withoutCredentials(f.URL)] = f
+			feedIDs[f.ID] = true
 		}
 		count := len(existing)
 
@@ -153,6 +158,7 @@ func ImportRemote(ctx context.Context, db *store.Store, registry *hooks.Registry
 			}
 			byKey[rf.Key] = f
 			byURL[address] = f
+			feedIDs[f.ID] = true
 			count++
 			report.Feeds++
 		}
@@ -181,7 +187,10 @@ func ImportRemote(ctx context.Context, db *store.Store, registry *hooks.Registry
 			report.Incomplete = true
 			report.Warnings = append(report.Warnings, fmt.Sprintf("%d entries not imported: their feeds were not imported or they have no identifier", skipped))
 		}
-		return writeEntries(ctx, tx, registry, u, byKey, candidates, &report)
+		if err := writeEntries(ctx, tx, registry, u, byKey, candidates, &report); err != nil {
+			return err
+		}
+		return importFilters(ctx, tx, u.ID, remote.FilterAccount, remote.Filters, byURL, feedIDs, &report)
 	})
 	return report, err
 }

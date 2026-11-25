@@ -93,9 +93,11 @@ type Options struct {
 type Report struct {
 	// Feeds counts the feeds that were added, Entries and Updated the
 	// entries that were added and rewritten.
-	Feeds   int
-	Entries int
-	Updated int
+	Feeds          int
+	Entries        int
+	Updated        int
+	Filters        int
+	FiltersUpdated int
 	// Incomplete says that something of the file was left out: a feed past
 	// the limit, an entry without a usable feed, a part of an archive that
 	// could not be read.
@@ -109,6 +111,8 @@ func (r *Report) add(other Report) {
 	r.Feeds += other.Feeds
 	r.Entries += other.Entries
 	r.Updated += other.Updated
+	r.Filters += other.Filters
+	r.FiltersUpdated += other.FiltersUpdated
 	r.Incomplete = r.Incomplete || other.Incomplete
 	r.Warnings = append(r.Warnings, other.Warnings...)
 }
