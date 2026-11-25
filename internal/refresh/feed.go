@@ -192,14 +192,25 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 			if e, ok = r.hooks.EntryBeforeInsert.Call(ctx, e); !ok {
 				continue
 			}
+			actions := filterActions(j, f, e)
+			if actions.drop {
+				continue
+			}
 			r.autoRead(ctx, e, uponReception, known)
+			if actions.read && !e.IsRead {
+				e.IsRead = true
+				r.hooks.EntryAutoRead.Call(ctx, hooks.EntryAuto{Entry: e, Why: hooks.WhyFilter})
+			}
+			if actions.star {
+				e.IsFavorite = true
+			}
 			r.applyRules(ctx, j, f, feedRules, e, false, now)
 			known.add(e)
 			if e, ok = r.hooks.EntryBeforeAdd.Call(ctx, e); !ok {
 				continue
 			}
 			// Labels look at the entry as it is stored.
-			if tagIDs := labelsFor(j, f, e, now); len(tagIDs) > 0 {
+			if tagIDs := append(labelsFor(j, f, e, now), actions.labels...); len(tagIDs) > 0 {
 				labels[e] = tagIDs
 			}
 			added = append(added, e)
@@ -210,7 +221,7 @@ func (r *Refresher) storeFetched(ctx context.Context, j *job, f *store.Feed, par
 		case !bytes.Equal(st.Hash, e.Hash):
 			e.ID, e.IsRead, e.IsFavorite, e.LastUserModified = st.ID, st.IsRead, st.IsFavorite, st.LastUserModified
 			e.LastModified = now
-			if markUnread {
+			if markUnread && !filterActions(j, f, e).read {
 				e.IsRead = false
 				r.hooks.EntryAutoUnread.Call(ctx, hooks.EntryAuto{Entry: e, Why: hooks.WhyUpdatedArticle})
 			}
