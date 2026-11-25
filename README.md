@@ -205,7 +205,9 @@ or, as the user, use "Import from another server" on the page of import and expo
 
 What it carries over: categories, feeds with their name, site, category and address, a feed with updates disabled as a muted one; articles with title, author, link, text and date, their read and starred states, and their labels as labels. Categories inside other categories become top-level ones, and a warning names them. The command prints the numbers of feeds and entries added and updated, then the warnings on the error output.
 
-What it does not, and says so in warnings: the refresh period of a feed (freshgo asks a feed as often as it publishes), published articles, notes, and the tags of articles. The filters and the logins of feeds are not given by the API of Tiny Tiny RSS, so they cannot be carried over, and the report says so every time. Not looked at: feed icons (fetched at the first refresh), attachments, labels that are on no article. Articles over the limits of the installation (feeds, categories) are left out and named in the warnings.
+The import downloads filters automatically. If the download fails, export OPML with **Include tt-rss settings** enabled and attach it in the import form or pass `-source-opml <file>`. Edit imported filters under **Settings → Filtering**.
+
+What it does not, and says so in warnings: the refresh period of a feed (freshgo asks a feed as often as it publishes), published articles, notes, and the tags of articles. Feed logins and attachments are omitted. The first refresh fetches feed icons. Articles over the limits of the installation (feeds, categories) are left out and named in the warnings.
 
 Things to know:
 
@@ -318,7 +320,7 @@ The API gives groups (the categories), feeds, items (fifty at a time), unread an
 | `purge` | Deletes old articles by the retention settings without waiting for a refresh. |
 | `import -data <dir>` | Imports a FreshRSS installation into an empty database. |
 | `import -from miniflux -source-url <url> -source-token <token> -user <name>` | Imports one account of a Miniflux server into an existing user; see "Moving from Miniflux". |
-| `import -from ttrss -source-url <url> -source-user <login> -source-password <password> -user <name>` | Imports one account of a Tiny Tiny RSS server into an existing user; see "Moving from Tiny Tiny RSS". |
+| `import -from ttrss -source-url <url> -source-user <login> -source-password <password> -user <name> [-source-opml <file>]` | Imports a Tiny Tiny RSS account into an existing user. |
 | `backup -to <file>` | Copies the database while the server runs: SQLite by itself, PostgreSQL with `pg_dump`. |
 | `restore -check <file>` | Checks a SQLite copy before it is put in place, without touching the database of the server. |
 | `user create [-admin]\|passwd\|delete <name>`, `user list` | Manages users. Deleting a user deletes their feeds and articles; deleting the default user makes the oldest remaining user the default user and an administrator. |

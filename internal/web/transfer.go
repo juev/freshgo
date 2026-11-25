@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"strconv"
@@ -35,8 +36,10 @@ type transferPage struct {
 
 // serverImport is the outcome of an import from another server.
 type serverImport struct {
-	Summary  string
-	Warnings []string
+	Summary        string
+	Filters        string
+	FiltersUpdated string
+	Warnings       []string
 }
 
 // sources are the servers an account can be imported from: the values of
@@ -133,7 +136,22 @@ func (h *Handler) importServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx, s := r.Context(), state(r)
-	if !h.form(w, r) {
+	mediaType, _, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+	if mediaType == "multipart/form-data" {
+		r.Body = http.MaxBytesReader(w, r.Body, ttrss.MaxOPML+maxActionForm)
+		err := r.ParseMultipartForm(maxActionForm)
+		if r.MultipartForm != nil {
+			defer func() { _ = r.MultipartForm.RemoveAll() }()
+		}
+		switch {
+		case errors.As(err, new(*http.MaxBytesError)):
+			h.showTransfer(w, r, http.StatusRequestEntityTooLarge, "transfer.problem.large")
+			return
+		case err != nil || !isText(r.PostForm):
+			h.fail(w, r, http.StatusBadRequest)
+			return
+		}
+	} else if !h.form(w, r) {
 		return
 	}
 	address := strings.TrimSpace(r.PostForm.Get("address"))
@@ -151,13 +169,28 @@ func (h *Handler) importServer(w http.ResponseWriter, r *http.Request) {
 			h.showTransfer(w, r, http.StatusBadRequest, "transfer.problem.server-missing-login")
 			return
 		}
-		read = func() (*transfer.Remote, error) { return ttrss.Read(ctx, h.sources, address, login, password) }
+		var opml io.Reader
+		if r.MultipartForm != nil {
+			if files := r.MultipartForm.File["source_opml"]; len(files) > 0 && files[0].Filename != "" {
+				file, err := files[0].Open()
+				if err != nil {
+					h.broken(w, r, err)
+					return
+				}
+				defer func() { _ = file.Close() }()
+				opml = file
+			}
+		}
+		read = func() (*transfer.Remote, error) { return ttrss.Read(ctx, h.sources, address, login, password, opml) }
 	default:
 		h.showTransfer(w, r, http.StatusBadRequest, "transfer.problem.source")
 		return
 	}
 	remote, err := read()
 	switch {
+	case errors.Is(err, ttrss.ErrFilterExport):
+		h.showTransfer(w, r, http.StatusBadRequest, "transfer.problem.source-opml")
+		return
 	case errors.Is(err, miniflux.ErrAddress), errors.Is(err, ttrss.ErrAddress):
 		h.showTransfer(w, r, http.StatusBadRequest, "transfer.problem.server-address")
 		return
@@ -193,10 +226,17 @@ func (h *Handler) importServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	v := h.view(r, "subscriptions", "transfer.heading")
-	h.showImported(w, r, http.StatusOK, "", &serverImport{
+	imported := &serverImport{
 		Summary:  v.T("transfer.server-done", report.Feeds, report.Entries, report.Updated),
 		Warnings: report.Warnings,
-	})
+	}
+	if report.Filters > 0 {
+		imported.Filters = v.T("transfer.server-filters", report.Filters)
+	}
+	if report.FiltersUpdated > 0 {
+		imported.FiltersUpdated = v.T("transfer.server-filters-updated", report.FiltersUpdated)
+	}
+	h.showImported(w, r, http.StatusOK, "", imported)
 }
 
 // exported is a file of an export: its name and what writes it.

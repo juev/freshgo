@@ -203,7 +203,7 @@ func TestImportFromTTRSS(t *testing.T) {
 	imported(t, withTTRSS(t, tt), func(t *testing.T, s *site) {
 		s.asAlice()
 		page := s.shown("/subscriptions/transfer")
-		for _, want := range []string{`<option value="ttrss">Tiny Tiny RSS</option>`, `type="password" id="password"`, `name="login"`, `type="password" id="token"`} {
+		for _, want := range []string{`<option value="ttrss">Tiny Tiny RSS</option>`, `type="password" id="password"`, `name="login"`, `type="password" id="token"`, `name="source_opml"`} {
 			if !strings.Contains(page, want) {
 				t.Errorf("GET /subscriptions/transfer: no %q", want)
 			}
@@ -225,7 +225,7 @@ func TestImportFromTTRSS(t *testing.T) {
 		}
 		for _, want := range []string{
 			"Imported from the server: 4 feeds and 230 entries added, 0 entries updated.", "Not carried over:",
-			"<li>refresh period not carried over, set on 1 feeds: Sub</li>", "<li>the filters and the logins of feeds",
+			"<li>refresh period not carried over, set on 1 feeds: Sub</li>", "<li>feed logins are not carried over",
 		} {
 			if !strings.Contains(a.body, want) {
 				t.Errorf("import: no %q in\n%s", want, a.body)
@@ -257,6 +257,40 @@ func TestImportFromTTRSS(t *testing.T) {
 		}
 		if !found {
 			t.Error("Entry 5 is not read and starred after the second import")
+		}
+	})
+}
+
+func TestImportFromTTRSSWithFilters(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		tt := ttrsstest.New(t)
+		tt.SetExport(ttrsstest.FilterExport)
+		s.h.sources = withTTRSS(t, tt).Sources
+		s.asAlice()
+		path := "/subscriptions/import-server"
+		form := ttrssForm(tt, nil)
+
+		bad := s.upload(path, form, "source_opml", "feeds.opml", []byte("<opml><body></body></opml>"))
+		if bad.status != http.StatusBadRequest || !strings.Contains(bad.body, "OPML export with settings") || len(tt.Ops()) != 0 {
+			t.Fatalf("invalid OPML: status %d, source calls %v", bad.status, tt.Ops())
+		}
+		result := s.post(path, form)
+		if result.status != http.StatusOK || !strings.Contains(result.body, "Filters added: 2.") {
+			t.Fatalf("OPML import: status %d, body %s", result.status, result.body)
+		}
+		// A supplied export works even when the source rejects automatic download.
+		tt.SetExport("<html></html>")
+		supplied := strings.ReplaceAll(ttrsstest.FilterExport, "Read headlines", "Read from upload")
+		result = s.upload(path, form, "source_opml", "settings.opml", []byte(supplied))
+		if result.status != http.StatusOK || !strings.Contains(result.body, "Filters added: 1.") ||
+			strings.Contains(result.body, "could not download filters") {
+			t.Fatalf("manual OPML import: status %d, body %s", result.status, result.body)
+		}
+
+		page := s.shown("/settings/filtering")
+		first, second := strings.Index(page, "Read headlines"), strings.Index(page, "Label updates")
+		if first < 0 || second <= first {
+			t.Errorf("filter list does not show imported filters in order")
 		}
 	})
 }

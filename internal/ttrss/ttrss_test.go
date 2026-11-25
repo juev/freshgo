@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/juev/freshgo/internal/fetch"
+	"github.com/juev/freshgo/internal/filters"
 	"github.com/juev/freshgo/internal/hooks"
 	"github.com/juev/freshgo/internal/store"
 	"github.com/juev/freshgo/internal/storetest"
@@ -33,7 +35,7 @@ func client(t *testing.T, s *ttrsstest.Server) *fetch.Client {
 
 func read(t *testing.T, s *ttrsstest.Server) (*transfer.Remote, error) {
 	t.Helper()
-	return ttrss.Read(context.Background(), client(t, s), s.URL+"/", ttrsstest.User, ttrsstest.Password)
+	return ttrss.Read(context.Background(), client(t, s), s.URL+"/", ttrsstest.User, ttrsstest.Password, nil)
 }
 
 func hasWarning(remote *transfer.Remote, part string) bool {
@@ -85,14 +87,15 @@ func TestRead(t *testing.T) {
 		"published articles (shared in the public feed of Tiny Tiny RSS) not carried over, set on 1 articles",
 		"notes of articles not carried over, set on 1 articles",
 		"tags of articles (labels are carried over) not carried over, set on 1 articles",
-		"filters and the logins of feeds",
+		"feed logins are not carried over",
+		"could not download filters from Tiny Tiny RSS",
 	} {
 		if !hasWarning(remote, w) {
 			t.Errorf("no warning with %q in %q", w, remote.Warnings)
 		}
 	}
-	if len(remote.Warnings) != 6 {
-		t.Errorf("warnings = %q, want the six above", remote.Warnings)
+	if len(remote.Warnings) != 7 {
+		t.Errorf("warnings = %q, want the seven above", remote.Warnings)
 	}
 
 	byTitle := map[string]transfer.RemoteEntry{}
@@ -144,17 +147,17 @@ func TestReadCalls(t *testing.T) {
 func TestReadFailures(t *testing.T) {
 	s := ttrsstest.New(t)
 	ctx := context.Background()
-	if _, err := ttrss.Read(ctx, client(t, s), s.URL, ttrsstest.User, "wrong"); !errors.Is(err, ttrss.ErrLogin) {
+	if _, err := ttrss.Read(ctx, client(t, s), s.URL, ttrsstest.User, "wrong", nil); !errors.Is(err, ttrss.ErrLogin) {
 		t.Errorf("wrong password: %v, want ErrLogin", err)
 	}
-	if _, err := ttrss.Read(ctx, client(t, s), s.URL, "bob", ttrsstest.Password); !errors.Is(err, ttrss.ErrLogin) {
+	if _, err := ttrss.Read(ctx, client(t, s), s.URL, "bob", ttrsstest.Password, nil); !errors.Is(err, ttrss.ErrLogin) {
 		t.Errorf("wrong login: %v, want ErrLogin", err)
 	}
 	if s.Logouts() != 0 {
 		t.Errorf("%d logouts without a session", s.Logouts())
 	}
 	for _, address := range []string{"", "ftp://x.example", "not a url", "https://user:pw@x.example"} {
-		if _, err := ttrss.Read(ctx, client(t, s), address, ttrsstest.User, ttrsstest.Password); !errors.Is(err, ttrss.ErrAddress) {
+		if _, err := ttrss.Read(ctx, client(t, s), address, ttrsstest.User, ttrsstest.Password, nil); !errors.Is(err, ttrss.ErrAddress) {
 			t.Errorf("address %q: %v, want ErrAddress", address, err)
 		}
 	}
@@ -180,7 +183,7 @@ func TestReadFailures(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ttrss.Read(ctx, guarded, s.URL, ttrsstest.User, ttrsstest.Password); !errors.Is(err, fetch.ErrForbiddenAddress) {
+	if _, err := ttrss.Read(ctx, guarded, s.URL, ttrsstest.User, ttrsstest.Password, nil); !errors.Is(err, fetch.ErrForbiddenAddress) {
 		t.Errorf("server on a private address: %v, want ErrForbiddenAddress", err)
 	}
 }
@@ -228,6 +231,43 @@ func (w *world) entries() map[string]*store.Entry {
 		}
 	}
 	return byTitle
+}
+
+func TestImportedLegacyAndModernScopes(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		server := ttrsstest.New(t)
+		export := `<opml><body>
+   <outline text="Blog" xmlUrl="https://site1.example/feed.xml"/>
+   <outline text="Sub" xmlUrl="https://site2.example/feed.xml"/>
+   <outline text="tt-rss-filters">` +
+			scopedFilter("Legacy", `"feed":"Blog"`, `"feed":"Sub"`, "^Different") +
+			scopedFilter("Legacy with global rule", `"feed":""`, `"feed":"Sub"`, "^Different") +
+			scopedFilter("Modern", `"match":[["Blog",false,false]]`, `"match":[["Sub",false,false]]`, "^Different") +
+			`</outline></body></opml>`
+		saved, report := w.importFilterExport(server, export)
+		if report.Filters != 3 {
+			t.Fatalf("import = %+v", report)
+		}
+		article := filters.Article{FeedID: w.entries()["Entry 4"].FeedID, Title: "Entry one"}
+		for _, filter := range saved {
+			compiled, err := filters.Compile([]filters.Filter{filter})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got, want := len(filters.Actions(compiled, article)) > 0, filter.Title != "Modern"; got != want {
+				t.Errorf("filter %q matched = %t, want %t", filter.Title, got, want)
+			}
+		}
+	})
+}
+
+func scopedFilter(title, firstScope, secondScope, secondPattern string) string {
+	return fmt.Sprintf(`<outline filter-type="2"><![CDATA[
+ {"title":%q,"enabled":true,"match_any_rule":false,"rules":[
+ {"filter_type":1,"reg_exp":"^Entry",%s},
+ {"filter_type":1,"reg_exp":%q,%s}
+ ],"actions":[{"action_id":3}]}
+ ]]></outline>`, title, firstScope, secondPattern, secondScope)
 }
 
 // R4: an account is written into an existing user with its categories, the
@@ -377,10 +417,117 @@ func TestReadIsBounded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ttrss.Read(context.Background(), c, server.URL, "u", "p"); !errors.Is(err, transfer.ErrRemoteTooLarge) {
+	if _, err := ttrss.Read(context.Background(), c, server.URL, "u", "p", nil); !errors.Is(err, transfer.ErrRemoteTooLarge) {
 		t.Errorf("an account without end: %v, want ErrRemoteTooLarge", err)
 	}
 	if pages > 7 {
 		t.Errorf("%d pages read past the bound", pages)
 	}
+}
+
+func TestRepeatFilterImportOrder(t *testing.T) {
+	eachEngine(t, func(t *testing.T, w *world) {
+		s := ttrsstest.New(t)
+		const begin = `<opml><body><outline text="tt-rss-filters">`
+		const end = `</outline></body></opml>`
+		record := func(title string, order, action int) string {
+			return fmt.Sprintf(`<outline filter-type="2"><![CDATA[{"title":%q,"enabled":true,"order_id":%d,
+				"rules":[{"filter_type":1,"reg_exp":".+"}],"actions":[{"action_id":%d}]}]]></outline>`, title, order, action)
+		}
+		stop, star, read := record("Stop", 20, 8), record("Star", 10, 3), record("Read", 40, 2)
+
+		w.importFilterExport(s, begin+stop+end)
+		saved, report := w.importFilterExport(s, begin+stop+star+stop+end)
+		if report.Filters != 1 || report.Incomplete {
+			t.Fatalf("inserting a filter = %+v", report)
+		}
+		assertFilterOrder(t, saved, []string{"Star", "Stop"}, filters.ActionStar)
+
+		star = record("Star", 30, 3)
+		saved, report = w.importFilterExport(s, begin+stop+star+end)
+		if report.Filters != 0 || report.Incomplete {
+			t.Fatalf("reordering filters = %+v", report)
+		}
+		assertFilterOrder(t, saved, []string{"Stop", "Star"})
+
+		w.saveFilters([]filters.Filter{saved[1], saved[0]})
+		export := begin + stop + star + read + end
+		saved, report = w.importFilterExport(s, export)
+		if report.Filters != 1 || !hasOrderConflict(report) {
+			t.Fatalf("adding a filter during a local reorder = %+v", report)
+		}
+		assertFilterOrder(t, saved, []string{"Star", "Stop", "Read"}, filters.ActionStar)
+
+		// The new filter must also participate in local reorder detection.
+		w.saveFilters([]filters.Filter{saved[2], saved[1], saved[0]})
+		saved, report = w.importFilterExport(s, export)
+		if !hasOrderConflict(report) {
+			t.Errorf("re-import failed to flag the local reorder: %+v", report)
+		}
+		assertFilterOrder(t, saved, []string{"Read", "Stop", "Star"}, filters.ActionRead)
+	})
+}
+
+func assertFilterOrder(t *testing.T, saved []filters.Filter, want []string, wantActions ...string) {
+	t.Helper()
+	var titles []string
+	for _, filter := range saved {
+		titles = append(titles, filter.Title)
+	}
+	if !slices.Equal(titles, want) {
+		t.Fatalf("filter order = %v, want %v", titles, want)
+	}
+	compiled, err := filters.Compile(saved)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var actions []string
+	for _, action := range filters.Actions(compiled, filters.Article{Title: "Entry"}) {
+		actions = append(actions, action.Type)
+	}
+	if !slices.Equal(actions, wantActions) {
+		t.Errorf("actions = %v, want %v", actions, wantActions)
+	}
+}
+
+func hasOrderConflict(report transfer.Report) bool {
+	return report.Incomplete && slices.ContainsFunc(report.Warnings, func(warning string) bool {
+		return strings.Contains(warning, "reordered in FreshGo")
+	})
+}
+
+func (w *world) saveFilters(saved []filters.Filter) {
+	w.t.Helper()
+	if err := w.db.UpdateUserSettings(context.Background(), w.u.ID, func(settings map[string]json.RawMessage) error {
+		return filters.Save(settings, saved)
+	}); err != nil {
+		w.t.Fatal(err)
+	}
+}
+
+func (w *world) importFilterExport(server *ttrsstest.Server, opml string) ([]filters.Filter, transfer.Report) {
+	w.t.Helper()
+	server.SetExport(opml)
+	account, err := read(w.t, server)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	ctx := context.Background()
+	report, err := transfer.ImportRemote(ctx, w.db, &hooks.Registry{}, w.u, account, transfer.Options{Now: now})
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	user, err := w.db.UserByName(ctx, w.u.Name)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	var settings map[string]json.RawMessage
+	if err := json.Unmarshal(user.Settings, &settings); err != nil {
+		w.t.Fatal(err)
+	}
+	saved, err := filters.Decode(settings[filters.SettingsKey])
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	return saved, report
 }

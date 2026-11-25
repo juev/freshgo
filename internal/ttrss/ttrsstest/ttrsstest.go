@@ -41,6 +41,7 @@ type Server struct {
 	headlines []map[string]any
 	disabled  bool
 	failFrom  int
+	opml      string
 	requests  []Request
 	logouts   int
 }
@@ -105,11 +106,37 @@ func New(t *testing.T) *Server {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /api/", s.serve)
+	mux.HandleFunc("GET /backend.php", s.export)
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
 	s.URL = server.URL
 	s.Host = server.Listener.Addr().String()
 	return s
+}
+
+// SetExport sets the document returned by the authenticated OPML endpoint.
+func (s *Server) SetExport(opml string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.opml = opml
+}
+
+func (s *Server) export(w http.ResponseWriter, r *http.Request) {
+	cookie, err := r.Cookie("ttrss_sid")
+	query := r.URL.Query()
+	if err != nil || cookie.Value != session || query.Get("op") != "OPML" ||
+		query.Get("method") != "export" || query.Get("include_settings") != "1" {
+		http.Error(w, "export refused", http.StatusForbidden)
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.opml == "" {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", "application/xml")
+	_, _ = fmt.Fprint(w, s.opml)
 }
 
 // DisableAPI makes the server refuse the login with API_DISABLED, as it does

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -126,7 +127,7 @@ func TestImportTTRSS(t *testing.T) {
 	if code != 0 || stdout != "alice: 4 feeds, 230 entries added, 0 entries updated\n" {
 		t.Fatalf("import: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
-	for _, want := range []string{"warning: 1 categories were inside others", "warning: refresh period not carried over, set on 1 feeds: Sub\n", "warning: the filters and the logins of feeds"} {
+	for _, want := range []string{"warning: 1 categories were inside others", "warning: refresh period not carried over, set on 1 feeds: Sub\n", "warning: feed logins are not carried over"} {
 		if !strings.Contains(stderr, want) {
 			t.Errorf("no %q in the warnings:\n%s", want, stderr)
 		}
@@ -146,6 +147,21 @@ func TestImportTTRSS(t *testing.T) {
 	code, stdout, stderr = runCLI(t, args...)
 	if code != 0 || stdout != "alice: 0 feeds, 0 entries added, 230 entries updated\n" {
 		t.Errorf("second import: code %d, stdout %q, stderr %q", code, stdout, stderr)
+	}
+}
+
+func TestImportTTRSSWithOPML(t *testing.T) {
+	database, _ := userIn(t)
+	server := ttrsstest.New(t)
+	export := filepath.Join(t.TempDir(), "filters.opml")
+	if err := os.WriteFile(export, []byte(ttrsstest.FilterExport), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	code, stdout, stderr := runCLI(t, "import", "-database-url", database, "-from", "ttrss", "-source-url", server.URL,
+		"-source-user", ttrsstest.User, "-source-password", ttrsstest.Password, "-source-opml", export, "-user", "alice")
+	if code != 0 || !strings.Contains(stdout, "2 filters added") || !strings.Contains(stderr, `filter "Missing feed" skipped`) {
+		t.Fatalf("import: code %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 }
 
