@@ -70,7 +70,7 @@ var importFlags = []struct {
 }{
 	{fromFreshRSS, []string{"data", "source-database-url"}},
 	{fromMiniflux, []string{"source-url", "source-token", "user"}},
-	{fromTTRSS, []string{"source-url", "source-user", "source-password", "user"}},
+	{fromTTRSS, []string{"source-url", "source-user", "source-password", "source-opml", "user"}},
 }
 
 // checkImportFlags refuses a flag that goes with another source than the one
@@ -110,6 +110,7 @@ func runImport(ctx context.Context, e env, args []string) (err error) {
 	sourceUser := fs.String("source-user", "", "login of the Tiny Tiny RSS account, which needs the API enabled in its preferences (required for -from ttrss)")
 	sourcePassword := fs.String("source-password", "", "password of the Tiny Tiny RSS account; FRESHGO_SOURCE_PASSWORD is read when the flag is not given, "+
 		"which keeps the password out of the list of processes (required for -from ttrss)")
+	sourceOPML := fs.String("source-opml", "", "Tiny Tiny RSS OPML export with settings, to import filters (optional for -from ttrss)")
 	user := fs.String("user", "", "the existing user who gets the account (required for -from miniflux and ttrss)")
 	driver, dsn, err := parseDatabase(fs, conf, args, 0)
 	if err != nil {
@@ -172,7 +173,16 @@ func runImport(ctx context.Context, e env, args []string) (err error) {
 		})
 	case fromTTRSS:
 		return importRemote(ctx, e, conf, db, *user, func(ctx context.Context, f *fetch.Client) (*transfer.Remote, error) {
-			return ttrss.Read(ctx, f, *sourceURL, *sourceUser, *sourcePassword)
+			var opml io.Reader
+			if *sourceOPML != "" {
+				file, err := os.Open(*sourceOPML)
+				if err != nil {
+					return nil, err
+				}
+				defer func() { _ = file.Close() }()
+				opml = file
+			}
+			return ttrss.Read(ctx, f, *sourceURL, *sourceUser, *sourcePassword, opml)
 		})
 	}
 	report, err := importer.Run(ctx, db, opts)
@@ -216,6 +226,16 @@ func importRemote(ctx context.Context, e env, conf *config.Config, db *store.Sto
 	if _, err := fmt.Fprintf(e.stdout, "%s: %d feeds, %d entries added, %d entries updated\n",
 		u.Name, report.Feeds, report.Entries, report.Updated); err != nil {
 		return err
+	}
+	if report.Filters > 0 {
+		if _, err := fmt.Fprintf(e.stdout, "%d filters added\n", report.Filters); err != nil {
+			return err
+		}
+	}
+	if report.FiltersUpdated > 0 {
+		if _, err := fmt.Fprintf(e.stdout, "%d filters updated\n", report.FiltersUpdated); err != nil {
+			return err
+		}
 	}
 	return printWarnings(e, report.Warnings)
 }

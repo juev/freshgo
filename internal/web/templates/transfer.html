@@ -17,12 +17,14 @@
 <h2>{{$.T "transfer.server"}}</h2>
 {{with $.Data.Imported}}<div role="status" id="server-done">
 <p>{{.Summary}}</p>
+{{if .Filters}}<p>{{.Filters}}</p>{{end}}
+{{if .FiltersUpdated}}<p>{{.FiltersUpdated}}</p>{{end}}
 {{if .Warnings}}<p>{{$.T "transfer.server-warnings"}}</p>
 <ul>
 {{range .Warnings}}<li>{{.}}</li>
 {{end}}</ul>{{end}}
 </div>{{end}}
-<form method="post" action="{{$.URL "/subscriptions/import-server"}}" class="form">
+<form method="post" action="{{$.URL "/subscriptions/import-server"}}" enctype="multipart/form-data" class="form" hx-boost="false">
 <p>{{$.T "transfer.server.hint"}}</p>
 <p>
 <label for="source">{{$.T "transfer.source"}}</label>
@@ -48,6 +50,11 @@
 <label for="password">{{$.T "transfer.password"}}</label>
 <input type="password" id="password" name="password" autocomplete="off" aria-describedby="password-hint">
 <span class="hint" id="password-hint">{{$.T "transfer.password.hint"}}</span>
+</p>
+<p>
+<label for="source-opml">{{$.T "transfer.source-opml"}}</label>
+<input type="file" id="source-opml" name="source_opml" accept=".opml,.xml" aria-describedby="source-opml-hint">
+<span class="hint" id="source-opml-hint">{{$.T "transfer.source-opml.hint"}}</span>
 </p>
 <p><button type="submit">{{$.T "transfer.server.submit"}}</button></p>
 </form>

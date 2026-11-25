@@ -1,13 +1,16 @@
 // Package ttrss reads an account from a Tiny Tiny RSS server through its JSON
 // API (classes/API.php of tt-rss): the categories, the feeds, and the
-// articles with their read and starred states and their labels.
+// articles with their read and starred states and their labels. It can also
+// read filters from an OPML export with settings.
 package ttrss
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -42,10 +45,17 @@ const pageSize = 200
 // installation, not its API: https://example.org/tt-rss. Nothing is kept on
 // the way: the result is the whole account or an error. The session is closed
 // at the end whatever came of the read.
-func Read(ctx context.Context, f Fetcher, address, user, password string) (*transfer.Remote, error) {
+func Read(ctx context.Context, f Fetcher, address, user, password string, opml io.Reader) (*transfer.Remote, error) {
 	base, err := baseURL(address)
 	if err != nil {
 		return nil, err
+	}
+	remote := &transfer.Remote{}
+	if opml != nil {
+		remote.Filters, remote.Warnings, err = readFilterExport(opml)
+		if err != nil {
+			return nil, err
+		}
 	}
 	c := &client{fetcher: f, endpoint: base + "/api/"}
 
@@ -72,7 +82,6 @@ func Read(ctx context.Context, f Fetcher, address, user, password string) (*tran
 	if err != nil {
 		return nil, err
 	}
-	remote := &transfer.Remote{}
 	titles := map[int64]string{}
 	var nested []string
 	for _, cat := range all {
@@ -169,7 +178,20 @@ func Read(ctx context.Context, f Fetcher, address, user, password string) (*tran
 			remote.Warnings = append(remote.Warnings, fmt.Sprintf("%s not carried over, set on %d articles", w.what, w.count))
 		}
 	}
-	remote.Warnings = append(remote.Warnings, "the filters and the logins of feeds in Tiny Tiny RSS are not given by its API, so none of them are carried over")
+	if opml == nil {
+		imported, warnings, err := c.exportFilters(ctx, base)
+		switch {
+		case ctx.Err() != nil:
+			return nil, ctx.Err()
+		case err != nil:
+			remote.Warnings = append(remote.Warnings, "could not download filters from Tiny Tiny RSS. Attach an OPML export with settings to import them")
+		default:
+			remote.Filters = imported
+			remote.Warnings = append(remote.Warnings, warnings...)
+		}
+	}
+	remote.FilterAccount = fmt.Sprintf("%x", sha256.Sum256([]byte(base+"\x00"+user)))
+	remote.Warnings = append(remote.Warnings, "feed logins are not carried over from Tiny Tiny RSS")
 	return remote, nil
 }
 
