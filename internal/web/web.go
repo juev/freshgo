@@ -283,6 +283,8 @@ func New(o Options) (*Handler, error) {
 	h.mux.HandleFunc("POST /settings/display", h.protect(members, h.saveDisplay))
 	h.mux.HandleFunc("GET /settings/reading", h.protect(members, h.readingPage))
 	h.mux.HandleFunc("POST /settings/reading", h.protect(members, h.saveReading))
+	h.mux.HandleFunc("GET /settings/filtering", h.protect(members, h.filteringPage))
+	h.mux.HandleFunc("POST /settings/filtering", h.protect(members, h.saveFiltering))
 	h.mux.HandleFunc("GET /settings/archiving", h.protect(members, h.archivingPage))
 	h.mux.HandleFunc("POST /settings/archiving", h.protect(members, h.saveArchiving))
 	h.mux.HandleFunc("POST /settings/archiving/purge", h.protect(members, h.purgeNow))

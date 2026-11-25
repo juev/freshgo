@@ -19,7 +19,7 @@
 <button type="submit">{{.T "sub.add-category"}}</button>
 </form>
 
-<h2>{{.T "tree.labels"}}</h2>
+<h2 id="labels">{{.T "tree.labels"}}</h2>
 {{if .Data.Labels}}
 <ul class="feed-list">
 {{range .Data.Labels}}<li><a href="{{.URL}}">{{.Name}}</a></li>
