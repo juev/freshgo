@@ -431,6 +431,107 @@ func TestSharedQuery(t *testing.T) {
 	})
 }
 
+func TestSharedBitTorrentEnclosures(t *testing.T) {
+	imported(t, Options{}, func(t *testing.T, s *site) {
+		s.asAlice()
+		id := s.stored("alice", store.Listing{Set: store.EntrySet{CategoryID: 2, MinPriority: ptr(0)}})[0]
+		entry := s.entry("alice", id)
+		entry.Attributes = json.RawMessage(`{
+			"thumbnail":{"url":"https://example.org/cover.jpg","type":"image/jpeg"},
+			"enclosures":[
+				{"url":"https://example.org/file.bin","type":"Application/X-BitTorrent","length":12216},
+				{"url":"magnet:?xt=urn:btih:0123456789abcdef&dn=Example"},
+				{"url":"https://example.org/file.torrent?x=1&y=2","type":"application/octet-stream"},
+				{"url":"https://example.org/pic.png","type":"image/png","medium":"image"},
+				{"url":"https://example.org/episode.mp3","type":"audio/mpeg","medium":"audio"},
+				{"url":"https://example.org/movie.mp4","type":"video/mp4","medium":"video"}
+			]}`)
+		if err := s.db.UpdateEntry(t.Context(), entry); err != nil {
+			t.Fatal(err)
+		}
+		s.follow("/queries", url.Values{"name": {"Torrents"}, "stream": {"/categories/2"}, "state": {"all"}})
+		form := s.formAt("/settings/queries/0", "/settings/queries/0")
+		form.Set("share_rss", "1")
+		s.follow("/settings/queries/0", form)
+		token, _ := s.queries("alice")[0]["token"].(string)
+		base := "/shared/" + token
+		s.cookies = nil
+
+		want := []rssEnclosure{
+			{URL: "https://example.org/file.bin", Type: "application/x-bittorrent", Length: "12216"},
+			{URL: "magnet:?xt=urn:btih:0123456789abcdef&dn=Example", Type: "application/x-bittorrent"},
+			{URL: "https://example.org/file.torrent?x=1&y=2", Type: "application/x-bittorrent"},
+		}
+		mediaURLs := []string{
+			"https://example.org/cover.jpg",
+			"https://example.org/file.bin",
+			"magnet:?xt=urn:btih:0123456789abcdef&dn=Example",
+			"https://example.org/file.torrent?x=1&y=2",
+			"https://example.org/pic.png",
+			"https://example.org/episode.mp3",
+			"https://example.org/movie.mp4",
+		}
+		for _, target := range []string{base + ".rss", "/api/query.php?user=alice&t=" + token + "&f=rss"} {
+			a := s.get(target)
+			var document rssChannel
+			if a.status != http.StatusOK || xml.Unmarshal([]byte(a.body), &document) != nil {
+				t.Fatalf("GET %s: status %d, invalid RSS:\n%s", target, a.status, a.body)
+			}
+			var item *rssItem
+			for i := range document.Items {
+				if document.Items[i].GUID == strconv.FormatInt(id, 10) {
+					item = &document.Items[i]
+					break
+				}
+			}
+			if item == nil {
+				t.Fatalf("GET %s: entry %d is missing", target, id)
+			}
+			if !reflect.DeepEqual(item.Enclosures, want) {
+				t.Errorf("GET %s: enclosures = %+v, want %+v", target, item.Enclosures, want)
+			}
+			if len(item.Thumbnail) != 1 || item.Thumbnail[0].URL != mediaURLs[0] {
+				t.Errorf("GET %s: thumbnails = %+v", target, item.Thumbnail)
+			}
+			var gotMedia []string
+			for _, content := range item.Content {
+				gotMedia = append(gotMedia, content.URL)
+			}
+			if !reflect.DeepEqual(gotMedia, mediaURLs) {
+				t.Errorf("GET %s: Media RSS URLs = %v, want %v", target, gotMedia, mediaURLs)
+			}
+		}
+
+		a := s.get(base + ".atom")
+		var document struct {
+			Entries []struct {
+				ID    string `xml:"id"`
+				Links []struct {
+					Rel  string `xml:"rel,attr"`
+					Href string `xml:"href,attr"`
+				} `xml:"link"`
+			} `xml:"entry"`
+		}
+		if err := xml.Unmarshal([]byte(a.body), &document); err != nil {
+			t.Fatalf("GET %s.atom: %v", base, err)
+		}
+		var gotAtom []string
+		for _, entry := range document.Entries {
+			if !strings.HasSuffix(entry.ID, "#"+strconv.FormatInt(id, 10)) {
+				continue
+			}
+			for _, link := range entry.Links {
+				if link.Rel == "enclosure" {
+					gotAtom = append(gotAtom, link.Href)
+				}
+			}
+		}
+		if !reflect.DeepEqual(gotAtom, mediaURLs) {
+			t.Errorf("GET %s.atom: enclosure URLs = %v, want %v", base, gotAtom, mediaURLs)
+		}
+	})
+}
+
 // A reader that asks for a shared document again with what it was told of
 // the version it has gets 304 and no document, as long as only the time the
 // document is made at has moved. A changed document is sent whole.
@@ -578,15 +679,22 @@ func TestTokenFeeds(t *testing.T) {
 	})
 }
 
+type rssEnclosure struct {
+	URL    string `xml:"url,attr"`
+	Type   string `xml:"type,attr"`
+	Length string `xml:"length,attr"`
+}
+
 // rssItem is an entry of an RSS document, in what a reader of the feed gets.
 type rssItem struct {
-	Title       string   `xml:"title"`
-	Link        string   `xml:"link"`
-	Creators    []string `xml:"creator"`
-	Categories  []string `xml:"category"`
-	Description string   `xml:"description"`
-	PubDate     string   `xml:"pubDate"`
-	GUID        string   `xml:"guid"`
+	Title       string         `xml:"title"`
+	Link        string         `xml:"link"`
+	Creators    []string       `xml:"creator"`
+	Categories  []string       `xml:"category"`
+	Description string         `xml:"description"`
+	PubDate     string         `xml:"pubDate"`
+	GUID        string         `xml:"guid"`
+	Enclosures  []rssEnclosure `xml:"enclosure"`
 	Thumbnail   []struct {
 		URL string `xml:"url,attr"`
 	} `xml:"thumbnail"`
