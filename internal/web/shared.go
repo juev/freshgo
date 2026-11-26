@@ -31,6 +31,7 @@ var sharedFormats = []struct {
 }{{"rss", false}, {"atom", false}, {"html", false}, {"opml", true}, {"json", true}}
 
 var alnum = regexp.MustCompile(`^[A-Za-z0-9]+$`)
+var torrentURL = regexp.MustCompile(`(?i)^magnet:|\.torrent(\?|#|$)`)
 
 // shared is a stream handed out to whoever has its address.
 type shared struct {
@@ -537,6 +538,18 @@ func rssDocument(sh *shared, description string, shown []article, entries []*sto
 				b.WriteString(`</media:title>`)
 			}
 			b.WriteString("</media:content>\n")
+			// BitTorrent clients look for RSS enclosures rather than Media RSS.
+			if !strings.EqualFold(enc.Type, "application/x-bittorrent") && !torrentURL.MatchString(enc.URL) {
+				continue
+			}
+			b.WriteString(`<enclosure url="`)
+			escaped(&b, enc.URL)
+			b.WriteString(`" type="application/x-bittorrent`)
+			if length := fmt.Sprint(enc.Length); enc.Length != nil && length != "" && length != "0" {
+				b.WriteString(`" length="`)
+				escaped(&b, length)
+			}
+			b.WriteString(`"/>` + "\n")
 		}
 		// The text as it is stored, as in the JSON: whoever reads a feed
 		// cleans it for themselves.
